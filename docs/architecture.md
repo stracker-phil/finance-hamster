@@ -78,7 +78,30 @@ Everything lives in the config dir (ADR 0012), 0700 with files 0600:
 
 ## Repository map
 
-Filled in by feature folder, one line each, as the code is added (step 1 onward).
+Rust (`src-tauri/src/`):
+
+| Path | Holds |
+|---|---|
+| `lib.rs` | identity consts (`IDENTIFIER`, `APP_NAME`, `LINK_SCHEME`), `config_dir`, `run` (CLI or app), the config-contract tests |
+| `app.rs` | the Tauri builder: plugins, window events, setup, run loop, logging |
+| `cli/` | the `hamster` command line (`parse`) and how replies print (`reply`) |
+| `instance.rs`, `ipc/` | single instance: lock file, Unix socket, one JSON line per request |
+| `remote/` | handles each `IpcMessage` from another process |
+| `launch.rs` | launch events queued for the page (`take_launch_events`) |
+| `window/` | showing and hiding windows; `navigation.rs` keeps webviews on app pages |
+| `error.rs`, `events.rs`, `lock.rs`, `state.rs`, `handlers.rs` | `AppError`, event names, poison-tolerant locks, managed state, the command list |
+| `store/` | `json_file.rs`: private dir creation, atomic JSON files |
+| `dev/` | debug-only hooks: window frame, background launches, `eval` |
+| `test_support/` | fixtures for tests and, later, the demo seed |
+| `../tests/no_network.rs` | no network crate in `Cargo.toml` or the resolved dependency tree (ADR 0016) |
+
+Frontend (`src/`):
+
+| Path | Holds |
+|---|---|
+| `api/` | the `api` object (only place that imports `@tauri-apps/*`), `toAppError`, generated `types.gen.ts` |
+| `state/` | the zustand store (`window.hamster` in debug builds), `useAppEvents`, `useAppInfo` |
+| `test/` | `createApiMock`, the module boundary test |
 
 ## Webview hardening
 

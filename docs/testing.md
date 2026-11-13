@@ -39,7 +39,7 @@ step.
 - **Parsers** are tested against synthetic statements in the bank's layout (`test_support/fixtures/`):
   balance check, a tampered copy, card and FX lines, a gap in the chain. Real sample statements never enter
   the repo; `HAMSTER_REAL_FIXTURES=<dir>` runs an ignored test against local copies.
-- **No network:** a unit test scans `Cargo.toml` and `cargo tree` for HTTP crates (ADR 0016).
+- **No network:** `src-tauri/tests/no_network.rs` scans `Cargo.toml` and `cargo tree` for HTTP crates (ADR 0016); it runs with the unit tests.
 
 ## Frontend
 
