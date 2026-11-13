@@ -9,9 +9,10 @@ every trade-off, earlier wins: privacy, persistence (nothing disappears by accid
 frozen history (finished documents and closed years are locked), simplicity (the monthly ritual takes under
 ten minutes).
 
-The spec (`docs/plan/spec.md`), the mockups (`docs/plan/mockups/`, from the canvas "Finance Helper –
-Simplified Concept"; `Main.dc.html` holds every screen) and the step plan (`docs/plan/steps.md`) live in
-`docs/plan/` (gitignored). Build only what the current step asks for.
+The plan (`docs/plan/plan.md`: behavior, decisions and the numbered steps), the approved mockups
+(`docs/plan/mockups/`, canvas "Hamster – Simplified Concept"; `Main.dc.html` holds every screen) and the rules
+reference files (`docs/plan/config/`) live in `docs/plan/` (gitignored). Where plan and mockups disagree, the
+mockups win. Build only what the current step asks for.
 
 Hamster is part of the owner's family of macOS apps and inherits its architecture, process and look from the
 family catalog (the user-level `app-blueprint` skill). The sibling apps (leave out this app's own entry):
@@ -39,7 +40,7 @@ Read them; never write to them. Hamster differs only where its job differs; each
 - Demo data only: code, docs, tests, commits and screenshots never contain the owner's real data
   (`.claude/rules/demo-data.md`). The debug build runs on its own data folder with the demo seed.
 - UI changes follow `docs/ux.md` and `.claude/rules/stable-controls.md`.
-- The implementation plan lives in `docs/plan/` (gitignored). Work one step per session; set its status from
+- The implementation plan is `docs/plan/plan.md` (gitignored), section 11. Work one step per session; set its status from
   PENDING to DONE when it is committed.
 - Changes to the family catalog go through the owner (`app-blueprint`, mode `record`); never edit it from here.
 

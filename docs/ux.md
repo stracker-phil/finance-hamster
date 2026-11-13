@@ -2,7 +2,7 @@
 
 The family's shared design language (from the `app-blueprint` catalog; full token sets and CSS rules live in
 Taskboard's `docs/ux.md` and `src/styles/`) plus Hamster's own window. The main window follows the approved
-mockup "Finance Helper – Simplified Concept" (`docs/plan/mockups/`, ADR 0024); Settings and behavior follow
+mockup "Hamster – Simplified Concept" (`docs/plan/mockups/`, ADR 0024); Settings and behavior follow
 the family language.
 
 ## Hamster's window
