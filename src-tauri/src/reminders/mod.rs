@@ -506,9 +506,8 @@ mod tests {
         assert_eq!(
             dues,
             vec![Due {
-                key:
-                    "gap:account-1:August is missing: statement Nr. 009/2026 was never imported."
-                        .into(),
+                key: "gap:account-1:August is missing: statement Nr. 009/2026 was never imported."
+                    .into(),
                 notification: notification(
                     "A Private statement is missing",
                     "August is missing: statement Nr. 009/2026 was never imported."

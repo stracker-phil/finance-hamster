@@ -147,7 +147,7 @@ describe("App", () => {
     });
 
     it("opens the command palette for palette.open", async () => {
-      mocked.listCommands.mockResolvedValue([{ id: "go.today", title: "Go to Today", shortcut: "⌘1" }]);
+      mocked.listCommands.mockResolvedValue([{ id: "go.today", title: "Go to Today", shortcut: "⌘1", custom: false }]);
       renderApp();
 
       await emit("run_command", "palette.open");

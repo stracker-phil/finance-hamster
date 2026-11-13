@@ -327,7 +327,7 @@ describe("command palette", () => {
   });
 
   it("shows over the window once opened", async () => {
-    mocked.listCommands.mockResolvedValue([{ id: "go.today", title: "Go to Today", shortcut: null }]);
+    mocked.listCommands.mockResolvedValue([{ id: "go.today", title: "Go to Today", shortcut: null, custom: false }]);
     useStore.setState({ paletteOpen: true });
 
     render(<Window />);

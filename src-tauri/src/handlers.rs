@@ -5,11 +5,14 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static
         crate::launch::take_launch_events,
         log_frontend_error,
         crate::commands::handlers::list_commands,
+        crate::commands::handlers::keybinding_set,
+        crate::commands::handlers::keybinding_reset,
         crate::commands::handlers::run_command,
         crate::settings::commands::get_settings,
         crate::settings::commands::update_settings,
         show_data_folder,
         data_folder,
+        backup_included,
         crate::db::commands::undo,
         crate::db::commands::redo,
         crate::accounts::commands::list_accounts,
@@ -36,6 +39,7 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static
         crate::statements::commands::account_lines,
         crate::rules::commands::rules_view,
         crate::rules::commands::rule_save,
+        crate::rules::commands::rule_preview,
         crate::rules::commands::rule_delete,
         crate::rules::commands::rules_rerun,
         crate::review::commands::review_queue,
@@ -103,6 +107,24 @@ fn show_data_folder() -> crate::error::AppResult<()> {
     tauri_plugin_opener::reveal_item_in_dir(crate::config_dir()).map_err(|e| {
         crate::error::AppError::Internal(format!("Couldn't show the data folder: {e}"))
     })
+}
+
+/// Whether Time Machine backs up the data folder; None when `tmutil` can't say (no backup set up).
+#[tauri::command]
+fn backup_included() -> Option<bool> {
+    let output = std::process::Command::new("/usr/bin/tmutil")
+        .arg("isexcluded")
+        .arg(crate::config_dir())
+        .output()
+        .ok()?;
+    let text = String::from_utf8_lossy(&output.stdout);
+    if text.contains("[Included]") {
+        Some(true)
+    } else if text.contains("[Excluded]") {
+        Some(false)
+    } else {
+        None
+    }
 }
 
 /// Writes a page error (a crash, an e2e result) to the app's log, where scripts and bug reports find it.

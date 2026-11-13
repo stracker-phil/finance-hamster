@@ -8,6 +8,7 @@ import { api } from "../../api";
 import { account } from "../../test/accounts";
 import { renderWithQuery } from "../../test/renderWithQuery";
 import { settings } from "../../test/settings";
+import { accountCoverage, coverage } from "../../test/statements";
 import { AccountsPage } from "./AccountsPage";
 
 const mocked = vi.mocked(api, true);
@@ -15,6 +16,7 @@ const mocked = vi.mocked(api, true);
 beforeEach(() => {
   vi.clearAllMocks();
   mocked.listAccounts.mockResolvedValue([account()]);
+  mocked.statementsCoverage.mockResolvedValue({ months: [], accounts: [] });
   mocked.getSettings.mockResolvedValue(settings({ hideOwnTransfers: true }));
   mocked.updateSettings.mockResolvedValue(settings());
 });
@@ -26,16 +28,31 @@ describe("AccountsPage", () => {
       renderWithQuery(<AccountsPage />);
 
       expect(await screen.findByText("Private")).toBeTruthy();
-      expect(screen.getByText("Example Bank · AT•• •••• 0001")).toBeTruthy();
+      expect(screen.getByText(/^Example Bank · AT•• •••• 0001/)).toBeTruthy();
       expect(screen.getByText("Savings")).toBeTruthy();
-      expect(screen.getByText("Sample Bank · AT•• •••• 0002")).toBeTruthy();
+      expect(screen.getByText(/^Sample Bank · AT•• •••• 0002/)).toBeTruthy();
     });
 
     it("leaves out the bank separator when the bank is empty", async () => {
       mocked.listAccounts.mockResolvedValue([account({ bank: "" })]);
       renderWithQuery(<AccountsPage />);
 
-      expect(await screen.findByText("AT•• •••• 0001")).toBeTruthy();
+      expect(await screen.findByText(/^AT•• •••• 0001 · /)).toBeTruthy();
+    });
+
+    it("adds the last statement of each account", async () => {
+      mocked.listAccounts.mockResolvedValue([account(), account({ id: "acc-2", name: "Savings", bank: "Sample Bank", ibanMasked: "AT•• •••• 0002" })]);
+      mocked.statementsCoverage.mockResolvedValue(coverage({ accounts: [accountCoverage({ id: "acc-1", last: "Nr. 010 · until 10 Nov" })] }));
+      renderWithQuery(<AccountsPage />);
+
+      expect(await screen.findByText("Example Bank · AT•• •••• 0001 · Nr. 010 · until 10 Nov")).toBeTruthy();
+      expect(screen.getByText("Sample Bank · AT•• •••• 0002 · no statement yet")).toBeTruthy();
+    });
+
+    it("says no statement yet for an account while the coverage is unknown", async () => {
+      renderWithQuery(<AccountsPage />);
+
+      expect(await screen.findByText("Example Bank · AT•• •••• 0001 · no statement yet")).toBeTruthy();
     });
 
     it("says there are no accounts yet when the list is empty", async () => {

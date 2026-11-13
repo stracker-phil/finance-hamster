@@ -1,6 +1,7 @@
 use tauri::{AppHandle, State};
 
 use super::RuleForm;
+use super::preview::RulePreview;
 use super::view::{self, RulesView};
 use crate::date::DateOrder;
 use crate::db::Source;
@@ -54,4 +55,15 @@ pub fn rules_rerun(app: AppHandle, state: State<'_, AppState>) -> AppResult<Stri
             )
         }
     })
+}
+
+/// What the sheet's rule would match, while it is being edited.
+#[tauri::command]
+pub fn rule_preview(state: State<'_, AppState>, form: RuleForm) -> AppResult<RulePreview> {
+    super::preview::preview(
+        &state.db,
+        &form,
+        state.settings.get().number_format,
+        DateOrder::system(),
+    )
 }

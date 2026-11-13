@@ -10,6 +10,7 @@ use crate::events::RUN_COMMAND_EVENT;
 use crate::window;
 
 pub mod handlers;
+pub mod keys;
 
 /// Who carries a command out.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -75,6 +76,8 @@ pub struct CommandInfo {
     pub title: String,
     /// The shortcut as macOS draws it (`⇧⌘K`).
     pub shortcut: Option<String>,
+    /// The owner changed this command's shortcut.
+    pub custom: bool,
 }
 
 /// `CmdOrCtrl+Shift+K` → `⇧⌘K`: modifiers in macOS's order (⌃⌥⇧⌘), then the key.
@@ -97,13 +100,16 @@ pub fn shortcut_label(accelerator: &str) -> String {
     label
 }
 
+/// Every command with its shortcut, the owner's own ones applied.
 pub fn list() -> Vec<CommandInfo> {
+    let overrides = keys::load(&crate::config_dir());
     COMMANDS
         .iter()
         .map(|command| CommandInfo {
             id: command.id.to_string(),
             title: command.title.to_string(),
-            shortcut: command.accelerator.map(shortcut_label),
+            shortcut: keys::effective(command, &overrides).map(|a| shortcut_label(&a)),
+            custom: overrides.contains_key(command.id),
         })
         .collect()
 }
@@ -226,10 +232,11 @@ mod tests {
             id: "x".into(),
             title: "X".into(),
             shortcut: None,
+            custom: false,
         };
         assert_eq!(
             serde_json::to_value(&info).unwrap(),
-            serde_json::json!({ "id": "x", "title": "X", "shortcut": null })
+            serde_json::json!({ "id": "x", "title": "X", "shortcut": null, "custom": false })
         );
     }
 }

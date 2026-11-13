@@ -15,6 +15,7 @@ import { subscriptionDetail, subscriptionForm, subscriptionsView } from "../test
 import { step, todayView } from "../test/today";
 import { elsewhere, yearPage } from "../test/year";
 import { useAccounts } from "./accounts";
+import { useCommands } from "./commands";
 import { useArchive, useDeletions, useDocument, useDocumentHistory, useDocumentLineOptions, useDocuments, useVendors, useYearLog } from "./documents";
 import { useLastFileCheck, useStatus } from "./integrity";
 import { useLineRules } from "./lineRules";
@@ -453,6 +454,27 @@ describe("useEvents", () => {
       await act(async () => handler(null));
 
       expect(await screen.findByText("Today: New step")).toBeTruthy();
+    });
+  });
+
+  describe("commands", () => {
+    function CommandsProbe() {
+      useEvents();
+      const { data } = useCommands();
+      return <p>Shortcuts: {data?.map((c) => c.shortcut ?? "none").join(", ")}</p>;
+    }
+
+    it("refetches the commands when commands_changed arrives", async () => {
+      mocked.listCommands.mockResolvedValue([{ id: "go.today", title: "Go to Today", shortcut: "⌘1", custom: false }]);
+      renderWithQuery(<CommandsProbe />);
+      await screen.findByText("Shortcuts: ⌘1");
+      mocked.listCommands.mockResolvedValue([{ id: "go.today", title: "Go to Today", shortcut: "⌘⇧T", custom: true }]);
+      await waitFor(() => expect(mocked.listen.mock.calls.some(([name]) => name === "commands_changed")).toBe(true));
+      const handler = mocked.listen.mock.calls.find(([name]) => name === "commands_changed")![1] as (payload: null) => void;
+
+      await act(async () => handler(null));
+
+      expect(await screen.findByText("Shortcuts: ⌘⇧T")).toBeTruthy();
     });
   });
 

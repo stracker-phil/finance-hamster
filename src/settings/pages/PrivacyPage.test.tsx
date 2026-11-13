@@ -23,6 +23,7 @@ describe("PrivacyPage", () => {
     mocked.getSettings.mockResolvedValue(settings());
     mocked.updateSettings.mockResolvedValue(settings());
     mocked.deletionLog.mockResolvedValue([]);
+    mocked.backupIncluded.mockResolvedValue(null);
     mocked.filesLastCheck.mockResolvedValue(null);
     mocked.filesVerify.mockResolvedValue(fileCheck());
   });
@@ -153,6 +154,21 @@ describe("PrivacyPage", () => {
       renderWithQuery(<PrivacyPage />);
 
       expect(await screen.findByText("Nothing deleted")).toBeTruthy();
+    });
+  });
+
+  describe("Time Machine backup", () => {
+    it.each([
+      [true, "Included", "The data folder is included in your backups."],
+      [false, "Excluded", "The data folder is excluded from your backups."],
+      [null, "Unknown", "Time Machine isn't set up, or can't be asked."],
+    ])("for %s shows %s", async (included, label, description) => {
+      mocked.backupIncluded.mockResolvedValue(included);
+      renderWithQuery(<PrivacyPage />);
+
+      expect(await screen.findByText(label)).toBeTruthy();
+      expect(screen.getByText("Time Machine")).toBeTruthy();
+      expect(screen.getByText(description)).toBeTruthy();
     });
   });
 

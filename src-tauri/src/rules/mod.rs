@@ -4,6 +4,7 @@
 pub mod apply;
 pub mod commands;
 pub mod engine;
+pub mod preview;
 pub mod store;
 pub mod view;
 
@@ -114,13 +115,13 @@ fn parse_amount(field: &str, text: &Option<String>) -> AppResult<Option<i64>> {
         .transpose()
 }
 
-fn encode_tokens(tokens: &[impl AsRef<str>]) -> String {
+pub(crate) fn encode_tokens(tokens: &[impl AsRef<str>]) -> String {
     let tokens: Vec<&str> = tokens.iter().map(AsRef::as_ref).collect();
     serde_json::Value::from(tokens).to_string()
 }
 
 /// A rule with no conditions that ignores; callers set what it matches and does.
-fn blank(id: String, position: i64, now: i64) -> RuleRow {
+pub(crate) fn blank(id: String, position: i64, now: i64) -> RuleRow {
     RuleRow {
         id,
         position,

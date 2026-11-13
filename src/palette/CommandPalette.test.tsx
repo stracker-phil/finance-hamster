@@ -70,8 +70,8 @@ describe("CommandPalette", () => {
 
   it("puts a title prefix before a later word match", async () => {
     mocked.listCommands.mockResolvedValue([
-      { id: "go.settings", title: "Go to Settings", shortcut: null },
-      { id: "settings.open", title: "Settings", shortcut: null },
+      { id: "go.settings", title: "Go to Settings", shortcut: null, custom: false },
+      { id: "settings.open", title: "Settings", shortcut: null, custom: false },
     ]);
     useStore.setState({ paletteOpen: true });
     renderWithQuery(<CommandPalette />);

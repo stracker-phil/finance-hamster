@@ -149,7 +149,11 @@ export type CommandInfo = { id: string, title: string,
 /**
  * The shortcut as macOS draws it (`⇧⌘K`).
  */
-shortcut: string | null, };
+shortcut: string | null, 
+/**
+ * The owner changed this command's shortcut.
+ */
+custom: boolean, };
 
 export type Cover = "full" | "part" | "missing";
 
@@ -590,6 +594,16 @@ export type RuleForm = {
 contains: Array<string>, amount: string | null, tolerance: string | null, accountId: string | null, ownCounterparty: boolean, action: Action, itemKey: string | null, };
 
 export type RuleGroup = { title: string, rules: Array<RuleView>, };
+
+export type RulePreview = { count: number, 
+/**
+ * `Matches 12 lines; 2 decided by hand keep your choice.`
+ */
+text: string, 
+/**
+ * `Tue, 10 Nov · BILLA · −€12.30`, newest first.
+ */
+examples: Array<string>, };
 
 export type RuleView = { id: string, 
 /**

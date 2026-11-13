@@ -17,7 +17,7 @@ export const SETTINGS_PAGES: SettingsPage[] = [
     group: "Finance",
     label: "Rules",
     icon: "rules",
-    intro: "Rules run on every import, top to bottom. Most are created right in Review with “Always do this”. Your own choice on a line always wins.",
+    intro: "Rules run on every import, top to bottom, and the first that matches decides. Most are created right in Review with “Always do this”. Your own choice on a line always wins; subscriptions find their own charges.",
     Body: RulesPage,
     rows: [
       { id: "add-rule", title: "New rule", keywords: ["ignore", "assign", "item", "bank text"] },
@@ -91,6 +91,7 @@ export const SETTINGS_PAGES: SettingsPage[] = [
       { id: "verify-files", title: "Verify files", keywords: ["checksum", "integrity", "missing"] },
       { id: "archive", title: "Days in Archive before delete", keywords: ["delete", "exclude", "archive"] },
       { id: "deletion-log", title: "Deletion log", keywords: ["deleted", "delete"] },
+      { id: "backup", title: "Time Machine", keywords: ["backup"] },
       { id: "network", title: "Internet access", keywords: ["network", "offline"] },
     ],
   },
@@ -107,7 +108,18 @@ export const SETTINGS_PAGES: SettingsPage[] = [
       { id: "original-currency", title: "Show foreign currency next to amounts", keywords: ["usd", "currency"] },
     ],
   },
-  { id: "shortcuts", group: "App", label: "Shortcuts", icon: "shortcuts", Body: ShortcutsPage, rows: [{ id: "commands", title: "Commands", keywords: ["keys"] }] },
+  {
+    id: "shortcuts",
+    group: "App",
+    label: "Shortcuts",
+    icon: "shortcuts",
+    intro: "Click a shortcut and press the new keys. ⌘Z undoes everything except deleting from the Archive.",
+    Body: ShortcutsPage,
+    rows: [
+      { id: "commands", title: "Commands", keywords: ["keys", "rebind", "keyboard"] },
+      { id: "review-keys", title: "Review keys", keywords: ["anv", "skip"] },
+    ],
+  },
   { id: "status", group: "App", label: "Status", icon: "status", intro: "A quick health check. Everything is computed on this Mac.", Body: StatusPage, rows: [
       { id: "status-statements", title: "Statement chains", keywords: ["balance", "gap"] },
       { id: "status-files", title: "Files and journal", keywords: ["checksum", "journal", "inbox"] },

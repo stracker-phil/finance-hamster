@@ -1,7 +1,7 @@
 import { getName, getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { Account, AccountEdit, AccountLines, Action, Elsewhere, YearPage, NewEntry, TodayView, FileCheck, StatusGroup, CloseCheck, SubscriptionsView, SubscriptionDetail, SubscriptionForm, PlanForm, MatchCount, AddInput, AddPreview, ArchivedDocument, DeletionView, DocumentEdit, DocumentGroup, DocumentStep, DocumentView, HistoryEntry, VendorChange, VendorsView, Estimate, LineChoice, Coverage, ReviewQueue, RuleForm, RulesView, Frame, ImportPreview, PdfSource, AppError, AppInfo, CommandInfo, ErrorKind, EventName, EventPayloads, Imported, LaunchEvent, NewAccount, ReloadPreview, RulesFile, Settings, SettingsPatch, TaxYear } from "./types";
+import type { Account, AccountEdit, AccountLines, Action, Elsewhere, YearPage, NewEntry, TodayView, RulePreview, FileCheck, StatusGroup, CloseCheck, SubscriptionsView, SubscriptionDetail, SubscriptionForm, PlanForm, MatchCount, AddInput, AddPreview, ArchivedDocument, DeletionView, DocumentEdit, DocumentGroup, DocumentStep, DocumentView, HistoryEntry, VendorChange, VendorsView, Estimate, LineChoice, Coverage, ReviewQueue, RuleForm, RulesView, Frame, ImportPreview, PdfSource, AppError, AppInfo, CommandInfo, ErrorKind, EventName, EventPayloads, Imported, LaunchEvent, NewAccount, ReloadPreview, RulesFile, Settings, SettingsPatch, TaxYear } from "./types";
 
 export * from "./types";
 
@@ -16,6 +16,9 @@ export const api = {
   },
   listCommands: () => invoke<CommandInfo[]>("list_commands"),
   runCommand: (id: string) => invoke<void>("run_command", { id }),
+  /** Gives a command its own shortcut (`CmdOrCtrl+Shift+K`), or none with null. */
+  keybindingSet: (id: string, accelerator: string | null) => invoke<void>("keybinding_set", { id, accelerator }),
+  keybindingReset: (id: string) => invoke<void>("keybinding_reset", { id }),
   getSettings: () => invoke<Settings>("get_settings"),
   updateSettings: (patch: SettingsPatch) => invoke<Settings>("update_settings", { patch }),
   showDataFolder: () => invoke<void>("show_data_folder"),
@@ -72,6 +75,8 @@ export const api = {
   /** Adds a rule (`id` null) or changes one; the label of the change. */
   ruleSave: (id: string | null, form: RuleForm) => invoke<string>("rule_save", { id, form }),
   ruleDelete: (id: string) => invoke<string>("rule_delete", { id }),
+  /** What the sheet's rule would match before it is saved. */
+  rulePreview: (form: RuleForm) => invoke<RulePreview>("rule_preview", { form }),
   /** How many lines changed, in words. */
   rulesRerun: () => invoke<string>("rules_rerun"),
   reviewQueue: () => invoke<ReviewQueue>("review_queue"),
@@ -109,6 +114,8 @@ export const api = {
   filesLastCheck: () => invoke<FileCheck | null>("files_last_check"),
   statusView: () => invoke<StatusGroup[]>("status_view"),
   /** Opens Settings at a page or row id. */
+  /** Whether Time Machine backs up the data folder; null when it can't say. */
+  backupIncluded: () => invoke<boolean | null>("backup_included"),
   settingsShow: (page: string) => invoke<void>("settings_show", { page }),
   /** `query` keeps the subscriptions whose name or category contains it. */
   subscriptionsView: (query: string) => invoke<SubscriptionsView>("subscriptions_view", { query }),

@@ -35,7 +35,8 @@ fn with_command<'a>(
         return Ok(builder);
     };
     let mut item = MenuItemBuilder::with_id(command.id, command.title);
-    if let Some(accelerator) = command.accelerator {
+    let overrides = commands::keys::load(&crate::config_dir());
+    if let Some(accelerator) = commands::keys::effective(command, &overrides) {
         item = item.accelerator(accelerator);
     }
     Ok(builder.item(&item.build(app)?))
@@ -77,7 +78,8 @@ fn app_menu(app: &AppHandle) -> tauri::Result<Submenu<Wry>> {
 pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let app_menu = app_menu(app)?;
     let file = with_command(app, SubmenuBuilder::new(app, "File"), "statement.import")?;
-    let file = with_command(app, file, "document.add")?
+    let file = with_command(app, file, "document.add")?;
+    let file = with_command(app, file, "subscription.new")?
         .separator()
         .close_window()
         .build()?;
@@ -114,3 +116,11 @@ pub fn on_event(app: &AppHandle, event: MenuEvent) {
 
 #[cfg(test)]
 mod tests;
+
+/// Builds the menu bar again, so changed shortcuts take effect.
+pub fn refresh(app: &AppHandle) {
+    match build(app).and_then(|menu| app.set_menu(menu)) {
+        Ok(_) => {}
+        Err(e) => log::warn!("Couldn't rebuild the menu bar: {e}"),
+    }
+}

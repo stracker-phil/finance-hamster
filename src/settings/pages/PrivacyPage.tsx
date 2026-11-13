@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { api, toAppError } from "../../api";
 import { Icon } from "../../components/icons";
 import { useDeletions } from "../../queries/documents";
@@ -50,6 +51,7 @@ export function PrivacyPage() {
   const { data: settings } = useSettings();
   const { mutate } = useUpdateSettings();
   const { data: deletions } = useDeletions();
+  const { data: backup } = useQuery({ queryKey: ["backup-included"], queryFn: api.backupIncluded });
   return (
     <>
       <Group title="Data folder" anchor="data-folder">
@@ -83,6 +85,14 @@ export function PrivacyPage() {
         {deletions?.map((d, i) => (
           <Row key={i} label={d.title} description={`${d.file} · ${d.dates} · ${d.reason}`} />
         ))}
+      </Group>
+      <Group title="Backup" anchor="backup">
+        <Row label="Time Machine" description={backup === true ? "The data folder is included in your backups." : backup === false ? "The data folder is excluded from your backups." : "Time Machine isn't set up, or can't be asked."}>
+          <span className={backup ? "settings-value settings-value--ok" : "settings-value"}>
+            {backup && <Icon name="check" size={14} strokeWidth={2.4} />}
+            {backup === true ? "Included" : backup === false ? "Excluded" : "Unknown"}
+          </span>
+        </Row>
       </Group>
       <Group title="Network" anchor="network">
         <Row label="Internet access" description="Hamster contains no network code. Invoice text is read on this Mac.">

@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useQueryClient, type QueryClient, type QueryKey } from "@tanstack/react-query";
 import { api, type EventName } from "../api";
 import { ACCOUNTS_KEY } from "./accounts";
+import { COMMANDS_KEY } from "./commands";
 import { ARCHIVE_KEY, DELETIONS_KEY, DOCUMENT_KEY, DOCUMENT_LINES_KEY, DOCUMENTS_KEY, HISTORY_KEY, LOG_KEY, VENDORS_KEY } from "./documents";
 import { FILE_CHECK_KEY, STATUS_KEY } from "./integrity";
 import { LINE_RULES_KEY } from "./lineRules";
@@ -17,6 +18,7 @@ import { RULES_KEY, TAX_YEARS_KEY } from "./taxYears";
 export const INVALIDATIONS: Partial<Record<EventName, QueryKey[]>> = {
   settings_changed: [SETTINGS_KEY, TODAY_KEY, STATUS_KEY],
   files_checked: [FILE_CHECK_KEY, STATUS_KEY],
+  commands_changed: [COMMANDS_KEY],
 };
 
 /** The query keys a `data_changed` for each table makes stale. */

@@ -94,6 +94,7 @@ mod tests {
             id: id.into(),
             title: title.into(),
             shortcut: shortcut.map(Into::into),
+            custom: false,
         }
     }
 
@@ -110,7 +111,7 @@ mod tests {
     }
 
     #[test]
-    fn commands_text_as_json_is_an_array_of_id_title_and_shortcut() {
+    fn commands_text_as_json_is_an_array_of_id_title_shortcut_and_custom() {
         let commands = [
             info("go.today", Some("⌘1"), "Today"),
             info("demo.noshortcut", None, "No Shortcut"),
@@ -120,8 +121,8 @@ mod tests {
         assert_eq!(
             serde_json::from_str::<Value>(&text).unwrap(),
             json!([
-                { "id": "go.today", "title": "Today", "shortcut": "⌘1" },
-                { "id": "demo.noshortcut", "title": "No Shortcut", "shortcut": null }
+                { "id": "go.today", "title": "Today", "shortcut": "⌘1", "custom": false },
+                { "id": "demo.noshortcut", "title": "No Shortcut", "shortcut": null, "custom": false }
             ])
         );
     }

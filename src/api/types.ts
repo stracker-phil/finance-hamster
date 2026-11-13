@@ -27,6 +27,8 @@ export interface EventPayloads {
   add_ready: AddReady;
   /** A check of the stored PDFs finished. */
   files_checked: null;
+  /** A shortcut changed; the commands list reads it again. */
+  commands_changed: null;
 }
 
 export type EventName = keyof EventPayloads;

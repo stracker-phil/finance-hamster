@@ -28,6 +28,8 @@ const contains = () => screen.getByLabelText<HTMLInputElement>("Bank text contai
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocked.rulePreview.mockReset();
+  mocked.rulePreview.mockResolvedValue({ count: 0, text: "", examples: [] });
   useStore.setState({ toasts: [], confirmation: null });
   mocked.listAccounts.mockResolvedValue([account(), account({ id: "acc-2", name: "Savings" })]);
 });
@@ -59,8 +61,8 @@ describe("RuleSheet", () => {
       renderSheet();
       await screen.findByRole("option", { name: "Savings" });
       await userEvent.type(contains(), "CLOUDBOX");
-      await userEvent.type(screen.getByLabelText("Amount"), "25.95");
-      await userEvent.type(screen.getByLabelText("Within ±"), "0.50");
+      await userEvent.type(screen.getByLabelText("Amount in €"), "25.95");
+      await userEvent.type(screen.getByLabelText("Within ± €"), "0.50");
       await userEvent.selectOptions(screen.getByLabelText("Account"), "Savings");
       await userEvent.click(screen.getByRole("switch", { name: "Counterparty is one of my accounts" }));
       await userEvent.click(screen.getByRole("button", { name: "Assign item" }));
@@ -100,8 +102,8 @@ describe("RuleSheet", () => {
 
       expect(screen.getByRole("dialog", { name: "Edit Rule" })).toBeTruthy();
       expect(contains().value).toBe("BILLA, SPAR");
-      expect(screen.getByLabelText<HTMLInputElement>("Amount").value).toBe("12.00");
-      expect(screen.getByLabelText<HTMLInputElement>("Within ±").value).toBe("1.00");
+      expect(screen.getByLabelText<HTMLInputElement>("Amount in €").value).toBe("12.00");
+      expect(screen.getByLabelText<HTMLInputElement>("Within ± €").value).toBe("1.00");
       await screen.findByRole("option", { name: "Savings" });
       expect(screen.getByLabelText<HTMLSelectElement>("Account").value).toBe("acc-2");
       expect(screen.getByRole("switch", { name: "Counterparty is one of my accounts" })).toBeChecked();
@@ -154,6 +156,42 @@ describe("RuleSheet", () => {
       expect(mocked.ruleDelete).not.toHaveBeenCalled();
       expect(onClose).not.toHaveBeenCalled();
       expect(screen.getByRole("dialog", { name: "Edit Rule" })).toBeTruthy();
+    });
+  });
+
+  describe("help and preview", () => {
+    it("explains how the conditions combine and how subscriptions are matched", () => {
+      renderSheet();
+
+      expect(screen.getByText(/Every condition you fill in must hold/)).toBeTruthy();
+      expect(screen.getByText(/A subscription finds its own charges by its bank text and plan amount/)).toBeTruthy();
+    });
+
+    it("shows what the rule would match, with example lines", async () => {
+      mocked.rulePreview.mockResolvedValue({ count: 5, text: "Matches 5 lines", examples: ["10 Nov · Example Market · −€22.48", "3 Nov · Example Market · −€8.10", "28 Oct · Example Market · −€15.00"] });
+      renderSheet();
+
+      expect(await screen.findByText("Matches 5 lines")).toBeTruthy();
+      expect(screen.getByText("10 Nov · Example Market · −€22.48")).toBeTruthy();
+      expect(screen.getByText("3 Nov · Example Market · −€8.10")).toBeTruthy();
+      expect(screen.getByText("28 Oct · Example Market · −€15.00")).toBeTruthy();
+    });
+
+    it("asks for the preview of the draft with the bank text split on commas", async () => {
+      renderSheet();
+
+      await userEvent.type(contains(), "BILLA,SPAR");
+
+      await vi.waitFor(() => expect(mocked.rulePreview).toHaveBeenLastCalledWith(ruleForm({ contains: ["BILLA", "SPAR"] })));
+    });
+
+    it("updates the preview when the draft changes", async () => {
+      mocked.rulePreview.mockImplementation((form) => Promise.resolve({ count: 0, text: `Looks for ${form.contains.join(" or ")}`, examples: [] }));
+      renderSheet();
+
+      await userEvent.type(contains(), "COOP");
+
+      expect(await screen.findByText("Looks for COOP")).toBeTruthy();
     });
   });
 

@@ -3,11 +3,14 @@ import type { Account } from "../../api";
 import { AccountSheet } from "../../accounts/AccountSheet";
 import { useAccounts } from "../../queries/accounts";
 import { useSettings, useUpdateSettings } from "../../queries/settings";
+import { useCoverage } from "../../queries/statements";
 import { Group, Row, Switch } from "../controls";
 
 /** Settings → Accounts (mockup Settings, page accounts). */
 export function AccountsPage() {
   const { data: accounts } = useAccounts();
+  const { data: coverage } = useCoverage();
+  const lastOf = (id: string) => coverage?.accounts.find((a) => a.id === id)?.last;
   const { data: settings } = useSettings();
   const { mutate } = useUpdateSettings();
   // `null` adds an account; an account edits it.
@@ -17,7 +20,7 @@ export function AccountsPage() {
       <Group title="Bank accounts" anchor="bank-accounts">
         {accounts?.length === 0 && <Row label="No accounts yet" description="Add the account whose statements you import." />}
         {accounts?.map((account) => (
-          <Row key={account.id} label={account.name} description={[account.bank, account.ibanMasked].filter(Boolean).join(" · ")}>
+          <Row key={account.id} label={account.name} description={[account.bank, account.ibanMasked, lastOf(account.id) ?? "no statement yet"].filter(Boolean).join(" · ")}>
             <button className="btn btn--small" onClick={() => setEditing(account)}>
               Edit…
             </button>

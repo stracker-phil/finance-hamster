@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query";
 import { useId, useState, type FormEvent } from "react";
 import { api, toAppError, type ItemOption, type RuleForm, type RuleView } from "../../api";
 import { Modal } from "../../components/Modal";
@@ -20,6 +21,8 @@ export function RuleSheet({ rule, items, onClose }: { rule?: RuleView; items: It
   const [contains, setContains] = useState((rule?.form.contains ?? []).join(", "));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  const draft = { ...form, contains: contains.split(",") };
+  const { data: preview } = useQuery({ queryKey: ["rule-preview", draft], queryFn: () => api.rulePreview(draft), placeholderData: (previous) => previous });
   const set = (patch: Partial<RuleForm>) => setForm((f) => ({ ...f, ...patch }));
   const text = (value: string) => (value.trim() === "" ? null : value);
 
@@ -63,17 +66,23 @@ export function RuleSheet({ rule, items, onClose }: { rule?: RuleView; items: It
         <div className="form-field">
           <label htmlFor={`${id}-contains`}>Bank text contains</label>
           <input id={`${id}-contains`} className="field" value={contains} placeholder="ALPENMARKT, BILLA" autoFocus onChange={(e) => setContains(e.target.value)} />
-          <span className="form-check__desc">Any of these, separated by commas; upper or lower case doesn&apos;t matter.</span>
+          <span className="form-check__desc">Any one of these, separated by commas, in the booking text, its detail lines, the merchant or the counterparty; upper or lower case doesn&apos;t matter.</span>
         </div>
         <div className="rule-form__pair">
           <div className="form-field">
-            <label htmlFor={`${id}-amount`}>Amount</label>
-            <input id={`${id}-amount`} className="field" value={form.amount ?? ""} placeholder="Any" inputMode="decimal" aria-invalid={!!fieldError("amount")} onChange={(e) => set({ amount: text(e.target.value) })} />
+            <label htmlFor={`${id}-amount`}>Amount in €</label>
+            <div className="rule-form__unit">
+              <input id={`${id}-amount`} className="field" value={form.amount ?? ""} placeholder="Any" inputMode="decimal" aria-invalid={!!fieldError("amount")} onChange={(e) => set({ amount: text(e.target.value) })} />
+              <span>€</span>
+            </div>
             {error("amount")}
           </div>
           <div className="form-field">
-            <label htmlFor={`${id}-tolerance`}>Within ±</label>
-            <input id={`${id}-tolerance`} className="field" value={form.tolerance ?? ""} placeholder="0.00" inputMode="decimal" aria-invalid={!!fieldError("tolerance")} onChange={(e) => set({ tolerance: text(e.target.value) })} />
+            <label htmlFor={`${id}-tolerance`}>Within ± €</label>
+            <div className="rule-form__unit">
+              <input id={`${id}-tolerance`} className="field" value={form.tolerance ?? ""} placeholder="0.00" inputMode="decimal" aria-invalid={!!fieldError("tolerance")} onChange={(e) => set({ tolerance: text(e.target.value) })} />
+              <span>€</span>
+            </div>
             {error("tolerance")}
           </div>
         </div>
@@ -93,11 +102,21 @@ export function RuleSheet({ rule, items, onClose }: { rule?: RuleView; items: It
           <input type="checkbox" className="switch" role="switch" checked={form.ownCounterparty} onChange={(e) => set({ ownCounterparty: e.target.checked })} />
           <span>Counterparty is one of my accounts</span>
         </label>
+        <span className="form-check__desc">Every condition you fill in must hold; an empty one is ignored. The amount is compared without its sign, in euros as booked.</span>
         {error("conditions")}
+        <div className="rule-form__preview" aria-live="polite">
+          <div>{preview?.text ?? " "}</div>
+          {preview?.examples.map((line) => (
+            <div key={line} className="rule-form__example">
+              {line}
+            </div>
+          ))}
+        </div>
         <div className="form-field">
           <span className="form-field__label">Then</span>
           <Segmented label="Then" options={ACTIONS} value={form.action === "subscription" ? undefined : form.action} onChange={(action) => set({ action })} />
         </div>
+        <span className="form-check__desc">A subscription finds its own charges by its bank text and plan amount; set that on the subscription, not here.</span>
         {form.action === "anv" && (
           <div className="form-field">
             <label htmlFor={`${id}-item`}>Item</label>
