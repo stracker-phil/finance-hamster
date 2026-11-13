@@ -1,7 +1,7 @@
 {
   "name": "hamster",
   "private": true,
-  "version": "0.12.0",
+  "version": "0.13.0",
   "description": "Private macOS app that collects ANV documents with the real amount paid, keeps bank statements and tracks subscriptions",
   "license": "MIT",
   "type": "module",
