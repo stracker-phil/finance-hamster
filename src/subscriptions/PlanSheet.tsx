@@ -1,0 +1,103 @@
+import { useId, useState, type FormEvent } from "react";
+import { api, toAppError, type PlanForm } from "../api";
+import { Modal } from "../components/Modal";
+import { undoToast } from "../lib/undoToast";
+import { Segmented } from "../settings/controls";
+import { useStore } from "../state/store";
+import { INTERVALS } from "./SubscriptionSheet";
+
+const dayBefore = (iso: string) => {
+  const day = new Date(`${iso}T12:00:00`);
+  if (Number.isNaN(day.getTime())) return "";
+  day.setDate(day.getDate() - 1);
+  return day.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+};
+
+/** Change Plan: the current plan ends the day before the new one starts; its charges stay with it. */
+export function PlanSheet({ id, name, currentPlan, initial, onClose }: { id: string; name: string; currentPlan: string; initial: PlanForm; onClose: () => void }) {
+  const titleId = useId();
+  const field = (key: string) => `${titleId}-${key}`;
+  const [form, setForm] = useState(initial);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+  const set = (patch: Partial<PlanForm>) => setForm((f) => ({ ...f, ...patch }));
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    api
+      .subscriptionChangePlan(id, form)
+      .then((label) => {
+        undoToast(label);
+        onClose();
+      })
+      .catch((err: unknown) => {
+        const error = toAppError(err);
+        setErrors(error.field ? { [error.field.path]: error.field.message } : { "subscription.form": error.message });
+        setBusy(false);
+      });
+  };
+  const message = (key: string) => errors[`subscription.${key}`];
+  const fieldError = (...keys: string[]) => {
+    const text = keys.map(message).find(Boolean);
+    return (
+      <div className="form-field__error" role={text ? "alert" : undefined}>
+        {text ?? ""}
+      </div>
+    );
+  };
+  const ends = dayBefore(form.start);
+  return (
+    <Modal labelledBy={titleId} onClose={onClose}>
+      <form onSubmit={submit} className="plan-sheet">
+        <div>
+          <h2 id={titleId}>Change plan · {name}</h2>
+          <span className="add-doc__hint">Current: {currentPlan}</span>
+        </div>
+        <div className="sub-grid">
+          <label htmlFor={field("name")}>New plan</label>
+          <div>
+            <input id={field("name")} className="field" value={form.name} placeholder="Pro, Family, …" autoFocus aria-invalid={!!message("planName")} onChange={(e) => set({ name: e.target.value })} />
+            {fieldError("planName")}
+          </div>
+          <label htmlFor={field("amount")}>Amount</label>
+          <div>
+            <div className="sub-grid__pair">
+              <input id={field("amount")} className="field sub-sheet__amount" inputMode="decimal" value={form.amount} aria-invalid={!!message("amount")} onChange={(e) => set({ amount: e.target.value })} />
+              <input className="field sub-sheet__currency" aria-label="Currency" maxLength={3} value={form.currency} onChange={(e) => set({ currency: e.target.value.toUpperCase() })} />
+            </div>
+            {fieldError("amount", "currency")}
+          </div>
+          <span>Repeats</span>
+          <div>
+              <Segmented label="Repeats" options={INTERVALS} value={form.interval} onChange={(interval) => set({ interval })} />
+              <div className="form-field__error" />
+            </div>
+          <label htmlFor={field("start")}>Starts</label>
+          <div>
+            <input id={field("start")} type="date" className="field" value={form.start} aria-invalid={!!message("start")} onChange={(e) => set({ start: e.target.value })} />
+            {fieldError("start")}
+          </div>
+        </div>
+        <p className="plan-sheet__box">
+          {ends ? `The current plan ends on ${ends}. Its charges stay with it; the bank text keeps matching, so the next charges link to the new plan.` : "Choose when the new plan starts."}
+        </p>
+        {fieldError("form")}
+        <div className="actions">
+          <button type="button" className="btn" onClick={onClose}>
+            Cancel
+          </button>
+          <button type="submit" className="btn btn--primary" disabled={busy}>
+            Change Plan
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+/** The open Change Plan sheet from the store. */
+export function PlanSheetHost() {
+  const sheet = useStore((s) => s.subscriptionSheet);
+  if (sheet?.kind !== "plan") return null;
+  return <PlanSheet key={sheet.id} id={sheet.id} name={sheet.name} currentPlan={sheet.currentPlan} initial={sheet.form} onClose={() => useStore.getState().setSubscriptionSheet(null)} />;
+}

@@ -40,3 +40,5 @@
   display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; padding: 10px 14px;
   border: 1px solid var(--banner-info-border); border-radius: 10px; background: var(--banner-info-bg); color: var(--banner-info-text); font-size: 13px;
 }
+.review-card__plan { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 14px; padding: 10px 12px; border-radius: 10px; background: var(--selection-bg); color: var(--text-secondary); font-size: 13px; line-height: 1.5; }
+.review-card__plan svg { flex: none; margin-top: 3px; color: var(--accent-text); }

@@ -7,6 +7,7 @@ import { useStore } from "../state/store";
 import { useCoversPdf } from "../lib/pdfCover";
 import { routeOf } from "../lib/targets";
 import { useElsewhere } from "../queries/year";
+import { newSubscription } from "../subscriptions/flow";
 import { startImport } from "../statements/importFlow";
 
 /** The title and, for a nested page, the crumb back to its parent. */
@@ -87,7 +88,7 @@ function FilterField({ page }: { page: Route["page"] }) {
 const NEW_ITEMS: { label: string; key: string; run?: () => void }[] = [
   { label: "Import Statement…", key: "⌘I", run: startImport },
   { label: "Add Invoice PDF…", key: "⌘O", run: startAddDocument },
-  { label: "New Subscription", key: "⌘N" },
+  { label: "New Subscription", key: "⌘N", run: newSubscription },
 ];
 
 function NewMenu() {

@@ -15,15 +15,20 @@ pub struct Line<'a> {
 /// An own account's id and IBAN, to tell transfers between own accounts.
 pub type OwnAccount = (String, String);
 
+/// The text conditions search: booking text, detail lines, merchant and counterparty, upper case.
+pub fn line_text(t: &TransactionRow) -> String {
+    let extra: Vec<String> = serde_json::from_str(&t.extra).unwrap_or_default();
+    let mut parts = vec![t.text.as_str()];
+    parts.extend(extra.iter().map(String::as_str));
+    parts.extend(t.merchant.as_deref());
+    parts.extend(t.counterparty.as_deref());
+    parts.join("\n").to_uppercase()
+}
+
 impl<'a> Line<'a> {
     pub fn of(t: &'a TransactionRow, own: &[OwnAccount]) -> Line<'a> {
-        let extra: Vec<String> = serde_json::from_str(&t.extra).unwrap_or_default();
-        let mut parts = vec![t.text.as_str()];
-        parts.extend(extra.iter().map(String::as_str));
-        parts.extend(t.merchant.as_deref());
-        parts.extend(t.counterparty.as_deref());
         Line {
-            text: parts.join("\n").to_uppercase(),
+            text: line_text(t),
             abs_cents: t.cents.abs(),
             account_id: &t.account_id,
             counterparty_own: t.counterparty_iban.as_ref().is_some_and(|iban| {

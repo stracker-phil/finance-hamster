@@ -126,6 +126,12 @@ entryId: string | null, };
 
 export type ChainKind = "first" | "continues" | "gap";
 
+export type ChargeView = { id: string, 
+/**
+ * `Mon, 9 Nov 2026`.
+ */
+date: string, account: string, amount: string, };
+
 /**
  * A command as the palette and the Shortcuts page list it.
  */
@@ -267,6 +273,12 @@ label: string,
  */
 place: string, target: Target, };
 
+export type EndedRowView = { id: string, name: string, letter: string, tone: number, interval: string, 
+/**
+ * `Ended 31 Aug 2026 · last charge 3 Aug 2026`.
+ */
+ended: string, };
+
 export type EntryKind = "amount" | "trip";
 
 export type ErrorKind = "io" | "invalid_input" | "not_found" | "internal";
@@ -342,6 +354,8 @@ backup: string | null,
  */
 needsReload: boolean, };
 
+export type Interval = "monthly" | "quarterly" | "yearly";
+
 /**
  * An item the ANV action can assign.
  */
@@ -407,6 +421,12 @@ amount: string, credit: boolean, transfer: boolean, status: LineStatus,
  */
 note: string | null, };
 
+export type MatchCount = { 
+/**
+ * `Matches 7 charges, the last on 9 Nov`.
+ */
+text: string, count: number, };
+
 export type MonthCover = { cover: Cover, tip: string, };
 
 export type MonthHead = { label: string, 
@@ -442,6 +462,35 @@ export type NumberFormat = "dot_decimal" | "comma_decimal";
  */
 export type PdfSource = { kind: SourceKind, id: string, };
 
+/**
+ * What the "Plan changed?" card offers: the subscription and the line's amount for its new plan.
+ */
+export type PlanChanged = { subscriptionId: string, name: string, 
+/**
+ * `Lumen AI usually charges USD 24.00; this charge is USD 120.00.`
+ */
+text: string, 
+/**
+ * The charge in the plan's currency as typed in a sheet, `120.00`.
+ */
+amount: string, currency: string, 
+/**
+ * The line's date, `YYYY-MM-DD`, where a new plan would start.
+ */
+date: string, };
+
+export type PlanForm = { name: string, amount: string, currency: string, interval: Interval, start: string, };
+
+export type PlanView = { name: string, 
+/**
+ * `USD 24.00 monthly`.
+ */
+price: string, 
+/**
+ * `since 1 Apr 2026`, `1 Jan – 31 Mar 2026`.
+ */
+when: string, };
+
 export type QuestionView = { id: string, label: string, help: string | null, unit: string | null, 
 /**
  * The answer as the field shows it; empty while unanswered.
@@ -452,6 +501,11 @@ value: string, answered: boolean, };
  * One open year's pending Reload.
  */
 export type ReloadPreview = { year: number, from: string, to: string | null, changes: Array<string>, problems: Array<string>, };
+
+/**
+ * How long before a charge the reminder comes.
+ */
+export type Reminder = "off" | "one_day" | "three_days" | "one_week";
 
 /**
  * A line waiting for a decision, as the Review card shows it.
@@ -484,13 +538,17 @@ itemKey: string | null,
 /**
  * `last used for Buchhandlung Seitenweise`.
  */
-itemWhy: string | null, };
+itemWhy: string | null, 
+/**
+ * A subscription's bank text at another amount than its plan's.
+ */
+planChanged: PlanChanged | null, };
 
 export type ReviewQueue = { 
 /**
  * Newest first.
  */
-lines: Array<ReviewLine>, items: Array<ItemOption>, };
+lines: Array<ReviewLine>, items: Array<ItemOption>, subscriptions: Array<SubscriptionOption>, };
 
 export type RowKind = "document" | "line" | "amount" | "trip";
 
@@ -589,6 +647,89 @@ range: string,
  */
 count: string, lines: Array<LineView>, };
 
+export type SubscriptionDetail = { id: string, name: string, letter: string, tone: number, interval: string, 
+/**
+ * `€22.48 / month`.
+ */
+amount: string, 
+/**
+ * `Mon, 9 Dec · in 26 days`; None once ended.
+ */
+next: string | null, 
+/**
+ * `Ended 31 Aug 2026`.
+ */
+ended: string | null, year: number, timeline: Array<TimelineMonth>, plans: Array<PlanView>, 
+/**
+ * `Yes · KZ 169 Digitale Arbeitsmittel` or `No`.
+ */
+anv: string, reminder: string, 
+/**
+ * `text contains LUMEN AI · ± €1.00`.
+ */
+rule: string, charges: Array<ChargeView>, 
+/**
+ * What Edit starts from.
+ */
+form: SubscriptionForm, 
+/**
+ * `Pro · monthly · USD 24.00 since 1 Apr 2026`, for the Change Plan sheet.
+ */
+currentPlan: string, };
+
+export type SubscriptionForm = { name: string, tone: number, category: string, active: boolean, 
+/**
+ * The last day it runs, when not active; today when left empty.
+ */
+endedOn: string | null, amount: string, currency: string, interval: Interval, 
+/**
+ * The first charge of a new subscription; ignored when editing.
+ */
+start: string, reminder: Reminder, itemKey: string | null, matchText: string, 
+/**
+ * The amount a charge may differ by; None matches any amount.
+ */
+tolerance: string | null, };
+
+export type SubscriptionGroup = { label: string, total: string, rows: Array<SubscriptionRowView>, };
+
+/**
+ * An active subscription a line can be linked to.
+ */
+export type SubscriptionOption = { id: string, name: string, letter: string, tone: number, };
+
+export type SubscriptionRowView = { id: string, name: string, letter: string, tone: number, anv: boolean, 
+/**
+ * `Monthly · USD 24.00`.
+ */
+interval: string, 
+/**
+ * The latest price change while it is recent: `+€2.00 since Oct`.
+ */
+change: string | null, 
+/**
+ * `Tomorrow`, `9 Dec`.
+ */
+next: string, amount: string, };
+
+export type SubscriptionsView = { 
+/**
+ * `8 active · €123.45 per month`.
+ */
+summary: string, groups: Array<SubscriptionGroup>, ended: Array<EndedRowView>, 
+/**
+ * No subscription at all, before filtering.
+ */
+empty: boolean, 
+/**
+ * Every category in use, for the sheet's menu.
+ */
+categories: Array<string>, 
+/**
+ * The items an ANV subscription can count on.
+ */
+items: Array<ItemOption>, };
+
 /**
  * Where a match leads.
  */
@@ -598,6 +739,20 @@ export type Target = { "page": "documents" } | { "page": "document", documentId:
  * What the sidebar lists.
  */
 export type TaxYear = { year: number, state: YearState, ruleset: string, };
+
+export type TimelineMonth = { 
+/**
+ * `J`.
+ */
+label: string, 
+/**
+ * The plan's place in `plans`; None before the first or after the end.
+ */
+plan: number | null, 
+/**
+ * `March: Pro`.
+ */
+tip: string, };
 
 /**
  * One change to a vendor (Settings → Vendors); returns the label of the change.

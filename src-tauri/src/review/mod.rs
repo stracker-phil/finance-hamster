@@ -16,11 +16,15 @@ use crate::accounts;
 use crate::date::{self, DateOrder};
 use crate::db::{Change, Db, Op, Source, Written};
 use crate::error::{AppError, AppResult};
-use crate::money::{Money, format_signed};
+use crate::money::{Money, format_money, format_plain, format_signed};
 use crate::rules::store::{self as rules_store, Action, DecisionRow};
 use crate::rules::{self, ItemOption};
 use crate::settings::NumberFormat;
 use crate::statements::store::{self as statements, TransactionRow};
+use crate::subscriptions::{
+    self,
+    matcher::{Matchers, charged_in},
+};
 
 /// A line waiting for a decision, as the Review card shows it.
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
@@ -45,6 +49,35 @@ pub struct ReviewLine {
     pub item_key: Option<String>,
     /// `last used for Buchhandlung Seitenweise`.
     pub item_why: Option<String>,
+    /// A subscription's bank text at another amount than its plan's.
+    pub plan_changed: Option<PlanChanged>,
+}
+
+/// What the "Plan changed?" card offers: the subscription and the line's amount for its new plan.
+#[derive(Serialize, Clone, Debug, PartialEq, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "src/api/types.gen.ts")]
+pub struct PlanChanged {
+    pub subscription_id: String,
+    pub name: String,
+    /// `Lumen AI usually charges USD 24.00; this charge is USD 120.00.`
+    pub text: String,
+    /// The charge in the plan's currency as typed in a sheet, `120.00`.
+    pub amount: String,
+    pub currency: String,
+    /// The line's date, `YYYY-MM-DD`, where a new plan would start.
+    pub date: String,
+}
+
+/// An active subscription a line can be linked to.
+#[derive(Serialize, Clone, Debug, PartialEq, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "src/api/types.gen.ts")]
+pub struct SubscriptionOption {
+    pub id: String,
+    pub name: String,
+    pub letter: String,
+    pub tone: i64,
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
@@ -54,6 +87,7 @@ pub struct ReviewQueue {
     /// Newest first.
     pub lines: Vec<ReviewLine>,
     pub items: Vec<ItemOption>,
+    pub subscriptions: Vec<SubscriptionOption>,
 }
 
 /// The merchant, the counterparty or the booking text.
@@ -109,6 +143,7 @@ pub fn queue(db: &Db, format: NumberFormat, order: DateOrder) -> AppResult<Revie
     let lines = db.read(statements::all_transactions)?;
     let decisions = db.read(rules_store::decisions)?;
     let accounts = db.read(accounts::rows)?;
+    let matchers = db.read(Matchers::load)?;
     let mut earlier: HashMap<String, Earlier> = HashMap::new();
     for line in &lines {
         if let Some(d) = decisions.get(&line.id).filter(|d| d.by_hand()) {
@@ -150,6 +185,7 @@ pub fn queue(db: &Db, format: NumberFormat, order: DateOrder) -> AppResult<Revie
                 item_why: before
                     .filter(|b| b.item_key.is_some())
                     .map(|b| format!("last used for {}", b.title)),
+                plan_changed: plan_changed(&matchers, t, format),
                 title,
                 key,
             }
@@ -159,7 +195,57 @@ pub fn queue(db: &Db, format: NumberFormat, order: DateOrder) -> AppResult<Revie
     Ok(ReviewQueue {
         lines: waiting,
         items: rules::items(db)?,
+        subscriptions: subscription_options(db)?,
     })
+}
+
+fn plan_changed(
+    matchers: &Matchers,
+    t: &TransactionRow,
+    format: NumberFormat,
+) -> Option<PlanChanged> {
+    let (sub, plan) = matchers.plan_changed(t)?;
+    let money = |cents| {
+        format_money(
+            &Money {
+                cents,
+                currency: plan.currency.clone(),
+            },
+            format,
+        )
+    };
+    let charged = charged_in(t, &plan.currency);
+    let text = match charged {
+        Some(cents) => format!(
+            "{} usually charges {}; this charge is {}.",
+            sub.name,
+            money(plan.cents),
+            money(cents)
+        ),
+        None => format!("{} usually charges {}.", sub.name, money(plan.cents)),
+    };
+    Some(PlanChanged {
+        subscription_id: sub.id.clone(),
+        name: sub.name.clone(),
+        text,
+        amount: format_plain(charged.unwrap_or(plan.cents), format),
+        currency: plan.currency.clone(),
+        date: t.value_date.clone(),
+    })
+}
+
+fn subscription_options(db: &Db) -> AppResult<Vec<SubscriptionOption>> {
+    Ok(db
+        .read(subscriptions::store::subscriptions)?
+        .into_iter()
+        .filter(|s| s.ended_on.is_none())
+        .map(|s| SubscriptionOption {
+            letter: subscriptions::view::letter(&s.name),
+            id: s.id,
+            name: s.name,
+            tone: s.tone,
+        })
+        .collect())
 }
 
 fn verb(action: Action) -> &'static str {
@@ -168,6 +254,29 @@ fn verb(action: Action) -> &'static str {
         Action::Subscription => "Subscription",
         Action::Ignore => "Ignore",
     }
+}
+
+/// The subscription a Subscription decision links, which must exist; other actions link none.
+fn checked_subscription(
+    db: &Db,
+    action: Action,
+    subscription_id: Option<String>,
+) -> AppResult<Option<String>> {
+    if action != Action::Subscription {
+        return Ok(None);
+    }
+    let id = subscription_id.unwrap_or_default();
+    if !db
+        .read(subscriptions::store::subscriptions)?
+        .iter()
+        .any(|s| s.id == id)
+    {
+        return Err(AppError::InvalidField {
+            field: "review.subscription".into(),
+            message: "Choose the subscription it belongs to".into(),
+        });
+    }
+    Ok(Some(id))
 }
 
 /// The item an ANV decision assigns, which must be one of the year's; other actions assign none.
@@ -189,12 +298,15 @@ fn checked_item_key(
     Ok(Some(key))
 }
 
-/// Decides a line by hand; with `always`, also adds a rule for its key and applies it to the other lines.
+/// Decides a line by hand; with `always`, also adds a rule for its key and applies it to the other lines. A
+/// subscription finds its charges by its own bank text, so a Subscription decision makes no rule.
+#[allow(clippy::too_many_arguments)]
 pub fn decide(
     db: &Db,
     line_id: &str,
     action: Action,
     item_key: Option<String>,
+    subscription_id: Option<String>,
     always: bool,
     now: i64,
     source: Source,
@@ -203,11 +315,13 @@ pub fn decide(
         .read(|c| statements::transaction_by_id(c, line_id))?
         .ok_or_else(|| AppError::NotFound(format!("No line {line_id}")))?;
     let item_key = checked_item_key(db, action, item_key)?;
+    let subscription_id = checked_subscription(db, action, subscription_id)?;
+    let always = always && action != Action::Subscription;
     let decision = DecisionRow {
         id: line.id.clone(),
         kind: action,
         item_key: item_key.clone(),
-        subscription_id: None,
+        subscription_id,
         document_id: None,
         rule_id: None,
         decided_at: now,

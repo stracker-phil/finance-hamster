@@ -13,3 +13,4 @@ import "./rules.css";
 import "./review.css";
 import "./documents.css";
 import "./year.css";
+import "./subscriptions.css";

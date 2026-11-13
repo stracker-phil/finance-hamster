@@ -1,4 +1,5 @@
-//! Brings the rule decisions of every line in line with a set of rules; hand decisions are never touched.
+//! Brings the rule decisions of every line in line with a set of rules, then with the subscriptions' own
+//! matching for lines no rule decides; hand decisions are never touched.
 
 use rusqlite::Connection;
 
@@ -8,6 +9,7 @@ use crate::accounts;
 use crate::db::Change;
 use crate::error::AppResult;
 use crate::statements::store as statements;
+use crate::subscriptions::matcher::Matchers;
 
 pub fn own_accounts(conn: &Connection) -> AppResult<Vec<OwnAccount>> {
     Ok(accounts::rows(conn)?
@@ -29,6 +31,17 @@ pub fn changes_except(
     now: i64,
     skipped: Option<&str>,
 ) -> AppResult<Vec<Change>> {
+    changes_with(conn, rules, &Matchers::load(conn)?, now, skipped)
+}
+
+/// Like `changes_except`, matching `subscriptions` as they will be after the op that carries the changes.
+pub fn changes_with(
+    conn: &Connection,
+    rules: &[RuleRow],
+    subscriptions: &Matchers,
+    now: i64,
+    skipped: Option<&str>,
+) -> AppResult<Vec<Change>> {
     let own = own_accounts(conn)?;
     let existing = store::decisions(conn)?;
     let mut changes = Vec::new();
@@ -37,7 +50,8 @@ pub fn changes_except(
         if current.is_some_and(DecisionRow::by_hand) || skipped == Some(line.id.as_str()) {
             continue;
         }
-        let wanted = engine::decide(rules, &line, &own, now);
+        let wanted =
+            engine::decide(rules, &line, &own, now).or_else(|| subscriptions.decide(&line, now));
         if let Some(change) = change_for(current, wanted)? {
             changes.push(change);
         }

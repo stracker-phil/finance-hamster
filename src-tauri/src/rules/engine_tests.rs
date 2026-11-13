@@ -1,5 +1,5 @@
 use super::builtin_rules;
-use super::engine::{Line, decide, matches};
+use super::engine::{Line, decide, line_text, matches};
 use super::store::{Action, DecisionRow, RuleRow};
 use super::tests::{HOUSEHOLD_IBAN, NOW, PRIVATE_IBAN, line, own_accounts, rule_row};
 use crate::statements::store::TransactionRow;
@@ -10,6 +10,22 @@ fn rule(tokens: &[&str]) -> RuleRow {
 
 fn holds(rule: &RuleRow, t: &TransactionRow) -> bool {
     matches(rule, &Line::of(t, &own_accounts()))
+}
+
+#[test]
+fn the_searched_text_joins_booking_text_extra_lines_merchant_and_counterparty_in_upper_case() {
+    let t = TransactionRow {
+        text: "Lastschrift".into(),
+        extra: r#"["ref: abc"]"#.into(),
+        merchant: Some("Zebra Shop".into()),
+        counterparty: Some("Zebra GmbH".into()),
+        ..line()
+    };
+
+    assert_eq!(
+        line_text(&t),
+        "LASTSCHRIFT\nREF: ABC\nZEBRA SHOP\nZEBRA GMBH"
+    );
 }
 
 #[test]

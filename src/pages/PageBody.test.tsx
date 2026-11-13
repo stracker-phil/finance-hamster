@@ -7,6 +7,7 @@ import { api } from "../api";
 import { archivedDocument, documentGroup, historyEntry } from "../test/documents";
 import { renderWithQuery } from "../test/renderWithQuery";
 import { reviewQueue } from "../test/review";
+import { subscriptionsView } from "../test/subscriptions";
 import { yearPage } from "../test/year";
 import { PageBody } from "./PageBody";
 
@@ -33,6 +34,15 @@ describe("PageBody", () => {
 
     expect(await screen.findByRole("button", { name: /Demo Cloud Ltd/ })).toBeTruthy();
     expect(screen.getByRole("textbox", { name: "Search documents" })).toBeTruthy();
+  });
+
+  it("shows the Subscriptions page on the subscriptions route", async () => {
+    mocked.subscriptionsView.mockResolvedValue(subscriptionsView());
+
+    renderWithQuery(<PageBody route={{ page: "subscriptions" }} />);
+
+    expect(await screen.findByRole("button", { name: /Lumen AI/ })).toBeTruthy();
+    expect(screen.getByText("1 active · €20.00 a month")).toBeTruthy();
   });
 
   it("shows the Review page on the review route", async () => {

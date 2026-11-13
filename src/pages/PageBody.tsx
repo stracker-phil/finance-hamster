@@ -7,6 +7,7 @@ import { EmptyPage } from "./EmptyPage";
 import { LogPage } from "./LogPage";
 import { ReviewPage } from "./ReviewPage";
 import { StatementsPage } from "./StatementsPage";
+import { SubscriptionsPage } from "./SubscriptionsPage";
 import { YearPage } from "./YearPage";
 
 /** The body of the current page. */
@@ -15,7 +16,7 @@ export function PageBody({ route }: { route: Route }) {
     case "today":
       return <EmptyPage title="You're up to date" text="Import a statement to get started." />;
     case "subscriptions":
-      return <EmptyPage title="No subscriptions" text="Subscriptions show here once you add one." />;
+      return <SubscriptionsPage />;
     case "statements":
       return <StatementsPage />;
     case "documents":

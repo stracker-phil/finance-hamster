@@ -232,7 +232,11 @@ fn entry(db: &Db, year: i32, id: &str) -> AppResult<EntryRow> {
 fn copy_evidence(config_dir: &Path, day: &str, text: &str, from: &Path) -> AppResult<String> {
     let bytes = std::fs::read(from)?;
     let name = slug(text);
-    let name = if name.is_empty() { "amount".into() } else { name };
+    let name = if name.is_empty() {
+        "amount".into()
+    } else {
+        name
+    };
     let base = format!("{}/{}/evidence/{day}-{name}.pdf", files::FOLDER, &day[..4]);
     files::copy_to(
         config_dir,

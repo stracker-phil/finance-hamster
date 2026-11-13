@@ -1,7 +1,7 @@
 import { getName, getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { Account, AccountEdit, AccountLines, Action, Elsewhere, YearPage, NewEntry, AddInput, AddPreview, ArchivedDocument, DeletionView, DocumentEdit, DocumentGroup, DocumentStep, DocumentView, HistoryEntry, VendorChange, VendorsView, Estimate, LineChoice, Coverage, ReviewQueue, RuleForm, RulesView, Frame, ImportPreview, PdfSource, AppError, AppInfo, CommandInfo, ErrorKind, EventName, EventPayloads, Imported, LaunchEvent, NewAccount, ReloadPreview, RulesFile, Settings, SettingsPatch, TaxYear } from "./types";
+import type { Account, AccountEdit, AccountLines, Action, Elsewhere, YearPage, NewEntry, SubscriptionsView, SubscriptionDetail, SubscriptionForm, PlanForm, MatchCount, AddInput, AddPreview, ArchivedDocument, DeletionView, DocumentEdit, DocumentGroup, DocumentStep, DocumentView, HistoryEntry, VendorChange, VendorsView, Estimate, LineChoice, Coverage, ReviewQueue, RuleForm, RulesView, Frame, ImportPreview, PdfSource, AppError, AppInfo, CommandInfo, ErrorKind, EventName, EventPayloads, Imported, LaunchEvent, NewAccount, ReloadPreview, RulesFile, Settings, SettingsPatch, TaxYear } from "./types";
 
 export * from "./types";
 
@@ -91,7 +91,21 @@ export const api = {
   vendorChange: (id: string, change: VendorChange) => invoke<string>("vendor_change", { id, change }),
   documentEstimate: (lineId: string | null, itemKey: string | null) => invoke<Estimate | null>("document_estimate", { lineId, itemKey }),
   /** Decides a line by hand; `always` also adds a rule for its key. The label of the change. */
-  reviewDecide: (lineId: string, action: Action, itemKey: string | null, always: boolean) => invoke<string>("review_decide", { lineId, action, itemKey, always }),
+  /** `subscriptionId` links a Subscription decision; the label of the change. */
+  reviewDecide: (lineId: string, action: Action, itemKey: string | null, subscriptionId: string | null, always: boolean) =>
+    invoke<string>("review_decide", { lineId, action, itemKey, subscriptionId, always }),
+  /** `query` keeps the subscriptions whose name or category contains it. */
+  subscriptionsView: (query: string) => invoke<SubscriptionsView>("subscriptions_view", { query }),
+  subscriptionDetail: (id: string) => invoke<SubscriptionDetail>("subscription_detail", { id }),
+  /** Adds a subscription (`id` null) or fixes one; the label of the change. */
+  subscriptionSave: (id: string | null, form: SubscriptionForm) => invoke<string>("subscription_save", { id, form }),
+  subscriptionChangePlan: (id: string, form: PlanForm) => invoke<string>("subscription_change_plan", { id, form }),
+  /** Ends a subscription on `endedOn`; null resumes it. */
+  subscriptionSetEnded: (id: string, endedOn: string | null) => invoke<string>("subscription_set_ended", { id, endedOn }),
+  subscriptionDelete: (id: string) => invoke<string>("subscription_delete", { id }),
+  subscriptionMatchCount: (form: SubscriptionForm) => invoke<MatchCount>("subscription_match_count", { form }),
+  /** A New sheet's form prefilled from a bank line. */
+  subscriptionPrefill: (lineId: string) => invoke<SubscriptionForm>("subscription_prefill", { lineId }),
   pdfViewShow: (source: PdfSource, frame: Frame) => invoke<void>("pdf_view_show", { source, frame }),
   pdfViewMove: (frame: Frame) => invoke<void>("pdf_view_move", { frame }),
   pdfViewHide: () => invoke<void>("pdf_view_hide"),

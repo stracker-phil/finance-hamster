@@ -12,9 +12,10 @@ use crate::documents::amounts::{anv_cents, default_work_share};
 use crate::documents::store as documents;
 use crate::error::AppResult;
 use crate::review::title_of as line_title;
-use crate::rules::store::{self as decisions, Action};
+use crate::rules::store::{self as decisions, Action, DecisionRow};
 use crate::settings::NumberFormat;
 use crate::statements::store as statements;
+use crate::subscriptions::{self, store::SubscriptionRow};
 use crate::taxrules::model::{Evidence, Ruleset};
 
 /// Amounts count for the whole year; trips sit in their month at the rate valid on their date.
@@ -91,6 +92,18 @@ pub(super) fn entry_rows(
     Ok(())
 }
 
+/// The item an ANV line counts on: its own, or its subscription's when that counts for ANV.
+fn anv_item(decision: &DecisionRow, subscriptions: &[SubscriptionRow]) -> Option<String> {
+    match decision.kind {
+        Action::Anv => decision.item_key.clone(),
+        Action::Subscription => subscriptions
+            .iter()
+            .find(|s| decision.subscription_id.as_ref() == Some(&s.id))
+            .and_then(|s| s.item_key.clone()),
+        Action::Ignore => None,
+    }
+}
+
 pub(super) fn decided_lines(
     db: &Db,
     year: i32,
@@ -105,14 +118,18 @@ pub(super) fn decided_lines(
         .map(|l| l.transaction_id)
         .collect();
     let decided = db.read(decisions::decisions)?;
+    let subscriptions = db.read(subscriptions::store::subscriptions)?;
     for line in db.read(statements::all_transactions)? {
         if !in_year(&line.value_date, year) || linked.contains(&line.id) {
             continue;
         }
-        let Some(decision) = decided.get(&line.id).filter(|d| d.kind == Action::Anv) else {
+        let Some(item_key) = decided
+            .get(&line.id)
+            .and_then(|d| anv_item(d, &subscriptions))
+        else {
             continue;
         };
-        let Some(item) = countable(&ruleset.items, decision.item_key.as_ref()) else {
+        let Some(item) = countable(&ruleset.items, Some(&item_key)) else {
             continue;
         };
         let title = line_title(&line);

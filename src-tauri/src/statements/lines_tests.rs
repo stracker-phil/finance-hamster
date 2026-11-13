@@ -9,6 +9,7 @@ use crate::rules::store::Action;
 use crate::rules::{RuleForm, ensure_builtins, save};
 use crate::settings::NumberFormat;
 use crate::test_support::statements::StatementLine;
+use crate::test_support::subscriptions::{add as add_subscription, form as subscription_form};
 
 const NOW: i64 = 1_700_000_000;
 
@@ -110,7 +111,7 @@ fn decided_october() -> (tempfile::TempDir, Db) {
 
 fn decide_by_hand(db: &Db, title: &str, action: Action) {
     let id = line_titled(&lines_of(db, "account-1"), title).id.clone();
-    review::decide(db, &id, action, None, false, NOW, Source::Ui).unwrap();
+    review::decide(db, &id, action, None, None, false, NOW, Source::Ui).unwrap();
 }
 
 #[test]
@@ -375,7 +376,24 @@ fn an_ignore_by_rule_says_so_and_an_ignore_by_hand_does_not() {
 #[test]
 fn a_subscription_decision_is_a_subscription_without_a_note() {
     let (_dir, db) = decided_october();
-    decide_by_hand(&db, "STREAMFLIX WIEN", Action::Subscription);
+    let subscription_id = add_subscription(
+        &db,
+        &subscription_form("Streamflix", "NO SUCH TEXT", "12.99"),
+    );
+    let line_id = line_titled(&lines_of(&db, "account-1"), "STREAMFLIX WIEN")
+        .id
+        .clone();
+    review::decide(
+        &db,
+        &line_id,
+        Action::Subscription,
+        None,
+        Some(subscription_id),
+        false,
+        NOW,
+        Source::Ui,
+    )
+    .unwrap();
 
     let page = lines_of(&db, "account-1");
 

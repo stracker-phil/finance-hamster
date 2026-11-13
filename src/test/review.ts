@@ -14,6 +14,7 @@ export function reviewLine(patch: Partial<ReviewLine> = {}): ReviewLine {
     suggestion: null,
     itemKey: null,
     itemWhy: null,
+    planChanged: null,
     ...patch,
   };
 }
@@ -26,5 +27,5 @@ export const ITEMS: ItemOption[] = [
 
 /** A demo review queue, with `patch` applied. */
 export function reviewQueue(patch: Partial<ReviewQueue> = {}): ReviewQueue {
-  return { lines: [reviewLine()], items: ITEMS, ...patch };
+  return { lines: [reviewLine()], items: ITEMS, subscriptions: [], ...patch };
 }

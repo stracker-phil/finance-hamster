@@ -586,6 +586,64 @@ fn an_anv_bank_line_on_an_item_without_a_document_counts_at_the_items_default_wo
 }
 
 #[test]
+fn a_subscription_charge_counts_on_the_item_of_its_subscription_and_one_without_an_item_does_not() {
+    use crate::test_support::subscriptions::{insert_rows, plan_row, subscription_row};
+    let (_dir, db) = open_year();
+    let mut with_item = subscription_row("sub-copy", "Copy Club", "COPYSHOP");
+    with_item.item_key = Some("tips".into());
+    insert_rows(
+        &db,
+        &with_item,
+        &[plan_row("plan-1", "sub-copy", 5_000, "2026-01-01", None)],
+    );
+    let without_item = subscription_row("sub-plain", "Plain Club", "PLAIN");
+    insert_rows(
+        &db,
+        &without_item,
+        &[plan_row("plan-2", "sub-plain", 1_000, "2026-01-01", None)],
+    );
+    add_lines(
+        &db,
+        &[
+            debit("l-copy", "2026-09-09", -5_000, "Lastschrift COPYSHOP"),
+            debit("l-plain", "2026-09-10", -1_000, "Lastschrift PLAIN"),
+        ],
+    );
+    for (line, subscription) in [("l-copy", "sub-copy"), ("l-plain", "sub-plain")] {
+        insert(
+            &db,
+            decisions::DECISIONS,
+            &DecisionRow {
+                id: line.into(),
+                kind: Action::Subscription,
+                item_key: None,
+                subscription_id: Some(subscription.into()),
+                document_id: None,
+                rule_id: None,
+                decided_at: 1,
+            },
+        );
+    }
+
+    let page = year_page(&db);
+
+    assert_eq!(
+        rows_of(&page, "722"),
+        [YearRow {
+            id: "l-copy".into(),
+            kind: RowKind::Line,
+            title: "Lastschrift COPYSHOP".into(),
+            detail: "9 Sep · bank line".into(),
+            amount: "€40.00".into(),
+            draft: false,
+            carried_from: None,
+            kz: "722".into(),
+            attach: false,
+        }]
+    );
+}
+
+#[test]
 fn kennzahlen_follow_the_rules_file_with_a_copy_value_and_skip_hidden_items() {
     let (_dir, db) = counted_entries();
     finished(&db, "doc-h", "secret", "2026-02-02", 2_000, 100);

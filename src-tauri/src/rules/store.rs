@@ -92,7 +92,7 @@ pub struct DecisionRow {
     pub item_key: Option<String>,
     pub subscription_id: Option<String>,
     pub document_id: Option<String>,
-    /// None when decided by hand.
+    /// The rule, or the subscription, that decided it; None when decided by hand.
     pub rule_id: Option<String>,
     pub decided_at: i64,
 }

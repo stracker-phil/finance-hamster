@@ -2,7 +2,9 @@ use std::collections::HashMap;
 
 use tempfile::TempDir;
 
-use super::{ReviewLine, ReviewQueue, decide, key_of, queue, title_of, undecided_by_account};
+use super::{
+    PlanChanged, ReviewLine, ReviewQueue, decide, key_of, queue, title_of, undecided_by_account,
+};
 use crate::date::DateOrder;
 use crate::db::{Db, Source, Written};
 use crate::error::AppError;
@@ -11,8 +13,10 @@ use crate::settings::NumberFormat;
 use crate::statements::import;
 use crate::statements::import_tests::{october, open_with_accounts, open_with_accounts_and_year};
 use crate::statements::store::{self as statements, TransactionRow};
+use crate::subscriptions::store as subscription_store;
 use crate::test_support::demo::seed_if_empty;
 use crate::test_support::statements::{Statement, demo_month};
+use crate::test_support::subscriptions::{add as add_subscription, form as subscription_form};
 use crate::test_support::temp_config_dir;
 
 const NOW: i64 = 1_700_000_000;
@@ -76,6 +80,22 @@ fn decision_of(db: &Db, title: &str, month: u32) -> Option<DecisionRow> {
     decisions(db).remove(&line_id(db, title, month))
 }
 
+/// The id of a subscription whose text matches no demo line, so a hand decision can link to it.
+fn hand_linked_subscription(db: &Db) -> String {
+    let existing = db
+        .read(subscription_store::subscriptions)
+        .unwrap()
+        .into_iter()
+        .find(|s| s.name == "Hand Linked");
+    match existing {
+        Some(sub) => sub.id,
+        None => add_subscription(
+            db,
+            &subscription_form("Hand Linked", "NO SUCH TEXT", "1.00"),
+        ),
+    }
+}
+
 fn decide_line(
     db: &Db,
     title: &str,
@@ -84,11 +104,13 @@ fn decide_line(
     item_key: Option<&str>,
     always: bool,
 ) -> Written {
+    let subscription_id = (action == Action::Subscription).then(|| hand_linked_subscription(db));
     decide(
         db,
         &line_id(db, title, month),
         action,
         item_key.map(Into::into),
+        subscription_id,
         always,
         NOW + 5,
         Source::Ui,
@@ -231,6 +253,7 @@ fn a_queued_line_shows_its_account_date_amount_raw_text_and_key() {
             suggestion: None,
             item_key: None,
             item_why: None,
+            plan_changed: None,
         }]
     );
     let card = &waiting(&queue, "STREAMFLIX WIEN")[0];
@@ -336,7 +359,7 @@ fn a_suggestion_without_an_item_has_no_item_hint() {
 }
 
 #[test]
-fn the_seeded_demo_keeps_the_streaming_ai_and_cafe_lines_in_the_queue() {
+fn the_seeded_demo_keeps_only_the_cafe_lines_in_the_queue() {
     let dir = temp_config_dir();
     let db = Db::open(dir.path()).unwrap();
     seed_if_empty(
@@ -351,13 +374,14 @@ fn the_seeded_demo_keeps_the_streaming_ai_and_cafe_lines_in_the_queue() {
     let mut distinct: Vec<&str> = titles(&queue);
     distinct.sort_unstable();
     distinct.dedup();
+    assert_eq!(distinct, ["CAFE LINDE DORNBIRN"]);
     assert_eq!(
-        distinct,
-        [
-            "CAFE LINDE DORNBIRN",
-            "LUMEN AI SAN FRANCISCO",
-            "STREAMFLIX WIEN"
-        ]
+        queue
+            .subscriptions
+            .iter()
+            .map(|s| s.name.as_str())
+            .collect::<Vec<_>>(),
+        ["Lumen AI", "Streamflix"]
     );
 }
 
@@ -453,7 +477,16 @@ fn an_item_decision_needs_an_item_of_the_year() {
     let id = line_id(&db, "BUCHHANDLUNG SEITENWEISE", 10);
 
     for item in [None, Some("no-such-item".to_string()), Some(String::new())] {
-        let result = decide(&db, &id, Action::Anv, item.clone(), true, NOW, Source::Ui);
+        let result = decide(
+            &db,
+            &id,
+            Action::Anv,
+            item.clone(),
+            None,
+            true,
+            NOW,
+            Source::Ui,
+        );
         assert_eq!(invalid_field(result), "review.item", "{item:?}");
     }
 
@@ -469,6 +502,7 @@ fn deciding_an_unknown_line_is_not_found() {
         &db,
         "no-such-line",
         Action::Ignore,
+        None,
         None,
         false,
         NOW,
@@ -608,4 +642,151 @@ fn undoing_a_decision_with_a_rule_reverts_the_decision_the_rule_and_its_lines_in
     assert_eq!(rules(&db), vec![]);
     assert_eq!(decisions(&db), HashMap::new());
     assert_eq!(queue_of(&db).lines.len(), 14);
+}
+
+#[test]
+fn a_subscription_decision_needs_an_existing_subscription() {
+    let (_dir, db) = imported(&[october()]);
+    let id = line_id(&db, "STREAMFLIX WIEN", 10);
+
+    for subscription in [
+        None,
+        Some("no-such-subscription".to_string()),
+        Some(String::new()),
+    ] {
+        let result = decide(
+            &db,
+            &id,
+            Action::Subscription,
+            None,
+            subscription.clone(),
+            false,
+            NOW,
+            Source::Ui,
+        );
+        assert_eq!(
+            invalid_field(result),
+            "review.subscription",
+            "{subscription:?}"
+        );
+    }
+
+    assert_eq!(decisions(&db), HashMap::new());
+}
+
+#[test]
+fn a_subscription_decision_links_the_line_and_never_creates_a_rule() {
+    let (_dir, db) = imported(&[september(), october()]);
+    let subscription_id = hand_linked_subscription(&db);
+
+    let result = decide(
+        &db,
+        &line_id(&db, "STREAMFLIX WIEN", 10),
+        Action::Subscription,
+        None,
+        Some(subscription_id.clone()),
+        true,
+        NOW + 5,
+        Source::Ui,
+    )
+    .unwrap();
+
+    assert_eq!(
+        result,
+        written("Subscription: STREAMFLIX WIEN", &["decisions"])
+    );
+    assert_eq!(
+        decision_of(&db, "STREAMFLIX WIEN", 10),
+        Some(DecisionRow {
+            id: line_id(&db, "STREAMFLIX WIEN", 10),
+            kind: Action::Subscription,
+            item_key: None,
+            subscription_id: Some(subscription_id),
+            document_id: None,
+            rule_id: None,
+            decided_at: NOW + 5,
+        })
+    );
+    assert_eq!(rules(&db), vec![]);
+    assert_eq!(decision_of(&db, "STREAMFLIX WIEN", 9), None);
+}
+
+#[test]
+fn a_decision_other_than_subscription_links_no_subscription() {
+    let (_dir, db) = imported(&[october()]);
+    let subscription_id = hand_linked_subscription(&db);
+
+    decide(
+        &db,
+        &line_id(&db, "CAFE LINDE DORNBIRN", 10),
+        Action::Ignore,
+        None,
+        Some(subscription_id),
+        false,
+        NOW,
+        Source::Ui,
+    )
+    .unwrap();
+
+    let decision = decision_of(&db, "CAFE LINDE DORNBIRN", 10).unwrap();
+    assert_eq!(decision.subscription_id, None);
+}
+
+#[test]
+fn the_queue_offers_only_active_subscriptions() {
+    let (_dir, db) = imported(&[october()]);
+    let mut ended = subscription_form("Tonfeld Audiobooks", "TONFELD", "9.95");
+    ended.active = false;
+    ended.ended_on = Some("2026-06-30".into());
+    add_subscription(&db, &ended);
+    add_subscription(
+        &db,
+        &subscription_form("Streamflix", "NO SUCH TEXT", "12.99"),
+    );
+
+    let options: Vec<_> = queue_of(&db)
+        .subscriptions
+        .into_iter()
+        .map(|s| (s.name, s.letter, s.tone))
+        .collect();
+
+    assert_eq!(options, [("Streamflix".to_string(), "S".to_string(), 1)]);
+}
+
+#[test]
+fn a_line_matching_a_subscription_at_another_amount_asks_whether_the_plan_changed() {
+    let (_dir, db) = imported(&[october()]);
+    let mut form = subscription_form("Lumen AI", "LUMEN AI", "20.00");
+    form.currency = "USD".into();
+    let id = add_subscription(&db, &form);
+
+    let queue = queue_of(&db);
+
+    let lumen = &waiting(&queue, "LUMEN AI SAN FRANCISCO")[0];
+    assert_eq!(
+        lumen.plan_changed,
+        Some(PlanChanged {
+            subscription_id: id,
+            name: "Lumen AI".into(),
+            text: "Lumen AI usually charges USD 20.00; this charge is USD 24.00.".into(),
+            amount: "24.00".into(),
+            currency: "USD".into(),
+            date: "2026-10-10".into(),
+        })
+    );
+    assert_eq!(waiting(&queue, "CAFE LINDE DORNBIRN")[0].plan_changed, None);
+}
+
+#[test]
+fn a_line_at_the_planned_amount_is_decided_and_leaves_the_queue() {
+    let (_dir, db) = imported(&[october()]);
+    let id = add_subscription(&db, &subscription_form("Streamflix", "STREAMFLIX", "12.99"));
+
+    let decision = decision_of(&db, "STREAMFLIX WIEN", 10).unwrap();
+
+    assert_eq!(
+        (decision.kind, decision.subscription_id, decision.rule_id),
+        (Action::Subscription, Some(id.clone()), Some(id))
+    );
+    assert!(waiting(&queue_of(&db), "STREAMFLIX WIEN").is_empty());
 }

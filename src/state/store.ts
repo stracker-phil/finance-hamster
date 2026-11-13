@@ -1,8 +1,14 @@
-import type { AddPreview, ImportPreview } from "../api";
+import type { AddPreview, ImportPreview, PlanForm, SubscriptionForm } from "../api";
 import { create } from "zustand";
 import { HOME, sameRoute, type Route } from "./route";
 
 export type ToastKind = "success" | "info" | "error";
+
+/** New starts empty or from a bank line; Edit and Change Plan start from the subscription. */
+export type SubscriptionSheet =
+  | { kind: "new"; form: SubscriptionForm | null }
+  | { kind: "edit"; id: string; form: SubscriptionForm }
+  | { kind: "plan"; id: string; name: string; currentPlan: string; form: PlanForm };
 
 export interface Toast {
   id: number;
@@ -49,6 +55,9 @@ export interface AppStore {
   importPreview: ImportPreview | null;
   addPreview: AddPreview | null;
   setAddPreview: (preview: AddPreview | null) => void;
+  /** The open New, Edit or Change Plan sheet of a subscription. */
+  subscriptionSheet: SubscriptionSheet | null;
+  setSubscriptionSheet: (sheet: SubscriptionSheet | null) => void;
   setImportPreview: (preview: ImportPreview | null) => void;
 
   /** How many overlays (sheets, menus, toasts, tooltips) are open; the native PDF preview hides while any is. */
@@ -113,6 +122,8 @@ export const useStore = create<AppStore>((set, get) => ({
   importPreview: null,
   addPreview: null,
   setAddPreview: (addPreview) => set({ addPreview }),
+  subscriptionSheet: null,
+  setSubscriptionSheet: (subscriptionSheet) => set({ subscriptionSheet }),
   setImportPreview: (importPreview) => set({ importPreview }),
 
   pdfCovers: 0,

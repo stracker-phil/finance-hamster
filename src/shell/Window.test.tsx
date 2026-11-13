@@ -18,7 +18,7 @@ const mocked = vi.mocked(api, true);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useStore.setState({ route: HOME, back: [], forward: [], filter: "", toasts: [], confirmation: null, paletteOpen: false, pdfCovers: 0, importPreview: null, addPreview: null });
+  useStore.setState({ route: HOME, back: [], forward: [], filter: "", toasts: [], confirmation: null, paletteOpen: false, pdfCovers: 0, importPreview: null, addPreview: null, subscriptionSheet: null });
   mocked.runCommand.mockResolvedValue(undefined);
   mocked.listCommands.mockResolvedValue([]);
   mocked.listAccounts.mockResolvedValue([account()]);
@@ -470,11 +470,16 @@ describe("New menu", () => {
     expect(useStore.getState().addPreview).toEqual(preview);
   });
 
-  it("keeps the items of later features disabled", async () => {
+  it("opens the New Subscription sheet when New Subscription is chosen, and closes the menu", async () => {
     render(<Window />);
     await openMenu();
 
-    expect(screen.getByRole("menuitem", { name: /New Subscription/ })).toBeDisabled();
+    const item = screen.getByRole("menuitem", { name: /New Subscription/ });
+    expect(item).toBeEnabled();
+    await userEvent.click(item);
+
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(await screen.findByRole("dialog", { name: "New Subscription" })).toBeTruthy();
   });
 
   it("closes on Escape", async () => {

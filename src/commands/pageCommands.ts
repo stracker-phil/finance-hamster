@@ -4,6 +4,7 @@ import { isTypingTarget } from "./pageKeys";
 import { FILTER_FIELD_ID } from "../shell/Header";
 import { startAddDocument } from "../documents/addFlow";
 import { startImport } from "../statements/importFlow";
+import { newSubscription } from "../subscriptions/flow";
 import { useStore } from "../state/store";
 
 type Handler = () => void;
@@ -42,6 +43,7 @@ const HANDLERS: Record<string, Handler> = {
   "palette.open": () => useStore.getState().setPaletteOpen(true),
   "statement.import": startImport,
   "document.add": startAddDocument,
+  "subscription.new": newSubscription,
   "filter.focus": () => document.getElementById(FILTER_FIELD_ID)?.focus(),
 };
 

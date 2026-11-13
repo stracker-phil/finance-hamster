@@ -10,12 +10,14 @@ import { archivedDocument, deletionView, documentGroup, documentRow, documentVie
 import { ruleView, rulesView } from "../test/lineRules";
 import { reviewLine, reviewQueue } from "../test/review";
 import { accountCoverage, accountLines, coverage, lineView, statementGroup } from "../test/statements";
+import { subscriptionDetail, subscriptionForm, subscriptionsView } from "../test/subscriptions";
 import { elsewhere, yearPage } from "../test/year";
 import { useAccounts } from "./accounts";
 import { useArchive, useDeletions, useDocument, useDocumentHistory, useDocumentLineOptions, useDocuments, useVendors, useYearLog } from "./documents";
 import { useLineRules } from "./lineRules";
 import { useReviewQueue } from "./review";
 import { useAccountLines, useCoverage } from "./statements";
+import { useMatchCount, useSubscription, useSubscriptions } from "./subscriptions";
 import { useTaxYears } from "./taxYears";
 import { useElsewhere, useYearPage } from "./year";
 import { useEvents } from "./useEvents";
@@ -363,6 +365,56 @@ describe("useEvents", () => {
       for (const key of Object.keys(shown) as (keyof typeof shown)[]) {
         if (!(refreshed as readonly string[]).includes(key)) expect(screen.getByText(shown[key][0])).toBeTruthy();
       }
+    });
+  });
+
+  describe("subscriptions", () => {
+    function SubscriptionsProbe() {
+      useEvents();
+      const { data: view } = useSubscriptions("");
+      const { data: detail } = useSubscription("sub-1");
+      const { data: count } = useMatchCount(subscriptionForm());
+      return (
+        <>
+          <p>List: {view?.summary}</p>
+          <p>Detail: {detail?.name}</p>
+          <p>Count: {count?.text}</p>
+        </>
+      );
+    }
+
+    const shown = {
+      list: ["List: Old summary", "List: New summary"],
+      detail: ["Detail: Old Name", "Detail: New Name"],
+      count: ["Count: Old count", "Count: New count"],
+    } as const;
+
+    beforeEach(() => {
+      mocked.subscriptionsView.mockResolvedValue(subscriptionsView({ summary: "Old summary" }));
+      mocked.subscriptionDetail.mockResolvedValue(subscriptionDetail({ name: "Old Name" }));
+      mocked.subscriptionMatchCount.mockResolvedValue({ text: "Old count", count: 1 });
+    });
+
+    it.each(["subscriptions", "plans", "decisions"])("refetches the list, the detail and the match count when data_changed names the %s table", async (table) => {
+      renderWithQuery(<SubscriptionsProbe />);
+      for (const [old] of Object.values(shown)) await screen.findByText(old);
+      mocked.subscriptionsView.mockResolvedValue(subscriptionsView({ summary: "New summary" }));
+      mocked.subscriptionDetail.mockResolvedValue(subscriptionDetail({ name: "New Name" }));
+      mocked.subscriptionMatchCount.mockResolvedValue({ text: "New count", count: 2 });
+
+      await emitDataChanged([table]);
+
+      for (const [, fresh] of Object.values(shown)) expect(await screen.findByText(fresh)).toBeTruthy();
+    });
+
+    it("keeps the subscriptions when data_changed names an unrelated table", async () => {
+      renderWithQuery(<SubscriptionsProbe />);
+      for (const [old] of Object.values(shown)) await screen.findByText(old);
+      mocked.subscriptionsView.mockResolvedValue(subscriptionsView({ summary: "New summary" }));
+
+      await emitDataChanged(["accounts"]);
+
+      expect(screen.getByText("List: Old summary")).toBeTruthy();
     });
   });
 

@@ -2,13 +2,8 @@ import { useState } from "react";
 import { FileText } from "lucide-react";
 import { api, toAppError, type KennzahlView, type NewEntry } from "../api";
 import { useStore } from "../state/store";
-import { showError, undoToast } from "./entryActions";
-
-const today = () => {
-  const now = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-};
+import { showError, undoToast } from "../lib/undoToast";
+import { today } from "../lib/today";
 
 /** A date in `year`: today while it is that year, else the year's last day. */
 const startDate = (year: number) => (today().startsWith(String(year)) ? today() : `${year}-12-31`);

@@ -25,6 +25,7 @@ pub fn review_decide(
     line_id: String,
     action: Action,
     item_key: Option<String>,
+    subscription_id: Option<String>,
     always: bool,
 ) -> AppResult<String> {
     let written = super::decide(
@@ -32,6 +33,7 @@ pub fn review_decide(
         &line_id,
         action,
         item_key,
+        subscription_id,
         always,
         chrono::Utc::now().timestamp_millis(),
         Source::Ui,

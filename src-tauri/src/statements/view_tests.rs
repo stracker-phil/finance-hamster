@@ -222,7 +222,7 @@ fn the_seeded_demo_accounts_are_current_but_have_lines_to_review() {
     let (_dir, db) = seeded();
     let overview = overview(&db);
 
-    for (name, waiting) in [("Private", 32), ("Household", 29), ("Business", 8)] {
+    for (name, waiting) in [("Private", 10), ("Household", 9), ("Business", 2)] {
         let account = account(&overview, name);
         assert_eq!(account.state, AccountState::Review, "{name}");
         assert_eq!(account.to_review, waiting, "{name}");

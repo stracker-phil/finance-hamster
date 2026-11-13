@@ -1,16 +1,11 @@
-import { useRef, useState, type RefObject } from "react";
+import { useRef, useState } from "react";
 import { Check } from "lucide-react";
-import { api, toAppError, type Action, type ItemOption, type ReviewLine } from "../api";
+import { api, toAppError, type Action, type ReviewLine } from "../api";
 import { usePageKeys } from "../commands/pageKeys";
-import { accountTone } from "../lib/accountTone";
 import { useReviewQueue } from "../queries/review";
+import { CHOICES, NEW_SUBSCRIPTION, ReviewCard, type Choice } from "../review/ReviewCard";
 import { useStore } from "../state/store";
-
-const CHOICES: { action: Action; key: string; label: string; hint: string }[] = [
-  { action: "anv", key: "A", label: "ANV", hint: "Counts for the tax year" },
-  { action: "subscription", key: "S", label: "Subscription", hint: "Recurring payment" },
-  { action: "ignore", key: "I", label: "Ignore", hint: "Not relevant" },
-];
+import { changePlan, newSubscriptionFrom } from "../subscriptions/flow";
 
 const SKIP_KEY = "J";
 
@@ -44,75 +39,12 @@ function AllReviewed({ decided, rules }: { decided: number; rules: number }) {
   );
 }
 
-interface CardProps {
-  line: ReviewLine;
-  items: ItemOption[];
-  item: string;
-  itemChosen: boolean;
-  always: boolean;
-  error: string | null;
-  busy: boolean;
-  itemSelect: RefObject<HTMLSelectElement | null>;
-  onDecide: (action: Action) => void;
-  onItem: (key: string) => void;
-  onAlways: (on: boolean) => void;
-}
-
-function ReviewCard({ line, items, item, itemChosen, always, error, busy, itemSelect, onDecide, onItem, onAlways }: CardProps) {
-  const suggested = CHOICES.find((c) => c.action === line.suggestion);
-  return (
-    <article className="review-card" aria-label={line.title}>
-      <div className="review-card__account">
-        <span className={`tile tile--small ${accountTone(line.accountIndex)}`}>{line.accountName.slice(0, 1).toUpperCase()}</span>
-        {line.accountName} · {line.date}
-      </div>
-      <div className="review-card__head">
-        <h2 className="review-card__title">{line.title}</h2>
-        <div className="review-card__amount">{line.amount}</div>
-      </div>
-      <pre className="review-card__raw">{line.raw}</pre>
-      <div className="review-card__choices">
-        {CHOICES.map((c) => (
-          <button key={c.action} className={c === suggested ? "tbig tbig--suggested" : "tbig"} aria-label={`${c.label} (${c.key})`} disabled={busy} onClick={() => onDecide(c.action)}>
-            <span className="kbd">{c.key}</span>
-            <span className="tbig__label">{c.label}</span>
-            <span className="tbig__hint">{c.hint}</span>
-          </button>
-        ))}
-      </div>
-      <div className="review-card__item">
-        <label htmlFor="review-item">If ANV, counts as</label>
-        <select id="review-item" ref={itemSelect} className="field" value={item} onChange={(e) => onItem(e.target.value)}>
-          <option value="">Choose an item</option>
-          {items.map((i) => (
-            <option key={i.key} value={i.key}>
-              {i.label}
-            </option>
-          ))}
-        </select>
-        {line.itemWhy && !itemChosen && <span className="review-card__why">{line.itemWhy}</span>}
-      </div>
-      <div className="form-field__error review-card__error" role={error ? "alert" : undefined}>
-        {error ?? ""}
-      </div>
-      {suggested && (
-        <div className="review-card__suggestion">
-          Suggested: {suggested.label}, as before for “{line.key}”
-        </div>
-      )}
-      <label className="review-card__always">
-        <input type="checkbox" checked={always} onChange={(e) => onAlways(e.target.checked)} />
-        Always do this for “{line.key}”
-      </label>
-    </article>
-  );
-}
-
 export function ReviewPage() {
   const { data } = useReviewQueue();
   const [position, setPosition] = useState(0);
   const [items, setItems] = useState<Record<string, string>>({});
   const [always, setAlways] = useState<Record<string, boolean>>({});
+  const [subscriptions, setSubscriptions] = useState<Record<string, string>>({});
   const [session, setSession] = useState({ decided: 0, rules: 0 });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -123,13 +55,17 @@ export function ReviewPage() {
 
   const itemOf = (line: ReviewLine) => items[line.id] ?? line.itemKey ?? "";
 
-  const decide = (action: Action) => {
+  const alwaysOn = current ? (always[current.id] ?? false) : false;
+  const pickedSubscription = current ? (subscriptions[current.id] ?? NEW_SUBSCRIPTION) : NEW_SUBSCRIPTION;
+
+  const sendDecision = (action: Action, subscriptionId: string | null) => {
     if (!current || busy) return;
-    const rule = always[current.id] ?? false;
+    // Rust makes no rule for a Subscription decision; the done count follows it.
+    const rule = alwaysOn && action !== "subscription";
     setBusy(true);
     setError(null);
     api
-      .reviewDecide(current.id, action, itemOf(current) || null, rule)
+      .reviewDecide(current.id, action, itemOf(current) || null, subscriptionId, alwaysOn)
       .then((label) => {
         setSession((s) => ({ decided: s.decided + 1, rules: s.rules + (rule ? 1 : 0) }));
         useStore.getState().showToast("success", label, { label: "Undo", run: undo });
@@ -142,6 +78,33 @@ export function ReviewPage() {
       .finally(() => setBusy(false));
   };
 
+  const decide = (action: Action) => {
+    if (!current) return;
+    if (action === "subscription" && pickedSubscription === NEW_SUBSCRIPTION) newSubscriptionFrom(current.id);
+    else sendDecision(action, action === "subscription" ? pickedSubscription : null);
+  };
+
+  const updatePlan = () => {
+    const plan = current?.planChanged;
+    if (!plan) return;
+    api
+      .subscriptionDetail(plan.subscriptionId)
+      .then((detail) => changePlan(detail, plan))
+      .catch((e: unknown) => setError(toAppError(e).message));
+  };
+
+  const choices = (line: ReviewLine): Choice[] => {
+    const plan = line.planChanged;
+    if (plan)
+      return [
+        { key: "U", label: "Update Plan", hint: "A new plan from this charge", suggested: true, run: updatePlan },
+        { key: "O", label: "One-off", hint: `Keep the plan; link it to ${plan.name}`, run: () => sendDecision("subscription", plan.subscriptionId) },
+        { key: "N", label: "New Subscription", hint: "A different service", run: () => newSubscriptionFrom(line.id) },
+      ];
+    return CHOICES.map((c) => ({ key: c.key, label: c.label, hint: c.hint, suggested: c.action === line.suggestion, run: () => decide(c.action) }));
+  };
+  const shown = current ? choices(current) : [];
+
   const skip = () => {
     if (lines.length > 0) setPosition((index + 1) % lines.length);
   };
@@ -149,7 +112,7 @@ export function ReviewPage() {
     if (index > 0) setPosition(index - 1);
   };
 
-  usePageKeys({ ...Object.fromEntries(CHOICES.map((c) => [c.key.toLowerCase(), () => decide(c.action)])), [SKIP_KEY.toLowerCase()]: skip });
+  usePageKeys({ ...Object.fromEntries(shown.map((c) => [c.key.toLowerCase(), c.run])), [SKIP_KEY.toLowerCase()]: skip });
 
   if (!data) return null;
   if (!current) return <AllReviewed decided={session.decided} rules={session.rules} />;
@@ -165,15 +128,18 @@ export function ReviewPage() {
         </div>
         <ReviewCard
           line={current}
+          choices={shown}
           items={data.items}
+          subscriptions={data.subscriptions}
           item={itemOf(current)}
           itemChosen={current.id in items}
-          always={always[current.id] ?? false}
+          subscription={pickedSubscription}
+          always={alwaysOn}
           error={error}
           busy={busy}
           itemSelect={itemSelect}
-          onDecide={decide}
           onItem={(key) => setItems((m) => ({ ...m, [current.id]: key }))}
+          onSubscription={(id) => setSubscriptions((m) => ({ ...m, [current.id]: id }))}
           onAlways={(on) => setAlways((m) => ({ ...m, [current.id]: on }))}
         />
         <div className="review__nav">
@@ -181,7 +147,7 @@ export function ReviewPage() {
             ← Previous
           </button>
           <span className="review__keys">
-            {CHOICES.map((c) => (
+            {shown.map((c) => (
               <span key={c.key} className="kbd">
                 {c.key}
               </span>

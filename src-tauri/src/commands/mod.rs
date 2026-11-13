@@ -53,6 +53,7 @@ pub const COMMANDS: &[CommandDef] = &[
     page("palette.open", "Command Palette…", Some("CmdOrCtrl+K")),
     page("statement.import", "Import Statement…", Some("CmdOrCtrl+I")),
     page("document.add", "Add Invoice PDF…", Some("CmdOrCtrl+O")),
+    page("subscription.new", "New Subscription", Some("CmdOrCtrl+N")),
     page("filter.focus", "Filter This Page", Some("CmdOrCtrl+F")),
     CommandDef {
         id: "settings.open",

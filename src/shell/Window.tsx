@@ -10,6 +10,8 @@ import { useDocument } from "../queries/documents";
 import { useTaxYears } from "../queries/taxYears";
 import { AddDocumentSheet } from "../documents/AddDocumentSheet";
 import { ImportSheet } from "../statements/ImportSheet";
+import { PlanSheetHost } from "../subscriptions/PlanSheet";
+import { SubscriptionSheetHost } from "../subscriptions/SubscriptionSheet";
 import { useStore } from "../state/store";
 import { Header } from "./Header";
 import { Sidebar } from "./Sidebar";
@@ -53,6 +55,8 @@ export function Window() {
       </main>
       {importSheet}
       {addPreview && <AddDocumentSheet preview={addPreview} />}
+      <SubscriptionSheetHost />
+      <PlanSheetHost />
       <CommandPalette />
       <Toasts />
       <ConfirmHost />

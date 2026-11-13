@@ -50,3 +50,4 @@ Why Hamster is built the way it is. One record per decision, in Nygard format, a
 | [0038](0038-tax-rules-are-versioned-data-per-year.md) | Tax rules are versioned data per year, split into copy values and preview | Superseded by 0040 |
 | [0039](0039-werbungskosten-only-open-for-other-l1-sections.md) | Werbungskosten only, open for other L1 sections | Accepted (2026-11-13); partly superseded by 0040 |
 | [0040](0040-tax-rules-live-in-a-json-file-per-year.md) | Tax rules live in a JSON file per year; the tax year shows one copy value per Kennzahl | Accepted (2026-11-13) |
+| [0041](0041-subscriptions-match-their-own-charges.md) | Subscriptions match their own charges, by plan period | Accepted (2026-11-13) |

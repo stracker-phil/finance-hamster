@@ -183,6 +183,31 @@ pub const MIGRATIONS: &[&str] = &[
         created_at INTEGER NOT NULL
     );
     CREATE INDEX entries_year ON entries (year);",
+    // 10: subscriptions and their plans; a plan's period decides which plan a charge belongs to.
+    "CREATE TABLE subscriptions (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        tone INTEGER NOT NULL,
+        category TEXT NOT NULL,
+        ended_on TEXT,
+        reminder TEXT NOT NULL,
+        item_key TEXT,
+        match_text TEXT NOT NULL,
+        tolerance_cents INTEGER,
+        created_at INTEGER NOT NULL
+    );
+    CREATE TABLE plans (
+        id TEXT PRIMARY KEY,
+        subscription_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        cents INTEGER NOT NULL,
+        currency TEXT NOT NULL,
+        interval TEXT NOT NULL,
+        start TEXT NOT NULL,
+        end TEXT,
+        created_at INTEGER NOT NULL
+    );
+    CREATE INDEX plans_subscription ON plans (subscription_id);",
 ];
 
 pub fn version(conn: &Connection) -> AppResult<usize> {
@@ -244,14 +269,33 @@ mod tests {
             "documents",
             "entries",
             "journal",
+            "plans",
             "rules",
             "statements",
+            "subscriptions",
             "tax_years",
             "transactions",
             "vendors",
         ]
         .map(String::from)
         .to_vec()
+    }
+
+    #[test]
+    fn a_file_at_version_nine_gains_subscriptions_and_plans_and_keeps_its_entries() {
+        let dir = temp_config_dir();
+        let mut conn = Connection::open(dir.path().join("v9.sqlite")).unwrap();
+        for sql in &MIGRATIONS[..9] {
+            conn.execute_batch(sql).unwrap();
+        }
+        conn.pragma_update(None, "user_version", 9i64).unwrap();
+        assert!(!tables(&conn).contains(&"subscriptions".to_string()));
+
+        migrate(&mut conn).unwrap();
+
+        assert_eq!(version(&conn).unwrap(), MIGRATIONS.len());
+        assert_eq!(tables(&conn), all_tables());
+        assert!(tables(&conn).contains(&"entries".to_string()));
     }
 
     #[test]

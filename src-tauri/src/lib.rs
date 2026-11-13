@@ -29,6 +29,7 @@ pub mod settings;
 pub mod state;
 pub mod statements;
 pub mod store;
+pub mod subscriptions;
 pub mod taxrules;
 pub mod taxyears;
 #[cfg(any(test, debug_assertions, feature = "test-util"))]

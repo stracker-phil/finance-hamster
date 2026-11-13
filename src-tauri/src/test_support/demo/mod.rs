@@ -11,6 +11,7 @@ use crate::error::AppResult;
 mod documents;
 mod entries;
 mod statements;
+mod subscriptions;
 
 type Seeder = fn() -> AppResult<Option<Op>>;
 
@@ -97,6 +98,7 @@ pub fn seed_if_empty(db: &Db, config_dir: &Path, today: chrono::NaiveDate) -> Ap
         .map(|t| t.and_utc().timestamp_millis())
         .unwrap_or_default();
     count += entries::seed(db, config_dir, chrono::Datelike::year(&today), now)?;
+    count += subscriptions::seed(db, today, now)?;
     Ok(count)
 }
 
@@ -186,7 +188,7 @@ mod tests {
         let db = Db::open(dir.path()).unwrap();
         assert_eq!(
             seed_if_empty(&db, dir.path(), today()).unwrap(),
-            2 + 24 + 1 + 4 + 2 + 1 + 3
+            2 + 24 + 1 + 4 + 2 + 1 + 3 + 3
         );
         let kinds: Vec<_> = crate::year::entries::entries(&db, 2026)
             .unwrap()
@@ -260,11 +262,60 @@ mod tests {
             Some("literature"),
             "demo-rule-4",
         );
-        for waiting in ["STREAMFLIX", "LUMEN AI", "CAFE"] {
-            for outcome in outcomes_of_lines_containing(&db, waiting) {
-                assert_eq!(outcome, None, "{waiting}");
+        for outcome in outcomes_of_lines_containing(&db, "CAFE") {
+            assert_eq!(outcome, None);
+        }
+    }
+
+    #[test]
+    fn the_seed_has_three_subscriptions_and_links_the_lines_they_match() {
+        let dir = temp_config_dir();
+        let db = Db::open(dir.path()).unwrap();
+        seed_if_empty(&db, dir.path(), today()).unwrap();
+        let subscriptions = db.read(crate::subscriptions::store::subscriptions).unwrap();
+
+        let shown: Vec<(&str, Option<&str>, Option<&str>)> = subscriptions
+            .iter()
+            .map(|s| {
+                (
+                    s.name.as_str(),
+                    s.item_key.as_deref(),
+                    s.ended_on.as_deref(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            shown,
+            [
+                ("Lumen AI", Some("digital-equipment"), None),
+                ("Streamflix", None, None),
+                ("Tonfeld Audiobooks", None, Some("2026-06-30")),
+            ]
+        );
+        for (needle, name) in [("STREAMFLIX", "Streamflix"), ("LUMEN AI", "Lumen AI")] {
+            let id = subscriptions
+                .iter()
+                .find(|s| s.name == name)
+                .map(|s| s.id.clone());
+            for outcome in outcomes_of_lines_containing(&db, needle) {
+                assert_eq!(
+                    outcome,
+                    Some((Action::Subscription, None, id.clone())),
+                    "{needle}"
+                );
             }
         }
+        let linked: std::collections::HashSet<String> = db
+            .read(crate::rules::store::decisions)
+            .unwrap()
+            .into_values()
+            .filter_map(|d| d.subscription_id)
+            .collect();
+        let tonfeld = subscriptions
+            .iter()
+            .find(|s| s.name == "Tonfeld Audiobooks")
+            .unwrap();
+        assert!(!linked.contains(&tonfeld.id));
     }
 
     #[test]

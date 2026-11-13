@@ -27,7 +27,7 @@ async function emit(event: EventName, payload: unknown = null) {
 describe("App", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useStore.setState({ route: HOME, back: [], forward: [], filter: "", toasts: [], confirmation: null, paletteOpen: false, pdfCovers: 0, importPreview: null, addPreview: null });
+    useStore.setState({ route: HOME, back: [], forward: [], filter: "", toasts: [], confirmation: null, paletteOpen: false, pdfCovers: 0, importPreview: null, addPreview: null, subscriptionSheet: null });
     mocked.takeLaunchEvents.mockResolvedValue([]);
     mocked.listen.mockResolvedValue(() => {});
     mocked.getSettings.mockResolvedValue(settings());
@@ -174,6 +174,14 @@ describe("App", () => {
       await emit("run_command", "filter.focus");
 
       expect(screen.getByPlaceholderText("Search everywhere")).toHaveFocus();
+    });
+
+    it("opens the New Subscription sheet for subscription.new", async () => {
+      renderApp();
+
+      await emit("run_command", "subscription.new");
+
+      expect(await screen.findByRole("dialog", { name: "New Subscription" })).toBeTruthy();
     });
 
     describe.each([

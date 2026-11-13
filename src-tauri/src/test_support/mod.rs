@@ -8,6 +8,8 @@ mod fixtures;
 pub mod rules;
 #[cfg(any(test, debug_assertions, feature = "test-util"))]
 pub mod statements;
+#[cfg(test)]
+pub mod subscriptions;
 
 #[cfg(any(test, feature = "test-util"))]
 pub use fixtures::*;
