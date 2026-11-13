@@ -132,9 +132,11 @@ fn line_view(
 }
 
 /// The account's lines grouped by statement, newest first.
+/// `query` keeps only the lines whose title or booking text contains it.
 pub fn account_lines(
     db: &Db,
     account_id: &str,
+    query: &str,
     format: NumberFormat,
     order: DateOrder,
 ) -> AppResult<AccountLines> {
@@ -146,8 +148,26 @@ pub fn account_lines(
     let decisions = db.read(rules_store::decisions)?;
     let items = rules::items(db)?;
     let mut groups = Vec::new();
+    let needle = query.trim().to_lowercase();
     for s in db.read(|c| store::statements_of(c, account_id))? {
-        let lines = db.read(|c| store::transactions_of(c, &s.id))?;
+        let lines: Vec<TransactionRow> = db
+            .read(|c| store::transactions_of(c, &s.id))?
+            .into_iter()
+            .filter(|t| {
+                needle.is_empty()
+                    || [
+                        t.merchant.as_deref(),
+                        t.counterparty.as_deref(),
+                        Some(t.text.as_str()),
+                    ]
+                    .into_iter()
+                    .flatten()
+                    .any(|text| text.to_lowercase().contains(&needle))
+            })
+            .collect();
+        if lines.is_empty() && !needle.is_empty() {
+            continue;
+        }
         let range = format!(
             "{} – {}",
             day_month_or_empty(&s.from_date, order),

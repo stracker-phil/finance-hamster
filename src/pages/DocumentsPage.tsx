@@ -14,7 +14,8 @@ const STATE_PILL: Record<DocState, { label: string; className: string }> = {
 /** Documents: "Is it already here?", then every document by tax year, the undated ones in the Inbox. */
 export function DocumentsPage() {
   const [query, setQuery] = useState("");
-  const { data: groups } = useDocuments(query);
+  const filter = useStore((s) => s.filter);
+  const { data: groups } = useDocuments(query || filter);
   const navigate = useStore((s) => s.navigate);
   return (
     <div className="page-scroll">

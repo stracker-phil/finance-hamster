@@ -18,7 +18,7 @@ const inbox = () =>
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useStore.setState({ route: HOME, back: [], forward: [] });
+  useStore.setState({ route: HOME, back: [], forward: [], filter: "" });
   mocked.documentsList.mockResolvedValue([]);
 });
 
@@ -99,6 +99,17 @@ describe("DocumentsPage", () => {
       expect(mocked.documentsList).toHaveBeenLastCalledWith("books");
       expect(await screen.findByRole("button", { name: /Sample Books/ })).toBeTruthy();
       expect(screen.queryByRole("button", { name: /Demo Cloud Ltd/ })).toBeNull();
+    });
+
+    it("lists the documents matching the header filter, and prefers the typed search over it", async () => {
+      useStore.setState({ filter: "cloud" });
+      renderWithQuery(<DocumentsPage />);
+      await screen.findByText("No documents");
+      expect(mocked.documentsList).toHaveBeenLastCalledWith("cloud");
+
+      await userEvent.type(screen.getByRole("textbox", { name: "Search documents" }), "books");
+
+      expect(mocked.documentsList).toHaveBeenLastCalledWith("books");
     });
 
     it("says nothing matches, with the trimmed text, when a search finds none", async () => {

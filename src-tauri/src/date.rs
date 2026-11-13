@@ -118,6 +118,11 @@ pub fn weekday_short(date: NaiveDate, order: DateOrder) -> String {
     format!("{weekday}, {}", day_month(date, order))
 }
 
+/// `November` for 11.
+pub fn month_name(month: u32) -> &'static str {
+    NaiveDate::from_ymd_opt(2000, month.clamp(1, 12), 1).map_or("", self::month)
+}
+
 /// `November 2026`, a month heading.
 pub fn month_year(date: NaiveDate) -> String {
     format!("{} {}", month(date), date.year())

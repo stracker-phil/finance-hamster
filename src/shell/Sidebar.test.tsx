@@ -16,7 +16,7 @@ const mocked = vi.mocked(api, true);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useStore.setState({ route: HOME, back: [], forward: [], toasts: [], addPreview: null });
+  useStore.setState({ route: HOME, back: [], forward: [], filter: "", toasts: [], addPreview: null });
   mocked.statementsCoverage.mockResolvedValue(coverage());
 });
 
@@ -29,6 +29,16 @@ describe("Sidebar", () => {
     const badge = await screen.findByLabelText("7 to review");
     expect(badge.textContent).toBe("7");
     expect(screen.getByRole("button", { name: /Statements/ }).contains(badge)).toBe(true);
+  });
+
+  it("counts the lines to review regardless of the header filter", async () => {
+    useStore.setState({ filter: "market" });
+
+    render(<Sidebar years={[]} />);
+
+    await screen.findByRole("button", { name: "Statements" });
+    expect(mocked.statementsCoverage).toHaveBeenCalledWith("");
+    expect(mocked.statementsCoverage).not.toHaveBeenCalledWith("market");
   });
 
   it("shows no badge when no line waits for review", async () => {

@@ -3668,7 +3668,7 @@ fn the_year_log_covers_documents_paid_that_year_and_those_deleted_from_its_folde
         .unwrap();
     }
 
-    let log = history::year_log(&db, 2026, FORMAT, ORDER).unwrap();
+    let log = history::year_log(&db, 2026, "", FORMAT, ORDER).unwrap();
 
     let mut seen: Vec<(&str, &str, HistoryKind)> = log
         .iter()
@@ -3684,6 +3684,43 @@ fn the_year_log_covers_documents_paid_that_year_and_those_deleted_from_its_folde
             ("doc-c", "Deleted: Scanned twice", HistoryKind::Deleted),
         ]
     );
+}
+
+#[test]
+fn the_year_log_query_matches_the_entry_text_or_the_document_ignoring_case() {
+    let (_dir, db) = setup_with_vendor();
+    draft(&db, "doc-a", |d| {
+        d.pay_date = Some("2026-10-14".into());
+        d.note = "Seminar".into();
+    });
+    apply(
+        &db,
+        "doc-a",
+        DocumentEdit::Note {
+            text: "Workshop".into(),
+        },
+    )
+    .unwrap();
+    draft(&db, "doc-b", |d| d.pay_date = Some("2026-05-01".into()));
+
+    let by_text = history::year_log(&db, 2026, " WORKSHOP ", FORMAT, ORDER).unwrap();
+    let by_document = history::year_log(&db, 2026, "doc-b", FORMAT, ORDER).unwrap();
+    let nothing = history::year_log(&db, 2026, "no such entry", FORMAT, ORDER).unwrap();
+
+    let texts = |log: &[history::HistoryEntry]| -> Vec<(String, String)> {
+        log.iter()
+            .map(|e| (e.document.clone(), e.text.clone()))
+            .collect()
+    };
+    assert_eq!(
+        texts(&by_text),
+        [("doc-a".to_string(), "Note: Seminar → Workshop".to_string())]
+    );
+    assert_eq!(
+        texts(&by_document),
+        [("doc-b".to_string(), "Added".to_string())]
+    );
+    assert!(nothing.is_empty());
 }
 
 #[test]

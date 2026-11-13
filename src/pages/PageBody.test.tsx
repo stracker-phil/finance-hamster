@@ -7,6 +7,7 @@ import { api } from "../api";
 import { archivedDocument, documentGroup, historyEntry } from "../test/documents";
 import { renderWithQuery } from "../test/renderWithQuery";
 import { reviewQueue } from "../test/review";
+import { yearPage } from "../test/year";
 import { PageBody } from "./PageBody";
 
 const mocked = vi.mocked(api, true);
@@ -48,7 +49,16 @@ describe("PageBody", () => {
     renderWithQuery(<PageBody route={{ page: "log", year: 2026 }} />);
 
     expect(await screen.findByRole("button", { name: "Example Market" })).toBeTruthy();
-    expect(mocked.yearLog).toHaveBeenCalledWith(2026);
+    expect(mocked.yearLog).toHaveBeenCalledWith(2026, "");
+  });
+
+  it("shows the tax year page on the year route", async () => {
+    mocked.yearPage.mockResolvedValue(yearPage({ total: "€1,228.40" }));
+
+    renderWithQuery(<PageBody route={{ page: "year", year: 2026 }} />);
+
+    expect(await screen.findByText("€1,228.40")).toBeTruthy();
+    expect(screen.getByText("Total to enter for 2026 · ruleset 2026 v1")).toBeTruthy();
   });
 
   it("shows the Archive of the year on the archive route", async () => {

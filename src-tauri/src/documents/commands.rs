@@ -328,10 +328,15 @@ pub fn document_history(state: State<'_, AppState>, id: String) -> AppResult<Vec
 }
 
 #[tauri::command]
-pub fn year_log(state: State<'_, AppState>, year: i32) -> AppResult<Vec<HistoryEntry>> {
+pub fn year_log(
+    state: State<'_, AppState>,
+    year: i32,
+    query: String,
+) -> AppResult<Vec<HistoryEntry>> {
     history::year_log(
         &state.db,
         year,
+        &query,
         state.settings.get().number_format,
         DateOrder::system(),
     )

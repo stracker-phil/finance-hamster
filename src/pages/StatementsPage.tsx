@@ -44,7 +44,8 @@ function AccountRow({ account, index }: { account: AccountCoverage; index: numbe
 
 /** Coverage per account over the last twelve months. */
 export function StatementsPage() {
-  const { data } = useCoverage();
+  const filter = useStore((s) => s.filter);
+  const { data } = useCoverage(filter);
   const navigate = useStore((s) => s.navigate);
   if (data && data.accounts.length === 0) return <EmptyPage title="No accounts" text="Add an account in Settings → Accounts." />;
   const toReview = data?.accounts.reduce((sum, a) => sum + a.toReview, 0) ?? 0;

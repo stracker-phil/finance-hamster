@@ -84,3 +84,6 @@
 
 .pdf-preview { flex: 1; min-width: 0; position: relative; border-radius: 8px; background: var(--fill-subtle); }
 .pdf-preview__error { position: absolute; inset: 0; display: grid; place-items: center; color: var(--text-muted); font-size: 13px; }
+.filter-wrap { position: relative; }
+.elsewhere { position: absolute; top: calc(100% + 6px); right: 0; z-index: 30; width: 300px; padding: 4px; }
+.elsewhere__caption { padding: 6px 10px 4px; font-size: 11px; font-weight: 600; color: var(--text-muted); }

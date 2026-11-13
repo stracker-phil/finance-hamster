@@ -195,10 +195,16 @@ fn account_coverage(
     }
 }
 
-pub fn coverage(db: &Db, today: NaiveDate, order: DateOrder) -> AppResult<Coverage> {
+/// `query` keeps only the accounts whose name contains it.
+pub fn coverage(db: &Db, today: NaiveDate, query: &str, order: DateOrder) -> AppResult<Coverage> {
+    let needle = query.trim().to_lowercase();
     let mut accounts = Vec::new();
     let waiting = db.read(crate::review::undecided_by_account)?;
-    for account in db.read(accounts::rows)? {
+    for account in db
+        .read(accounts::rows)?
+        .into_iter()
+        .filter(|a| a.name.to_lowercase().contains(&needle))
+    {
         let statements = db.read(|c| store::statements_of(c, &account.id))?;
         let to_review = waiting.get(&account.id).copied().unwrap_or(0);
         accounts.push(account_coverage(

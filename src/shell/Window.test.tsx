@@ -242,7 +242,7 @@ describe("account page", () => {
     render(<Window />);
 
     expect(await screen.findByRole("region", { name: "Nr. 010/2026" })).toBeTruthy();
-    expect(mocked.accountLines).toHaveBeenCalledWith("acc-2");
+    expect(mocked.accountLines).toHaveBeenCalledWith("acc-2", "");
   });
 });
 

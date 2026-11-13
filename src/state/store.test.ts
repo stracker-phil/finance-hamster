@@ -83,6 +83,35 @@ describe("sidebarKey", () => {
   });
 });
 
+describe("palette", () => {
+  beforeEach(() => {
+    useStore.setState({ paletteOpen: false, paletteQuery: "" });
+  });
+
+  it("opens with the text it searches everywhere for", () => {
+    useStore.getState().searchEverywhere("pixelforge");
+
+    expect(useStore.getState().paletteOpen).toBe(true);
+    expect(useStore.getState().paletteQuery).toBe("pixelforge");
+  });
+
+  it("forgets the text when it closes", () => {
+    useStore.getState().searchEverywhere("pixelforge");
+
+    useStore.getState().setPaletteOpen(false);
+
+    expect(useStore.getState().paletteOpen).toBe(false);
+    expect(useStore.getState().paletteQuery).toBe("");
+  });
+
+  it("opens empty when opened directly", () => {
+    useStore.getState().setPaletteOpen(true);
+
+    expect(useStore.getState().paletteOpen).toBe(true);
+    expect(useStore.getState().paletteQuery).toBe("");
+  });
+});
+
 describe("toasts", () => {
   it("collapses an identical consecutive message into a count of 2", () => {
     useStore.getState().showToast("error", "Disk full");

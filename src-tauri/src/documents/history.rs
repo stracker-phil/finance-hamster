@@ -325,9 +325,11 @@ fn year_of(doc: &DocumentRow) -> Option<i32> {
 }
 
 /// Every change to the documents paid in `year`, and those deleted from its folder, newest first.
+/// `query` keeps the entries whose text or document contains it.
 pub fn year_log(
     db: &Db,
     year: i32,
+    query: &str,
     format: NumberFormat,
     order: DateOrder,
 ) -> AppResult<Vec<HistoryEntry>> {
@@ -357,5 +359,11 @@ pub fn year_log(
             )?);
         }
     }
+    let needle = query.trim().to_lowercase();
+    entries.retain(|(_, e)| {
+        needle.is_empty()
+            || e.text.to_lowercase().contains(&needle)
+            || e.document.to_lowercase().contains(&needle)
+    });
     Ok(into_newest_first(entries))
 }

@@ -28,6 +28,15 @@ describe("StatementsPage", () => {
     expect(screen.getByText("Up to date")).toBeTruthy();
   });
 
+  it("asks for the accounts matching the header filter", async () => {
+    useStore.setState({ filter: "sav" });
+
+    render(<StatementsPage />);
+
+    await screen.findByText("Private");
+    expect(mocked.statementsCoverage).toHaveBeenCalledWith("sav");
+  });
+
   it("shows the month heads and each month's tip", async () => {
     render(<StatementsPage />);
 

@@ -158,6 +158,15 @@ pub const MIGRATIONS: &[&str] = &[
         deleted_at INTEGER NOT NULL,
         reason TEXT NOT NULL
     );",
+    // 7: the answers to a tax year's questions (Telearbeitstage, …): a count, or cents for an amount.
+    "CREATE TABLE answers (
+        id TEXT PRIMARY KEY,
+        year INTEGER NOT NULL,
+        question TEXT NOT NULL,
+        value INTEGER NOT NULL,
+        answered_at INTEGER NOT NULL,
+        UNIQUE (year, question)
+    );",
 ];
 
 pub fn version(conn: &Connection) -> AppResult<usize> {
@@ -212,6 +221,7 @@ mod tests {
     fn all_tables() -> Vec<String> {
         [
             "accounts",
+            "answers",
             "decisions",
             "deletions",
             "document_links",
@@ -225,6 +235,22 @@ mod tests {
         ]
         .map(String::from)
         .to_vec()
+    }
+
+    #[test]
+    fn a_file_at_version_six_gains_the_answers_and_keeps_its_deletion_log() {
+        let dir = temp_config_dir();
+        let mut conn = Connection::open(dir.path().join("v6.sqlite")).unwrap();
+        for sql in &MIGRATIONS[..6] {
+            conn.execute_batch(sql).unwrap();
+        }
+        conn.pragma_update(None, "user_version", 6i64).unwrap();
+        assert!(!tables(&conn).contains(&"answers".to_string()));
+
+        migrate(&mut conn).unwrap();
+
+        assert_eq!(version(&conn).unwrap(), MIGRATIONS.len());
+        assert_eq!(tables(&conn), all_tables());
     }
 
     #[test]

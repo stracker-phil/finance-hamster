@@ -1,7 +1,7 @@
 import { getName, getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { Account, AccountEdit, AccountLines, Action, AddInput, AddPreview, ArchivedDocument, DeletionView, DocumentEdit, DocumentGroup, DocumentStep, DocumentView, HistoryEntry, VendorChange, VendorsView, Estimate, LineChoice, Coverage, ReviewQueue, RuleForm, RulesView, Frame, ImportPreview, PdfSource, AppError, AppInfo, CommandInfo, ErrorKind, EventName, EventPayloads, Imported, LaunchEvent, NewAccount, ReloadPreview, RulesFile, Settings, SettingsPatch, TaxYear } from "./types";
+import type { Account, AccountEdit, AccountLines, Action, Elsewhere, YearPage, AddInput, AddPreview, ArchivedDocument, DeletionView, DocumentEdit, DocumentGroup, DocumentStep, DocumentView, HistoryEntry, VendorChange, VendorsView, Estimate, LineChoice, Coverage, ReviewQueue, RuleForm, RulesView, Frame, ImportPreview, PdfSource, AppError, AppInfo, CommandInfo, ErrorKind, EventName, EventPayloads, Imported, LaunchEvent, NewAccount, ReloadPreview, RulesFile, Settings, SettingsPatch, TaxYear } from "./types";
 
 export * from "./types";
 
@@ -42,8 +42,16 @@ export const api = {
   /** The label of the import. */
   statementImportCommit: (token: string) => invoke<string>("statement_import_commit", { token }),
   statementImportCancel: (token: string) => invoke<void>("statement_import_cancel", { token }),
-  statementsCoverage: () => invoke<Coverage>("statements_coverage"),
-  accountLines: (accountId: string) => invoke<AccountLines>("account_lines", { accountId }),
+  /** `query` keeps the accounts whose name contains it. */
+  statementsCoverage: (query: string) => invoke<Coverage>("statements_coverage", { query }),
+  /** `query` keeps the lines that contain it. */
+  accountLines: (accountId: string, query: string) => invoke<AccountLines>("account_lines", { accountId, query }),
+  /** `query` filters the rows. */
+  yearPage: (year: number, query: string) => invoke<YearPage>("year_page", { year, query }),
+  /** The label of the change, or null when nothing changed. */
+  yearAnswer: (year: number, question: string, value: string) => invoke<string | null>("year_answer", { year, question, value }),
+  /** Where else the filter text turns up. */
+  searchElsewhere: (query: string) => invoke<Elsewhere[]>("search_elsewhere", { query }),
   rulesView: () => invoke<RulesView>("rules_view"),
   /** Adds a rule (`id` null) or changes one; the label of the change. */
   ruleSave: (id: string | null, form: RuleForm) => invoke<string>("rule_save", { id, form }),
@@ -66,7 +74,7 @@ export const api = {
   /** Deletes an excluded document for good; the label of the change. */
   documentDelete: (id: string, reason: string, understood: boolean) => invoke<string>("document_delete", { id, reason, understood }),
   documentHistory: (id: string) => invoke<HistoryEntry[]>("document_history", { id }),
-  yearLog: (year: number) => invoke<HistoryEntry[]>("year_log", { year }),
+  yearLog: (year: number, query: string) => invoke<HistoryEntry[]>("year_log", { year, query }),
   archiveList: (year: number) => invoke<ArchivedDocument[]>("archive_list", { year }),
   deletionLog: () => invoke<DeletionView[]>("deletion_log"),
   documentsList: (query: string) => invoke<DocumentGroup[]>("documents_list", { query }),

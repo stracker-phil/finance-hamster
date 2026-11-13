@@ -32,6 +32,9 @@ export interface AppStore {
   goForward: () => void;
 
   paletteOpen: boolean;
+  /** The text the palette opens with: what the filter field held when ⌘↩ searched everywhere. */
+  paletteQuery: string;
+  searchEverywhere: (query: string) => void;
   setPaletteOpen: (open: boolean) => void;
 
   /** The header's filter text; each page clears it. */
@@ -88,7 +91,9 @@ export const useStore = create<AppStore>((set, get) => ({
   },
 
   paletteOpen: false,
-  setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
+  paletteQuery: "",
+  searchEverywhere: (paletteQuery) => set({ paletteOpen: true, paletteQuery }),
+  setPaletteOpen: (paletteOpen) => set({ paletteOpen, paletteQuery: "" }),
 
   filter: "",
   setFilter: (filter) => set({ filter }),

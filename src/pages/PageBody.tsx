@@ -7,6 +7,7 @@ import { EmptyPage } from "./EmptyPage";
 import { LogPage } from "./LogPage";
 import { ReviewPage } from "./ReviewPage";
 import { StatementsPage } from "./StatementsPage";
+import { YearPage } from "./YearPage";
 
 /** The body of the current page. */
 export function PageBody({ route }: { route: Route }) {
@@ -24,7 +25,7 @@ export function PageBody({ route }: { route: Route }) {
     case "account":
       return <AccountPage accountId={route.accountId} />;
     case "year":
-      return <EmptyPage title={`Tax year ${route.year}`} text="Nothing is recorded for this year yet." />;
+      return <YearPage year={route.year} />;
     case "document":
       return <DocumentPage documentId={route.documentId} />;
     case "log":

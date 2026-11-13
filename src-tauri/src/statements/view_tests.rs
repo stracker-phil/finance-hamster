@@ -54,7 +54,7 @@ fn ending(number: u32, month: u32, to: NaiveDate, old_balance: i64) -> Statement
 }
 
 fn overview(db: &Db) -> Coverage {
-    coverage(db, today(), DateOrder::DayFirst).unwrap()
+    coverage(db, today(), "", DateOrder::DayFirst).unwrap()
 }
 
 fn account<'a>(coverage: &'a Coverage, name: &str) -> &'a AccountCoverage {
@@ -334,7 +334,7 @@ fn balances_that_do_not_connect_are_a_note() {
 fn the_month_heads_cross_the_year_boundary_for_an_early_date() {
     let (_dir, db) = open_with_accounts();
 
-    let early = coverage(&db, day(2026, 2, 3), DateOrder::DayFirst).unwrap();
+    let early = coverage(&db, day(2026, 2, 3), "", DateOrder::DayFirst).unwrap();
 
     let labels: Vec<&str> = early.months.iter().map(|m| m.label.as_str()).collect();
     assert_eq!(
@@ -354,10 +354,28 @@ fn the_month_heads_cross_the_year_boundary_for_an_early_date() {
 }
 
 #[test]
+fn a_query_keeps_the_accounts_whose_name_contains_it_ignoring_case() {
+    let (_dir, db) = seeded();
+
+    for (query, expected) in [
+        ("", vec!["Private", "Household", "Business"]),
+        ("hOUSE", vec!["Household"]),
+        ("  i", vec!["Private", "Business"]),
+        ("savings", vec![]),
+    ] {
+        let filtered = coverage(&db, today(), query, DateOrder::DayFirst).unwrap();
+
+        let names: Vec<&str> = filtered.accounts.iter().map(|a| a.name.as_str()).collect();
+        assert_eq!(names, expected, "{query:?}");
+        assert_eq!(filtered.months.len(), 12, "{query:?}");
+    }
+}
+
+#[test]
 fn the_last_day_follows_the_date_order() {
     let (_dir, db) = seeded();
 
-    let month_first = coverage(&db, today(), DateOrder::MonthFirst).unwrap();
+    let month_first = coverage(&db, today(), "", DateOrder::MonthFirst).unwrap();
 
     assert_eq!(
         account(&month_first, "Private").last,

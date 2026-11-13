@@ -3,7 +3,9 @@ import { Search } from "lucide-react";
 import { api, toAppError, type CommandInfo } from "../api";
 import { Modal } from "../components/Modal";
 import { ranked } from "../lib/rank";
+import { routeOf } from "../lib/targets";
 import { useCommands } from "../queries/commands";
+import { useElsewhere } from "../queries/year";
 import { useStore } from "../state/store";
 
 const withoutPalette = (commands: CommandInfo[]) => commands.filter((c) => c.id !== "palette.open");
@@ -15,12 +17,31 @@ function run(id: string) {
   api.runCommand(id).catch((e: unknown) => useStore.getState().showToast("error", toAppError(e).message));
 }
 
-/** ⌘K command palette, ranked by name (ADR 0031). */
+interface Option {
+  key: string;
+  label: string;
+  hint?: string;
+  go: () => void;
+}
+
+/** ⌘K command palette, ranked by name (ADR 0031), followed by the documents and bank lines the text matches. */
 function Palette() {
   const { data = [] } = useCommands();
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(() => useStore.getState().paletteQuery);
   const [active, setActive] = useState(0);
-  const results = ranked(withoutPalette(data), query, (c) => [c.title, c.id]);
+  const { data: elsewhere = [] } = useElsewhere(query);
+  const results: Option[] = [
+    ...ranked(withoutPalette(data), query, (c) => [c.title, c.id]).map((c) => ({ key: c.id, label: c.title, hint: c.shortcut ?? undefined, go: () => run(c.id) })),
+    ...elsewhere.map((match, i) => ({
+      key: `match-${i}`,
+      label: match.label,
+      hint: match.place,
+      go: () => {
+        close();
+        useStore.getState().navigate(routeOf(match.target));
+      },
+    })),
+  ];
   const count = results.length;
   const picked = Math.min(active, Math.max(count - 1, 0));
   const onKeyDown = (e: KeyboardEvent) => {
@@ -30,7 +51,7 @@ function Palette() {
       if (count > 0) setActive((picked + step + count) % count);
     } else if (e.key === "Enter" && results[picked]) {
       e.preventDefault();
-      run(results[picked].id);
+      results[picked].go();
     }
   };
   return (
@@ -40,8 +61,8 @@ function Palette() {
         <input
           id="palette-input"
           autoFocus
-          placeholder="Search commands"
-          aria-label="Search commands"
+          placeholder="Search commands, documents and bank lines"
+          aria-label="Search everywhere"
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
@@ -51,18 +72,11 @@ function Palette() {
         />
       </label>
       <div className="palette__list scroller" role="listbox" aria-label="Commands">
-        {results.length === 0 && <div className="palette__empty">No matching command</div>}
-        {results.map((command, i) => (
-          <button
-            key={command.id}
-            className="menu-row"
-            role="option"
-            aria-selected={i === picked}
-            onMouseMove={() => setActive(i)}
-            onClick={() => run(command.id)}
-          >
-            {command.title}
-            {command.shortcut && <span className="menu-row__key">{command.shortcut}</span>}
+        {results.length === 0 && <div className="palette__empty">Nothing matches</div>}
+        {results.map((option, i) => (
+          <button key={option.key} className="menu-row" role="option" aria-selected={i === picked} onMouseMove={() => setActive(i)} onClick={option.go}>
+            {option.label}
+            {option.hint && <span className="menu-row__key">{option.hint}</span>}
           </button>
         ))}
       </div>

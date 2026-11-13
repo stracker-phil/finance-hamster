@@ -95,15 +95,20 @@ pub fn statement_import_cancel(state: State<'_, AppState>, token: String) {
 }
 
 #[tauri::command]
-pub fn statements_coverage(state: State<'_, AppState>) -> AppResult<Coverage> {
-    view::coverage(&state.db, today(), DateOrder::system())
+pub fn statements_coverage(state: State<'_, AppState>, query: String) -> AppResult<Coverage> {
+    view::coverage(&state.db, today(), &query, DateOrder::system())
 }
 
 #[tauri::command]
-pub fn account_lines(state: State<'_, AppState>, account_id: String) -> AppResult<AccountLines> {
+pub fn account_lines(
+    state: State<'_, AppState>,
+    account_id: String,
+    query: String,
+) -> AppResult<AccountLines> {
     lines::account_lines(
         &state.db,
         &account_id,
+        &query,
         state.settings.get().number_format,
         DateOrder::system(),
     )

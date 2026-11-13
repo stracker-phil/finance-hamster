@@ -15,7 +15,7 @@ const mocked = vi.mocked(api, true);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useStore.setState({ route: HOME, back: [], forward: [] });
+  useStore.setState({ route: HOME, back: [], forward: [], filter: "" });
   mocked.yearLog.mockResolvedValue([]);
 });
 
@@ -27,7 +27,15 @@ describe("LogPage", () => {
     expect(await screen.findByRole("button", { name: "Demo Cloud Ltd" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Example Market" })).toBeTruthy();
     expect(screen.getByText("Finished")).toBeTruthy();
-    expect(mocked.yearLog).toHaveBeenCalledWith(2026);
+    expect(mocked.yearLog).toHaveBeenCalledWith(2026, "");
+  });
+
+  it("asks for the entries matching the header filter", async () => {
+    useStore.setState({ filter: "market" });
+    renderWithQuery(<LogPage year={2026} />);
+
+    await screen.findByText("Nothing logged yet");
+    expect(mocked.yearLog).toHaveBeenCalledWith(2026, "market");
   });
 
   it("opens the document of an entry when its name is clicked", async () => {

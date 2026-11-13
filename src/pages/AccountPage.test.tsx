@@ -13,7 +13,7 @@ const mocked = vi.mocked(api, true);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useStore.setState({ toasts: [] });
+  useStore.setState({ toasts: [], filter: "" });
   mocked.accountLines.mockResolvedValue(accountLines());
 });
 
@@ -22,7 +22,15 @@ describe("AccountPage", () => {
     render(<AccountPage accountId="acc-7" />);
 
     await screen.findByRole("region");
-    expect(mocked.accountLines).toHaveBeenCalledWith("acc-7");
+    expect(mocked.accountLines).toHaveBeenCalledWith("acc-7", "");
+  });
+
+  it("asks for the lines matching the header filter", async () => {
+    useStore.setState({ filter: "software" });
+    render(<AccountPage accountId="acc-7" />);
+
+    await screen.findByRole("region");
+    expect(mocked.accountLines).toHaveBeenCalledWith("acc-7", "software");
   });
 
   it("shows each statement with its label, range and line count", async () => {

@@ -16,6 +16,18 @@ fn lines_of(db: &Db, account_id: &str) -> AccountLines {
     account_lines(
         db,
         account_id,
+        "",
+        NumberFormat::DotDecimal,
+        DateOrder::DayFirst,
+    )
+    .unwrap()
+}
+
+fn lines_matching(db: &Db, account_id: &str, query: &str) -> AccountLines {
+    account_lines(
+        db,
+        account_id,
+        query,
         NumberFormat::DotDecimal,
         DateOrder::DayFirst,
     )
@@ -205,6 +217,7 @@ fn amounts_and_days_follow_the_number_format_and_date_order() {
     let page = account_lines(
         &db,
         "demo-account-1",
+        "",
         NumberFormat::CommaDecimal,
         DateOrder::MonthFirst,
     )
@@ -243,6 +256,47 @@ fn a_line_without_merchant_or_counterparty_shows_its_booking_text_and_a_single_l
 }
 
 #[test]
+fn a_query_keeps_only_the_lines_containing_it_ignoring_case() {
+    let (_dir, db) = decided_october();
+
+    let page = lines_matching(&db, "account-1", "  seitenWEISE ");
+
+    assert_eq!(page.groups.len(), 1);
+    assert_eq!(page.groups[0].count, "1 line");
+    let titles: Vec<&str> = page.groups[0]
+        .lines
+        .iter()
+        .map(|l| l.title.as_str())
+        .collect();
+    assert_eq!(titles, ["BUCHHANDLUNG SEITENWEISE"]);
+}
+
+#[test]
+fn a_query_matches_the_booking_text_of_a_line_shown_under_its_counterparty() {
+    let (_dir, db) = decided_october();
+
+    let page = lines_matching(&db, "account-1", "dauerauftrag");
+
+    let titles: Vec<&str> = page
+        .groups
+        .iter()
+        .flat_map(|g| &g.lines)
+        .map(|l| l.title.as_str())
+        .collect();
+    assert_eq!(titles, ["HOUSEHOLD", "HAUSVERWALTUNG MUSTER"]);
+}
+
+#[test]
+fn statements_without_a_matching_line_are_left_out_while_a_query_is_set() {
+    let (_dir, db) = decided_october();
+
+    let page = lines_matching(&db, "account-1", "no such merchant");
+
+    assert!(page.groups.is_empty());
+    assert_eq!(lines_of(&db, "account-1").groups.len(), 1);
+}
+
+#[test]
 fn an_account_without_statements_has_no_groups() {
     let (_dir, db) = open_with_accounts();
 
@@ -259,6 +313,7 @@ fn lines_of_an_unknown_account_are_not_found() {
     let err = account_lines(
         &db,
         "no-such-account",
+        "",
         NumberFormat::DotDecimal,
         DateOrder::DayFirst,
     )

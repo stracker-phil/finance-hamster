@@ -1,0 +1,38 @@
+/* The tax year page. */
+.year-page { max-width: 880px; margin: 0 auto; padding: 40px 40px 48px; }
+.year-hero { display: flex; align-items: flex-end; gap: 24px; }
+.year-hero__main { min-width: 0; }
+.year-hero__main { flex: 1; }
+.year-hero__total { font-size: 46px; font-weight: 750; letter-spacing: -0.02em; line-height: 1.1; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.year-hero__progress { width: 260px; flex: none; padding-bottom: 8px; display: flex; flex-direction: column; gap: 7px; }
+.year-hero__progress .add-doc__hint { white-space: normal; }
+.year-bar { height: 5px; border-radius: 3px; background: var(--fill-subtle); overflow: hidden; }
+.year-bar span { display: block; height: 100%; background: var(--accent); }
+.year-menu { position: relative; padding-bottom: 8px; }
+.year-menu__list { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; width: 220px; padding: 4px; }
+.year-heading { margin: 36px 0 8px; font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.year-line { display: flex; align-items: center; gap: 10px; min-height: 44px; border-bottom: 1px solid var(--row-hairline); font-size: 13px; }
+.year-line__text { flex: 1; min-width: 0; color: var(--text); }
+.year-line__help { margin-left: 8px; white-space: normal; }
+.year-dot { width: 8px; height: 8px; flex: none; border-radius: 4px; background: var(--border-strong); }
+.year-dot--done { background: var(--positive); }
+.year-dot--warn { background: var(--warning); }
+.year-answer { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); }
+.year-answer input { width: 90px; height: 28px; padding: 0 8px; border: 1px solid var(--border-strong); border-radius: 7px; background: var(--panel-bg); color: var(--text); font: inherit; font-size: 13px; text-align: right; }
+.year-answer--empty input { border-style: dashed; }
+.year-switch { display: inline-flex; gap: 2px; padding: 2px; margin-top: 36px; border: 1px solid var(--border); border-radius: 8px; background: var(--fill-subtle); }
+.kennzahl { margin-top: 30px; }
+.kennzahl--empty .kennzahl__name { color: var(--text-tertiary); }
+.kennzahl__head { display: flex; align-items: center; gap: 10px; padding-bottom: 6px; border-bottom: 1px solid var(--hairline); }
+.kennzahl__kz { width: 62px; font-size: 12px; color: var(--text-muted); }
+.kennzahl__name { flex: 1; min-width: 0; font-size: 16px; font-weight: 700; }
+.kennzahl__note { margin: 8px 0 0 72px; font-size: 12px; color: var(--text-muted); }
+.copy-btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--panel-bg); color: var(--text); font: inherit; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.copy-btn:hover { background: var(--fill-hover); }
+.year-row { width: 100%; min-height: 44px; display: flex; align-items: center; gap: 10px; padding: 0 4px 0 72px; border: 0; border-bottom: 1px solid var(--row-hairline); background: transparent; color: var(--text); font: inherit; font-size: 13px; text-align: left; }
+.year-row:hover:not(:disabled) { background: var(--fill-hover); }
+.year-row:disabled { color: var(--text); opacity: 1; }
+.year-row__title { font-weight: 500; }
+.year-row__detail { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.year-row__amount { margin-left: auto; font-variant-numeric: tabular-nums; font-size: 13px; }
+.year-more { margin-top: 10px; font-size: 12px; }

@@ -24,6 +24,7 @@ pub mod preview;
 mod remote;
 pub mod review;
 pub mod rules;
+pub mod search;
 pub mod settings;
 pub mod state;
 pub mod statements;
@@ -33,6 +34,7 @@ pub mod taxyears;
 #[cfg(any(test, debug_assertions, feature = "test-util"))]
 pub mod test_support;
 pub mod window;
+pub mod year;
 
 use std::path::PathBuf;
 

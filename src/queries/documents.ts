@@ -21,7 +21,7 @@ export const useVendors = () => useQuery({ queryKey: VENDORS_KEY, queryFn: api.v
 
 export const useDocumentHistory = (id: string) => useQuery({ queryKey: [...HISTORY_KEY, id], queryFn: () => api.documentHistory(id) });
 
-export const useYearLog = (year: number) => useQuery({ queryKey: [...LOG_KEY, year], queryFn: () => api.yearLog(year) });
+export const useYearLog = (year: number, query = "") => useQuery({ queryKey: [...LOG_KEY, year, query], queryFn: () => api.yearLog(year, query), placeholderData: (previous) => previous });
 
 export const useArchive = (year: number) => useQuery({ queryKey: [...ARCHIVE_KEY, year], queryFn: () => api.archiveList(year) });
 

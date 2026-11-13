@@ -6,14 +6,16 @@ vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await impo
 
 import { api } from "../api";
 import { useStore } from "../state/store";
+import { HOME } from "../state/route";
 import { COMMAND_LIST } from "../test/commands";
 import { renderWithQuery } from "../test/renderWithQuery";
+import { elsewhere } from "../test/year";
 import { CommandPalette } from "./CommandPalette";
 
 const mocked = vi.mocked(api, true);
 
 const option = (name: RegExp | string) => screen.findByRole("option", { name });
-const search = () => screen.getByRole("textbox", { name: "Search commands" });
+const search = () => screen.getByRole("textbox", { name: "Search everywhere" });
 const optionNames = () => screen.getAllByRole("option").map((o) => o.textContent);
 const selected = () => screen.getAllByRole("option").find((o) => o.getAttribute("aria-selected") === "true")?.textContent;
 
@@ -26,9 +28,10 @@ async function openPalette() {
 describe("CommandPalette", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useStore.setState({ paletteOpen: false, toasts: [] });
+    useStore.setState({ route: HOME, back: [], forward: [], paletteOpen: false, paletteQuery: "", toasts: [] });
     mocked.listCommands.mockResolvedValue(COMMAND_LIST);
     mocked.runCommand.mockResolvedValue(undefined);
+    mocked.searchElsewhere.mockResolvedValue([]);
   });
 
   it("shows nothing while closed", () => {
@@ -84,7 +87,7 @@ describe("CommandPalette", () => {
 
     await userEvent.type(search(), "zzzz");
 
-    expect(screen.getByText("No matching command")).toBeTruthy();
+    expect(screen.getByText("Nothing matches")).toBeTruthy();
     expect(screen.queryAllByRole("option")).toHaveLength(0);
   });
 
@@ -152,6 +155,71 @@ describe("CommandPalette", () => {
 
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(mocked.runCommand).not.toHaveBeenCalled();
+  });
+
+  describe("matches elsewhere", () => {
+    const pixelforge = () => option(/Pixelforge Ltd\. invoice/);
+
+    it("opens with the text the header searched everywhere for, and lists its matches", async () => {
+      mocked.searchElsewhere.mockResolvedValue([elsewhere()]);
+      useStore.setState({ paletteOpen: true, paletteQuery: "pixel" });
+      renderWithQuery(<CommandPalette />);
+
+      expect(await pixelforge()).toBeTruthy();
+      expect((search() as HTMLInputElement).value).toBe("pixel");
+      expect(mocked.searchElsewhere).toHaveBeenCalledWith("pixel");
+    });
+
+    it("lists the matches after the commands, each with its place", async () => {
+      mocked.searchElsewhere.mockResolvedValue([elsewhere()]);
+      await openPalette();
+
+      await userEvent.type(search(), "go");
+
+      await pixelforge();
+      expect(optionNames()).toEqual(["Go to Today⌘1", "Go to Subscriptions⌘2", "Pixelforge Ltd. invoiceTax year 2026"]);
+    });
+
+    it("shows no matches for an empty query", async () => {
+      mocked.searchElsewhere.mockResolvedValue([elsewhere()]);
+
+      await openPalette();
+
+      expect(optionNames()).not.toContain("Pixelforge Ltd. invoiceTax year 2026");
+      expect(mocked.searchElsewhere).not.toHaveBeenCalled();
+    });
+
+    it("opens the match and closes on Enter", async () => {
+      mocked.searchElsewhere.mockResolvedValue([elsewhere()]);
+      await openPalette();
+      await userEvent.type(search(), "pixelforge");
+      await pixelforge();
+
+      await userEvent.keyboard("{Enter}");
+
+      expect(useStore.getState().route).toEqual({ page: "document", documentId: "doc-9", year: 2026 });
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(mocked.runCommand).not.toHaveBeenCalled();
+    });
+
+    it("opens a clicked match and closes", async () => {
+      mocked.searchElsewhere.mockResolvedValue([elsewhere({ label: "4 lines", place: "Private", target: { page: "account", accountId: "acc-1" } })]);
+      await openPalette();
+      await userEvent.type(search(), "zzzz");
+
+      await userEvent.click(await option(/4 lines/));
+
+      expect(useStore.getState().route).toEqual({ page: "account", accountId: "acc-1" });
+      expect(screen.queryByRole("dialog")).toBeNull();
+    });
+
+    it("says nothing matches when neither a command nor a document does", async () => {
+      await openPalette();
+
+      await userEvent.type(search(), "zzzz");
+
+      expect(screen.getByText("Nothing matches")).toBeTruthy();
+    });
   });
 
   it("reports a command that fails as an error toast", async () => {

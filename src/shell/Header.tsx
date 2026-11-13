@@ -5,6 +5,8 @@ import { FILTER_PLACEHOLDER } from "../pages/pages";
 import type { Route } from "../state/route";
 import { useStore } from "../state/store";
 import { useCoversPdf } from "../lib/pdfCover";
+import { routeOf } from "../lib/targets";
+import { useElsewhere } from "../queries/year";
 import { startImport } from "../statements/importFlow";
 
 /** The title and, for a nested page, the crumb back to its parent. */
@@ -17,36 +19,67 @@ export interface HeaderTitle {
 /** The filter field's id, so ⌘F (`filter.focus`) can reach it. */
 export const FILTER_FIELD_ID = "page-filter";
 
+/** Where else the filter text turns up, under the field; ⌘↩ searches everywhere in the palette. */
+function ElsewhereMenu({ query }: { query: string }) {
+  const { data: matches = [] } = useElsewhere(query);
+  const navigate = useStore((s) => s.navigate);
+  useCoversPdf(true);
+  return (
+    <div className="menu elsewhere" role="menu" aria-label="Matches elsewhere">
+      {matches.length > 0 && <div className="elsewhere__caption">Matches elsewhere</div>}
+      {matches.map((match, i) => (
+        <button key={i} className="menu-row" role="menuitem" onMouseDown={(e) => e.preventDefault()} onClick={() => navigate(routeOf(match.target))}>
+          {match.label}
+          <span className="menu-row__key">{match.place}</span>
+        </button>
+      ))}
+      <button className="menu-row" role="menuitem" onMouseDown={(e) => e.preventDefault()} onClick={() => useStore.getState().searchEverywhere(query)}>
+        Search everywhere
+        <span className="menu-row__key">⌘↩</span>
+      </button>
+    </div>
+  );
+}
+
 function FilterField({ page }: { page: Route["page"] }) {
   const filter = useStore((s) => s.filter);
   const setFilter = useStore((s) => s.setFilter);
+  const [focused, setFocused] = useState(false);
   const scoped = FILTER_PLACEHOLDER[page];
   const placeholder = scoped ?? "Search everywhere";
   const key = scoped ? "⌘F" : "⌘K";
   return (
-    <label className="filter-field">
-      <Search size={14} />
-      <input
-        id={FILTER_FIELD_ID}
-        value={filter}
-        placeholder={placeholder}
-        aria-label={placeholder}
-        onChange={(e) => setFilter(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Escape" && filter) {
-            e.stopPropagation();
-            setFilter("");
-          }
-        }}
-      />
-      {filter ? (
-        <button className="icon-btn icon-btn--tiny" onClick={() => setFilter("")} aria-label="Clear filter (Esc)">
-          <X size={11} />
-        </button>
-      ) : (
-        <span className="kbd">{key}</span>
-      )}
-    </label>
+    <div className="filter-wrap">
+      <label className="filter-field">
+        <Search size={14} />
+        <input
+          id={FILTER_FIELD_ID}
+          value={filter}
+          placeholder={placeholder}
+          aria-label={placeholder}
+          onChange={(e) => setFilter(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape" && filter) {
+              e.stopPropagation();
+              setFilter("");
+            } else if (e.key === "Enter" && (e.metaKey || !scoped) && filter.trim()) {
+              e.preventDefault();
+              useStore.getState().searchEverywhere(filter);
+            }
+          }}
+        />
+        {filter ? (
+          <button className="icon-btn icon-btn--tiny" onClick={() => setFilter("")} aria-label="Clear filter (Esc)">
+            <X size={11} />
+          </button>
+        ) : (
+          <span className="kbd">{key}</span>
+        )}
+      </label>
+      {focused && filter.trim() && <ElsewhereMenu query={filter} />}
+    </div>
   );
 }
 

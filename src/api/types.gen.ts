@@ -107,6 +107,14 @@ excluded: string, deletable: boolean,
  */
 deletableNote: string | null, };
 
+export type AttentionKind = "missing_invoice" | "draft" | "undated";
+
+export type AttentionView = { kind: AttentionKind, title: string, detail: string, 
+/**
+ * The document to open; None for a missing invoice.
+ */
+documentId: string | null, };
+
 export type ChainKind = "first" | "continues" | "gap";
 
 /**
@@ -218,6 +226,16 @@ finishedOn: string | null,
  */
 excludedOn: string | null, excludeReason: string | null, };
 
+export type Elsewhere = { 
+/**
+ * `Pixelforge Ltd. invoice`, `3 documents`, `4 lines`.
+ */
+label: string, 
+/**
+ * `Tax year 2026`, `All documents`, `Private`.
+ */
+place: string, target: Target, };
+
 export type ErrorKind = "io" | "invalid_input" | "not_found" | "internal";
 
 export type Estimate = { workShare: number, 
@@ -300,6 +318,12 @@ export type ItemOption = { key: string,
  */
 label: string, kz: string, };
 
+export type KennzahlView = { key: string, kz: string, name: string, 
+/**
+ * The plain number to copy into FinanzOnline, `1228,40`.
+ */
+copy: string, rows: Array<YearRow>, note: string | null, };
+
 /**
  * Something the page acts on once it listens: from the launch that started the app or a later one.
  */
@@ -346,6 +370,12 @@ export type MonthHead = { label: string,
  */
 january: boolean, };
 
+export type MonthView = { 
+/**
+ * `November`, `Every month`, `Whole year`.
+ */
+label: string, total: string, rows: Array<YearRow>, };
+
 export type NewAccount = { name: string, bank: string, iban: string, own: boolean, };
 
 /**
@@ -357,6 +387,12 @@ export type NumberFormat = "dot_decimal" | "comma_decimal";
  * A PDF the app keeps, named by what it belongs to; the page never sends paths.
  */
 export type PdfSource = { kind: SourceKind, id: string, };
+
+export type QuestionView = { id: string, label: string, help: string | null, unit: string | null, 
+/**
+ * The answer as the field shows it; empty while unanswered.
+ */
+value: string, answered: boolean, };
 
 /**
  * One open year's pending Reload.
@@ -401,6 +437,8 @@ export type ReviewQueue = {
  * Newest first.
  */
 lines: Array<ReviewLine>, items: Array<ItemOption>, };
+
+export type RowKind = "document" | "line";
 
 /**
  * A rule as the Rule sheet edits it; amounts as typed.
@@ -492,6 +530,11 @@ range: string,
 count: string, lines: Array<LineView>, };
 
 /**
+ * Where a match leads.
+ */
+export type Target = { "page": "documents" } | { "page": "document", documentId: string, year: number | null, } | { "page": "account", accountId: string, };
+
+/**
  * What the sidebar lists.
  */
 export type TaxYear = { year: number, state: YearState, ruleset: string, };
@@ -521,5 +564,37 @@ detail: string, defaultItemKey: string | null,
 unused: boolean, };
 
 export type VendorsView = { vendors: Array<VendorView>, items: Array<ItemOption>, };
+
+export type YearPage = { year: number, ruleset: string, state: YearState, 
+/**
+ * `€1,228.40`.
+ */
+total: string, 
+/**
+ * `Draft · 2 invoices and 1 answer missing`, `Ready to close`.
+ */
+progress: string, 
+/**
+ * Done facts out of all, 0–100.
+ */
+progressPercent: number, 
+/**
+ * Shown when the total is below the Werbungskostenpauschale.
+ */
+pauschaleNote: string | null, questions: Array<QuestionView>, attention: Array<AttentionView>, kennzahlen: Array<KennzahlView>, months: Array<MonthView>, archived: number, };
+
+export type YearRow = { id: string, kind: RowKind, title: string, 
+/**
+ * `10 Nov · 60 % of €22.48`.
+ */
+detail: string, 
+/**
+ * What it counts, `€13.49`.
+ */
+amount: string, draft: boolean, 
+/**
+ * Counts from an earlier year (a depreciation slice).
+ */
+carried: boolean, kz: string, };
 
 export type YearState = "open" | "closed";
