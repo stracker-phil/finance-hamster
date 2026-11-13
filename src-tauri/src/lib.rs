@@ -1,5 +1,6 @@
 //! Hamster's modules and the `run` entry point.
 
+pub mod accounts;
 mod app;
 pub mod cli;
 pub mod commands;
@@ -21,6 +22,8 @@ mod remote;
 pub mod settings;
 pub mod state;
 pub mod store;
+pub mod taxrules;
+pub mod taxyears;
 #[cfg(any(test, debug_assertions, feature = "test-util"))]
 pub mod test_support;
 pub mod window;

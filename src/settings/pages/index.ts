@@ -1,12 +1,41 @@
 import type { SettingsPage } from "../registry";
 import { AboutPage } from "./AboutPage";
+import { AccountsPage } from "./AccountsPage";
 import { AppearancePage } from "./AppearancePage";
 import { PrivacyPage } from "./PrivacyPage";
 import { ShortcutsPage } from "./ShortcutsPage";
 import { StatusPage } from "./StatusPage";
+import { TaxRulesPage } from "./TaxRulesPage";
 
 /** Every Settings page in nav order (mockup Settings). */
 export const SETTINGS_PAGES: SettingsPage[] = [
+  {
+    id: "accounts",
+    group: "Finance",
+    label: "Accounts",
+    icon: "accounts",
+    Body: AccountsPage,
+    rows: [
+      { id: "bank-accounts", title: "Bank accounts", keywords: ["iban", "bank"] },
+      { id: "own-transfers", title: "Hide transfers between my accounts", keywords: ["transfer"] },
+      { id: "add-account", title: "Add Account", keywords: ["new", "bank"] },
+    ],
+  },
+  {
+    id: "taxrules",
+    group: "Finance",
+    label: "Tax Rules",
+    icon: "taxRules",
+    intro: "The rules for each tax year live in one JSON file. Edit it in any text editor, then reload. Hamster checks the file before using it and never changes a closed year.",
+    Body: TaxRulesPage,
+    rows: [
+      { id: "rulesets", title: "Rulesets", keywords: ["json", "kennzahl", "draft", "open", "closed"] },
+      { id: "reload", title: "Reload after editing", keywords: ["rules"] },
+      { id: "import", title: "Import a JSON file", keywords: ["rules"] },
+      { id: "duplicate", title: "Start next year", keywords: ["duplicate", "rules"] },
+      { id: "rules-folder", title: "Rules folder", keywords: ["finder"] },
+    ],
+  },
   {
     id: "privacy",
     group: "App",

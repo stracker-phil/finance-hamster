@@ -3,6 +3,20 @@
 export type Accent = "system" | "orange" | "gold" | "red" | "magenta" | "purple" | "indigo" | "blue" | "teal" | "graphite";
 
 /**
+ * An account as the page shows it.
+ */
+export type Account = { id: string, name: string, bank: string, 
+/**
+ * `AT•• •••• 0001`.
+ */
+ibanMasked: string, own: boolean, };
+
+/**
+ * The fields to change; the IBAN stays, as statements are matched by it.
+ */
+export type AccountEdit = { name: string, bank: string, own: boolean, };
+
+/**
  * The JSON shape of an `AppError`.
  */
 export type AppError = { kind: ErrorKind, message: string, 
@@ -34,23 +48,82 @@ export type DataChanged = { tables: Array<string>, };
 
 export type ErrorKind = "io" | "invalid_input" | "not_found" | "internal";
 
+export type Imported = { fileName: string, year: number, 
+/**
+ * The replaced file's new name, kept as a backup.
+ */
+backup: string | null, 
+/**
+ * The year is open, so a Reload applies the imported file.
+ */
+needsReload: boolean, };
+
 /**
  * Something the page acts on once it listens: from the launch that started the app or a later one.
  */
 export type LaunchEvent = { "type": "error", message: string, } | { "type": "activate" };
+
+export type NewAccount = { name: string, bank: string, iban: string, own: boolean, };
 
 /**
  * How amounts read: `1,234.56` or `1.234,56`.
  */
 export type NumberFormat = "dot_decimal" | "comma_decimal";
 
+/**
+ * One open year's pending Reload.
+ */
+export type ReloadPreview = { year: number, from: string, to: string | null, changes: Array<string>, problems: Array<string>, };
+
+/**
+ * One row of Settings → Tax Rules.
+ */
+export type RulesFile = { fileName: string, year: number, state: RulesState, 
+/**
+ * The file's ruleset name, or the applied one when the file can't be read.
+ */
+ruleset: string | null, basedOn: string | null, items: number, unverified: number, 
+/**
+ * Why the file can't be used; empty when it is valid.
+ */
+problems: Array<string>, 
+/**
+ * An open year's file differs from what the year applies, so Reload has something to do.
+ */
+edited: boolean, 
+/**
+ * The year exists but its file is gone; a closed year still has its frozen copy.
+ */
+missing: boolean, 
+/**
+ * When a closed year was closed, as a date label.
+ */
+closedOn: string | null, 
+/**
+ * When an open year last loaded its file, as a date label.
+ */
+loadedOn: string | null, };
+
+export type RulesState = "draft" | "open" | "closed";
+
 export type Settings = { appearance: Appearance, accent: Accent, numberFormat: NumberFormat, 
 /**
  * Shows a card payment's original amount (`USD 24.00`) beside the euro amount.
  */
-showOriginalCurrency: boolean, };
+showOriginalCurrency: boolean, 
+/**
+ * Transfers between two of the owner's accounts show as Transfer and never count twice.
+ */
+hideOwnTransfers: boolean, };
 
 /**
  * The fields to change; absent ones keep their value.
  */
-export type SettingsPatch = { appearance?: Appearance, accent?: Accent, numberFormat?: NumberFormat, showOriginalCurrency?: boolean, };
+export type SettingsPatch = { appearance?: Appearance, accent?: Accent, numberFormat?: NumberFormat, showOriginalCurrency?: boolean, hideOwnTransfers?: boolean, };
+
+/**
+ * What the sidebar lists.
+ */
+export type TaxYear = { year: number, state: YearState, ruleset: string, };
+
+export type YearState = "open" | "closed";

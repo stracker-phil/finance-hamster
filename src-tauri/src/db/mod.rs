@@ -65,6 +65,8 @@ pub enum Source {
     Import,
     /// The debug build's demo data.
     Seed,
+    /// Hamster's own bookkeeping, such as a tax year started from its rules file.
+    App,
     Undo,
     Redo,
 }
@@ -76,12 +78,13 @@ impl Source {
             Source::Cli => "cli",
             Source::Import => "import",
             Source::Seed => "seed",
+            Source::App => "app",
             Source::Undo => "undo",
             Source::Redo => "redo",
         }
     }
 
-    /// Changes by the owner or an import join the undo history; seeds and undo/redo themselves don't.
+    /// Changes by the owner or an import join the undo history; the rest don't.
     pub fn is_undoable(self) -> bool {
         matches!(self, Source::Ui | Source::Cli | Source::Import)
     }

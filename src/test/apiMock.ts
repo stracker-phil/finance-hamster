@@ -1,5 +1,6 @@
 import { vi } from "vitest";
 import type { api as realApi } from "../api";
+import { account } from "./accounts";
 import { settings } from "./settings";
 
 type Api = typeof realApi;
@@ -18,6 +19,17 @@ export function createApiMock(overrides: Partial<Api> = {}): Api {
     dataFolder: vi.fn().mockResolvedValue("~/Library/Application Support/com.example.hamster/"),
     undo: vi.fn().mockResolvedValue(null),
     redo: vi.fn().mockResolvedValue(null),
+    listAccounts: vi.fn().mockResolvedValue([account()]),
+    addAccount: vi.fn().mockResolvedValue(account()),
+    editAccount: vi.fn().mockResolvedValue(undefined),
+    listTaxYears: vi.fn().mockResolvedValue([]),
+    rulesOverview: vi.fn().mockResolvedValue([]),
+    rulesReloadPreview: vi.fn().mockResolvedValue([]),
+    rulesReloadApply: vi.fn().mockResolvedValue(null),
+    rulesImport: vi.fn().mockResolvedValue(null),
+    rulesDuplicate: vi.fn().mockResolvedValue("rules-2027.json"),
+    rulesOpen: vi.fn().mockResolvedValue(undefined),
+    rulesShowFolder: vi.fn().mockResolvedValue(undefined),
     listen: vi.fn().mockResolvedValue(() => {}),
   };
   return { ...api, ...overrides };

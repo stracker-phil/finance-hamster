@@ -1,7 +1,7 @@
 import { getName, getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { AppError, AppInfo, CommandInfo, ErrorKind, EventName, EventPayloads, LaunchEvent, Settings, SettingsPatch } from "./types";
+import type { Account, AccountEdit, AppError, AppInfo, CommandInfo, ErrorKind, EventName, EventPayloads, Imported, LaunchEvent, NewAccount, ReloadPreview, RulesFile, Settings, SettingsPatch, TaxYear } from "./types";
 
 export * from "./types";
 
@@ -23,6 +23,20 @@ export const api = {
   /** The label of what was undone, or null when there was nothing. */
   undo: () => invoke<string | null>("undo"),
   redo: () => invoke<string | null>("redo"),
+  listAccounts: () => invoke<Account[]>("list_accounts"),
+  addAccount: (account: NewAccount) => invoke<Account>("add_account", { account }),
+  editAccount: (id: string, account: AccountEdit) => invoke<void>("edit_account", { id, account }),
+  listTaxYears: () => invoke<TaxYear[]>("list_tax_years"),
+  rulesOverview: () => invoke<RulesFile[]>("rules_overview"),
+  rulesReloadPreview: () => invoke<ReloadPreview[]>("rules_reload_preview"),
+  /** The label of the applied change, or null when no file had changed. */
+  rulesReloadApply: () => invoke<string | null>("rules_reload_apply"),
+  /** Null when the file panel was cancelled. */
+  rulesImport: () => invoke<Imported | null>("rules_import"),
+  /** The new draft's file name. */
+  rulesDuplicate: () => invoke<string>("rules_duplicate"),
+  rulesOpen: (year: number) => invoke<void>("rules_open", { year }),
+  rulesShowFolder: () => invoke<void>("rules_show_folder"),
   listen: <E extends EventName>(event: E, handler: (payload: EventPayloads[E]) => void): Promise<UnlistenFn> =>
     listen<EventPayloads[E]>(event, (e) => handler(e.payload)),
 };

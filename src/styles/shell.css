@@ -71,3 +71,13 @@
 }
 .empty-page__title { font-size: 17px; font-weight: 700; color: var(--text); }
 .new-menu { top: 38px; right: 0; width: 240px; }
+
+/* First run: no sidebar, one card in the middle of the window. */
+.window--first-run { flex-direction: column; align-items: center; background: var(--panel-bg); }
+.first-run { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; }
+.first-run__titlebar { height: 46px; width: 100%; flex: none; }
+.first-run__card { width: min(440px, calc(100% - 32px)); margin-top: 8vh; display: flex; flex-direction: column; gap: 12px; font-size: 13px; }
+.first-run__card h1 { margin: 0; font-size: 22px; font-weight: 700; }
+.first-run__card p { margin: 0; line-height: 1.5; color: var(--text-tertiary); }
+.first-run__step { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.first-run .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }

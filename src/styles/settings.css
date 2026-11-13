@@ -59,3 +59,11 @@
 .accent-dot--blue { background: var(--accent-blue); }
 .accent-dot--teal { background: var(--accent-teal); }
 .accent-dot--graphite { background: var(--accent-graphite); }
+
+.settings-code {
+  margin: 0; padding: 10px 14px 12px; border-top: 1px solid var(--border); overflow-x: auto;
+  font-family: var(--font-mono); font-size: 11.5px; line-height: 1.5; color: var(--text-tertiary);
+}
+.reload-year h3 { margin: 4px 0 6px; font-size: 13px; font-weight: 600; }
+.reload-list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary); }
+.reload-list--problems { color: var(--danger-text); }

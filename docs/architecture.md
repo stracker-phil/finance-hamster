@@ -71,8 +71,10 @@ Everything lives in the config dir (ADR 0012), 0700 with files 0600:
 - **Money** is integer cents plus a currency code; foreign-currency lines also keep the original amount,
   rate and fee. Bank dates are `YYYY-MM-DD` text.
 - **Statement lines** are parsed once at import, stored with the parser layout version and never re-parsed.
-- **Tax rules** are files, not database rows: loaded and validated at launch and on Reload; a closed year
-  stores a frozen copy of its file with its snapshot (ADR 0040).
+- **Tax rules** are files edited outside the app (ADR 0040). Each tax year's row keeps the rules text it
+  applies: a year starts from its valid file once the calendar reaches it, an edited file takes effect only
+  through Reload (checked, previewed, journaled, undoable), and closing the year freezes that text. Files are
+  checked at launch and whenever Settings → Tax Rules shows them.
 - **JSON stores** (`JsonStore`: atomic, 0600, defaults for missing files, unparsable files moved aside) hold
   settings, keybindings and UI state.
 
@@ -89,8 +91,12 @@ Rust (`src-tauri/src/`):
 | `menu/` | the menu bar: macOS's standard items around `MENUS` (command ids); a menu item's id is its command |
 | `db/` | `hamster.sqlite`: `migrations.rs` (numbered, `user_version`), `change.rs` (row changes over JSON rows with inverses and field-level journal entries), `journal.rs` (the `journal` table and its `journal.jsonl` mirror, caught up at launch), `undo.rs`, `Db::write`/`undo`/`redo`, `commands.rs` (`undo`, `redo`, the `data_changed` event) |
 | `money.rs`, `date.rs` | cents plus currency, amount labels by the number format, the FinanzOnline copy value, typed amounts; `YYYY-MM-DD` dates and their labels in the region's order |
+| `accounts/` | bank accounts: IBAN check and mask, `add`/`edit`/`list` and their commands |
+| `taxyears/` | the `tax_years` rows (state, applied rules text), `start_from_rules` at launch, `list_tax_years` |
+| `taxrules/` | the rules files: `model.rs` (typed file, unknown fields fail), `check.rs` (schema constraints and Reload checks), `files.rs` (the `rules/` folder, seed, backups, next year's draft), `diff.rs` (the Reload preview lines), `overview`/`preview`/`apply`/`import`/`duplicate`, `commands.rs` (Settings → Tax Rules) |
+| `../resources/rules/` | the schema, README and seed `rules-2026.json` the app writes to `rules/` |
 | `notify.rs` | `Notifier`: notifications recorded, not posted (the real center comes with reminders) |
-| `settings/` | `settings.json`: appearance, accent, number format, original currency (`SettingsStore`, `get_settings`, `update_settings`) |
+| `settings/` | `settings.json`: appearance, accent, number format, original currency, own transfers (`SettingsStore`, `get_settings`, `update_settings`) |
 | `instance.rs`, `ipc/` | single instance: lock file, Unix socket, one JSON line per request |
 | `remote/` | handles each `IpcMessage` from another process |
 | `launch.rs` | launch events queued for the page (`take_launch_events`) |
@@ -108,12 +114,13 @@ Frontend (`src/`):
 | `api/` | the `api` object (only place that imports `@tauri-apps/*`), `toAppError`, generated `types.gen.ts` |
 | `state/` | the zustand store (route and history, filter, toasts, confirmation; `window.hamster` in debug builds), `route.ts` (every page), `useAppEvents` |
 | `shell/` | `Window`, `Sidebar` (pages, tax years, drop zone), `Header` (crumb, title, page controls, filter field, + New), page titles |
-| `pages/` | each page's body (`PageBody`) and the per-page header texts |
+| `pages/` | each page's body (`PageBody`), the per-page header texts, `FirstRun` (no account yet) |
+| `accounts/` | `AccountForm` (first run and Settings) and `AccountSheet` |
 | `commands/` | `pageCommands.ts` (what the main window does for each page command), `pageKeys.ts` (single keys a page answers to) |
 | `palette/` | the ⌘K command palette |
-| `queries/` | TanStack Query: the client, `useEvents` (event → stale keys), settings, commands, `useLook` |
+| `queries/` | TanStack Query: the client, `useEvents` (event → stale keys, `data_changed` table → stale keys), settings, commands, accounts, tax years and rules, `useLook` |
 | `settings/`, `windows/settings/` | the Settings window: page registry and search, row controls, the pages |
-| `components/` | `Modal`, `ConfirmSheet`, `Toasts`, `TooltipHost`, `ErrorBoundary`, the mockup's line icons |
+| `components/` | `Modal`, `ConfirmSheet`, `Toasts`, `TooltipHost`, `ErrorBoundary`, `icons.tsx` (lucide icons by role) |
 | `lib/` | `theme.ts` (scheme and accent on `<html>`), `motion.ts` (`usePresence`, `useGlide`, `useFlash`, `useListGlide`) |
 | `styles/` | `palettes/` (every color, light and dark), accents, motion tokens, base, controls, shell, overlays |
 | `test/` | `createApiMock`, the module boundary test |

@@ -1,6 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
 import { api, toAppError } from "../../api";
 import { Icon } from "../../components/icons";
+import { useDataFolder } from "../../queries/settings";
 import { useStore } from "../../state/store";
 import { Group, Row } from "../controls";
 
@@ -9,7 +9,7 @@ const showDataFolder = () => {
 };
 
 export function PrivacyPage() {
-  const { data: folder } = useQuery({ queryKey: ["data-folder"], queryFn: api.dataFolder });
+  const { data: folder } = useDataFolder();
   return (
     <>
       <Group title="Data folder" anchor="data-folder">

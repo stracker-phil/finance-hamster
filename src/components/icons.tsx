@@ -1,4 +1,4 @@
-import { Activity, Check, FilePlus, FileText, House, Info, Keyboard, Layers, Lock, Palette, PanelLeft, Repeat, Settings, ShieldCheck, type LucideIcon } from "lucide-react";
+import { Activity, Check, FilePlus, FileText, House, Info, Keyboard, Landmark, Layers, Lock, Palette, PanelLeft, Repeat, Scale, Settings, ShieldCheck, type LucideIcon } from "lucide-react";
 
 /** The app's icons by role, from lucide like the family's other apps (Taskboard); the mockup's drawn icons were
  *  placeholders. */
@@ -17,6 +17,8 @@ const ICONS = {
   status: Activity,
   about: Info,
   check: Check,
+  accounts: Landmark,
+  taxRules: Scale,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;

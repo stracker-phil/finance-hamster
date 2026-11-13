@@ -1,5 +1,4 @@
-//! The owner's preferences in `settings.json`: appearance, accent, number format and original-currency display
-//! (ADR 0013, ADR 0026).
+//! The owner's preferences in `settings.json` (ADR 0013, ADR 0026).
 
 pub mod commands;
 
@@ -60,6 +59,8 @@ pub struct Settings {
     pub number_format: NumberFormat,
     /// Shows a card payment's original amount (`USD 24.00`) beside the euro amount.
     pub show_original_currency: bool,
+    /// Transfers between two of the owner's accounts show as Transfer and never count twice.
+    pub hide_own_transfers: bool,
 }
 
 impl Default for Settings {
@@ -69,6 +70,7 @@ impl Default for Settings {
             accent: Accent::default(),
             number_format: NumberFormat::default(),
             show_original_currency: true,
+            hide_own_transfers: true,
         }
     }
 }
@@ -82,6 +84,7 @@ pub struct SettingsPatch {
     pub accent: Option<Accent>,
     pub number_format: Option<NumberFormat>,
     pub show_original_currency: Option<bool>,
+    pub hide_own_transfers: Option<bool>,
 }
 
 impl Settings {
@@ -97,6 +100,9 @@ impl Settings {
         }
         if let Some(show) = patch.show_original_currency {
             self.show_original_currency = show;
+        }
+        if let Some(hide) = patch.hide_own_transfers {
+            self.hide_own_transfers = hide;
         }
     }
 }
@@ -141,16 +147,49 @@ mod tests {
     }
 
     #[test]
-    fn defaults_are_system_look_dot_decimal_and_original_currency_shown() {
+    fn defaults_are_system_look_dot_decimal_original_currency_shown_and_own_transfers_hidden() {
         assert_eq!(
             serde_json::to_value(Settings::default()).unwrap(),
             json!({
                 "appearance": "system",
                 "accent": "system",
                 "numberFormat": "dot_decimal",
-                "showOriginalCurrency": true
+                "showOriginalCurrency": true,
+                "hideOwnTransfers": true
             })
         );
+    }
+
+    #[test]
+    fn an_old_settings_file_without_hide_own_transfers_loads_it_as_true() {
+        let dir = temp_config_dir();
+        std::fs::write(
+            dir.path().join(FILE_NAME),
+            r#"{"appearance":"dark","showOriginalCurrency":false}"#,
+        )
+        .unwrap();
+
+        let settings = store_in(&dir).get();
+        assert!(settings.hide_own_transfers);
+        assert_eq!(settings.appearance, Appearance::Dark);
+        assert!(!settings.show_original_currency);
+    }
+
+    #[test]
+    fn hide_own_transfers_can_be_patched_and_survives_reopening() {
+        let dir = temp_config_dir();
+        let updated = store_in(&dir)
+            .update(SettingsPatch {
+                hide_own_transfers: Some(false),
+                ..SettingsPatch::default()
+            })
+            .unwrap();
+        assert!(!updated.hide_own_transfers);
+        assert!(!store_in(&dir).get().hide_own_transfers);
+
+        let patch: SettingsPatch =
+            serde_json::from_value(json!({ "hideOwnTransfers": true })).unwrap();
+        assert_eq!(patch.hide_own_transfers, Some(true));
     }
 
     #[test]

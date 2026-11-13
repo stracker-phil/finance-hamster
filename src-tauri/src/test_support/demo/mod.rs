@@ -4,13 +4,41 @@
 
 use std::path::Path;
 
-use crate::db::{Db, Op, Source};
+use crate::accounts::{self, AccountRow};
+use crate::db::{Change, Db, Op, Source};
 use crate::error::AppResult;
 
 type Seeder = fn() -> AppResult<Option<Op>>;
 
 /// The ops that build the demo data set, in order.
-const SEEDERS: &[Seeder] = &[];
+const SEEDERS: &[Seeder] = &[demo_accounts];
+
+/// Made-up accounts at a made-up bank code; the IBANs' check digits are valid.
+pub const DEMO_ACCOUNTS: [(&str, &str); 3] = [
+    ("Private", "AT241999900000000001"),
+    ("Household", "AT941999900000000002"),
+    ("Business", "AT671999900000000003"),
+];
+
+fn demo_accounts() -> AppResult<Option<Op>> {
+    let demo = DEMO_ACCOUNTS;
+    let changes = demo
+        .iter()
+        .enumerate()
+        .map(|(i, (name, iban))| {
+            let row = AccountRow {
+                id: format!("demo-account-{}", i + 1),
+                name: (*name).into(),
+                bank: "Example Sparkasse".into(),
+                iban: (*iban).into(),
+                own: true,
+                created_at: i as i64,
+            };
+            Change::insert(accounts::TABLE, &row)
+        })
+        .collect::<AppResult<_>>()?;
+    Ok(Some(Op::new("Add the demo accounts", changes)))
+}
 
 /// Seeds the demo data when the database has never been written to.
 pub fn seed_if_empty(db: &Db) -> AppResult<usize> {
@@ -64,11 +92,61 @@ mod tests {
     }
 
     #[test]
-    fn seeding_an_empty_database_writes_nothing_without_seeders() {
+    fn seeding_an_empty_database_writes_one_op_with_the_three_demo_accounts() {
         let dir = temp_config_dir();
         let db = Db::open(dir.path()).unwrap();
+        assert_eq!(seed_if_empty(&db).unwrap(), 1);
+
+        let accounts = accounts::list(&db).unwrap();
+        let shown: Vec<(&str, &str, bool)> = accounts
+            .iter()
+            .map(|a| (a.name.as_str(), a.iban_masked.as_str(), a.own))
+            .collect();
+        assert_eq!(
+            shown,
+            vec![
+                ("Private", "AT•• •••• 0001", true),
+                ("Household", "AT•• •••• 0002", true),
+                ("Business", "AT•• •••• 0003", true),
+            ]
+        );
+        assert_eq!(db.undo().unwrap(), None);
+    }
+
+    #[test]
+    fn seeding_twice_changes_nothing_the_second_time() {
+        let dir = temp_config_dir();
+        let db = Db::open(dir.path()).unwrap();
+        seed_if_empty(&db).unwrap();
+        let before = journal_rows(&db);
+
         assert_eq!(seed_if_empty(&db).unwrap(), 0);
-        assert_eq!(journal_rows(&db), 0);
+        assert_eq!(journal_rows(&db), before);
+        assert_eq!(accounts::list(&db).unwrap().len(), 3);
+    }
+
+    #[test]
+    fn the_demo_ibans_have_valid_check_digits() {
+        let ops = SEEDERS.iter().filter_map(|seeder| seeder().unwrap());
+        let dir = temp_config_dir();
+        let db = Db::open(dir.path()).unwrap();
+        for op in ops {
+            db.write(op, Source::Seed).unwrap();
+        }
+        let ibans: Vec<String> = db
+            .read(|conn| {
+                let mut query = conn.prepare("SELECT iban FROM accounts ORDER BY created_at")?;
+                let rows = query.query_map([], |r| r.get(0))?;
+                Ok(rows.collect::<Result<_, _>>()?)
+            })
+            .unwrap();
+        for iban in ibans {
+            assert_eq!(
+                accounts::normalize_iban(&iban),
+                Some(iban.clone()),
+                "{iban}"
+            );
+        }
     }
 
     #[test]

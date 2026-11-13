@@ -7,10 +7,13 @@ vi.mock("../../api", async (orig) => ({ ...(await orig<object>()), api: (await i
 import { api } from "../../api";
 import { createQueryClient } from "../../queries/queryClient";
 import { useStore } from "../../state/store";
+import { SETTINGS_PAGES } from "../../settings/pages";
+import { account } from "../../test/accounts";
 import { settings } from "../../test/settings";
 import { SettingsApp } from "./SettingsApp";
 
 const mocked = vi.mocked(api, true);
+const FIRST_PAGE = SETTINGS_PAGES[0].label;
 
 const renderSettings = () => render(<SettingsApp client={createQueryClient()} />);
 const pageTitle = () => screen.getByRole("heading", { level: 2 }).textContent;
@@ -30,6 +33,7 @@ describe("SettingsApp", () => {
     useStore.setState({ toasts: [] });
     mocked.listen.mockResolvedValue(() => {});
     mocked.getSettings.mockResolvedValue(settings());
+    mocked.listAccounts.mockResolvedValue([account()]);
     mocked.listCommands.mockResolvedValue([]);
     delete document.documentElement.dataset.scheme;
     delete document.documentElement.dataset.accent;
@@ -47,8 +51,8 @@ describe("SettingsApp", () => {
     it("shows the first page by default", () => {
       renderSettings();
 
-      expect(pageTitle()).toBe("Privacy & Data");
-      expect(nav().getByRole("button", { name: "Privacy & Data" }).getAttribute("aria-current")).toBe("page");
+      expect(pageTitle()).toBe(FIRST_PAGE);
+      expect(nav().getByRole("button", { name: FIRST_PAGE }).getAttribute("aria-current")).toBe("page");
     });
 
     it("opens the page named by ?page= in the location", () => {
@@ -117,7 +121,7 @@ describe("SettingsApp", () => {
       await userEvent.type(search(), "zzzz{Enter}");
 
       expect(screen.getByText("No Results")).toBeTruthy();
-      expect(pageTitle()).toBe("Privacy & Data");
+      expect(pageTitle()).toBe(FIRST_PAGE);
     });
 
     it("brings back the page list when the search is cleared", async () => {

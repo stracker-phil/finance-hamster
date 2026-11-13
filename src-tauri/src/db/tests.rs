@@ -105,6 +105,7 @@ fn sources_are_named_for_the_journal() {
         (Source::Cli, "cli"),
         (Source::Import, "import"),
         (Source::Seed, "seed"),
+        (Source::App, "app"),
         (Source::Undo, "undo"),
         (Source::Redo, "redo"),
     ] {
@@ -326,6 +327,22 @@ fn seed_writes_are_not_undoable() {
     db.write(insert("a", "Rent", 100), Source::Seed).unwrap();
     assert_eq!(db.undo().unwrap(), None);
     assert_eq!(things(&db), vec![row("a", "Rent", 100)]);
+}
+
+#[test]
+fn app_writes_are_journaled_but_not_undoable() {
+    let (_dir, db) = open();
+    db.write(insert("a", "Rent", 100), Source::App).unwrap();
+    assert_eq!(db.undo().unwrap(), None);
+    assert_eq!(things(&db), vec![row("a", "Rent", 100)]);
+    let sources: Vec<String> = db
+        .read(|conn| {
+            let mut query = conn.prepare("SELECT DISTINCT source FROM journal")?;
+            let rows = query.query_map([], |r| r.get(0))?;
+            Ok(rows.collect::<Result<_, _>>()?)
+        })
+        .unwrap();
+    assert_eq!(sources, vec!["app".to_string()]);
 }
 
 #[test]

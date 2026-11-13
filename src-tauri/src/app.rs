@@ -23,6 +23,7 @@ pub fn start(
         .plugin(log_plugin())
         .plugin(init_logging(log_level))
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(window::navigation::guard())
         .plugin(tauri_plugin_deep_link::init())
         .menu(crate::menu::build)
@@ -38,6 +39,7 @@ pub fn start(
             log::info!("Hamster {} started", env!("CARGO_PKG_VERSION"));
             #[cfg(debug_assertions)]
             seed_demo(app);
+            start_tax_years(app);
             take_initial(app.handle(), initial);
             #[cfg(debug_assertions)]
             apply_dev_frame(app);
@@ -105,6 +107,15 @@ fn init_logging(level: LogLevel) -> tauri::plugin::TauriPlugin<tauri::Wry> {
             Ok(())
         })
         .build()
+}
+
+fn start_tax_years(app: &tauri::App) {
+    let state = app.state::<AppState>();
+    let started =
+        crate::taxyears::start_on_launch(&state.db, &crate::config_dir(), chrono::Local::now());
+    if let Err(e) = started {
+        log::warn!("Couldn't start the tax years: {e}");
+    }
 }
 
 #[cfg(debug_assertions)]

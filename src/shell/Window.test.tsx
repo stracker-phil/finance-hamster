@@ -1,12 +1,14 @@
-import { fireEvent, screen } from "@testing-library/react";
+import { act, fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
 
 import { api } from "../api";
+import { useEvents } from "../queries/useEvents";
 import { HOME } from "../state/route";
 import { useStore } from "../state/store";
+import { account } from "../test/accounts";
 import { renderWithQuery as render } from "../test/renderWithQuery";
 import { Window } from "./Window";
 
@@ -17,6 +19,8 @@ beforeEach(() => {
   useStore.setState({ route: HOME, back: [], forward: [], filter: "", toasts: [], confirmation: null, paletteOpen: false });
   mocked.runCommand.mockResolvedValue(undefined);
   mocked.listCommands.mockResolvedValue([]);
+  mocked.listAccounts.mockResolvedValue([account()]);
+  mocked.listTaxYears.mockResolvedValue([]);
 });
 
 const row = (name: string) => screen.getByRole("button", { name });
@@ -88,6 +92,92 @@ describe("settings button", () => {
     await userEvent.click(settingsButton());
 
     expect((await screen.findByRole("alert")).textContent).toContain("No window available");
+  });
+});
+
+describe("tax years in the sidebar", () => {
+  it("lists each year with Open for an open one and a lock for a closed one", async () => {
+    mocked.listTaxYears.mockResolvedValue([
+      { year: 2026, state: "open", ruleset: "2026 v1" },
+      { year: 2025, state: "closed", ruleset: "2025 v1" },
+    ]);
+    render(<Window />);
+
+    const open = await screen.findByRole("button", { name: /Tax year 2026/ });
+    const closed = screen.getByRole("button", { name: /Tax year 2025/ });
+    expect(within(open).getByText("Open")).toBeTruthy();
+    expect(within(closed).queryByText("Open")).toBeNull();
+  });
+
+  it("opens the year page when a year is clicked", async () => {
+    mocked.listTaxYears.mockResolvedValue([{ year: 2026, state: "open", ruleset: "2026 v1" }]);
+    render(<Window />);
+
+    await userEvent.click(await screen.findByRole("button", { name: /Tax year 2026/ }));
+
+    expect(title()).toBe("Tax year 2026");
+    expect(screen.getByRole("button", { name: /Tax year 2026/ }).getAttribute("aria-current")).toBe("page");
+  });
+
+  it("shows no years caption when there are none", () => {
+    render(<Window />);
+
+    expect(screen.queryByText("Tax years")).toBeNull();
+  });
+});
+
+describe("first run", () => {
+  function WithEvents() {
+    useEvents();
+    return <Window />;
+  }
+
+  beforeEach(() => {
+    mocked.listAccounts.mockResolvedValue([]);
+    mocked.listTaxYears.mockResolvedValue([{ year: 2026, state: "open", ruleset: "2026 v1" }]);
+    mocked.listen.mockResolvedValue(() => {});
+    mocked.addAccount.mockResolvedValue(account());
+  });
+
+  const addFirstAccount = async () => {
+    await userEvent.type(await screen.findByLabelText("Name"), "Private");
+    await userEvent.type(screen.getByLabelText("IBAN"), "AT61 1904 3002 3457 3201");
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+  };
+
+  it("asks for the first account without the sidebar while no account exists", async () => {
+    render(<Window />);
+
+    expect(await screen.findByRole("heading", { name: "Add your first account" })).toBeTruthy();
+    expect(screen.queryByRole("complementary", { name: "Sidebar" })).toBeNull();
+    expect(screen.getByText("Step 1 of 2")).toBeTruthy();
+  });
+
+  it("moves to the statement step with the open tax year once the account is added", async () => {
+    render(<Window />);
+
+    await addFirstAccount();
+
+    expect(await screen.findByRole("heading", { name: "Import your first statement" })).toBeTruthy();
+    expect(screen.getByText("Step 2 of 2")).toBeTruthy();
+    expect(screen.getByText("Tax year 2026 is ready with the rules 2026 v1.")).toBeTruthy();
+  });
+
+  it("leads to the main window when the statement step is skipped", async () => {
+    mocked.addAccount.mockImplementation(async () => {
+      mocked.listAccounts.mockResolvedValue([account()]);
+      return account();
+    });
+    render(<WithEvents />);
+    await addFirstAccount();
+    await screen.findByRole("heading", { name: "Import your first statement" });
+    const handler = mocked.listen.mock.calls.find(([name]) => name === "data_changed")![1] as (payload: unknown) => void;
+    await act(async () => handler({ tables: ["accounts"] }));
+
+    await userEvent.click(screen.getByRole("button", { name: "Skip for Now" }));
+
+    expect(await screen.findByRole("complementary", { name: "Sidebar" })).toBeTruthy();
+    expect(title()).toBe("Today");
   });
 });
 

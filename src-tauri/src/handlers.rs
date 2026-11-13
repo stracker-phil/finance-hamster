@@ -12,6 +12,17 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static
         data_folder,
         crate::db::commands::undo,
         crate::db::commands::redo,
+        crate::accounts::commands::list_accounts,
+        crate::accounts::commands::add_account,
+        crate::accounts::commands::edit_account,
+        crate::taxyears::commands::list_tax_years,
+        crate::taxrules::commands::rules_overview,
+        crate::taxrules::commands::rules_reload_preview,
+        crate::taxrules::commands::rules_reload_apply,
+        crate::taxrules::commands::rules_import,
+        crate::taxrules::commands::rules_duplicate,
+        crate::taxrules::commands::rules_open,
+        crate::taxrules::commands::rules_show_folder,
     ]
 }
 

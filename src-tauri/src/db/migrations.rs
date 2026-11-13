@@ -21,6 +21,24 @@ pub const MIGRATIONS: &[&str] = &[
         new TEXT
     );
     CREATE INDEX journal_entity ON journal (entity, entity_id);",
+    // 2: bank accounts and tax years; a tax year keeps the rules text it applies (ADR 0040).
+    "CREATE TABLE accounts (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        bank TEXT NOT NULL,
+        iban TEXT NOT NULL UNIQUE,
+        own INTEGER NOT NULL,
+        created_at INTEGER NOT NULL
+    );
+    CREATE TABLE tax_years (
+        id TEXT PRIMARY KEY,
+        year INTEGER NOT NULL UNIQUE,
+        state TEXT NOT NULL,
+        ruleset TEXT NOT NULL,
+        rules TEXT NOT NULL,
+        rules_loaded_at INTEGER NOT NULL,
+        closed_at INTEGER
+    );",
 ];
 
 pub fn version(conn: &Connection) -> AppResult<usize> {
@@ -69,7 +87,43 @@ mod tests {
         assert_eq!(version(&conn).unwrap(), 0);
         migrate(&mut conn).unwrap();
         assert_eq!(version(&conn).unwrap(), MIGRATIONS.len());
-        assert_eq!(tables(&conn), vec!["journal".to_string()]);
+        assert_eq!(
+            tables(&conn),
+            vec![
+                "accounts".to_string(),
+                "journal".to_string(),
+                "tax_years".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn a_file_at_version_one_gains_accounts_and_tax_years_and_keeps_its_journal() {
+        let dir = temp_config_dir();
+        let mut conn = Connection::open(dir.path().join("v1.sqlite")).unwrap();
+        conn.execute_batch(MIGRATIONS[0]).unwrap();
+        conn.pragma_update(None, "user_version", 1i64).unwrap();
+        conn.execute(
+            "INSERT INTO journal (op, at, label, source, entity, entity_id, field) VALUES (1, 1, 'Add', 'ui', 'things', 'a', 'id')",
+            [],
+        )
+        .unwrap();
+
+        migrate(&mut conn).unwrap();
+
+        assert_eq!(version(&conn).unwrap(), MIGRATIONS.len());
+        assert_eq!(
+            tables(&conn),
+            vec![
+                "accounts".to_string(),
+                "journal".to_string(),
+                "tax_years".to_string()
+            ]
+        );
+        let rows: i64 = conn
+            .query_row("SELECT COUNT(*) FROM journal", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(rows, 1);
     }
 
     #[test]
