@@ -37,6 +37,7 @@ tempfile = { version = "3", optional = true }
 rusqlite = { version = "0.37", features = ["bundled"] }
 objc2-pdf-kit = { version = "0.3", default-features = false, features = ["std", "PDFDocument", "PDFPage", "PDFSelection", "PDFView", "objc2-app-kit", "objc2-core-foundation"] }
 objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSImage", "NSImageRep", "NSBitmapImageRep", "NSView", "NSResponder", "NSWindow", "NSColor", "NSGraphics"] }
+sha2 = "0.10"
 
 [features]
 # Exposes test helpers to integration tests in tests/.

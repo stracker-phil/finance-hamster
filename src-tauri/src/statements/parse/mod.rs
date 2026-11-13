@@ -1,0 +1,59 @@
+//! Statement text to `ParsedStatement`, one parser per bank layout (ADR 0018: the text is untrusted and only
+//! ever read as text). A new layout adds an entry to `PARSERS`.
+
+pub mod model;
+pub mod sparkasse;
+
+#[cfg(test)]
+mod tests;
+
+use model::ParsedStatement;
+
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+pub enum ParseError {
+    #[error("No known statement layout")]
+    UnknownLayout,
+    #[error("The statement has no {0}")]
+    Missing(String),
+    #[error("Can't read {0}")]
+    Unreadable(String),
+}
+
+/// A bank layout: how to recognize and read it.
+pub struct Parser {
+    pub recognizes: fn(&[Vec<String>]) -> bool,
+    pub parse: fn(&[Vec<String>]) -> Result<ParsedStatement, ParseError>,
+}
+
+pub const PARSERS: &[Parser] = &[Parser {
+    recognizes: sparkasse::recognizes,
+    parse: sparkasse::parse,
+}];
+
+/// Reads the pages with the first parser that recognizes them.
+pub fn parse(pages: &[Vec<String>]) -> Result<ParsedStatement, ParseError> {
+    let parser = PARSERS
+        .iter()
+        .find(|p| (p.recognizes)(pages))
+        .ok_or(ParseError::UnknownLayout)?;
+    (parser.parse)(pages)
+}
+
+/// A printed amount in cents: `1.234,56`, `+2.850,00`, `-980,00`.
+pub fn amount(text: &str) -> Option<i64> {
+    let (negative, digits) = match text.strip_prefix('-') {
+        Some(rest) => (true, rest),
+        None => (false, text.strip_prefix('+').unwrap_or(text)),
+    };
+    let (whole, fraction) = digits.split_once(',')?;
+    let whole: String = whole.chars().filter(|&c| c != '.').collect();
+    let valid = !whole.is_empty()
+        && whole.chars().all(|c| c.is_ascii_digit())
+        && fraction.len() == 2
+        && fraction.chars().all(|c| c.is_ascii_digit());
+    if !valid {
+        return None;
+    }
+    let cents = whole.parse::<i64>().ok()?.checked_mul(100)? + fraction.parse::<i64>().ok()?;
+    Some(if negative { -cents } else { cents })
+}

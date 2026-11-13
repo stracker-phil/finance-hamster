@@ -23,6 +23,7 @@ pub mod preview;
 mod remote;
 pub mod settings;
 pub mod state;
+pub mod statements;
 pub mod store;
 pub mod taxrules;
 pub mod taxyears;

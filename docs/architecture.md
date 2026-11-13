@@ -95,6 +95,7 @@ Rust (`src-tauri/src/`):
 | `taxyears/` | the `tax_years` rows (state, applied rules text), `start_from_rules` at launch, `list_tax_years` |
 | `taxrules/` | the rules files: `model.rs` (typed file, unknown fields fail), `check.rs` (schema constraints and Reload checks), `files.rs` (the `rules/` folder, seed, backups, next year's draft), `diff.rs` (the Reload preview lines), `overview`/`preview`/`apply`/`import`/`duplicate`, `commands.rs` (Settings → Tax Rules) |
 | `../resources/rules/` | the schema, README and seed `rules-2026.json` the app writes to `rules/` |
+| `statements/` | bank statements: `parse/` (one parser per bank layout in `PARSERS`; `sparkasse.rs` reads the Sparkasse/Erste text layer into `ParsedStatement` with lines, card and FX details), `check.rs` (balance and line-sum checks naming the page, the chain to the previous statement), `file_hash` |
 | `platform/` | macOS frameworks: `pdf/` (PDFKit: `Pdf` text with the layout kept via `layout.rs`, pages as PNG; `write.rs`, a small PDF writer), `pdf_view.rs` (the native `PDFView` over the page placeholder, links swallowed) |
 | `preview/` | PDFs by id (`PdfSource`, `resolve`), the `pdf_view_*` commands and the `pdf-page://` scheme serving page PNGs (in the CSP's `img-src`) |
 | `notify.rs` | `Notifier`: notifications recorded, not posted (the real center comes with reminders) |

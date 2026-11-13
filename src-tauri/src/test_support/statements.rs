@@ -139,11 +139,15 @@ impl Statement {
 
     /// The printed text, page by page; an entry never breaks across pages.
     pub fn text_pages(&self) -> Vec<Vec<String>> {
+        self.text_pages_closing(self.closing())
+    }
+
+    fn text_pages_closing(&self, closing: Vec<String>) -> Vec<Vec<String>> {
         let room = LINES_PER_PAGE - self.header(1, 1).len();
         let mut chunks: Vec<Vec<String>> = vec![Vec::new()];
         let mut blocks = vec![self.opening()];
         blocks.extend(self.lines.iter().map(Self::entry));
-        blocks.push(self.closing());
+        blocks.push(closing);
         for block in blocks {
             if chunks.last().is_some_and(|c| c.len() + block.len() > room) {
                 chunks.push(Vec::new());
@@ -165,26 +169,38 @@ impl Statement {
     }
 
     pub fn pdf(&self) -> Vec<u8> {
-        let pages: Vec<Page> = self
-            .text_pages()
-            .into_iter()
-            .map(|lines| {
-                lines
-                    .into_iter()
-                    .enumerate()
-                    .filter(|(_, text)| !text.is_empty())
-                    .map(|(i, text)| Run {
-                        x: LEFT,
-                        y: TOP - i as f32 * LINE_HEIGHT,
-                        size: FONT_SIZE,
-                        font: Font::Courier,
-                        text,
-                    })
-                    .collect()
-            })
-            .collect();
-        write::write(&pages)
+        render(self.text_pages())
     }
+
+    /// The statement with one line's amount changed but the original sums printed, as a forged copy would be.
+    pub fn tampered_pdf(&self, line: usize, cents: i64) -> Vec<u8> {
+        let mut changed = self.clone();
+        if let Some(l) = changed.lines.get_mut(line) {
+            l.cents = cents;
+        }
+        render(changed.text_pages_closing(self.closing()))
+    }
+}
+
+fn render(text_pages: Vec<Vec<String>>) -> Vec<u8> {
+    let pages: Vec<Page> = text_pages
+        .into_iter()
+        .map(|lines| {
+            lines
+                .into_iter()
+                .enumerate()
+                .filter(|(_, text)| !text.is_empty())
+                .map(|(i, text)| Run {
+                    x: LEFT,
+                    y: TOP - i as f32 * LINE_HEIGHT,
+                    size: FONT_SIZE,
+                    font: Font::Courier,
+                    text,
+                })
+                .collect()
+        })
+        .collect();
+    write::write(&pages)
 }
 
 fn date(year: i32, month: u32, day: u32) -> NaiveDate {
@@ -219,7 +235,7 @@ pub fn demo_month(number: u32, year: i32, month: u32, old_balance: i64) -> State
                 "Gehalt",
                 &[
                     "NORDWIND SOFTWARE GMBH",
-                    "AT12 1999 9000 0000 0099",
+                    "AT94 1999 9000 0000 0099",
                     "REF: LOHN",
                 ],
                 d(1),
@@ -227,7 +243,7 @@ pub fn demo_month(number: u32, year: i32, month: u32, old_balance: i64) -> State
             ),
             line(
                 "Dauerauftrag",
-                &["HAUSVERWALTUNG MUSTER", "AT85 1999 9000 0000 0042", "MIETE"],
+                &["HAUSVERWALTUNG MUSTER", "AT81 1999 9000 0000 0042", "MIETE"],
                 d(3),
                 -98_000,
             ),
@@ -256,7 +272,7 @@ pub fn demo_month(number: u32, year: i32, month: u32, old_balance: i64) -> State
                 "Lastschrift",
                 &[
                     "BUCHHANDLUNG SEITENWEISE",
-                    "AT61 1999 9000 0000 0077",
+                    "AT09 1999 9000 0000 0077",
                     "RE 2026-0412",
                 ],
                 d(14),
@@ -363,7 +379,7 @@ mod tests {
             page[10..13],
             [
                 "    NORDWIND SOFTWARE GMBH",
-                "    AT12 1999 9000 0000 0099",
+                "    AT94 1999 9000 0000 0099",
                 "    REF: LOHN"
             ]
         );
@@ -413,5 +429,40 @@ mod tests {
             entries += rates;
         }
         assert_eq!(entries, 30);
+    }
+
+    fn read_pdf(bytes: &[u8]) -> crate::statements::parse::model::ParsedStatement {
+        let pages = crate::platform::pdf::Pdf::from_bytes(bytes)
+            .unwrap()
+            .text_pages()
+            .unwrap();
+        crate::statements::parse::parse(&pages).unwrap()
+    }
+
+    #[test]
+    fn a_tampered_pdf_changes_the_line_but_keeps_the_original_sums() {
+        let original = statement();
+        let forged = read_pdf(&original.tampered_pdf(1, -90_000));
+        let untouched = read_pdf(&original.pdf());
+        assert_eq!(forged.lines[1].cents, -90_000);
+        assert_eq!(untouched.lines[1].cents, -98_000);
+        assert_eq!(
+            (forged.credits, forged.debits, forged.new_balance),
+            (
+                original.credits(),
+                original.debits(),
+                original.new_balance()
+            )
+        );
+        assert_eq!(forged.lines[0], untouched.lines[0]);
+    }
+
+    #[test]
+    fn tampering_a_line_that_does_not_exist_changes_nothing() {
+        let original = statement();
+        assert_eq!(
+            read_pdf(&original.tampered_pdf(99, -1)),
+            read_pdf(&original.pdf())
+        );
     }
 }
