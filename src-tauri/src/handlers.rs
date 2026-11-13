@@ -23,6 +23,12 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static
         crate::taxrules::commands::rules_duplicate,
         crate::taxrules::commands::rules_open,
         crate::taxrules::commands::rules_show_folder,
+        crate::preview::commands::pdf_view_show,
+        crate::preview::commands::pdf_view_move,
+        crate::preview::commands::pdf_view_hide,
+        crate::preview::commands::pdf_view_suspend,
+        crate::preview::commands::pdf_view_resume,
+        crate::preview::commands::pdf_view_visible,
     ]
 }
 

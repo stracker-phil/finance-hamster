@@ -38,6 +38,17 @@ describe("Toasts", () => {
     expect(screen.getByText("Something went wrong (×2)")).toBeTruthy();
   });
 
+  it("covers the PDF preview while a toast shows and uncovers it once dismissed", async () => {
+    useStore.setState({ pdfCovers: 0 });
+    useStore.getState().showToast("error", "Could not save");
+    render(<Toasts />);
+    expect(useStore.getState().pdfCovers).toBe(1);
+
+    await userEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+
+    expect(useStore.getState().pdfCovers).toBe(0);
+  });
+
   it("shows a toast action by its label and runs it on click", async () => {
     const run = vi.fn();
     useStore.getState().showToast("success", "Subscription deleted", { label: "Undo", run });

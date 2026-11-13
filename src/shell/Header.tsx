@@ -3,6 +3,7 @@ import { ChevronDown, ChevronLeft, Plus, Search, X } from "lucide-react";
 import { FILTER_PLACEHOLDER } from "../pages/pages";
 import type { Route } from "../state/route";
 import { useStore } from "../state/store";
+import { useCoversPdf } from "../lib/pdfCover";
 
 /** The title and, for a nested page, the crumb back to its parent. */
 export interface HeaderTitle {
@@ -55,6 +56,7 @@ const NEW_ITEMS = [
 
 function NewMenu() {
   const [open, setOpen] = useState(false);
+  useCoversPdf(open);
   const anchor = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     if (!open) return;

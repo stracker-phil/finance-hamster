@@ -1,4 +1,5 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./api", async (orig) => ({ ...(await orig<object>()), api: (await import("./test/apiMock")).createApiMock() }));
@@ -24,7 +25,7 @@ async function emit(event: EventName, payload: unknown = null) {
 describe("App", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useStore.setState({ route: HOME, back: [], forward: [], filter: "", toasts: [], confirmation: null, paletteOpen: false });
+    useStore.setState({ route: HOME, back: [], forward: [], filter: "", toasts: [], confirmation: null, paletteOpen: false, pdfCovers: 0 });
     mocked.takeLaunchEvents.mockResolvedValue([]);
     mocked.listen.mockResolvedValue(() => {});
     mocked.getSettings.mockResolvedValue(settings());
@@ -151,6 +152,18 @@ describe("App", () => {
 
       expect(await screen.findByRole("dialog")).toBeTruthy();
       expect(await screen.findByRole("option", { name: /Go to Today/ })).toBeTruthy();
+    });
+
+    it("suspends the native PDF preview while the palette is open and resumes it once closed", async () => {
+      renderApp();
+      await emit("run_command", "palette.open");
+      await screen.findByRole("dialog");
+      await waitFor(() => expect(mocked.pdfViewSuspend).toHaveBeenCalled());
+      expect(mocked.pdfViewResume).not.toHaveBeenCalled();
+
+      await userEvent.keyboard("{Escape}");
+
+      await waitFor(() => expect(mocked.pdfViewResume).toHaveBeenCalled());
     });
 
     it("focuses the header filter for filter.focus", async () => {

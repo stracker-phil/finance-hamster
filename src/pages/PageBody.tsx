@@ -1,4 +1,5 @@
 import type { Route } from "../state/route";
+import { DocumentPage } from "./DocumentPage";
 import { EmptyPage } from "./EmptyPage";
 
 /** The body of the current page. */
@@ -19,7 +20,7 @@ export function PageBody({ route }: { route: Route }) {
     case "year":
       return <EmptyPage title={`Tax year ${route.year}`} text="Nothing is recorded for this year yet." />;
     case "document":
-      return <EmptyPage title="Document" text="This document can't be shown yet." />;
+      return <DocumentPage documentId={route.documentId} />;
     case "log":
       return <EmptyPage title="Log" text="Every change to a document shows here." />;
     case "archive":

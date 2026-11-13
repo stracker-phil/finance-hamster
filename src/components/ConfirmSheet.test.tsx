@@ -53,6 +53,18 @@ describe("ConfirmHost", () => {
     expect(await answer).toBe(true);
   });
 
+  it("covers the PDF preview while the question is open and uncovers it once answered", async () => {
+    useStore.setState({ pdfCovers: 0 });
+    render(<ConfirmHost />);
+    const answer = ask();
+    expect(useStore.getState().pdfCovers).toBe(1);
+
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await answer;
+
+    expect(useStore.getState().pdfCovers).toBe(0);
+  });
+
   it("resolves false on Escape", async () => {
     render(<ConfirmHost />);
     const answer = ask();

@@ -30,6 +30,12 @@ export function createApiMock(overrides: Partial<Api> = {}): Api {
     rulesDuplicate: vi.fn().mockResolvedValue("rules-2027.json"),
     rulesOpen: vi.fn().mockResolvedValue(undefined),
     rulesShowFolder: vi.fn().mockResolvedValue(undefined),
+    pdfViewShow: vi.fn().mockResolvedValue(undefined),
+    pdfViewMove: vi.fn().mockResolvedValue(undefined),
+    pdfViewHide: vi.fn().mockResolvedValue(undefined),
+    pdfViewSuspend: vi.fn().mockResolvedValue(undefined),
+    pdfViewResume: vi.fn().mockResolvedValue(undefined),
+    pdfPageUrl: (source, page, width) => `pdf-page://localhost/${source.kind}/${source.id}/${page}.png?w=${Math.round(width)}`,
     listen: vi.fn().mockResolvedValue(() => {}),
   };
   return { ...api, ...overrides };

@@ -16,7 +16,7 @@ const mocked = vi.mocked(api, true);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useStore.setState({ route: HOME, back: [], forward: [], filter: "", toasts: [], confirmation: null, paletteOpen: false });
+  useStore.setState({ route: HOME, back: [], forward: [], filter: "", toasts: [], confirmation: null, paletteOpen: false, pdfCovers: 0 });
   mocked.runCommand.mockResolvedValue(undefined);
   mocked.listCommands.mockResolvedValue([]);
   mocked.listAccounts.mockResolvedValue([account()]);
@@ -196,6 +196,15 @@ describe("command palette", () => {
 
     expect(await screen.findByRole("option", { name: "Go to Today" })).toBeTruthy();
   });
+
+  it("covers the PDF preview while open", async () => {
+    useStore.setState({ paletteOpen: true });
+
+    render(<Window />);
+
+    await screen.findByRole("dialog");
+    expect(useStore.getState().pdfCovers).toBe(1);
+  });
 });
 
 describe("back and forward", () => {
@@ -280,6 +289,17 @@ describe("New menu", () => {
 
     const items = screen.getAllByRole("menuitem").map((i) => i.textContent);
     expect(items).toEqual(["Import Statement…⌘I", "Add Invoice PDF…⌘O", "New Subscription⌘N"]);
+  });
+
+  it("covers the PDF preview while open and uncovers it once closed", async () => {
+    render(<Window />);
+    expect(useStore.getState().pdfCovers).toBe(0);
+
+    await openMenu();
+    expect(useStore.getState().pdfCovers).toBe(1);
+
+    await userEvent.keyboard("{Escape}");
+    expect(useStore.getState().pdfCovers).toBe(0);
   });
 
   it("closes on Escape", async () => {

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { useCoversPdf } from "../lib/pdfCover";
 
 interface Props {
   onClose: () => void;
@@ -21,6 +22,7 @@ function focusables(root: HTMLElement): HTMLElement[] {
 /** A sheet over a scrim: Escape and a click on the scrim close it, Tab stays inside, and focus returns
  *  to the element that opened it. */
 export function Modal({ onClose, role = "dialog", labelledBy, describedBy, className, children }: Props) {
+  useCoversPdf();
   const sheetRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
   useEffect(() => {

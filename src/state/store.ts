@@ -41,6 +41,11 @@ export interface AppStore {
   showToast: (kind: ToastKind, message: string, action?: Toast["action"]) => void;
   dismissToast: (id: number) => void;
 
+  /** How many overlays (sheets, menus, toasts, tooltips) are open; the native PDF preview hides while any is. */
+  pdfCovers: number;
+  coverPdf: () => void;
+  uncoverPdf: () => void;
+
   confirmation: Confirmation | null;
   /** Shows the sheet; resolves true when the owner confirms, false on Cancel or Escape. A new question
    *  replaces an open one, which resolves false. */
@@ -92,6 +97,10 @@ export const useStore = create<AppStore>((set, get) => ({
     set({ toasts: [...toasts, { id: nextToastId++, kind, message, count: 1, action }] });
   },
   dismissToast: (id) => set({ toasts: get().toasts.filter((t) => t.id !== id) }),
+
+  pdfCovers: 0,
+  coverPdf: () => set({ pdfCovers: get().pdfCovers + 1 }),
+  uncoverPdf: () => set({ pdfCovers: Math.max(0, get().pdfCovers - 1) }),
 
   confirmation: null,
   confirm: (question) =>

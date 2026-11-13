@@ -31,10 +31,12 @@ url = "2"
 ts-rs = { version = "12", features = ["serde-compat", "serde-json-impl", "no-serde-warnings"] }
 libc = "0.2"
 objc2 = "0.6"
-objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSString", "NSDateFormatter", "NSFormatter", "NSLocale"] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSString", "NSDateFormatter", "NSFormatter", "NSLocale", "NSData", "NSURL", "NSGeometry", "NSDictionary", "NSValue", "NSObject", "NSRange"] }
 tempfile = { version = "3", optional = true }
 # SQLite with FTS5, compiled in (ADR 0012).
 rusqlite = { version = "0.37", features = ["bundled"] }
+objc2-pdf-kit = { version = "0.3", default-features = false, features = ["std", "PDFDocument", "PDFPage", "PDFSelection", "PDFView", "objc2-app-kit", "objc2-core-foundation"] }
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSImage", "NSImageRep", "NSBitmapImageRep", "NSView", "NSResponder", "NSWindow", "NSColor", "NSGraphics"] }
 
 [features]
 # Exposes test helpers to integration tests in tests/.

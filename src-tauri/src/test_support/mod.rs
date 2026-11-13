@@ -6,6 +6,8 @@ pub mod demo;
 mod fixtures;
 #[cfg(test)]
 pub mod rules;
+#[cfg(any(test, debug_assertions, feature = "test-util"))]
+pub mod statements;
 
 #[cfg(any(test, feature = "test-util"))]
 pub use fixtures::*;

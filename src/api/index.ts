@@ -1,7 +1,7 @@
 import { getName, getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { Account, AccountEdit, AppError, AppInfo, CommandInfo, ErrorKind, EventName, EventPayloads, Imported, LaunchEvent, NewAccount, ReloadPreview, RulesFile, Settings, SettingsPatch, TaxYear } from "./types";
+import type { Account, AccountEdit, Frame, PdfSource, AppError, AppInfo, CommandInfo, ErrorKind, EventName, EventPayloads, Imported, LaunchEvent, NewAccount, ReloadPreview, RulesFile, Settings, SettingsPatch, TaxYear } from "./types";
 
 export * from "./types";
 
@@ -37,6 +37,13 @@ export const api = {
   rulesDuplicate: () => invoke<string>("rules_duplicate"),
   rulesOpen: (year: number) => invoke<void>("rules_open", { year }),
   rulesShowFolder: () => invoke<void>("rules_show_folder"),
+  pdfViewShow: (source: PdfSource, frame: Frame) => invoke<void>("pdf_view_show", { source, frame }),
+  pdfViewMove: (frame: Frame) => invoke<void>("pdf_view_move", { frame }),
+  pdfViewHide: () => invoke<void>("pdf_view_hide"),
+  pdfViewSuspend: () => invoke<void>("pdf_view_suspend"),
+  pdfViewResume: () => invoke<void>("pdf_view_resume"),
+  /** A page (1-based) of a known PDF as an image URL, served by Rust's `pdf-page` scheme. */
+  pdfPageUrl: (source: PdfSource, page: number, width: number) => `pdf-page://localhost/${source.kind}/${encodeURIComponent(source.id)}/${page}.png?w=${Math.round(width)}`,
   listen: <E extends EventName>(event: E, handler: (payload: EventPayloads[E]) => void): Promise<UnlistenFn> =>
     listen<EventPayloads[E]>(event, (e) => handler(e.payload)),
 };

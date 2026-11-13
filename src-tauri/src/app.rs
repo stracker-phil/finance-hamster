@@ -24,6 +24,10 @@ pub fn start(
         .plugin(init_logging(log_level))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .register_asynchronous_uri_scheme_protocol(
+            crate::preview::scheme::SCHEME,
+            crate::preview::scheme::handle,
+        )
         .plugin(window::navigation::guard())
         .plugin(tauri_plugin_deep_link::init())
         .menu(crate::menu::build)

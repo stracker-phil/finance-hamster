@@ -48,6 +48,11 @@ export type DataChanged = { tables: Array<string>, };
 
 export type ErrorKind = "io" | "invalid_input" | "not_found" | "internal";
 
+/**
+ * The placeholder's box in CSS pixels, relative to the webview's top left.
+ */
+export type Frame = { x: number, y: number, width: number, height: number, };
+
 export type Imported = { fileName: string, year: number, 
 /**
  * The replaced file's new name, kept as a backup.
@@ -69,6 +74,11 @@ export type NewAccount = { name: string, bank: string, iban: string, own: boolea
  * How amounts read: `1,234.56` or `1.234,56`.
  */
 export type NumberFormat = "dot_decimal" | "comma_decimal";
+
+/**
+ * A PDF the app keeps, named by what it belongs to; the page never sends paths.
+ */
+export type PdfSource = { kind: SourceKind, id: string, };
 
 /**
  * One open year's pending Reload.
@@ -120,6 +130,8 @@ hideOwnTransfers: boolean, };
  * The fields to change; absent ones keep their value.
  */
 export type SettingsPatch = { appearance?: Appearance, accent?: Accent, numberFormat?: NumberFormat, showOriginalCurrency?: boolean, hideOwnTransfers?: boolean, };
+
+export type SourceKind = "document" | "statement";
 
 /**
  * What the sidebar lists.

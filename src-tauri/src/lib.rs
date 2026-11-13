@@ -18,6 +18,8 @@ pub mod lock;
 mod menu;
 pub mod money;
 pub mod notify;
+pub mod platform;
+pub mod preview;
 mod remote;
 pub mod settings;
 pub mod state;

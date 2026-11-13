@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle2, Info, X } from "lucide-react";
 import { useStore, type Toast } from "../state/store";
+import { useCoversPdf } from "../lib/pdfCover";
 
 const AUTO_DISMISS_MS = { success: 2500, info: 4000, error: 8000 };
 /** A toast with an action (Undo) stays long enough to reach it. */
@@ -62,6 +63,7 @@ function errorLines(message: string): string[] {
 
 export function Toasts() {
   const toasts = useStore((s) => s.toasts);
+  useCoversPdf(toasts.length > 0);
   return (
     <div className="toasts">
       {toasts.map((t) => (

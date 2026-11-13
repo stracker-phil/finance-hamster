@@ -95,6 +95,8 @@ Rust (`src-tauri/src/`):
 | `taxyears/` | the `tax_years` rows (state, applied rules text), `start_from_rules` at launch, `list_tax_years` |
 | `taxrules/` | the rules files: `model.rs` (typed file, unknown fields fail), `check.rs` (schema constraints and Reload checks), `files.rs` (the `rules/` folder, seed, backups, next year's draft), `diff.rs` (the Reload preview lines), `overview`/`preview`/`apply`/`import`/`duplicate`, `commands.rs` (Settings → Tax Rules) |
 | `../resources/rules/` | the schema, README and seed `rules-2026.json` the app writes to `rules/` |
+| `platform/` | macOS frameworks: `pdf/` (PDFKit: `Pdf` text with the layout kept via `layout.rs`, pages as PNG; `write.rs`, a small PDF writer), `pdf_view.rs` (the native `PDFView` over the page placeholder, links swallowed) |
+| `preview/` | PDFs by id (`PdfSource`, `resolve`), the `pdf_view_*` commands and the `pdf-page://` scheme serving page PNGs (in the CSP's `img-src`) |
 | `notify.rs` | `Notifier`: notifications recorded, not posted (the real center comes with reminders) |
 | `settings/` | `settings.json`: appearance, accent, number format, original currency, own transfers (`SettingsStore`, `get_settings`, `update_settings`) |
 | `instance.rs`, `ipc/` | single instance: lock file, Unix socket, one JSON line per request |
@@ -104,7 +106,7 @@ Rust (`src-tauri/src/`):
 | `error.rs`, `events.rs`, `lock.rs`, `state.rs`, `handlers.rs` | `AppError`, event names, poison-tolerant locks, managed state, the command list |
 | `store/` | `json_file.rs`: private dir creation, atomic JSON files |
 | `dev/` | debug-only hooks: window frame, background launches, `eval` |
-| `test_support/` | fixtures for tests; `demo/` seeds the debug build's made-up data on its first launch (`SEEDERS`) and `reset` backs `hamster dev seed --yes` |
+| `test_support/` | fixtures for tests; `statements.rs` builds synthetic statements in the bank's layout (fixtures, demo data, the debug build's sample document); `demo/` seeds the debug build's made-up data on its first launch (`SEEDERS`) and `reset` backs `hamster dev seed --yes` |
 | `../tests/no_network.rs` | no network crate in `Cargo.toml` or the resolved dependency tree (ADR 0016) |
 
 Frontend (`src/`):
@@ -120,8 +122,8 @@ Frontend (`src/`):
 | `palette/` | the ⌘K command palette |
 | `queries/` | TanStack Query: the client, `useEvents` (event → stale keys, `data_changed` table → stale keys), settings, commands, accounts, tax years and rules, `useLook` |
 | `settings/`, `windows/settings/` | the Settings window: page registry and search, row controls, the pages |
-| `components/` | `Modal`, `ConfirmSheet`, `Toasts`, `TooltipHost`, `ErrorBoundary`, `icons.tsx` (lucide icons by role) |
-| `lib/` | `theme.ts` (scheme and accent on `<html>`), `motion.ts` (`usePresence`, `useGlide`, `useFlash`, `useListGlide`) |
+| `components/` | `PdfPreview` (the placeholder the native preview follows), `Modal`, `ConfirmSheet`, `Toasts`, `TooltipHost`, `ErrorBoundary`, `icons.tsx` (lucide icons by role) |
+| `lib/` | `pdfCover.ts` (overlays hide the native preview: `useCoversPdf`, `usePdfCovers`), `theme.ts` (scheme and accent on `<html>`), `motion.ts` (`usePresence`, `useGlide`, `useFlash`, `useListGlide`) |
 | `styles/` | `palettes/` (every color, light and dark), accents, motion tokens, base, controls, shell, overlays |
 | `test/` | `createApiMock`, the module boundary test |
 
