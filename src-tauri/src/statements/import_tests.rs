@@ -41,6 +41,31 @@ pub(crate) fn open_with_accounts() -> (tempfile::TempDir, Db) {
     (dir, db)
 }
 
+/// `open_with_accounts` plus an open 2026 tax year whose only item is `books` (KZ 720).
+pub(crate) fn open_with_accounts_and_year() -> (tempfile::TempDir, Db) {
+    use crate::taxyears::{self, TaxYearRow, YearState};
+    let (dir, db) = open_with_accounts();
+    let row = TaxYearRow {
+        state: YearState::Open,
+        closed_at: None,
+        ..TaxYearRow::new(
+            2026,
+            "2026 v1".into(),
+            crate::test_support::rules::minimal_text(2026),
+            1,
+        )
+    };
+    db.write(
+        Op::new(
+            "Add year",
+            vec![Change::insert(taxyears::TABLE, &row).unwrap()],
+        ),
+        Source::App,
+    )
+    .unwrap();
+    (dir, db)
+}
+
 pub(crate) fn october() -> Statement {
     demo_month(10, 2026, 10, 141_230)
 }

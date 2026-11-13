@@ -22,6 +22,7 @@
 .icon-btn--tiny { width: 18px; height: 18px; border-radius: 5px; }
 
 .link-btn { border: 0; background: transparent; padding: 0; color: var(--accent-text); font-size: 13px; font-weight: 600; }
+.link-btn:disabled { color: var(--text-muted); }
 
 .seg { display: flex; gap: 2px; padding: 2px; border-radius: 8px; border: 1px solid var(--border); background: var(--fill-subtle); }
 .seg-btn {

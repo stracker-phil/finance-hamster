@@ -150,6 +150,13 @@ pub fn transactions_of(conn: &Connection, statement_id: &str) -> AppResult<Vec<T
     Ok(rows.collect::<Result<_, _>>()?)
 }
 
+pub fn transaction_by_id(conn: &Connection, id: &str) -> AppResult<Option<TransactionRow>> {
+    let sql = format!("SELECT {TRANSACTION_COLUMNS} FROM {TRANSACTIONS} WHERE id = ?");
+    let mut query = conn.prepare(&sql)?;
+    let mut rows = query.query_map([id], transaction)?;
+    Ok(rows.next().transpose()?)
+}
+
 /// Every line, oldest first.
 pub fn all_transactions(conn: &Connection) -> AppResult<Vec<TransactionRow>> {
     let sql = format!(
@@ -274,6 +281,24 @@ mod tests {
 
         assert_eq!(db.read(|c| statement_by_id(c, "nope")).unwrap(), None);
         assert_eq!(db.read(|c| statement_by_hash(c, "nope")).unwrap(), None);
+    }
+
+    #[test]
+    fn a_line_is_found_by_id_and_an_unknown_id_finds_none() {
+        let (_dir, db) = open_with_accounts();
+        insert_all(&db, STATEMENTS, &[statement_row("a", "account-1", 1, 2026)]);
+        let first = transaction_row("t1", "a", 1, 1);
+        insert_all(
+            &db,
+            TRANSACTIONS,
+            &[first.clone(), transaction_row("t2", "a", 1, 2)],
+        );
+
+        assert_eq!(
+            db.read(|c| transaction_by_id(c, "t1")).unwrap(),
+            Some(first)
+        );
+        assert_eq!(db.read(|c| transaction_by_id(c, "nope")).unwrap(), None);
     }
 
     #[test]

@@ -3,6 +3,7 @@
 pub mod check;
 pub mod commands;
 pub mod import;
+pub mod lines;
 pub mod parse;
 pub mod store;
 pub mod view;
@@ -11,6 +12,8 @@ pub mod view;
 mod check_tests;
 #[cfg(test)]
 pub(crate) mod import_tests;
+#[cfg(test)]
+mod lines_tests;
 #[cfg(test)]
 mod view_tests;
 

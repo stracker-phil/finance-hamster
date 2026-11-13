@@ -7,9 +7,11 @@ import { api } from "../api";
 import { account } from "../test/accounts";
 import { renderWithQuery } from "../test/renderWithQuery";
 import { ruleView, rulesView } from "../test/lineRules";
-import { accountCoverage, accountLines, coverage, statementGroup } from "../test/statements";
+import { reviewLine, reviewQueue } from "../test/review";
+import { accountCoverage, accountLines, coverage, lineView, statementGroup } from "../test/statements";
 import { useAccounts } from "./accounts";
 import { useLineRules } from "./lineRules";
+import { useReviewQueue } from "./review";
 import { useAccountLines, useCoverage } from "./statements";
 import { useTaxYears } from "./taxYears";
 import { useEvents } from "./useEvents";
@@ -106,14 +108,70 @@ describe("useEvents", () => {
       expect(await screen.findByText("Lines: Nr. 010/2026, Nr. 009/2026")).toBeTruthy();
     });
 
-    it("refetches only the account lines when data_changed names the transactions table", async () => {
+    it("refetches the coverage and the account lines when data_changed names the transactions table", async () => {
       await loaded();
       newer();
 
       await emitDataChanged(["transactions"]);
 
       expect(await screen.findByText("Lines: Nr. 010/2026, Nr. 009/2026")).toBeTruthy();
-      expect(screen.getByText("Coverage: Nr. 009 · until 31 Oct")).toBeTruthy();
+      expect(await screen.findByText("Coverage: Nr. 010 · until 10 Nov")).toBeTruthy();
+    });
+  });
+
+  describe("review", () => {
+    function ReviewProbe() {
+      useEvents();
+      const { data } = useReviewQueue();
+      return <p>Review: {data?.lines.map((l) => l.title).join(", ")}</p>;
+    }
+
+    it.each(["decisions", "transactions", "accounts", "tax_years"])("refetches the review queue when data_changed names the %s table", async (table) => {
+      mocked.reviewQueue.mockResolvedValue(reviewQueue());
+      renderWithQuery(<ReviewProbe />);
+      await screen.findByText("Review: Example Bookshop");
+      mocked.reviewQueue.mockResolvedValue(reviewQueue({ lines: [reviewLine({ title: "Example Cinema" })] }));
+
+      await emitDataChanged([table]);
+
+      expect(await screen.findByText("Review: Example Cinema")).toBeTruthy();
+    });
+
+    it("keeps the review queue when data_changed names an unrelated table", async () => {
+      mocked.reviewQueue.mockResolvedValue(reviewQueue());
+      renderWithQuery(<ReviewProbe />);
+      await screen.findByText("Review: Example Bookshop");
+      mocked.reviewQueue.mockResolvedValue(reviewQueue({ lines: [] }));
+
+      await emitDataChanged(["documents"]);
+
+      expect(screen.getByText("Review: Example Bookshop")).toBeTruthy();
+    });
+
+    it("refetches the coverage and the account lines when data_changed names the decisions table", async () => {
+      function DecisionsProbe() {
+        useEvents();
+        const { data: cov } = useCoverage();
+        const { data: lines } = useAccountLines("acc-1");
+        return (
+          <>
+            <p>Coverage: {cov?.accounts.map((a) => a.toReview).join(", ")}</p>
+            <p>Lines: {lines?.groups.flatMap((g) => g.lines.map((l) => l.status)).join(", ")}</p>
+          </>
+        );
+      }
+      mocked.statementsCoverage.mockResolvedValue(coverage({ accounts: [accountCoverage({ toReview: 1 })] }));
+      mocked.accountLines.mockResolvedValue(accountLines({ groups: [statementGroup({ lines: [lineView({ status: "review" })] })] }));
+      renderWithQuery(<DecisionsProbe />);
+      await screen.findByText("Coverage: 1");
+      await screen.findByText("Lines: review");
+      mocked.statementsCoverage.mockResolvedValue(coverage({ accounts: [accountCoverage({ toReview: 0 })] }));
+      mocked.accountLines.mockResolvedValue(accountLines({ groups: [statementGroup({ lines: [lineView({ status: "anv" })] })] }));
+
+      await emitDataChanged(["decisions"]);
+
+      expect(await screen.findByText("Coverage: 0")).toBeTruthy();
+      expect(await screen.findByText("Lines: anv")).toBeTruthy();
     });
   });
 

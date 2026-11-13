@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
 
 import { api } from "../api";
+import { renderWithQuery } from "../test/renderWithQuery";
+import { reviewQueue } from "../test/review";
 import { PageBody } from "./PageBody";
 
 const mocked = vi.mocked(api, true);
@@ -17,6 +19,14 @@ describe("PageBody", () => {
     render(<PageBody route={{ page: "document", documentId: "d1", year: null }} />);
 
     expect(mocked.pdfViewShow).toHaveBeenCalledWith({ kind: "document", id: "d1" }, expect.anything());
+  });
+
+  it("shows the Review page on the review route", async () => {
+    mocked.reviewQueue.mockResolvedValue(reviewQueue());
+
+    renderWithQuery(<PageBody route={{ page: "review" }} />);
+
+    expect(await screen.findByRole("heading", { name: "Example Bookshop" })).toBeTruthy();
   });
 
   it("shows no PDF preview on a page without a document", () => {

@@ -21,6 +21,7 @@ pub mod notify;
 pub mod platform;
 pub mod preview;
 mod remote;
+pub mod review;
 pub mod rules;
 pub mod settings;
 pub mod state;

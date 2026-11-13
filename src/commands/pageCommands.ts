@@ -35,6 +35,7 @@ const HANDLERS: Record<string, Handler> = {
   "go.subscriptions": () => useStore.getState().navigate({ page: "subscriptions" }),
   "go.statements": () => useStore.getState().navigate({ page: "statements" }),
   "go.documents": () => useStore.getState().navigate({ page: "documents" }),
+  "go.review": () => useStore.getState().navigate({ page: "review" }),
   "go.back": () => useStore.getState().goBack(),
   "go.forward": () => useStore.getState().goForward(),
   "palette.open": () => useStore.getState().setPaletteOpen(true),

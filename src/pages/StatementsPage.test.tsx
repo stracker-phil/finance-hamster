@@ -88,6 +88,51 @@ describe("StatementsPage", () => {
     for (const label of ["Imported", "Partly", "Missing"]) expect(await screen.findByText(label)).toBeTruthy();
   });
 
+  describe("review", () => {
+    it("shows the state chip of an account whose lines wait for review", async () => {
+      mocked.statementsCoverage.mockResolvedValue(coverage({ accounts: [accountCoverage({ state: "review", stateLabel: "3 to review", toReview: 3 })] }));
+
+      render(<StatementsPage />);
+
+      expect(await screen.findByText("3 to review")).toBeTruthy();
+    });
+
+    it("offers Start Review with the lines of all accounts summed", async () => {
+      mocked.statementsCoverage.mockResolvedValue(
+        coverage({ accounts: [accountCoverage({ toReview: 3 }), accountCoverage({ id: "acc-2", name: "Savings", toReview: 2 })] }),
+      );
+
+      render(<StatementsPage />);
+
+      expect(await screen.findByText("5 lines wait for your decision.")).toBeTruthy();
+    });
+
+    it("says a single line waits in the singular", async () => {
+      mocked.statementsCoverage.mockResolvedValue(coverage({ accounts: [accountCoverage({ toReview: 1 })] }));
+
+      render(<StatementsPage />);
+
+      expect(await screen.findByText("1 line waits for your decision.")).toBeTruthy();
+    });
+
+    it("opens the review when Start Review is clicked", async () => {
+      mocked.statementsCoverage.mockResolvedValue(coverage({ accounts: [accountCoverage({ toReview: 3 })] }));
+      render(<StatementsPage />);
+
+      await userEvent.click(await screen.findByRole("button", { name: "Start Review" }));
+
+      expect(useStore.getState().route).toEqual({ page: "review" });
+    });
+
+    it("shows no banner when no line waits", async () => {
+      render(<StatementsPage />);
+
+      await screen.findByText("Private");
+      expect(screen.queryByRole("button", { name: "Start Review" })).toBeNull();
+      expect(screen.queryByText(/for your decision/)).toBeNull();
+    });
+  });
+
   it("points to Settings when there is no account", async () => {
     mocked.statementsCoverage.mockResolvedValue(coverage({ accounts: [] }));
 

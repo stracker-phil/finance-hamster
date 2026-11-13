@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { api, toAppError } from "../api";
 import { Icon, type IconName } from "../components/icons";
 import { sidebarKey, type Route } from "../state/route";
+import { useCoverage } from "../queries/statements";
 import { useStore } from "../state/store";
 
 export interface SidebarYear {
@@ -73,6 +74,8 @@ export function Sidebar({ years }: { years: SidebarYear[] }) {
   const route = useStore((s) => s.route);
   const navigate = useStore((s) => s.navigate);
   const current = sidebarKey(route);
+  const { data: coverage } = useCoverage();
+  const toReview = coverage?.accounts.reduce((sum, a) => sum + a.toReview, 0) ?? 0;
   const isCurrent = (r: Route) => sidebarKey(r) === current;
   return (
     <aside className="sidebar" aria-label="Sidebar">
@@ -82,6 +85,11 @@ export function Sidebar({ years }: { years: SidebarYear[] }) {
           <button key={row.label} className="nav-row" aria-current={isCurrent(row.route) ? "page" : undefined} onClick={() => navigate(row.route)}>
             <Icon name={row.icon} />
             <span className="nav-row__label">{row.label}</span>
+            {row.route.page === "statements" && toReview > 0 && (
+              <span className="nav-badge" aria-label={`${toReview} to review`}>
+                {toReview}
+              </span>
+            )}
           </button>
         ))}
       </nav>

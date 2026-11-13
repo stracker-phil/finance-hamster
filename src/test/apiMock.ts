@@ -39,6 +39,8 @@ export function createApiMock(overrides: Partial<Api> = {}): Api {
     statementImportCancel: vi.fn().mockResolvedValue(undefined),
     statementsCoverage: vi.fn().mockResolvedValue({ months: [], accounts: [] }),
     accountLines: vi.fn().mockResolvedValue({ id: "acc-1", name: "Private", ibanMasked: "AT•• •••• 0001", groups: [] }),
+    reviewQueue: vi.fn().mockResolvedValue({ lines: [], items: [] }),
+    reviewDecide: vi.fn().mockResolvedValue("Ignore: Demo Shop"),
     pdfViewShow: vi.fn().mockResolvedValue(undefined),
     pdfViewMove: vi.fn().mockResolvedValue(undefined),
     pdfViewHide: vi.fn().mockResolvedValue(undefined),

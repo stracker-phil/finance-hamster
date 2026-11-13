@@ -10,3 +10,4 @@ import "./overlays.css";
 import "./settings.css";
 import "./statements.css";
 import "./rules.css";
+import "./review.css";

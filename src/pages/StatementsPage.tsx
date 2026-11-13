@@ -3,14 +3,14 @@ import type { AccountCoverage } from "../api";
 import { useCoverage } from "../queries/statements";
 import { startImport } from "../statements/importFlow";
 import { useStore } from "../state/store";
+import { accountTone } from "../lib/accountTone";
 import { EmptyPage } from "./EmptyPage";
 
-/** The number of `acct-N` color classes in statements.css. */
-const ACCOUNT_TONES = 6;
+const STATE_CHIP: Record<AccountCoverage["state"], string> = { ok: "state-chip--ok", behind: "state-chip--warn", review: "state-chip--info" };
 
 function AccountRow({ account, index }: { account: AccountCoverage; index: number }) {
   const navigate = useStore((s) => s.navigate);
-  const tone = `acct-${index % ACCOUNT_TONES}`;
+  const tone = accountTone(index);
   return (
     <div className="cov-row">
       <button className="cov-row__open" onClick={() => navigate({ page: "account", accountId: account.id })} aria-label={`Open ${account.name}`} />
@@ -28,7 +28,7 @@ function AccountRow({ account, index }: { account: AccountCoverage; index: numbe
           ))}
         </div>
         <div className="cov-row__state">
-          <span className={account.state === "ok" ? "state-chip state-chip--ok" : "state-chip state-chip--warn"}>{account.stateLabel}</span>
+          <span className={`state-chip ${STATE_CHIP[account.state]}`}>{account.stateLabel}</span>
           <ChevronRight size={14} />
         </div>
       </div>
@@ -45,10 +45,22 @@ function AccountRow({ account, index }: { account: AccountCoverage; index: numbe
 /** Coverage per account over the last twelve months. */
 export function StatementsPage() {
   const { data } = useCoverage();
+  const navigate = useStore((s) => s.navigate);
   if (data && data.accounts.length === 0) return <EmptyPage title="No accounts" text="Add an account in Settings → Accounts." />;
+  const toReview = data?.accounts.reduce((sum, a) => sum + a.toReview, 0) ?? 0;
   return (
     <div className="page-scroll">
       <div className="statements">
+        {toReview > 0 && (
+          <div className="review-banner">
+            <span>
+              {toReview} {toReview === 1 ? "line waits" : "lines wait"} for your decision.
+            </span>
+            <button className="btn btn--small btn--primary" onClick={() => navigate({ page: "review" })}>
+              Start Review
+            </button>
+          </div>
+        )}
         <div className="dropline">
           <Upload size={18} />
           <span>Drop a statement PDF anywhere in this window. The app finds the account from the IBAN.</span>

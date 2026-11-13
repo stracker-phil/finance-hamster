@@ -47,6 +47,7 @@ pub const COMMANDS: &[CommandDef] = &[
     page("go.subscriptions", "Subscriptions", Some("CmdOrCtrl+2")),
     page("go.statements", "Statements", Some("CmdOrCtrl+3")),
     page("go.documents", "Documents", Some("CmdOrCtrl+4")),
+    page("go.review", "Review Lines", None),
     page("go.back", "Back", Some("CmdOrCtrl+[")),
     page("go.forward", "Forward", Some("CmdOrCtrl+]")),
     page("palette.open", "Command Palette…", Some("CmdOrCtrl+K")),
@@ -184,6 +185,14 @@ mod tests {
         let import = listed.iter().find(|c| c.id == "statement.import").unwrap();
         assert_eq!(import.title, "Import Statement…");
         assert_eq!(import.shortcut.as_deref(), Some("⌘I"));
+    }
+
+    #[test]
+    fn review_lines_is_a_page_command_without_a_shortcut() {
+        let listed = list();
+        let review = listed.iter().find(|c| c.id == "go.review").unwrap();
+        assert_eq!(review.title, "Review Lines");
+        assert_eq!(review.shortcut, None);
     }
 
     #[test]

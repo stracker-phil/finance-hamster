@@ -1,7 +1,7 @@
 import { getName, getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { Account, AccountEdit, AccountLines, Coverage, RuleForm, RulesView, Frame, ImportPreview, PdfSource, AppError, AppInfo, CommandInfo, ErrorKind, EventName, EventPayloads, Imported, LaunchEvent, NewAccount, ReloadPreview, RulesFile, Settings, SettingsPatch, TaxYear } from "./types";
+import type { Account, AccountEdit, AccountLines, Action, Coverage, ReviewQueue, RuleForm, RulesView, Frame, ImportPreview, PdfSource, AppError, AppInfo, CommandInfo, ErrorKind, EventName, EventPayloads, Imported, LaunchEvent, NewAccount, ReloadPreview, RulesFile, Settings, SettingsPatch, TaxYear } from "./types";
 
 export * from "./types";
 
@@ -50,6 +50,9 @@ export const api = {
   ruleDelete: (id: string) => invoke<string>("rule_delete", { id }),
   /** How many lines changed, in words. */
   rulesRerun: () => invoke<string>("rules_rerun"),
+  reviewQueue: () => invoke<ReviewQueue>("review_queue"),
+  /** Decides a line by hand; `always` also adds a rule for its key. The label of the change. */
+  reviewDecide: (lineId: string, action: Action, itemKey: string | null, always: boolean) => invoke<string>("review_decide", { lineId, action, itemKey, always }),
   pdfViewShow: (source: PdfSource, frame: Frame) => invoke<void>("pdf_view_show", { source, frame }),
   pdfViewMove: (frame: Frame) => invoke<void>("pdf_view_move", { frame }),
   pdfViewHide: () => invoke<void>("pdf_view_hide"),

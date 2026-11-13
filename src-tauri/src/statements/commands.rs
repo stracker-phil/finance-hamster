@@ -8,7 +8,8 @@ use tauri_plugin_dialog::DialogExt;
 use ts_rs::TS;
 
 use super::import::{self, ImportPreview};
-use super::view::{self, AccountLines, Coverage};
+use super::lines::{self, AccountLines};
+use super::view::{self, Coverage};
 use crate::date::DateOrder;
 use crate::db::Source;
 use crate::db::commands::announce;
@@ -100,7 +101,7 @@ pub fn statements_coverage(state: State<'_, AppState>) -> AppResult<Coverage> {
 
 #[tauri::command]
 pub fn account_lines(state: State<'_, AppState>, account_id: String) -> AppResult<AccountLines> {
-    view::account_lines(
+    lines::account_lines(
         &state.db,
         &account_id,
         state.settings.get().number_format,

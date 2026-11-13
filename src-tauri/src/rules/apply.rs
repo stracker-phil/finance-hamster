@@ -19,12 +19,22 @@ pub fn own_accounts(conn: &Connection) -> AppResult<Vec<OwnAccount>> {
 
 /// One change per line whose decision `rules` change; hand decisions stay.
 pub fn changes(conn: &Connection, rules: &[RuleRow], now: i64) -> AppResult<Vec<Change>> {
+    changes_except(conn, rules, now, None)
+}
+
+/// Like `changes`, leaving out the line `skipped`, which is being decided by hand in the same op.
+pub fn changes_except(
+    conn: &Connection,
+    rules: &[RuleRow],
+    now: i64,
+    skipped: Option<&str>,
+) -> AppResult<Vec<Change>> {
     let own = own_accounts(conn)?;
     let existing = store::decisions(conn)?;
     let mut changes = Vec::new();
     for line in statements::all_transactions(conn)? {
         let current = existing.get(&line.id);
-        if current.is_some_and(DecisionRow::by_hand) {
+        if current.is_some_and(DecisionRow::by_hand) || skipped == Some(line.id.as_str()) {
             continue;
         }
         let wanted = engine::decide(rules, &line, &own, now);

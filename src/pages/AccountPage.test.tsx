@@ -74,6 +74,38 @@ describe("AccountPage", () => {
     expect(await screen.findByText("Transfer")).toBeTruthy();
   });
 
+  it.each([
+    ["anv", "ANV", "KZ 720"],
+    ["subscription", "Subscription", "Matched by rule"],
+  ] as const)("marks a %s line with its chip and note", async (status, chip, note) => {
+    mocked.accountLines.mockResolvedValue(accountLines({ groups: [statementGroup({ lines: [lineView({ status, note })] })] }));
+
+    render(<AccountPage accountId="acc-1" />);
+
+    expect(await screen.findByText(chip)).toBeTruthy();
+    expect(screen.getByText(note)).toBeTruthy();
+  });
+
+  it.each([
+    ["ignored", "Ignored by rule"],
+    ["review", "Waiting for review"],
+  ] as const)("shows the note of a %s line without a chip", async (status, note) => {
+    mocked.accountLines.mockResolvedValue(accountLines({ groups: [statementGroup({ lines: [lineView({ status, note })] })] }));
+
+    render(<AccountPage accountId="acc-1" />);
+
+    expect(await screen.findByText(note)).toBeTruthy();
+    expect(screen.queryByText("ANV")).toBeNull();
+    expect(screen.queryByText("Subscription")).toBeNull();
+  });
+
+  it("shows no note for a line without one", async () => {
+    render(<AccountPage accountId="acc-1" />);
+
+    const group = await screen.findByRole("region", { name: "Nr. 010/2026" });
+    expect(within(group).queryByText(/KZ|rule|review/)).toBeNull();
+  });
+
   it("shows a credit with its plus sign", async () => {
     mocked.accountLines.mockResolvedValue(accountLines({ groups: [statementGroup({ lines: [lineView({ title: "Example Employer", amount: "+€2,850.00", credit: true })] })] }));
 

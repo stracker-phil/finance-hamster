@@ -857,6 +857,55 @@ fn re_running_picks_up_an_account_that_became_one_of_the_owners() {
 }
 
 #[test]
+fn the_changes_a_rule_set_makes_can_leave_out_one_line() {
+    let (dir, db) = setup();
+    import_statement(&db, dir.path(), &october());
+    let rules = vec![rule_row("rule-card", 0, &["E-COMM"], Action::Ignore)];
+    let skipped = line_with(&db, "STREAMFLIX").id;
+
+    let all = db
+        .read(|c| super::apply::changes_except(c, &rules, NOW, None))
+        .unwrap();
+    let without = db
+        .read(|c| super::apply::changes_except(c, &rules, NOW, Some(&skipped)))
+        .unwrap();
+
+    assert_eq!((all.len(), without.len()), (2, 1));
+}
+
+#[test]
+fn an_appended_rule_matches_one_token_and_runs_after_every_other_rule() {
+    let (_dir, db) = setup();
+    add(&db, ignore(&["Cloudbox"]));
+    add(&db, ignore(&["Lumen"]));
+    let existing = rules_of(&db);
+
+    let appended = super::appended(
+        &existing,
+        "STREAMFLIX",
+        Action::Anv,
+        Some("books".into()),
+        7,
+    );
+
+    assert_eq!(appended.position, 2);
+    assert_eq!(appended.tokens(), vec!["STREAMFLIX"]);
+    assert_eq!(
+        (
+            appended.action,
+            appended.item_key.as_deref(),
+            appended.builtin,
+            appended.created_at
+        ),
+        (Action::Anv, Some("books"), None, 7)
+    );
+    assert_eq!(
+        super::appended(&[], "X", Action::Ignore, None, 0).position,
+        0
+    );
+}
+
+#[test]
 fn the_built_in_rules_are_added_once() {
     let (_dir, db) = setup();
 

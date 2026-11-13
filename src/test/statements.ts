@@ -31,6 +31,7 @@ export function accountCoverage(patch: Partial<AccountCoverage> = {}): AccountCo
       { cover: "missing", tip: "Nov: no statement" },
     ],
     note: null,
+    toReview: 0,
     ...patch,
   };
 }
@@ -50,7 +51,7 @@ export function coverage(patch: Partial<Coverage> = {}): Coverage {
 
 /** A demo line of a statement, with `patch` applied. */
 export function lineView(patch: Partial<LineView> = {}): LineView {
-  return { id: "line-1", date: "10 Nov", title: "Example Market", original: null, amount: "−€22.48", credit: false, transfer: false, ...patch };
+  return { id: "line-1", date: "10 Nov", title: "Example Market", original: null, amount: "−€22.48", credit: false, transfer: false, status: "ignored", note: null, ...patch };
 }
 
 /** A demo statement group, with `patch` applied. */

@@ -19,7 +19,11 @@ last: string, state: AccountState,
 /**
  * `Up to date`, `13 days behind`.
  */
-stateLabel: string, months: Array<MonthCover>, 
+stateLabel: string, 
+/**
+ * Lines neither a rule nor the owner decided.
+ */
+toReview: number, months: Array<MonthCover>, 
 /**
  * A gap in the chain of statements, in words.
  */
@@ -32,7 +36,7 @@ export type AccountEdit = { name: string, bank: string, own: boolean, };
 
 export type AccountLines = { id: string, name: string, ibanMasked: string, groups: Array<StatementGroup>, };
 
-export type AccountState = "ok" | "behind";
+export type AccountState = "ok" | "behind" | "review";
 
 /**
  * What a rule or a hand decision does with a line.
@@ -128,6 +132,8 @@ label: string, kz: string, };
  */
 export type LaunchEvent = { "type": "error", message: string, } | { "type": "activate" };
 
+export type LineStatus = "review" | "anv" | "subscription" | "ignored" | "transfer";
+
 export type LineView = { id: string, 
 /**
  * `10 Nov`.
@@ -144,7 +150,11 @@ original: string | null,
 /**
  * `−€22.48`, `+€2,850.00`.
  */
-amount: string, credit: boolean, transfer: boolean, };
+amount: string, credit: boolean, transfer: boolean, status: LineStatus, 
+/**
+ * `KZ 720`, `Ignored by rule`, `Waiting for review`.
+ */
+note: string | null, };
 
 export type MonthCover = { cover: Cover, tip: string, };
 
@@ -170,6 +180,45 @@ export type PdfSource = { kind: SourceKind, id: string, };
  * One open year's pending Reload.
  */
 export type ReloadPreview = { year: number, from: string, to: string | null, changes: Array<string>, problems: Array<string>, };
+
+/**
+ * A line waiting for a decision, as the Review card shows it.
+ */
+export type ReviewLine = { id: string, accountName: string, 
+/**
+ * The account's place in the account list, for its color.
+ */
+accountIndex: number, 
+/**
+ * `Tue, 10 Nov`.
+ */
+date: string, title: string, amount: string, 
+/**
+ * The booking text and its detail lines as printed.
+ */
+raw: string, 
+/**
+ * The merchant token an "Always do this" rule matches, e.g. `SEITENWEISE`.
+ */
+key: string, 
+/**
+ * What the owner decided for this key before.
+ */
+suggestion: Action | null, 
+/**
+ * The item to assign if ANV: the one last used for this key.
+ */
+itemKey: string | null, 
+/**
+ * `last used for Buchhandlung Seitenweise`.
+ */
+itemWhy: string | null, };
+
+export type ReviewQueue = { 
+/**
+ * Newest first.
+ */
+lines: Array<ReviewLine>, items: Array<ItemOption>, };
 
 /**
  * A rule as the Rule sheet edits it; amounts as typed.

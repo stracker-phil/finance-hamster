@@ -185,6 +185,23 @@ fn write_with_rerun(
     db.write(Op::new(label, changes), source)
 }
 
+/// A rule matching `token` in the bank text, after every other rule.
+pub fn appended(
+    rules: &[RuleRow],
+    token: &str,
+    action: Action,
+    item_key: Option<String>,
+    now: i64,
+) -> RuleRow {
+    let position = rules.iter().map(|r| r.position).max().unwrap_or(-1) + 1;
+    RuleRow {
+        contains: encode_tokens(&[token]),
+        action,
+        item_key,
+        ..blank(uuid::Uuid::new_v4().to_string(), position, now)
+    }
+}
+
 /// Adds a rule at the end, or changes the rule `id`, and applies the rules again.
 pub fn save(
     db: &Db,

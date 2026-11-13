@@ -1,16 +1,14 @@
-//! What the Statements and Account pages show, with dates and amounts already formatted (ADR 0010).
+//! What the Statements page shows: coverage per account, with dates already formatted (ADR 0010).
 
 use chrono::{Datelike, Days, Months, NaiveDate};
 use serde::Serialize;
 use ts_rs::TS;
 
-use super::store::{self, StatementRow, TransactionRow};
+use super::store::{self, StatementRow};
 use crate::accounts::{self, AccountRow};
 use crate::date::{self, DateOrder};
 use crate::db::Db;
-use crate::error::{AppError, AppResult};
-use crate::money::{Money, format_money, format_signed};
-use crate::settings::NumberFormat;
+use crate::error::AppResult;
 
 /// Days after its last statement's end an account still counts as up to date.
 const UP_TO_DATE_DAYS: i64 = 7;
@@ -31,6 +29,8 @@ pub enum Cover {
 pub enum AccountState {
     Ok,
     Behind,
+    /// Up to date, with lines waiting in Review.
+    Review,
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
@@ -61,6 +61,8 @@ pub struct AccountCoverage {
     pub state: AccountState,
     /// `Up to date`, `13 days behind`.
     pub state_label: String,
+    /// Lines neither a rule nor the owner decided.
+    pub to_review: u32,
     pub months: Vec<MonthCover>,
     /// A gap in the chain of statements, in words.
     pub note: Option<String>,
@@ -150,6 +152,7 @@ fn chain_note(statements: &[StatementRow]) -> Option<String> {
 fn account_coverage(
     account: &AccountRow,
     statements: &[StatementRow],
+    to_review: u32,
     today: NaiveDate,
     order: DateOrder,
 ) -> AccountCoverage {
@@ -170,6 +173,8 @@ fn account_coverage(
                 );
                 if behind > UP_TO_DATE_DAYS {
                     (last, AccountState::Behind, format!("{behind} days behind"))
+                } else if to_review > 0 {
+                    (last, AccountState::Review, format!("{to_review} to review"))
                 } else {
                     (last, AccountState::Ok, "Up to date".to_string())
                 }
@@ -181,6 +186,7 @@ fn account_coverage(
         last,
         state,
         state_label,
+        to_review,
         months: months(today)
             .into_iter()
             .map(|m| month_cover(m, today, statements))
@@ -191,9 +197,17 @@ fn account_coverage(
 
 pub fn coverage(db: &Db, today: NaiveDate, order: DateOrder) -> AppResult<Coverage> {
     let mut accounts = Vec::new();
+    let waiting = db.read(crate::review::undecided_by_account)?;
     for account in db.read(accounts::rows)? {
         let statements = db.read(|c| store::statements_of(c, &account.id))?;
-        accounts.push(account_coverage(&account, &statements, today, order));
+        let to_review = waiting.get(&account.id).copied().unwrap_or(0);
+        accounts.push(account_coverage(
+            &account,
+            &statements,
+            to_review,
+            today,
+            order,
+        ));
     }
     Ok(Coverage {
         months: months(today)
@@ -204,111 +218,5 @@ pub fn coverage(db: &Db, today: NaiveDate, order: DateOrder) -> AppResult<Covera
             })
             .collect(),
         accounts,
-    })
-}
-
-#[derive(Serialize, Clone, Debug, PartialEq, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "src/api/types.gen.ts")]
-pub struct LineView {
-    pub id: String,
-    /// `10 Nov`.
-    pub date: String,
-    /// The merchant, the counterparty or the booking text.
-    pub title: String,
-    /// The foreign amount of a card payment, `USD 24.00`.
-    pub original: Option<String>,
-    /// `−€22.48`, `+€2,850.00`.
-    pub amount: String,
-    pub credit: bool,
-    pub transfer: bool,
-}
-
-#[derive(Serialize, Clone, Debug, PartialEq, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "src/api/types.gen.ts")]
-pub struct StatementGroup {
-    pub id: String,
-    /// `Nr. 003/2026`.
-    pub label: String,
-    /// `7 Sep – 10 Nov`.
-    pub range: String,
-    /// `62 lines`.
-    pub count: String,
-    pub lines: Vec<LineView>,
-}
-
-#[derive(Serialize, Clone, Debug, PartialEq, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "src/api/types.gen.ts")]
-pub struct AccountLines {
-    pub id: String,
-    pub name: String,
-    pub iban_masked: String,
-    pub groups: Vec<StatementGroup>,
-}
-
-fn line_view(t: TransactionRow, format: NumberFormat, order: DateOrder) -> LineView {
-    let title = t.merchant.or(t.counterparty).unwrap_or(t.text);
-    let original = match (t.original_cents, t.original_currency) {
-        (Some(cents), Some(currency)) => Some(format_money(&Money { cents, currency }, format)),
-        _ => None,
-    };
-    LineView {
-        date: date::parse(&t.value_date)
-            .map(|d| date::day_month(d, order))
-            .unwrap_or_default(),
-        title,
-        original,
-        amount: format_signed(&Money::eur(t.cents), format),
-        credit: t.cents > 0,
-        transfer: t.transfer,
-        id: t.id,
-    }
-}
-
-/// The account's lines grouped by statement, newest first.
-pub fn account_lines(
-    db: &Db,
-    account_id: &str,
-    format: NumberFormat,
-    order: DateOrder,
-) -> AppResult<AccountLines> {
-    let account = db
-        .read(accounts::rows)?
-        .into_iter()
-        .find(|a| a.id == account_id)
-        .ok_or_else(|| AppError::NotFound(format!("No account {account_id}")))?;
-    let mut groups = Vec::new();
-    for s in db.read(|c| store::statements_of(c, account_id))? {
-        let lines = db.read(|c| store::transactions_of(c, &s.id))?;
-        let range = match (date::parse(&s.from_date), date::parse(&s.to_date)) {
-            (Some(from), Some(to)) => format!(
-                "{} – {}",
-                date::day_month(from, order),
-                date::day_month(to, order)
-            ),
-            _ => String::new(),
-        };
-        groups.push(StatementGroup {
-            label: format!("Nr. {:03}/{}", s.number, s.year),
-            range,
-            count: format!(
-                "{} {}",
-                lines.len(),
-                if lines.len() == 1 { "line" } else { "lines" }
-            ),
-            lines: lines
-                .into_iter()
-                .map(|t| line_view(t, format, order))
-                .collect(),
-            id: s.id,
-        });
-    }
-    Ok(AccountLines {
-        iban_masked: accounts::mask_iban(&account.iban),
-        id: account.id,
-        name: account.name,
-        groups,
     })
 }
