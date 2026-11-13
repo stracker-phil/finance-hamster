@@ -311,6 +311,24 @@ formula: string,
  */
 gwg: string | null, };
 
+export type FileCheck = { checked: number, problems: Array<FileProblem>, 
+/**
+ * When it ran, in milliseconds.
+ */
+at: number, };
+
+export type FileProblem = { trouble: FileTrouble, 
+/**
+ * Relative to the data folder.
+ */
+file: string, 
+/**
+ * `Document · Lumen AI invoice`, `Statement · Private Nr. 003/2026`.
+ */
+what: string, };
+
+export type FileTrouble = "missing" | "changed";
+
 /**
  * The placeholder's box in CSS pixels, relative to the webview's top left.
  */
@@ -661,6 +679,14 @@ count: string, lines: Array<LineView>, };
  * One part of the statements line: `Private and Business until 10 Nov`.
  */
 export type StatementReach = { text: string, behind: boolean, };
+
+export type StatusGroup = { title: string, rows: Array<StatusRow>, };
+
+export type StatusRow = { label: string, detail: string, 
+/**
+ * `OK`, `Gap`, `41 of 41`.
+ */
+value: string, ok: boolean, };
 
 export type Step = { 
 /**

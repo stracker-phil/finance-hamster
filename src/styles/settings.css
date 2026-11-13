@@ -68,3 +68,7 @@
 .reload-list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary); }
 .reload-list--problems { color: var(--danger-text); }
 .settings-number { width: 72px; text-align: right; }
+.settings-value--problem { color: var(--danger-text); font-weight: 600; }
+.status-value { border: 0; background: transparent; padding: 0; font: inherit; font-size: 13px; font-variant-numeric: tabular-nums; color: var(--text-secondary); }
+.status-value--ok { color: var(--positive-text); }
+.status-value:hover { text-decoration: underline; }

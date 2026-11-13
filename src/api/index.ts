@@ -1,7 +1,7 @@
 import { getName, getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { Account, AccountEdit, AccountLines, Action, Elsewhere, YearPage, NewEntry, TodayView, CloseCheck, SubscriptionsView, SubscriptionDetail, SubscriptionForm, PlanForm, MatchCount, AddInput, AddPreview, ArchivedDocument, DeletionView, DocumentEdit, DocumentGroup, DocumentStep, DocumentView, HistoryEntry, VendorChange, VendorsView, Estimate, LineChoice, Coverage, ReviewQueue, RuleForm, RulesView, Frame, ImportPreview, PdfSource, AppError, AppInfo, CommandInfo, ErrorKind, EventName, EventPayloads, Imported, LaunchEvent, NewAccount, ReloadPreview, RulesFile, Settings, SettingsPatch, TaxYear } from "./types";
+import type { Account, AccountEdit, AccountLines, Action, Elsewhere, YearPage, NewEntry, TodayView, FileCheck, StatusGroup, CloseCheck, SubscriptionsView, SubscriptionDetail, SubscriptionForm, PlanForm, MatchCount, AddInput, AddPreview, ArchivedDocument, DeletionView, DocumentEdit, DocumentGroup, DocumentStep, DocumentView, HistoryEntry, VendorChange, VendorsView, Estimate, LineChoice, Coverage, ReviewQueue, RuleForm, RulesView, Frame, ImportPreview, PdfSource, AppError, AppInfo, CommandInfo, ErrorKind, EventName, EventPayloads, Imported, LaunchEvent, NewAccount, ReloadPreview, RulesFile, Settings, SettingsPatch, TaxYear } from "./types";
 
 export * from "./types";
 
@@ -103,6 +103,13 @@ export const api = {
   reviewDecide: (lineId: string, action: Action, itemKey: string | null, subscriptionId: string | null, always: boolean) =>
     invoke<string>("review_decide", { lineId, action, itemKey, subscriptionId, always }),
   todayView: () => invoke<TodayView>("today_view"),
+  /** Checks every stored PDF now. */
+  filesVerify: () => invoke<FileCheck>("files_verify"),
+  /** The last file check since launch; null before the first. */
+  filesLastCheck: () => invoke<FileCheck | null>("files_last_check"),
+  statusView: () => invoke<StatusGroup[]>("status_view"),
+  /** Opens Settings at a page or row id. */
+  settingsShow: (page: string) => invoke<void>("settings_show", { page }),
   /** `query` keeps the subscriptions whose name or category contains it. */
   subscriptionsView: (query: string) => invoke<SubscriptionsView>("subscriptions_view", { query }),
   subscriptionDetail: (id: string) => invoke<SubscriptionDetail>("subscription_detail", { id }),

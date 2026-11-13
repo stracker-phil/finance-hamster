@@ -36,7 +36,7 @@ fn wanted_base(doc: &DocumentRow, vendors: &[VendorRow]) -> String {
     format!("{FOLDER}/{year}/{date}-{name}.pdf")
 }
 
-fn same_file(path: &Path, hash: &str) -> bool {
+pub fn same_file(path: &Path, hash: &str) -> bool {
     std::fs::read(path).is_ok_and(|bytes| crate::statements::file_hash(&bytes) == hash)
 }
 
@@ -87,7 +87,7 @@ pub fn copy_to(config_dir: &Path, base: &str, bytes: &[u8], hash: &str) -> AppRe
 }
 
 /// The file with `hash` somewhere under `docs/`, for a path that no longer holds it.
-fn find_by_hash(config_dir: &Path, hash: &str) -> Option<PathBuf> {
+pub fn find_by_hash(config_dir: &Path, hash: &str) -> Option<PathBuf> {
     fn walk(dir: &Path, hash: &str) -> Option<PathBuf> {
         for entry in std::fs::read_dir(dir).ok()?.flatten() {
             let path = entry.path();

@@ -13,6 +13,7 @@ pub mod error;
 pub mod events;
 mod handlers;
 mod instance;
+pub mod integrity;
 pub mod ipc;
 pub mod launch;
 pub mod lock;

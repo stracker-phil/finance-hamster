@@ -33,6 +33,11 @@ describe("SETTINGS_PAGES", () => {
     ["Days in Archive", "privacy/archive"],
     ["exclude", "privacy/archive"],
     ["Deletion log", "privacy/deletion-log"],
+    ["Verify files", "privacy/verify-files"],
+    ["checksum", "privacy/verify-files"],
+    ["Statement chains", "status/status-statements"],
+    ["Files and journal", "status/status-files"],
+    ["Rules files", "status/status-rules"],
   ])("finds the row for %s", (query, hit) => {
     expect(found(query)).toContain(hit);
   });

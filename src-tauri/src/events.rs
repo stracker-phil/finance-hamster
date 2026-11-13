@@ -17,3 +17,5 @@ pub const SETTINGS_CHANGED_EVENT: &str = "settings_changed";
 pub const IMPORT_READY_EVENT: &str = "import_ready";
 /// A dropped invoice PDF was read (or refused); payload `AddReady`.
 pub const ADD_READY_EVENT: &str = "add_ready";
+/// No payload; a check of the stored PDFs finished (`integrity::LastCheck`).
+pub const FILES_CHECKED: &str = "files_checked";

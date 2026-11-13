@@ -7,6 +7,7 @@ import { api } from "../api";
 import { account } from "../test/accounts";
 import { renderWithQuery } from "../test/renderWithQuery";
 import { archivedDocument, deletionView, documentGroup, documentRow, documentView, historyEntry, lineChoice, vendorView, vendorsView } from "../test/documents";
+import { fileCheck, fileProblem, statusGroup } from "../test/integrity";
 import { ruleView, rulesView } from "../test/lineRules";
 import { reviewLine, reviewQueue } from "../test/review";
 import { accountCoverage, accountLines, coverage, lineView, statementGroup } from "../test/statements";
@@ -15,6 +16,7 @@ import { step, todayView } from "../test/today";
 import { elsewhere, yearPage } from "../test/year";
 import { useAccounts } from "./accounts";
 import { useArchive, useDeletions, useDocument, useDocumentHistory, useDocumentLineOptions, useDocuments, useVendors, useYearLog } from "./documents";
+import { useLastFileCheck, useStatus } from "./integrity";
 import { useLineRules } from "./lineRules";
 import { useReviewQueue } from "./review";
 import { useAccountLines, useCoverage } from "./statements";
@@ -451,6 +453,48 @@ describe("useEvents", () => {
       await act(async () => handler(null));
 
       expect(await screen.findByText("Today: New step")).toBeTruthy();
+    });
+  });
+
+  describe("file check", () => {
+    function IntegrityProbe() {
+      useEvents();
+      const { data: check } = useLastFileCheck();
+      const { data: groups } = useStatus();
+      return (
+        <>
+          <p>Problems: {check ? check.problems.length : "none run"}</p>
+          <p>Status: {groups?.map((g) => g.title).join(", ")}</p>
+        </>
+      );
+    }
+
+    it("refetches the last check and the status when files_checked arrives", async () => {
+      mocked.filesLastCheck.mockResolvedValue(null);
+      mocked.statusView.mockResolvedValue([statusGroup({ title: "Old group" })]);
+      renderWithQuery(<IntegrityProbe />);
+      await screen.findByText("Problems: none run");
+      await screen.findByText("Status: Old group");
+      mocked.filesLastCheck.mockResolvedValue(fileCheck({ problems: [fileProblem()] }));
+      mocked.statusView.mockResolvedValue([statusGroup({ title: "New group" })]);
+      await waitFor(() => expect(mocked.listen.mock.calls.some(([name]) => name === "files_checked")).toBe(true));
+      const handler = mocked.listen.mock.calls.find(([name]) => name === "files_checked")![1] as (payload: null) => void;
+
+      await act(async () => handler(null));
+
+      expect(await screen.findByText("Problems: 1")).toBeTruthy();
+      expect(await screen.findByText("Status: New group")).toBeTruthy();
+    });
+
+    it("refetches the status when data_changed names the documents table", async () => {
+      mocked.statusView.mockResolvedValue([statusGroup({ title: "Old group" })]);
+      renderWithQuery(<IntegrityProbe />);
+      await screen.findByText("Status: Old group");
+      mocked.statusView.mockResolvedValue([statusGroup({ title: "New group" })]);
+
+      await emitDataChanged(["documents"]);
+
+      expect(await screen.findByText("Status: New group")).toBeTruthy();
     });
   });
 

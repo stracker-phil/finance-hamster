@@ -87,3 +87,5 @@
 .filter-wrap { position: relative; }
 .elsewhere { position: absolute; top: calc(100% + 6px); right: 0; z-index: 30; width: 300px; padding: 4px; }
 .elsewhere__caption { padding: 6px 10px 4px; font-size: 11px; font-weight: 600; color: var(--text-muted); }
+.files-banner { display: flex; align-items: center; gap: 10px; margin: 12px 24px 0; padding: 9px 14px; border: 1px solid var(--banner-error-border); border-radius: 10px; background: var(--banner-error-bg); color: var(--banner-error-text); font-size: 13px; }
+.files-banner .link-btn { margin-left: auto; color: var(--banner-error-text); }

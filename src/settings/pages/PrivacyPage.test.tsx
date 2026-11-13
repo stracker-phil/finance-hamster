@@ -7,6 +7,7 @@ vi.mock("../../api", async (orig) => ({ ...(await orig<object>()), api: (await i
 import { api } from "../../api";
 import { useStore } from "../../state/store";
 import { deletionView } from "../../test/documents";
+import { fileCheck, fileProblem } from "../../test/integrity";
 import { renderWithQuery } from "../../test/renderWithQuery";
 import { settings } from "../../test/settings";
 import { PrivacyPage } from "./PrivacyPage";
@@ -22,6 +23,70 @@ describe("PrivacyPage", () => {
     mocked.getSettings.mockResolvedValue(settings());
     mocked.updateSettings.mockResolvedValue(settings());
     mocked.deletionLog.mockResolvedValue([]);
+    mocked.filesLastCheck.mockResolvedValue(null);
+    mocked.filesVerify.mockResolvedValue(fileCheck());
+  });
+
+  describe("Verify files", () => {
+    it("explains the check and says it has not run since launch", async () => {
+      renderWithQuery(<PrivacyPage />);
+
+      expect(await screen.findByText(/Compares every PDF with its stored checksum\./)).toBeTruthy();
+      expect(screen.getByText(/Not run since launch\./)).toBeTruthy();
+    });
+
+    it("reports that all files match after a clean run", async () => {
+      mocked.filesLastCheck.mockResolvedValue(fileCheck({ checked: 12 }));
+      renderWithQuery(<PrivacyPage />);
+
+      expect(await screen.findByText(/Last run: .+ · all 12 files match\./)).toBeTruthy();
+      expect(screen.queryByText("Missing")).toBeNull();
+      expect(screen.queryByText("Changed")).toBeNull();
+    });
+
+    it("reports how many files are missing or changed and lists each problem", async () => {
+      mocked.filesLastCheck.mockResolvedValue(
+        fileCheck({
+          checked: 12,
+          problems: [
+            fileProblem(),
+            fileProblem({ trouble: "changed", file: "docs/inbox/statement-010-2026.pdf", what: "Statement · Private Nr. 010/2026" }),
+          ],
+        }),
+      );
+      renderWithQuery(<PrivacyPage />);
+
+      expect(await screen.findByText(/Last run: .+ · 2 of 12 files missing or changed\./)).toBeTruthy();
+      expect(screen.getByText("Document · Demo Cloud Ltd invoice")).toBeTruthy();
+      expect(screen.getByText("docs/2026/2026-11-09 Demo Cloud Ltd.pdf")).toBeTruthy();
+      expect(screen.getByText("Missing")).toBeTruthy();
+      expect(screen.getByText("Statement · Private Nr. 010/2026")).toBeTruthy();
+      expect(screen.getByText("docs/inbox/statement-010-2026.pdf")).toBeTruthy();
+      expect(screen.getByText("Changed")).toBeTruthy();
+    });
+
+    it("runs the check on Verify Now and stays disabled until it finishes", async () => {
+      let finish: (check: ReturnType<typeof fileCheck>) => void = () => {};
+      mocked.filesVerify.mockReturnValue(new Promise((resolve) => (finish = resolve)));
+      renderWithQuery(<PrivacyPage />);
+
+      await userEvent.click(screen.getByRole("button", { name: "Verify Now" }));
+
+      expect(mocked.filesVerify).toHaveBeenCalled();
+      expect(screen.getByRole("button", { name: "Verify Now" })).toBeDisabled();
+      finish(fileCheck());
+      await waitFor(() => expect(screen.getByRole("button", { name: "Verify Now" })).toBeEnabled());
+    });
+
+    it("shows the error as a toast when the check fails, and enables the button again", async () => {
+      mocked.filesVerify.mockRejectedValue({ kind: "io", message: "Data folder unreadable", code: null });
+      renderWithQuery(<PrivacyPage />);
+
+      await userEvent.click(screen.getByRole("button", { name: "Verify Now" }));
+
+      await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toEqual(["Data folder unreadable"]));
+      expect(screen.getByRole("button", { name: "Verify Now" })).toBeEnabled();
+    });
   });
 
   it("shows the data folder path", async () => {

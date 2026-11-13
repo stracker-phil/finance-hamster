@@ -20,6 +20,7 @@ pub fn start(
 ) {
     tauri::Builder::default()
         .manage(state)
+        .manage(crate::integrity::LastCheck::default())
         .plugin(log_plugin())
         .plugin(init_logging(log_level))
         .plugin(tauri_plugin_opener::init())
@@ -51,6 +52,7 @@ pub fn start(
             seed_demo(app);
             add_builtin_rules(app);
             start_tax_years(app);
+            check_files(app.handle().clone());
             take_initial(app.handle(), initial);
             #[cfg(debug_assertions)]
             apply_dev_frame(app);
@@ -126,6 +128,30 @@ fn add_builtin_rules(app: &tauri::App) {
     if let Err(e) = crate::rules::ensure_builtins(&state.db, now, crate::db::Source::App) {
         log::warn!("Couldn't add the built-in rules: {e}");
     }
+}
+
+/// Checks the stored PDFs in the background; a problem shows as the main window's banner.
+fn check_files(app: AppHandle) {
+    std::thread::spawn(move || {
+        let state = app.state::<AppState>();
+        match crate::integrity::verify(
+            &state.db,
+            &crate::config_dir(),
+            chrono::Utc::now().timestamp_millis(),
+        ) {
+            Ok(check) => {
+                if !check.problems.is_empty() {
+                    log::warn!(
+                        "{} stored files are missing or changed",
+                        check.problems.len()
+                    );
+                }
+                app.state::<crate::integrity::LastCheck>().set(check);
+                let _ = tauri::Emitter::emit(&app, crate::events::FILES_CHECKED, ());
+            }
+            Err(e) => log::warn!("Couldn't check the stored files: {e}"),
+        }
+    });
 }
 
 fn start_tax_years(app: &tauri::App) {

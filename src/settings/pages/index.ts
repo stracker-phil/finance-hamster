@@ -71,6 +71,7 @@ export const SETTINGS_PAGES: SettingsPage[] = [
     Body: PrivacyPage,
     rows: [
       { id: "data-folder", title: "Data folder", keywords: ["location", "finder"] },
+      { id: "verify-files", title: "Verify files", keywords: ["checksum", "integrity", "missing"] },
       { id: "archive", title: "Days in Archive before delete", keywords: ["delete", "exclude", "archive"] },
       { id: "deletion-log", title: "Deletion log", keywords: ["deleted", "delete"] },
       { id: "network", title: "Internet access", keywords: ["network", "offline"] },
@@ -90,6 +91,10 @@ export const SETTINGS_PAGES: SettingsPage[] = [
     ],
   },
   { id: "shortcuts", group: "App", label: "Shortcuts", icon: "shortcuts", Body: ShortcutsPage, rows: [{ id: "commands", title: "Commands", keywords: ["keys"] }] },
-  { id: "status", group: "App", label: "Status", icon: "status", Body: StatusPage, rows: [{ id: "checks", title: "Checks", keywords: ["integrity"] }] },
+  { id: "status", group: "App", label: "Status", icon: "status", intro: "A quick health check. Everything is computed on this Mac.", Body: StatusPage, rows: [
+      { id: "status-statements", title: "Statement chains", keywords: ["balance", "gap"] },
+      { id: "status-files", title: "Files and journal", keywords: ["checksum", "journal", "inbox"] },
+      { id: "status-rules", title: "Rules files", keywords: ["json", "unverified"] },
+    ] },
   { id: "about", group: "App", label: "About", icon: "about", Body: AboutPage, rows: [{ id: "version", title: "Version" }] },
 ];

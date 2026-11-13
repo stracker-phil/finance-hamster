@@ -13,6 +13,7 @@ import { ImportSheet } from "../statements/ImportSheet";
 import { PlanSheetHost } from "../subscriptions/PlanSheet";
 import { SubscriptionSheetHost } from "../subscriptions/SubscriptionSheet";
 import { useStore } from "../state/store";
+import { FilesBanner } from "./FilesBanner";
 import { Header } from "./Header";
 import { Sidebar } from "./Sidebar";
 import { titleFor } from "./titles";
@@ -48,6 +49,7 @@ export function Window() {
       <main className="main">
         <div className="panel">
           <Header route={route} title={title} />
+          <FilesBanner />
           <section className="page" aria-label={title.title}>
             <PageBody route={route} />
           </section>

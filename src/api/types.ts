@@ -25,6 +25,8 @@ export interface EventPayloads {
   /** A dropped statement was read, or refused. */
   import_ready: ImportReady;
   add_ready: AddReady;
+  /** A check of the stored PDFs finished. */
+  files_checked: null;
 }
 
 export type EventName = keyof EventPayloads;
