@@ -3,6 +3,8 @@
 mod app;
 pub mod cli;
 pub mod commands;
+pub mod date;
+pub mod db;
 #[cfg(debug_assertions)]
 mod dev;
 pub mod error;
@@ -13,6 +15,8 @@ pub mod ipc;
 pub mod launch;
 pub mod lock;
 mod menu;
+pub mod money;
+pub mod notify;
 mod remote;
 pub mod settings;
 pub mod state;
@@ -61,6 +65,21 @@ fn fail(message: &str) -> ! {
     std::process::exit(2);
 }
 
+/// Quits the running debug app (its lock is released on exit), then removes its data.
+#[cfg(debug_assertions)]
+fn reset_demo(config_dir: &std::path::Path, socket: &std::path::Path) -> ! {
+    if instance::ask(socket, &IpcMessage::Quit, false).is_some() {
+        std::thread::sleep(std::time::Duration::from_millis(800));
+    }
+    match test_support::demo::reset(config_dir) {
+        Ok(()) => {
+            println!("Removed the debug app's data; the next launch seeds the demo data");
+            std::process::exit(0);
+        }
+        Err(e) => fail(&format!("Couldn't remove the debug app's data: {e}")),
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let config_dir = config_dir();
@@ -85,6 +104,8 @@ pub fn run() {
                 None => fail("Hamster isn't running"),
             }
         }
+        #[cfg(debug_assertions)]
+        CliOutcome::ResetDemo => reset_demo(&config_dir, &socket),
         CliOutcome::Remote(CliRequest { message, json }) => {
             if let Some(code) = instance::ask(&socket, &message, json) {
                 std::process::exit(code);
@@ -95,7 +116,10 @@ pub fn run() {
 
     let hidden = matches!(message, IpcMessage::Activate { hidden: true });
     let _instance_lock = instance::forward_or_lock(&config_dir, &socket, &message);
-    let state = AppState::open(&config_dir);
+    let state = match AppState::open(&config_dir) {
+        Ok(state) => state,
+        Err(e) => fail(&format!("Hamster can't open its data: {e}")),
+    };
     app::start(
         state,
         socket,

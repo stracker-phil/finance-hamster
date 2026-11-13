@@ -1,12 +1,35 @@
 import { useEffect } from "react";
-import { api } from "../api";
+import { api, toAppError } from "../api";
+import { isTypingTarget } from "./pageKeys";
 import { FILTER_FIELD_ID } from "../shell/Header";
 import { useStore } from "../state/store";
 
 type Handler = () => void;
 
+const UNDO_WORDS = {
+  undo: { done: "Undid", none: "Nothing to undo" },
+  redo: { done: "Redid", none: "Nothing to redo" },
+};
+
+/** ⌘Z in a text field undoes the typing; elsewhere the newest change, as a new journaled op. */
+function undoOrRedo(which: keyof typeof UNDO_WORDS) {
+  if (isTypingTarget(document.activeElement)) {
+    document.execCommand(which);
+    return;
+  }
+  const { showToast } = useStore.getState();
+  api[which]()
+    .then((label) => {
+      if (label) showToast("success", `${UNDO_WORDS[which].done} ${label}`);
+      else showToast("info", UNDO_WORDS[which].none);
+    })
+    .catch((e: unknown) => showToast("error", toAppError(e).message));
+}
+
 /** What the main window does for each page command (`commands::COMMANDS` in Rust). */
 const HANDLERS: Record<string, Handler> = {
+  "edit.undo": () => undoOrRedo("undo"),
+  "edit.redo": () => undoOrRedo("redo"),
   "go.today": () => useStore.getState().navigate({ page: "today" }),
   "go.subscriptions": () => useStore.getState().navigate({ page: "subscriptions" }),
   "go.statements": () => useStore.getState().navigate({ page: "statements" }),

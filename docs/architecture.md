@@ -87,6 +87,9 @@ Rust (`src-tauri/src/`):
 | `cli/` | the `hamster` command line (`parse`) and how replies print (`reply`); `commands` answers without the app |
 | `commands/` | the bus: `COMMANDS` (id, title, accelerator, who runs it), `run`, `list`, `shortcut_label`; page commands go to the main window as `run_command` |
 | `menu/` | the menu bar: macOS's standard items around `MENUS` (command ids); a menu item's id is its command |
+| `db/` | `hamster.sqlite`: `migrations.rs` (numbered, `user_version`), `change.rs` (row changes over JSON rows with inverses and field-level journal entries), `journal.rs` (the `journal` table and its `journal.jsonl` mirror, caught up at launch), `undo.rs`, `Db::write`/`undo`/`redo`, `commands.rs` (`undo`, `redo`, the `data_changed` event) |
+| `money.rs`, `date.rs` | cents plus currency, amount labels by the number format, the FinanzOnline copy value, typed amounts; `YYYY-MM-DD` dates and their labels in the region's order |
+| `notify.rs` | `Notifier`: notifications recorded, not posted (the real center comes with reminders) |
 | `settings/` | `settings.json`: appearance, accent, number format, original currency (`SettingsStore`, `get_settings`, `update_settings`) |
 | `instance.rs`, `ipc/` | single instance: lock file, Unix socket, one JSON line per request |
 | `remote/` | handles each `IpcMessage` from another process |
@@ -95,7 +98,7 @@ Rust (`src-tauri/src/`):
 | `error.rs`, `events.rs`, `lock.rs`, `state.rs`, `handlers.rs` | `AppError`, event names, poison-tolerant locks, managed state, the command list |
 | `store/` | `json_file.rs`: private dir creation, atomic JSON files |
 | `dev/` | debug-only hooks: window frame, background launches, `eval` |
-| `test_support/` | fixtures for tests and, later, the demo seed |
+| `test_support/` | fixtures for tests; `demo/` seeds the debug build's made-up data on its first launch (`SEEDERS`) and `reset` backs `hamster dev seed --yes` |
 | `../tests/no_network.rs` | no network crate in `Cargo.toml` or the resolved dependency tree (ADR 0016) |
 
 Frontend (`src/`):

@@ -68,6 +68,7 @@ The dev scripts work without stealing focus. They are macOS-only (zsh, Swift, `s
 | `scripts/dev/launch.sh [args]` | signs and restarts the debug app next to the terminal without focus; refuses a bundle older than the code |
 | `scripts/dev/js.sh '<js>'` | runs JavaScript in the debug app over its socket (`@<label>` on the first line targets another window) |
 | `scripts/dev/screenshot.sh <png> [--overlay]` | captures the debug window, also on another Space or under other windows (the background launch keeps the webview painting, `dev::keep_painting_when_covered`); never the release app |
+| `hamster dev seed --yes` (debug binary) | quits the debug app and removes its data; the next launch seeds the demo data again |
 | `scripts/dev/e2e.sh` | clicks every sidebar row and + New twice and fails when the panel, header, first sidebar row, filter field or the control moved |
 
 ## Signing

@@ -20,6 +20,9 @@ export const api = {
   updateSettings: (patch: SettingsPatch) => invoke<Settings>("update_settings", { patch }),
   showDataFolder: () => invoke<void>("show_data_folder"),
   dataFolder: () => invoke<string>("data_folder"),
+  /** The label of what was undone, or null when there was nothing. */
+  undo: () => invoke<string | null>("undo"),
+  redo: () => invoke<string | null>("redo"),
   listen: <E extends EventName>(event: E, handler: (payload: EventPayloads[E]) => void): Promise<UnlistenFn> =>
     listen<EventPayloads[E]>(event, (e) => handler(e.payload)),
 };

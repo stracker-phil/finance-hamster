@@ -41,6 +41,8 @@ const fn page(
 }
 
 pub const COMMANDS: &[CommandDef] = &[
+    page("edit.undo", "Undo", Some("CmdOrCtrl+Z")),
+    page("edit.redo", "Redo", Some("CmdOrCtrl+Shift+Z")),
     page("go.today", "Today", Some("CmdOrCtrl+1")),
     page("go.subscriptions", "Subscriptions", Some("CmdOrCtrl+2")),
     page("go.statements", "Statements", Some("CmdOrCtrl+3")),
@@ -160,6 +162,19 @@ mod tests {
         }
         let palette = listed.iter().find(|c| c.id == "palette.open").unwrap();
         assert_eq!(palette.shortcut.as_deref(), Some("⌘K"));
+    }
+
+    #[test]
+    fn undo_and_redo_are_listed_with_their_shortcuts() {
+        let listed = list();
+        let shortcut = |id: &str| {
+            listed
+                .iter()
+                .find(|c| c.id == id)
+                .map(|c| (c.title.as_str(), c.shortcut.as_deref()))
+        };
+        assert_eq!(shortcut("edit.undo"), Some(("Undo", Some("⌘Z"))));
+        assert_eq!(shortcut("edit.redo"), Some(("Redo", Some("⇧⌘Z"))));
     }
 
     #[test]

@@ -76,6 +76,21 @@ enum Command {
     Run { id: String },
     /// List every command with its id and shortcut
     Commands,
+    /// Debug build only: tools for its demo data
+    #[cfg(debug_assertions)]
+    #[command(subcommand)]
+    Dev(DevCommand),
+}
+
+#[cfg(debug_assertions)]
+#[derive(Subcommand, Debug)]
+enum DevCommand {
+    /// Quit the debug app and remove its data, so the next launch seeds the demo data again
+    Seed {
+        /// Confirms removing the debug app's data
+        #[arg(long)]
+        yes: bool,
+    },
 }
 
 /// A message for the running app and how to print its reply.
@@ -98,6 +113,9 @@ pub enum CliOutcome {
     Ask(CliRequest),
     /// A subcommand the running app answers, or the app starts with it (`show`, `focus`).
     Remote(CliRequest),
+    /// `dev seed --yes`: quit the running debug app, then remove its data.
+    #[cfg(debug_assertions)]
+    ResetDemo,
 }
 
 /// Parses the full argv (including the program name).
@@ -121,6 +139,17 @@ where
             log_level: cli.log_level,
         };
     };
+    #[cfg(debug_assertions)]
+    if let Command::Dev(DevCommand::Seed { yes }) = command {
+        return if yes {
+            CliOutcome::ResetDemo
+        } else {
+            CliOutcome::Exit {
+                message: "This removes the debug app's data; run again with --yes\n".into(),
+                code: 2,
+            }
+        };
+    }
     if matches!(command, Command::Commands) {
         return CliOutcome::Exit {
             message: reply::commands_text(&crate::commands::list(), cli.json),
@@ -148,6 +177,8 @@ fn message(command: Command) -> IpcMessage {
         Command::Quit => IpcMessage::Quit,
         Command::Run { id } => IpcMessage::Run { id },
         Command::Commands => unreachable!("answered without the app"),
+        #[cfg(debug_assertions)]
+        Command::Dev(_) => unreachable!("answered without the app"),
     }
 }
 

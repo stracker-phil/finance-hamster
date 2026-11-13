@@ -186,6 +186,22 @@ fn an_unknown_subcommand_exits_with_code_2_and_a_message() {
 }
 
 #[test]
+fn dev_seed_with_yes_resets_the_demo_data() {
+    assert_eq!(run(&["dev", "seed", "--yes"]), CliOutcome::ResetDemo);
+}
+
+#[test]
+fn dev_seed_without_yes_is_refused_with_code_2() {
+    match run(&["dev", "seed"]) {
+        CliOutcome::Exit { message, code } => {
+            assert_eq!(code, 2);
+            assert!(!message.is_empty());
+        }
+        other => panic!("{other:?}"),
+    }
+}
+
+#[test]
 fn version_prints_the_version_and_exits_with_code_0() {
     assert_eq!(
         run(&["--version"]),

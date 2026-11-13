@@ -27,6 +27,11 @@ export type CommandInfo = { id: string, title: string,
  */
 shortcut: string | null, };
 
+/**
+ * Payload of `data_changed`: the tables a write touched, so the page refetches only what shows them.
+ */
+export type DataChanged = { tables: Array<string>, };
+
 export type ErrorKind = "io" | "invalid_input" | "not_found" | "internal";
 
 /**

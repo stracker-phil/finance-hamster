@@ -36,6 +36,8 @@ pub fn start(
         })
         .setup(move |app| {
             log::info!("Hamster {} started", env!("CARGO_PKG_VERSION"));
+            #[cfg(debug_assertions)]
+            seed_demo(app);
             take_initial(app.handle(), initial);
             #[cfg(debug_assertions)]
             apply_dev_frame(app);
@@ -103,6 +105,16 @@ fn init_logging(level: LogLevel) -> tauri::plugin::TauriPlugin<tauri::Wry> {
             Ok(())
         })
         .build()
+}
+
+#[cfg(debug_assertions)]
+fn seed_demo(app: &tauri::App) {
+    let state = app.state::<AppState>();
+    match crate::test_support::demo::seed_if_empty(&state.db) {
+        Ok(0) => {}
+        Ok(count) => log::info!("Seeded the demo data ({count} ops)"),
+        Err(e) => log::warn!("Couldn't seed the demo data: {e}"),
+    }
 }
 
 #[cfg(debug_assertions)]

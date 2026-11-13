@@ -10,6 +10,8 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static
         crate::settings::commands::update_settings,
         show_data_folder,
         data_folder,
+        crate::db::commands::undo,
+        crate::db::commands::redo,
     ]
 }
 

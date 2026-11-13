@@ -161,6 +161,50 @@ describe("App", () => {
       expect(screen.getByPlaceholderText("Search everywhere")).toHaveFocus();
     });
 
+    describe.each([
+      ["edit.undo", "undo", "Undid", "Nothing to undo"],
+      ["edit.redo", "redo", "Redid", "Nothing to redo"],
+    ] as const)("%s", (id, method, past, empty) => {
+      it(`shows "${past} <label>" when the api returns the label of the change`, async () => {
+        mocked[method].mockResolvedValue("Add subscription");
+        renderApp();
+
+        await emit("run_command", id);
+
+        expect((await screen.findByRole("status")).textContent).toContain(`${past} Add subscription`);
+      });
+
+      it(`shows "${empty}" when there is nothing to ${method}`, async () => {
+        mocked[method].mockResolvedValue(null);
+        renderApp();
+
+        await emit("run_command", id);
+
+        expect((await screen.findByRole("status")).textContent).toContain(empty);
+      });
+
+      it("shows the error message when the call is rejected", async () => {
+        mocked[method].mockRejectedValue({ kind: "io", message: "Disk full", code: null });
+        renderApp();
+
+        await emit("run_command", id);
+
+        expect((await screen.findByRole("alert")).textContent).toContain("Disk full");
+      });
+
+      it(`leaves the change alone and uses the browser's ${method} while a text field has focus`, async () => {
+        const execCommand = vi.fn().mockReturnValue(true);
+        document.execCommand = execCommand;
+        renderApp();
+        await emit("run_command", "filter.focus");
+
+        await emit("run_command", id);
+
+        expect(execCommand).toHaveBeenCalledWith(method);
+        expect(mocked[method]).not.toHaveBeenCalled();
+      });
+    });
+
     it("ignores a command it does not handle", async () => {
       renderApp();
 

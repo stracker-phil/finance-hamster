@@ -91,6 +91,13 @@ impl From<std::io::Error> for AppError {
     }
 }
 
+/// A database error is a bug or a broken file, never the owner's input.
+impl From<rusqlite::Error> for AppError {
+    fn from(e: rusqlite::Error) -> Self {
+        AppError::Internal(format!("Database: {e}"))
+    }
+}
+
 impl From<serde_json::Error> for AppError {
     fn from(e: serde_json::Error) -> Self {
         AppError::InvalidInput(e.to_string())

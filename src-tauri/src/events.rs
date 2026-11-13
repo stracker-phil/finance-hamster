@@ -8,5 +8,7 @@ pub const WINDOW_OPENED_EVENT: &str = "window_opened";
 pub const RUN_COMMAND_EVENT: &str = "run_command";
 /// Payload: the Settings page or row id to show.
 pub const OPEN_SETTINGS_EVENT: &str = "open_settings";
+/// Payload: `db::commands::DataChanged`, the tables a write touched.
+pub const DATA_CHANGED_EVENT: &str = "data_changed";
 /// No payload; `settings.json` changed and every window reads it again.
 pub const SETTINGS_CHANGED_EVENT: &str = "settings_changed";

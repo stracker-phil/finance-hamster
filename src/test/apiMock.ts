@@ -16,6 +16,8 @@ export function createApiMock(overrides: Partial<Api> = {}): Api {
     updateSettings: vi.fn().mockResolvedValue(settings()),
     showDataFolder: vi.fn().mockResolvedValue(undefined),
     dataFolder: vi.fn().mockResolvedValue("~/Library/Application Support/com.example.hamster/"),
+    undo: vi.fn().mockResolvedValue(null),
+    redo: vi.fn().mockResolvedValue(null),
     listen: vi.fn().mockResolvedValue(() => {}),
   };
   return { ...api, ...overrides };
