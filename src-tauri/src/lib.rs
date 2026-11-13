@@ -34,6 +34,7 @@ pub mod taxrules;
 pub mod taxyears;
 #[cfg(any(test, debug_assertions, feature = "test-util"))]
 pub mod test_support;
+pub mod today;
 pub mod window;
 pub mod year;
 

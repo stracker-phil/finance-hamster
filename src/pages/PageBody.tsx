@@ -3,18 +3,18 @@ import { AccountPage } from "./AccountPage";
 import { ArchivePage } from "./ArchivePage";
 import { DocumentPage } from "./DocumentPage";
 import { DocumentsPage } from "./DocumentsPage";
-import { EmptyPage } from "./EmptyPage";
 import { LogPage } from "./LogPage";
 import { ReviewPage } from "./ReviewPage";
 import { StatementsPage } from "./StatementsPage";
 import { SubscriptionsPage } from "./SubscriptionsPage";
+import { TodayPage } from "./TodayPage";
 import { YearPage } from "./YearPage";
 
 /** The body of the current page. */
 export function PageBody({ route }: { route: Route }) {
   switch (route.page) {
     case "today":
-      return <EmptyPage title="You're up to date" text="Import a statement to get started." />;
+      return <TodayPage />;
     case "subscriptions":
       return <SubscriptionsPage />;
     case "statements":

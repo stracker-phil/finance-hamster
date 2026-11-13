@@ -11,6 +11,7 @@ import { ruleView, rulesView } from "../test/lineRules";
 import { reviewLine, reviewQueue } from "../test/review";
 import { accountCoverage, accountLines, coverage, lineView, statementGroup } from "../test/statements";
 import { subscriptionDetail, subscriptionForm, subscriptionsView } from "../test/subscriptions";
+import { step, todayView } from "../test/today";
 import { elsewhere, yearPage } from "../test/year";
 import { useAccounts } from "./accounts";
 import { useArchive, useDeletions, useDocument, useDocumentHistory, useDocumentLineOptions, useDocuments, useVendors, useYearLog } from "./documents";
@@ -19,6 +20,7 @@ import { useReviewQueue } from "./review";
 import { useAccountLines, useCoverage } from "./statements";
 import { useMatchCount, useSubscription, useSubscriptions } from "./subscriptions";
 import { useTaxYears } from "./taxYears";
+import { useToday } from "./today";
 import { useElsewhere, useYearPage } from "./year";
 import { useEvents } from "./useEvents";
 
@@ -415,6 +417,40 @@ describe("useEvents", () => {
       await emitDataChanged(["accounts"]);
 
       expect(screen.getByText("List: Old summary")).toBeTruthy();
+    });
+  });
+
+  describe("today", () => {
+    function TodayProbe() {
+      useEvents();
+      const { data } = useToday();
+      return <p>Today: {data?.next?.title ?? "nothing open"}</p>;
+    }
+
+    const open = (title: string) => mocked.todayView.mockResolvedValue(todayView({ next: step({ title }) }));
+
+    it.each(["decisions", "documents", "statements", "subscriptions"])("refetches Today when data_changed names the %s table", async (table) => {
+      open("Old step");
+      renderWithQuery(<TodayProbe />);
+      await screen.findByText("Today: Old step");
+      open("New step");
+
+      await emitDataChanged([table]);
+
+      expect(await screen.findByText("Today: New step")).toBeTruthy();
+    });
+
+    it("refetches Today when the settings change", async () => {
+      open("Old step");
+      renderWithQuery(<TodayProbe />);
+      await screen.findByText("Today: Old step");
+      open("New step");
+      await waitFor(() => expect(mocked.listen.mock.calls.some(([name]) => name === "settings_changed")).toBe(true));
+      const handler = mocked.listen.mock.calls.find(([name]) => name === "settings_changed")![1] as (payload: null) => void;
+
+      await act(async () => handler(null));
+
+      expect(await screen.findByText("Today: New step")).toBeTruthy();
     });
   });
 

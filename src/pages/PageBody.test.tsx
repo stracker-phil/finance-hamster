@@ -8,6 +8,7 @@ import { archivedDocument, documentGroup, historyEntry } from "../test/documents
 import { renderWithQuery } from "../test/renderWithQuery";
 import { reviewQueue } from "../test/review";
 import { subscriptionsView } from "../test/subscriptions";
+import { step, todayView } from "../test/today";
 import { yearPage } from "../test/year";
 import { PageBody } from "./PageBody";
 
@@ -21,6 +22,14 @@ beforeEach(() => {
 });
 
 describe("PageBody", () => {
+  it("shows the Today page on the today route", async () => {
+    mocked.todayView.mockResolvedValue(todayView({ next: step({ title: "3 invoices need a PDF" }) }));
+
+    renderWithQuery(<PageBody route={{ page: "today" }} />);
+
+    expect(await screen.findByRole("heading", { name: "3 invoices need a PDF" })).toBeTruthy();
+  });
+
   it("shows the PDF preview of the document on a document page", () => {
     renderWithQuery(<PageBody route={{ page: "document", documentId: "d1", year: null }} />);
 

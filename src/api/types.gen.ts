@@ -647,6 +647,34 @@ range: string,
  */
 count: string, lines: Array<LineView>, };
 
+/**
+ * One part of the statements line: `Private and Business until 10 Nov`.
+ */
+export type StatementReach = { text: string, behind: boolean, };
+
+export type Step = { 
+/**
+ * `review`, `attach`, `import`, `questions`, `draft`: also the dot's colour.
+ */
+key: string, 
+/**
+ * `12 new transactions to review`.
+ */
+title: string, 
+/**
+ * The quiet row's right side: `about 2 minutes`.
+ */
+detail: string, 
+/**
+ * The headline's line under it.
+ */
+line: string, button: string, target: StepTarget, };
+
+/**
+ * Where a step's button leads.
+ */
+export type StepTarget = { "kind": "review" } | { "kind": "year", year: number, } | { "kind": "import" } | { "kind": "document", id: string, year: number, };
+
 export type SubscriptionDetail = { id: string, name: string, letter: string, tone: number, interval: string, 
 /**
  * `€22.48 / month`.
@@ -754,6 +782,30 @@ plan: number | null,
  */
 tip: string, };
 
+export type TodayView = { 
+/**
+ * `Friday, 13 November`.
+ */
+date: string, 
+/**
+ * The headline; None when nothing is open.
+ */
+next: Step | null, 
+/**
+ * The other open steps as quiet rows.
+ */
+also: Array<Step>, upcoming: Array<UpcomingCharge>, year: YearSummary | null, statements: Array<StatementReach>, };
+
+export type UpcomingCharge = { id: string, name: string, letter: string, tone: number, anv: boolean, 
+/**
+ * `tomorrow`, `in 12 days`, `9 Feb 2027`.
+ */
+when: string, 
+/**
+ * Within three days.
+ */
+soon: boolean, amount: string, };
+
 /**
  * One change to a vendor (Settings → Vendors); returns the label of the change.
  */
@@ -817,3 +869,5 @@ carriedFrom: number | null, kz: string,
 attach: boolean, };
 
 export type YearState = "open" | "closed";
+
+export type YearSummary = { year: number, total: string, progress: string, progressPercent: number, };

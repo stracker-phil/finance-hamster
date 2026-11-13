@@ -1,7 +1,7 @@
 import { getName, getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { Account, AccountEdit, AccountLines, Action, Elsewhere, YearPage, NewEntry, SubscriptionsView, SubscriptionDetail, SubscriptionForm, PlanForm, MatchCount, AddInput, AddPreview, ArchivedDocument, DeletionView, DocumentEdit, DocumentGroup, DocumentStep, DocumentView, HistoryEntry, VendorChange, VendorsView, Estimate, LineChoice, Coverage, ReviewQueue, RuleForm, RulesView, Frame, ImportPreview, PdfSource, AppError, AppInfo, CommandInfo, ErrorKind, EventName, EventPayloads, Imported, LaunchEvent, NewAccount, ReloadPreview, RulesFile, Settings, SettingsPatch, TaxYear } from "./types";
+import type { Account, AccountEdit, AccountLines, Action, Elsewhere, YearPage, NewEntry, TodayView, SubscriptionsView, SubscriptionDetail, SubscriptionForm, PlanForm, MatchCount, AddInput, AddPreview, ArchivedDocument, DeletionView, DocumentEdit, DocumentGroup, DocumentStep, DocumentView, HistoryEntry, VendorChange, VendorsView, Estimate, LineChoice, Coverage, ReviewQueue, RuleForm, RulesView, Frame, ImportPreview, PdfSource, AppError, AppInfo, CommandInfo, ErrorKind, EventName, EventPayloads, Imported, LaunchEvent, NewAccount, ReloadPreview, RulesFile, Settings, SettingsPatch, TaxYear } from "./types";
 
 export * from "./types";
 
@@ -94,6 +94,7 @@ export const api = {
   /** `subscriptionId` links a Subscription decision; the label of the change. */
   reviewDecide: (lineId: string, action: Action, itemKey: string | null, subscriptionId: string | null, always: boolean) =>
     invoke<string>("review_decide", { lineId, action, itemKey, subscriptionId, always }),
+  todayView: () => invoke<TodayView>("today_view"),
   /** `query` keeps the subscriptions whose name or category contains it. */
   subscriptionsView: (query: string) => invoke<SubscriptionsView>("subscriptions_view", { query }),
   subscriptionDetail: (id: string) => invoke<SubscriptionDetail>("subscription_detail", { id }),

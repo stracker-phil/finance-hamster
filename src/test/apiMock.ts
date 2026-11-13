@@ -67,6 +67,7 @@ export function createApiMock(overrides: Partial<Api> = {}): Api {
     yearEntryAttach: vi.fn().mockResolvedValue("Attach PDF"),
     yearEvidenceChoose: vi.fn().mockResolvedValue(null),
     yearEvidenceOpen: vi.fn().mockResolvedValue(undefined),
+    todayView: vi.fn().mockResolvedValue({ date: "Friday, 13 November", next: null, also: [], upcoming: [], year: null, statements: [] }),
     searchElsewhere: vi.fn().mockResolvedValue([]),
     archiveList: vi.fn().mockResolvedValue([]),
     deletionLog: vi.fn().mockResolvedValue([]),

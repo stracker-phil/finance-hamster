@@ -60,6 +60,7 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static
         crate::year::commands::year_answer,
         crate::year::commands::year_entry_add,
         crate::subscriptions::commands::subscriptions_view,
+        crate::today::commands::today_view,
         crate::subscriptions::commands::subscription_detail,
         crate::subscriptions::commands::subscription_save,
         crate::subscriptions::commands::subscription_change_plan,
