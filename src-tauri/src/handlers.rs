@@ -40,6 +40,10 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static
         crate::rules::commands::rules_rerun,
         crate::review::commands::review_queue,
         crate::review::commands::review_decide,
+        crate::documents::commands::document_add_choose,
+        crate::documents::commands::document_add_commit,
+        crate::documents::commands::document_add_cancel,
+        crate::documents::commands::document_estimate,
     ]
 }
 

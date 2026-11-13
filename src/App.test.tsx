@@ -10,6 +10,7 @@ import { createQueryClient } from "./queries/queryClient";
 import { HOME } from "./state/route";
 import { useStore } from "./state/store";
 import { settings } from "./test/settings";
+import { addPreview } from "./test/documents";
 import { importPreview } from "./test/statements";
 
 const mocked = vi.mocked(api, true);
@@ -26,7 +27,7 @@ async function emit(event: EventName, payload: unknown = null) {
 describe("App", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useStore.setState({ route: HOME, back: [], forward: [], filter: "", toasts: [], confirmation: null, paletteOpen: false, pdfCovers: 0, importPreview: null });
+    useStore.setState({ route: HOME, back: [], forward: [], filter: "", toasts: [], confirmation: null, paletteOpen: false, pdfCovers: 0, importPreview: null, addPreview: null });
     mocked.takeLaunchEvents.mockResolvedValue([]);
     mocked.listen.mockResolvedValue(() => {});
     mocked.getSettings.mockResolvedValue(settings());
@@ -253,6 +254,32 @@ describe("App", () => {
       await emit("import_ready", { preview: null, error: "No account matches this IBAN" });
 
       expect((await screen.findByRole("alert")).textContent).toContain("No account matches this IBAN");
+    });
+
+    it("opens the Add document sheet for the invoice the owner chose for document.add", async () => {
+      mocked.documentAddChoose.mockResolvedValue(addPreview());
+      renderApp();
+
+      await emit("run_command", "document.add");
+
+      expect(await screen.findByRole("dialog", { name: "Add document" })).toBeTruthy();
+      expect(screen.getByText("invoice-demo-1109.pdf")).toBeTruthy();
+    });
+
+    it("opens the Add document sheet when an invoice dropped on the window was read", async () => {
+      renderApp();
+
+      await emit("add_ready", { preview: addPreview(), error: null });
+
+      expect(await screen.findByRole("dialog", { name: "Add document" })).toBeTruthy();
+    });
+
+    it("shows why a dropped invoice was refused", async () => {
+      renderApp();
+
+      await emit("add_ready", { preview: null, error: "This PDF has no text" });
+
+      expect((await screen.findByRole("alert")).textContent).toContain("This PDF has no text");
     });
 
     it("ignores a command it does not handle", async () => {

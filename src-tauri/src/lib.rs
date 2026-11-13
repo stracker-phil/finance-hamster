@@ -8,6 +8,7 @@ pub mod date;
 pub mod db;
 #[cfg(debug_assertions)]
 mod dev;
+pub mod documents;
 pub mod error;
 pub mod events;
 mod handlers;

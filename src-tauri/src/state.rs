@@ -3,6 +3,7 @@
 use std::path::Path;
 
 use crate::db::Db;
+use crate::documents::add::AddQueue;
 use crate::error::AppResult;
 use crate::launch::LaunchQueue;
 use crate::notify::Notifier;
@@ -16,6 +17,7 @@ pub struct AppState {
     pub db: Db,
     pub notifier: Notifier,
     pub imports: ImportQueue,
+    pub adds: AddQueue,
 }
 
 impl AppState {
@@ -26,6 +28,7 @@ impl AppState {
             db: Db::open(config_dir)?,
             notifier: Notifier::default(),
             imports: ImportQueue::default(),
+            adds: AddQueue::default(),
         })
     }
 }

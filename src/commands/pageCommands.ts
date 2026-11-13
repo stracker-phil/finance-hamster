@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { api, toAppError } from "../api";
 import { isTypingTarget } from "./pageKeys";
 import { FILTER_FIELD_ID } from "../shell/Header";
+import { startAddDocument } from "../documents/addFlow";
 import { startImport } from "../statements/importFlow";
 import { useStore } from "../state/store";
 
@@ -40,6 +41,7 @@ const HANDLERS: Record<string, Handler> = {
   "go.forward": () => useStore.getState().goForward(),
   "palette.open": () => useStore.getState().setPaletteOpen(true),
   "statement.import": startImport,
+  "document.add": startAddDocument,
   "filter.focus": () => document.getElementById(FILTER_FIELD_ID)?.focus(),
 };
 

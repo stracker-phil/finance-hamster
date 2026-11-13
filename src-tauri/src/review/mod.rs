@@ -141,7 +141,7 @@ pub fn queue(db: &Db, format: NumberFormat, order: DateOrder) -> AppResult<Revie
                 account_name,
                 account_index,
                 date: date::parse(&t.value_date)
-                    .map(|d| format!("{}, {}", d.format("%a"), date::day_month(d, order)))
+                    .map(|d| date::weekday_short(d, order))
                     .unwrap_or_default(),
                 amount: format_signed(&Money::eur(t.cents), format),
                 raw: raw_text(t),

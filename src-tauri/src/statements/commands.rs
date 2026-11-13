@@ -118,7 +118,8 @@ pub struct ImportReady {
     pub error: Option<String>,
 }
 
-/// PDFs dropped on the main window: each is read as a statement and offered in the Import sheet.
+/// PDFs dropped on the main window: a statement is offered in the Import sheet, any other PDF in the Add
+/// document sheet.
 pub fn dropped(app: &AppHandle, paths: Vec<PathBuf>) {
     let pdfs: Vec<PathBuf> = paths
         .into_iter()
@@ -127,6 +128,11 @@ pub fn dropped(app: &AppHandle, paths: Vec<PathBuf>) {
     let app = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
         for path in pdfs {
+            let statement = std::fs::read(&path).is_ok_and(|bytes| super::is_statement(&bytes));
+            if !statement {
+                crate::documents::commands::offer(&app, &path);
+                continue;
+            }
             let payload = match prepare(&app, &path) {
                 Ok(preview) => ImportReady {
                     preview: Some(preview),

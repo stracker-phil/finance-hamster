@@ -5,6 +5,7 @@ import { queryClient as defaultClient } from "./queries/queryClient";
 import { useEvents } from "./queries/useEvents";
 import { usePdfCovers } from "./lib/pdfCover";
 import { useLook } from "./queries/useLook";
+import { useDroppedDocuments } from "./documents/addFlow";
 import { useDroppedStatements } from "./statements/importFlow";
 import { Window } from "./shell/Window";
 import { useAppEvents } from "./state/useAppEvents";
@@ -16,6 +17,7 @@ function MainWindow() {
   usePageCommands();
   usePdfCovers();
   useDroppedStatements();
+  useDroppedDocuments();
   return <Window />;
 }
 

@@ -10,6 +10,7 @@ import { HOME } from "../state/route";
 import { useStore } from "../state/store";
 import { account } from "../test/accounts";
 import { renderWithQuery as render } from "../test/renderWithQuery";
+import { addPreview } from "../test/documents";
 import { accountLines, importPreview } from "../test/statements";
 import { Window } from "./Window";
 
@@ -17,7 +18,7 @@ const mocked = vi.mocked(api, true);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useStore.setState({ route: HOME, back: [], forward: [], filter: "", toasts: [], confirmation: null, paletteOpen: false, pdfCovers: 0, importPreview: null });
+  useStore.setState({ route: HOME, back: [], forward: [], filter: "", toasts: [], confirmation: null, paletteOpen: false, pdfCovers: 0, importPreview: null, addPreview: null });
   mocked.runCommand.mockResolvedValue(undefined);
   mocked.listCommands.mockResolvedValue([]);
   mocked.listAccounts.mockResolvedValue([account()]);
@@ -245,6 +246,33 @@ describe("account page", () => {
   });
 });
 
+describe("Add document sheet", () => {
+  it("shows over the main window once an invoice was read", async () => {
+    useStore.setState({ addPreview: addPreview() });
+
+    render(<Window />);
+
+    expect(await screen.findByRole("dialog", { name: "Add document" })).toBeTruthy();
+    expect(screen.getByText("invoice-demo-1109.pdf")).toBeTruthy();
+  });
+
+  it("is absent while nothing was read", async () => {
+    render(<Window />);
+
+    await screen.findByRole("complementary", { name: "Sidebar" });
+    expect(screen.queryByRole("dialog", { name: "Add document" })).toBeNull();
+  });
+
+  it("closes on Cancel", async () => {
+    useStore.setState({ addPreview: addPreview() });
+    render(<Window />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Cancel" }));
+
+    expect(screen.queryByRole("dialog", { name: "Add document" })).toBeNull();
+  });
+});
+
 describe("Import sheet", () => {
   it("shows over the main window once a statement was read", async () => {
     useStore.setState({ importPreview: importPreview() });
@@ -408,11 +436,25 @@ describe("New menu", () => {
     expect(useStore.getState().importPreview).toEqual(preview);
   });
 
+  it("starts adding an invoice when Add Invoice PDF… is chosen, and closes the menu", async () => {
+    const preview = addPreview();
+    mocked.documentAddChoose.mockResolvedValue(preview);
+    render(<Window />);
+    await openMenu();
+
+    const item = screen.getByRole("menuitem", { name: /Add Invoice PDF…/ });
+    expect(item).toBeEnabled();
+    await userEvent.click(item);
+
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(await screen.findByRole("dialog", { name: "Add document" })).toBeTruthy();
+    expect(useStore.getState().addPreview).toEqual(preview);
+  });
+
   it("keeps the items of later features disabled", async () => {
     render(<Window />);
     await openMenu();
 
-    expect(screen.getByRole("menuitem", { name: /Add Invoice PDF…/ })).toBeDisabled();
     expect(screen.getByRole("menuitem", { name: /New Subscription/ })).toBeDisabled();
   });
 

@@ -44,6 +44,41 @@ export type AccountState = "ok" | "behind" | "review";
 export type Action = "ignore" | "anv" | "subscription";
 
 /**
+ * What the owner confirmed in the sheet.
+ */
+export type AddInput = { token: string, vendor: string, itemKey: string | null, lineId: string | null, };
+
+/**
+ * What the Add document sheet shows.
+ */
+export type AddPreview = { token: string, fileName: string, 
+/**
+ * A document with the same vendor and amount a few days apart.
+ */
+nearDuplicate: string | null, vendor: string | null, 
+/**
+ * Read from the PDF, not one of the known vendors.
+ */
+vendorFromPdf: boolean, 
+/**
+ * `VEC-2026-1109 · 9 Nov 2026`.
+ */
+invoice: string | null, 
+/**
+ * `USD 129.00`.
+ */
+invoiceAmount: string | null, items: Array<ItemOption>, itemKey: string | null, 
+/**
+ * `last used for Pixelforge Ltd.`.
+ */
+itemWhy: string | null, lines: Array<LineChoice>, };
+
+/**
+ * Payload of `add_ready`: a dropped invoice read and waiting, or why it can't be added.
+ */
+export type AddReady = { preview: AddPreview | null, error: string | null, };
+
+/**
  * The JSON shape of an `AppError`.
  */
 export type AppError = { kind: ErrorKind, message: string, 
@@ -79,7 +114,27 @@ export type Coverage = { months: Array<MonthHead>, accounts: Array<AccountCovera
  */
 export type DataChanged = { tables: Array<string>, };
 
+export type DocState = "draft" | "finished" | "excluded";
+
 export type ErrorKind = "io" | "invalid_input" | "not_found" | "internal";
+
+export type Estimate = { workShare: number, 
+/**
+ * `from the item: 40 % private`.
+ */
+shareHint: string | null, 
+/**
+ * `€72.74`.
+ */
+anv: string, 
+/**
+ * `€121.23 × 60 %`.
+ */
+formula: string, 
+/**
+ * `€121.23 is below the GWG limit (€1,000.00): counts fully in 2026.`
+ */
+gwg: string | null, };
 
 /**
  * The placeholder's box in CSS pixels, relative to the webview's top left.
@@ -131,6 +186,15 @@ label: string, kz: string, };
  * Something the page acts on once it listens: from the launch that started the app or a later one.
  */
 export type LaunchEvent = { "type": "error", message: string, } | { "type": "activate" };
+
+/**
+ * A bank line the Add sheet offers as the payment.
+ */
+export type LineChoice = { id: string, title: string, 
+/**
+ * `Business · Tue, 10 Nov · USD 129.00`.
+ */
+detail: string, amount: string, };
 
 export type LineStatus = "review" | "anv" | "subscription" | "ignored" | "transfer";
 

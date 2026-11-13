@@ -1,7 +1,7 @@
 import { getName, getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { Account, AccountEdit, AccountLines, Action, Coverage, ReviewQueue, RuleForm, RulesView, Frame, ImportPreview, PdfSource, AppError, AppInfo, CommandInfo, ErrorKind, EventName, EventPayloads, Imported, LaunchEvent, NewAccount, ReloadPreview, RulesFile, Settings, SettingsPatch, TaxYear } from "./types";
+import type { Account, AccountEdit, AccountLines, Action, AddInput, AddPreview, Estimate, Coverage, ReviewQueue, RuleForm, RulesView, Frame, ImportPreview, PdfSource, AppError, AppInfo, CommandInfo, ErrorKind, EventName, EventPayloads, Imported, LaunchEvent, NewAccount, ReloadPreview, RulesFile, Settings, SettingsPatch, TaxYear } from "./types";
 
 export * from "./types";
 
@@ -51,6 +51,13 @@ export const api = {
   /** How many lines changed, in words. */
   rulesRerun: () => invoke<string>("rules_rerun"),
   reviewQueue: () => invoke<ReviewQueue>("review_queue"),
+  /** Asks for an invoice PDF and reads it; null when the panel was cancelled. */
+  documentAddChoose: () => invoke<AddPreview | null>("document_add_choose"),
+  /** The label of the change. */
+  documentAddCommit: (input: AddInput) => invoke<string>("document_add_commit", { input }),
+  documentAddCancel: (token: string) => invoke<void>("document_add_cancel", { token }),
+  /** What a bank line counts as with an item; null without a line. */
+  documentEstimate: (lineId: string | null, itemKey: string | null) => invoke<Estimate | null>("document_estimate", { lineId, itemKey }),
   /** Decides a line by hand; `always` also adds a rule for its key. The label of the change. */
   reviewDecide: (lineId: string, action: Action, itemKey: string | null, always: boolean) => invoke<string>("review_decide", { lineId, action, itemKey, always }),
   pdfViewShow: (source: PdfSource, frame: Frame) => invoke<void>("pdf_view_show", { source, frame }),

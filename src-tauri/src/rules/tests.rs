@@ -9,7 +9,9 @@ use tempfile::TempDir;
 
 use super::engine::OwnAccount;
 use super::store::{self, Action, Builtin, DecisionRow, RuleRow};
-use super::{ItemOption, RuleForm, builtin_rules, delete, ensure_builtins, items, rerun, save};
+use super::{
+    ItemOption, RuleForm, builtin_rules, delete, ensure_builtins, items, rerun, ruleset, save,
+};
 use crate::accounts::{self, AccountRow};
 use crate::db::{Change, Db, Op, Source, Written};
 use crate::error::{AppError, AppResult};
@@ -294,6 +296,33 @@ fn items_list_the_visible_items_of_the_open_year_with_their_kz() {
             kz: "720".into(),
         }]
     );
+}
+
+#[test]
+fn there_is_no_ruleset_without_a_tax_year() {
+    let (_dir, db) = open_with_accounts();
+    assert_eq!(ruleset(&db).unwrap(), None);
+}
+
+#[test]
+fn the_ruleset_is_the_newest_open_years_even_when_a_newer_year_is_closed() {
+    let (_dir, db) = setup();
+    add_year(&db, 2025, YearState::Open, "Alt");
+    add_year(&db, 2027, YearState::Closed, "Neu");
+
+    let rules = ruleset(&db).unwrap().unwrap();
+
+    assert_eq!(rules.year, 2026);
+    assert_eq!(rules.items[0].name, "Fachliteratur");
+}
+
+#[test]
+fn with_only_closed_years_the_ruleset_is_the_newest_years() {
+    let (_dir, db) = open_with_accounts();
+    add_year(&db, 2025, YearState::Closed, "Alt");
+    add_year(&db, 2026, YearState::Closed, "Neu");
+
+    assert_eq!(ruleset(&db).unwrap().unwrap().year, 2026);
 }
 
 #[test]

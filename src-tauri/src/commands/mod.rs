@@ -52,6 +52,7 @@ pub const COMMANDS: &[CommandDef] = &[
     page("go.forward", "Forward", Some("CmdOrCtrl+]")),
     page("palette.open", "Command Palette…", Some("CmdOrCtrl+K")),
     page("statement.import", "Import Statement…", Some("CmdOrCtrl+I")),
+    page("document.add", "Add Invoice PDF…", Some("CmdOrCtrl+O")),
     page("filter.focus", "Filter This Page", Some("CmdOrCtrl+F")),
     CommandDef {
         id: "settings.open",
@@ -185,6 +186,14 @@ mod tests {
         let import = listed.iter().find(|c| c.id == "statement.import").unwrap();
         assert_eq!(import.title, "Import Statement…");
         assert_eq!(import.shortcut.as_deref(), Some("⌘I"));
+    }
+
+    #[test]
+    fn add_invoice_is_listed_with_its_shortcut() {
+        let listed = list();
+        let add = listed.iter().find(|c| c.id == "document.add").unwrap();
+        assert_eq!(add.title, "Add Invoice PDF…");
+        assert_eq!(add.shortcut.as_deref(), Some("⌘O"));
     }
 
     #[test]

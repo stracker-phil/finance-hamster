@@ -109,6 +109,42 @@ pub const MIGRATIONS: &[&str] = &[
         decided_at INTEGER NOT NULL
     );
     CREATE INDEX decisions_rule ON decisions (rule_id);",
+    // 5: vendors, documents (an invoice PDF plus its facts) and their links to the bank lines that paid them.
+    "CREATE TABLE vendors (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        default_item_key TEXT,
+        created_at INTEGER NOT NULL
+    );
+    CREATE TABLE documents (
+        id TEXT PRIMARY KEY,
+        state TEXT NOT NULL,
+        file TEXT NOT NULL,
+        original_name TEXT NOT NULL,
+        file_hash TEXT NOT NULL UNIQUE,
+        vendor_id TEXT,
+        pay_date TEXT,
+        paid_cents INTEGER,
+        item_key TEXT,
+        work_share INTEGER NOT NULL,
+        note TEXT NOT NULL,
+        invoice_cents INTEGER,
+        invoice_currency TEXT,
+        invoice_number TEXT,
+        invoice_date TEXT,
+        created_at INTEGER NOT NULL,
+        finished_at INTEGER,
+        excluded_at INTEGER,
+        exclude_reason TEXT
+    );
+    CREATE TABLE document_links (
+        id TEXT PRIMARY KEY,
+        document_id TEXT NOT NULL REFERENCES documents (id),
+        transaction_id TEXT NOT NULL REFERENCES transactions (id),
+        created_at INTEGER NOT NULL,
+        UNIQUE (document_id, transaction_id)
+    );
+    CREATE INDEX document_links_transaction ON document_links (transaction_id);",
 ];
 
 pub fn version(conn: &Connection) -> AppResult<usize> {
@@ -164,14 +200,46 @@ mod tests {
         [
             "accounts",
             "decisions",
+            "document_links",
+            "documents",
             "journal",
             "rules",
             "statements",
             "tax_years",
             "transactions",
+            "vendors",
         ]
         .map(String::from)
         .to_vec()
+    }
+
+    #[test]
+    fn a_file_at_version_four_gains_vendors_documents_and_their_links() {
+        let dir = temp_config_dir();
+        let mut conn = Connection::open(dir.path().join("v4.sqlite")).unwrap();
+        for sql in &MIGRATIONS[..4] {
+            conn.execute_batch(sql).unwrap();
+        }
+        conn.pragma_update(None, "user_version", 4i64).unwrap();
+        assert_eq!(
+            tables(&conn),
+            [
+                "accounts",
+                "decisions",
+                "journal",
+                "rules",
+                "statements",
+                "tax_years",
+                "transactions"
+            ]
+            .map(String::from)
+            .to_vec()
+        );
+
+        migrate(&mut conn).unwrap();
+
+        assert_eq!(version(&conn).unwrap(), MIGRATIONS.len());
+        assert_eq!(tables(&conn), all_tables());
     }
 
     #[test]

@@ -21,6 +21,13 @@ use std::fmt::Write as _;
 
 use sha2::{Digest, Sha256};
 
+/// Whether the PDF reads as a statement of a layout Hamster knows.
+pub fn is_statement(bytes: &[u8]) -> bool {
+    crate::platform::pdf::Pdf::from_bytes(bytes)
+        .and_then(|pdf| pdf.text_pages())
+        .is_ok_and(|pages| parse::parse(&pages).is_ok())
+}
+
 /// The file's SHA-256 in hex; the same hash on import is a duplicate.
 pub fn file_hash(bytes: &[u8]) -> String {
     Sha256::digest(bytes)
@@ -49,6 +56,29 @@ mod tests {
         ] {
             assert_eq!(file_hash(bytes), expected, "{bytes:?}");
         }
+    }
+
+    #[test]
+    fn a_demo_statement_reads_as_a_statement() {
+        let bytes = crate::test_support::statements::demo_month(10, 2026, 10, 141_230).pdf();
+        assert!(is_statement(&bytes));
+    }
+
+    #[test]
+    fn an_invoice_pdf_and_bytes_that_are_no_pdf_do_not_read_as_a_statement() {
+        use crate::platform::pdf::write::{self, Font, Run};
+
+        let invoice = write::write(&[vec![Run {
+            x: 50.0,
+            y: 780.0,
+            size: 10.0,
+            font: Font::Courier,
+            text: "Pixelforge Ltd. invoice, total USD 129.00".into(),
+        }]]);
+
+        assert!(!is_statement(&invoice));
+        assert!(!is_statement(b"just some text"));
+        assert!(!is_statement(b""));
     }
 
     #[test]

@@ -112,6 +112,12 @@ pub fn weekday_long(date: NaiveDate, order: DateOrder) -> String {
     }
 }
 
+/// `Tue, 10 Nov` / `Tue, Nov 10`, a bank line's day.
+pub fn weekday_short(date: NaiveDate, order: DateOrder) -> String {
+    let weekday = &WEEKDAYS[date.weekday().num_days_from_monday() as usize][..3];
+    format!("{weekday}, {}", day_month(date, order))
+}
+
 /// `November 2026`, a month heading.
 pub fn month_year(date: NaiveDate) -> String {
     format!("{} {}", month(date), date.year())
@@ -199,6 +205,17 @@ mod tests {
         assert_eq!(
             weekday_long(date, DateOrder::MonthFirst),
             "Friday, November 13"
+        );
+    }
+
+    #[test]
+    fn the_short_weekday_line_abbreviates_the_weekday_and_reads_in_the_chosen_order() {
+        let date = day(2026, 11, 10);
+        assert_eq!(weekday_short(date, DateOrder::DayFirst), "Tue, 10 Nov");
+        assert_eq!(weekday_short(date, DateOrder::MonthFirst), "Tue, Nov 10");
+        assert_eq!(
+            weekday_short(day(2026, 11, 15), DateOrder::DayFirst),
+            "Sun, 15 Nov"
         );
     }
 

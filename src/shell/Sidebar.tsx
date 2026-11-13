@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { api, toAppError } from "../api";
 import { Icon, type IconName } from "../components/icons";
 import { sidebarKey, type Route } from "../state/route";
+import { startAddDocument } from "../documents/addFlow";
 import { useCoverage } from "../queries/statements";
 import { useStore } from "../state/store";
 
@@ -63,7 +64,7 @@ function DropZone() {
       </span>
       <div className="dropzone__title">{over ? "Release to add" : "Drop an invoice PDF"}</div>
       <div className="dropzone__sub">It lands in the tax year of its payment</div>
-      <button className="btn btn--small" disabled>
+      <button className="btn btn--small" onClick={startAddDocument}>
         Choose File…
       </button>
     </div>

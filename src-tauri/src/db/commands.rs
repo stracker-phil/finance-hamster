@@ -31,6 +31,7 @@ pub fn undo(app: AppHandle, state: State<'_, AppState>) -> AppResult<Option<Stri
     let written = state.db.undo()?;
     if let Some(written) = &written {
         announce(&app, written);
+        crate::documents::commands::relocate(&app, &state);
     }
     Ok(written.map(|w| w.label))
 }
@@ -40,6 +41,7 @@ pub fn redo(app: AppHandle, state: State<'_, AppState>) -> AppResult<Option<Stri
     let written = state.db.redo()?;
     if let Some(written) = &written {
         announce(&app, written);
+        crate::documents::commands::relocate(&app, &state);
     }
     Ok(written.map(|w| w.label))
 }

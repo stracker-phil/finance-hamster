@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronDown, ChevronLeft, Plus, Search, X } from "lucide-react";
+import { startAddDocument } from "../documents/addFlow";
 import { FILTER_PLACEHOLDER } from "../pages/pages";
 import type { Route } from "../state/route";
 import { useStore } from "../state/store";
@@ -52,7 +53,7 @@ function FilterField({ page }: { page: Route["page"] }) {
 /** The + New menu; an item without `run` arrives with a later feature and stays in its slot, disabled. */
 const NEW_ITEMS: { label: string; key: string; run?: () => void }[] = [
   { label: "Import Statement…", key: "⌘I", run: startImport },
-  { label: "Add Invoice PDF…", key: "⌘O" },
+  { label: "Add Invoice PDF…", key: "⌘O", run: startAddDocument },
   { label: "New Subscription", key: "⌘N" },
 ];
 

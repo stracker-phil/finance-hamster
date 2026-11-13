@@ -61,17 +61,24 @@ fn invalid(field: &str, message: &str) -> AppError {
     }
 }
 
-/// The visible items of the newest open tax year's rules.
-pub fn items(db: &Db) -> AppResult<Vec<ItemOption>> {
+/// The rules the newest open tax year applies, or the newest year's when every year is closed.
+pub fn ruleset(db: &Db) -> AppResult<Option<Ruleset>> {
     let years = db.read(taxyears::rows)?;
     let Some(year) = years
         .iter()
         .find(|y| y.state == YearState::Open)
         .or(years.first())
     else {
+        return Ok(None);
+    };
+    Ok(Some(serde_json::from_str(&year.rules)?))
+}
+
+/// The visible items of the newest open tax year's rules.
+pub fn items(db: &Db) -> AppResult<Vec<ItemOption>> {
+    let Some(ruleset) = ruleset(db)? else {
         return Ok(Vec::new());
     };
-    let ruleset: Ruleset = serde_json::from_str(&year.rules)?;
     Ok(ruleset
         .items
         .into_iter()

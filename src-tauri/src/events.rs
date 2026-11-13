@@ -15,3 +15,5 @@ pub const SETTINGS_CHANGED_EVENT: &str = "settings_changed";
 
 /// A dropped statement was read (or refused); payload `ImportReady`.
 pub const IMPORT_READY_EVENT: &str = "import_ready";
+/// A dropped invoice PDF was read (or refused); payload `AddReady`.
+pub const ADD_READY_EVENT: &str = "add_ready";

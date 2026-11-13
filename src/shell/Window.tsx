@@ -7,6 +7,7 @@ import { FirstRun } from "../pages/FirstRun";
 import { PageBody } from "../pages/PageBody";
 import { useAccounts } from "../queries/accounts";
 import { useTaxYears } from "../queries/taxYears";
+import { AddDocumentSheet } from "../documents/AddDocumentSheet";
 import { ImportSheet } from "../statements/ImportSheet";
 import { useStore } from "../state/store";
 import { Header } from "./Header";
@@ -20,6 +21,7 @@ export function Window() {
   const { data: accounts } = useAccounts();
   const { data: years = [] } = useTaxYears();
   const importPreview = useStore((s) => s.importPreview);
+  const addPreview = useStore((s) => s.addPreview);
   // Keeps the first run's second step showing once its account exists.
   const [finishingFirstRun, setFinishingFirstRun] = useState(false);
   const importSheet = importPreview && <ImportSheet preview={importPreview} onImported={() => setFinishingFirstRun(false)} />;
@@ -46,6 +48,7 @@ export function Window() {
         </div>
       </main>
       {importSheet}
+      {addPreview && <AddDocumentSheet preview={addPreview} />}
       <CommandPalette />
       <Toasts />
       <ConfirmHost />

@@ -43,15 +43,21 @@ pub struct PdfSource {
 pub const SAMPLE_ID: &str = "sample";
 
 /// The file behind a source; only ids the app knows resolve.
-pub fn resolve(_db: &Db, _config_dir: &Path, source: &PdfSource) -> AppResult<PathBuf> {
+pub fn resolve(db: &Db, config_dir: &Path, source: &PdfSource) -> AppResult<PathBuf> {
     #[cfg(debug_assertions)]
     if source.kind == SourceKind::Document && source.id == SAMPLE_ID {
         return sample();
     }
-    Err(AppError::NotFound(format!(
-        "No PDF for {:?} {}",
-        source.kind, source.id
-    )))
+    let file = match source.kind {
+        SourceKind::Document => db
+            .read(|c| crate::documents::store::document_by_id(c, &source.id))?
+            .map(|d| d.file),
+        SourceKind::Statement => db
+            .read(|c| crate::statements::store::statement_by_id(c, &source.id))?
+            .map(|s| s.file),
+    };
+    file.map(|f| config_dir.join(f))
+        .ok_or_else(|| AppError::NotFound(format!("No PDF for {:?} {}", source.kind, source.id)))
 }
 
 #[cfg(test)]
@@ -95,6 +101,72 @@ mod tests {
                 "{source:?}"
             );
         }
+    }
+
+    #[test]
+    fn a_document_resolves_to_its_file_in_the_config_dir_by_id() {
+        use crate::db::Source;
+        use crate::documents::add::{self, AddInput};
+
+        let dir = temp_config_dir();
+        let db = Db::open(dir.path()).expect("db");
+        let pending = add::prepare(&db, b"%PDF demo".to_vec(), "invoice.pdf".into()).unwrap();
+        let input = AddInput {
+            token: "token-1".into(),
+            vendor: "Pixelforge Ltd.".into(),
+            item_key: None,
+            line_id: None,
+        };
+        add::commit(&db, dir.path(), pending, &input, 1, Source::Ui).unwrap();
+        let id = db.read(crate::documents::store::documents).unwrap()[0]
+            .id
+            .clone();
+
+        assert_eq!(
+            resolve(&db, dir.path(), &source(SourceKind::Document, &id)).unwrap(),
+            dir.path().join("docs/inbox/invoice.pdf")
+        );
+    }
+
+    #[test]
+    fn a_statement_resolves_to_its_file_in_the_config_dir_by_id() {
+        use crate::db::Source;
+        use crate::statements::import;
+        use crate::statements::import_tests::{october, open_with_accounts};
+
+        let (dir, db) = open_with_accounts();
+        let pending = import::prepare(&db, dir.path(), october().pdf()).unwrap();
+        let (_, row) = import::commit(&db, dir.path(), pending, 1, Source::Import).unwrap();
+
+        assert_eq!(
+            resolve(&db, dir.path(), &source(SourceKind::Statement, &row.id)).unwrap(),
+            dir.path().join(&row.file)
+        );
+    }
+
+    #[test]
+    fn a_document_id_is_not_found_as_a_statement() {
+        use crate::db::Source;
+        use crate::documents::add::{self, AddInput};
+
+        let dir = temp_config_dir();
+        let db = Db::open(dir.path()).expect("db");
+        let pending = add::prepare(&db, b"%PDF demo".to_vec(), "invoice.pdf".into()).unwrap();
+        let input = AddInput {
+            token: "token-1".into(),
+            vendor: "Pixelforge Ltd.".into(),
+            item_key: None,
+            line_id: None,
+        };
+        add::commit(&db, dir.path(), pending, &input, 1, Source::Ui).unwrap();
+        let id = db.read(crate::documents::store::documents).unwrap()[0]
+            .id
+            .clone();
+
+        assert!(matches!(
+            resolve(&db, dir.path(), &source(SourceKind::Statement, &id)),
+            Err(AppError::NotFound(_))
+        ));
     }
 
     #[test]
