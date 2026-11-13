@@ -4,6 +4,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::commands::CommandInfo;
 use crate::ipc::IpcMessage;
 
 /// The reply to `status`.
@@ -23,6 +24,24 @@ pub fn render(message: &IpcMessage, result: &Value) -> Result<Option<String>, St
         )),
         _ => None,
     })
+}
+
+/// One command per line: id, shortcut and title, tab-separated; `--json` prints the list as JSON.
+pub fn commands_text(commands: &[CommandInfo], json: bool) -> String {
+    if json {
+        return serde_json::to_string(commands).unwrap_or_default() + "\n";
+    }
+    commands
+        .iter()
+        .map(|c| {
+            format!(
+                "{}\t{}\t{}\n",
+                c.id,
+                c.shortcut.as_deref().unwrap_or(""),
+                c.title
+            )
+        })
+        .collect()
 }
 
 fn status_text(report: &StatusReport) -> String {
@@ -58,6 +77,9 @@ mod tests {
             IpcMessage::Quit,
             IpcMessage::Show { focus: false },
             IpcMessage::Activate { hidden: false },
+            IpcMessage::Run {
+                id: "go.today".into(),
+            },
         ] {
             assert_eq!(
                 render(&message, &serde_json::Value::Null),
@@ -65,6 +87,43 @@ mod tests {
                 "{message:?}"
             );
         }
+    }
+
+    fn info(id: &str, shortcut: Option<&str>, title: &str) -> CommandInfo {
+        CommandInfo {
+            id: id.into(),
+            title: title.into(),
+            shortcut: shortcut.map(Into::into),
+        }
+    }
+
+    #[test]
+    fn commands_text_lists_id_shortcut_and_title_tab_separated_per_line() {
+        let commands = [
+            info("go.today", Some("⌘1"), "Today"),
+            info("demo.noshortcut", None, "No Shortcut"),
+        ];
+        assert_eq!(
+            commands_text(&commands, false),
+            "go.today\t⌘1\tToday\ndemo.noshortcut\t\tNo Shortcut\n"
+        );
+    }
+
+    #[test]
+    fn commands_text_as_json_is_an_array_of_id_title_and_shortcut() {
+        let commands = [
+            info("go.today", Some("⌘1"), "Today"),
+            info("demo.noshortcut", None, "No Shortcut"),
+        ];
+        let text = commands_text(&commands, true);
+        assert!(text.ends_with('\n'));
+        assert_eq!(
+            serde_json::from_str::<Value>(&text).unwrap(),
+            json!([
+                { "id": "go.today", "title": "Today", "shortcut": "⌘1" },
+                { "id": "demo.noshortcut", "title": "No Shortcut", "shortcut": null }
+            ])
+        );
     }
 
     #[test]

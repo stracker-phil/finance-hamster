@@ -84,11 +84,14 @@ Rust (`src-tauri/src/`):
 |---|---|
 | `lib.rs` | identity consts (`IDENTIFIER`, `APP_NAME`, `LINK_SCHEME`), `config_dir`, `run` (CLI or app), the config-contract tests |
 | `app.rs` | the Tauri builder: plugins, window events, setup, run loop, logging |
-| `cli/` | the `hamster` command line (`parse`) and how replies print (`reply`) |
+| `cli/` | the `hamster` command line (`parse`) and how replies print (`reply`); `commands` answers without the app |
+| `commands/` | the bus: `COMMANDS` (id, title, accelerator, who runs it), `run`, `list`, `shortcut_label`; page commands go to the main window as `run_command` |
+| `menu/` | the menu bar: macOS's standard items around `MENUS` (command ids); a menu item's id is its command |
+| `settings/` | `settings.json`: appearance, accent, number format, original currency (`SettingsStore`, `get_settings`, `update_settings`) |
 | `instance.rs`, `ipc/` | single instance: lock file, Unix socket, one JSON line per request |
 | `remote/` | handles each `IpcMessage` from another process |
 | `launch.rs` | launch events queued for the page (`take_launch_events`) |
-| `window/` | showing and hiding windows; `navigation.rs` keeps webviews on app pages |
+| `window/` | showing and hiding windows; `settings.rs` opens Settings at a page; `navigation.rs` keeps webviews on app pages |
 | `error.rs`, `events.rs`, `lock.rs`, `state.rs`, `handlers.rs` | `AppError`, event names, poison-tolerant locks, managed state, the command list |
 | `store/` | `json_file.rs`: private dir creation, atomic JSON files |
 | `dev/` | debug-only hooks: window frame, background launches, `eval` |
@@ -103,6 +106,10 @@ Frontend (`src/`):
 | `state/` | the zustand store (route and history, filter, toasts, confirmation; `window.hamster` in debug builds), `route.ts` (every page), `useAppEvents` |
 | `shell/` | `Window`, `Sidebar` (pages, tax years, drop zone), `Header` (crumb, title, page controls, filter field, + New), page titles |
 | `pages/` | each page's body (`PageBody`) and the per-page header texts |
+| `commands/` | `pageCommands.ts` (what the main window does for each page command), `pageKeys.ts` (single keys a page answers to) |
+| `palette/` | the ⌘K command palette |
+| `queries/` | TanStack Query: the client, `useEvents` (event → stale keys), settings, commands, `useLook` |
+| `settings/`, `windows/settings/` | the Settings window: page registry and search, row controls, the pages |
 | `components/` | `Modal`, `ConfirmSheet`, `Toasts`, `TooltipHost`, `ErrorBoundary`, the mockup's line icons |
 | `lib/` | `theme.ts` (scheme and accent on `<html>`), `motion.ts` (`usePresence`, `useGlide`, `useFlash`, `useListGlide`) |
 | `styles/` | `palettes/` (every color, light and dark), accents, motion tokens, base, controls, shell, overlays |

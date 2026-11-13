@@ -72,6 +72,10 @@ enum Command {
     Hide,
     /// Quit the running app
     Quit,
+    /// Run a command by its id, as its menu item or shortcut would
+    Run { id: String },
+    /// List every command with its id and shortcut
+    Commands,
 }
 
 /// A message for the running app and how to print its reply.
@@ -117,6 +121,12 @@ where
             log_level: cli.log_level,
         };
     };
+    if matches!(command, Command::Commands) {
+        return CliOutcome::Exit {
+            message: reply::commands_text(&crate::commands::list(), cli.json),
+            code: 0,
+        };
+    }
     let starts_app = matches!(command, Command::Show | Command::Focus);
     let request = CliRequest {
         message: message(command),
@@ -136,6 +146,8 @@ fn message(command: Command) -> IpcMessage {
         Command::Focus => IpcMessage::Activate { hidden: false },
         Command::Hide => IpcMessage::Hide,
         Command::Quit => IpcMessage::Quit,
+        Command::Run { id } => IpcMessage::Run { id },
+        Command::Commands => unreachable!("answered without the app"),
     }
 }
 

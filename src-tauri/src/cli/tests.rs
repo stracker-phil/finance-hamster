@@ -88,6 +88,66 @@ fn status_hide_and_quit_only_ask_the_running_app() {
 }
 
 #[test]
+fn run_asks_the_running_app_to_run_the_command_id() {
+    assert_eq!(
+        run(&["run", "go.today"]),
+        CliOutcome::Ask(request(
+            IpcMessage::Run {
+                id: "go.today".into()
+            },
+            false
+        ))
+    );
+}
+
+#[test]
+fn run_without_an_id_is_a_usage_error() {
+    assert!(matches!(run(&["run"]), CliOutcome::Exit { code: 2, .. }));
+}
+
+#[test]
+fn commands_prints_every_command_one_per_line_without_the_app() {
+    let listed = crate::commands::list();
+    match run(&["commands"]) {
+        CliOutcome::Exit { message, code } => {
+            assert_eq!(code, 0);
+            let lines: Vec<&str> = message.lines().collect();
+            assert_eq!(lines.len(), listed.len());
+            for (line, info) in lines.iter().zip(&listed) {
+                let fields: Vec<&str> = line.split('\t').collect();
+                assert_eq!(
+                    fields,
+                    vec![
+                        info.id.as_str(),
+                        info.shortcut.as_deref().unwrap_or(""),
+                        info.title.as_str()
+                    ]
+                );
+            }
+        }
+        other => panic!("{other:?}"),
+    }
+}
+
+#[test]
+fn commands_with_json_prints_the_list_as_a_json_array() {
+    let listed = crate::commands::list();
+    for args in [["commands", "--json"], ["--json", "commands"]] {
+        match run(&args) {
+            CliOutcome::Exit { message, code } => {
+                assert_eq!(code, 0, "{args:?}");
+                assert_eq!(
+                    serde_json::from_str::<serde_json::Value>(&message).unwrap(),
+                    serde_json::to_value(&listed).unwrap(),
+                    "{args:?}"
+                );
+            }
+            other => panic!("{other:?}"),
+        }
+    }
+}
+
+#[test]
 fn show_and_focus_may_start_the_app() {
     assert_eq!(
         run(&["show"]),

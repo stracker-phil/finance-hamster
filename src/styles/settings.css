@@ -1,0 +1,61 @@
+/* The Settings window (mockup Settings): page list on the left, inset groups of rows on the right. */
+.settings-window { display: flex; height: 100%; background: var(--panel-bg); }
+
+.settings-nav { width: 190px; flex: none; display: flex; flex-direction: column; padding: 0 10px; background: var(--window-bg); border-right: 1px solid var(--border); }
+.settings-nav__titlebar { height: 46px; flex: none; }
+.settings-nav__search { height: 28px; margin-bottom: 4px; }
+.settings-nav__list { flex: 1; min-height: 0; padding-bottom: 12px; }
+.settings-nav__heading { padding: 12px 8px 4px; font-size: 11px; font-weight: 600; color: var(--text-muted); }
+.settings-nav__row {
+  width: 100%; min-height: 30px; padding: 4px 8px; border: 0; border-radius: 7px; background: transparent;
+  display: flex; align-items: center; gap: 9px; font-size: 13px; color: var(--text-secondary); text-align: left;
+}
+.settings-nav__row:hover { background: var(--fill-hover); }
+.settings-nav__row svg { color: var(--text-tertiary); flex: none; }
+.settings-nav__row[aria-current="page"] { background: var(--accent); color: var(--text-on-accent); }
+.settings-nav__row[aria-current="page"] svg { color: var(--text-on-accent); }
+.settings-nav__text { display: flex; flex-direction: column; min-width: 0; }
+.settings-nav__setting { font-size: 11.5px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; }
+.settings-nav__empty { padding: 12px 8px; color: var(--text-muted); font-size: 13px; }
+
+.settings-pane { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.settings-pane > header { height: 46px; flex: none; display: flex; align-items: center; padding: 0 28px; }
+.settings-pane h2 { margin: 0; font-size: 15px; font-weight: 700; }
+.settings-body { flex: 1; min-height: 0; padding: 4px 28px 28px; }
+.settings-intro { margin: 0 0 18px; font-size: 13px; line-height: 1.5; color: var(--text-tertiary); }
+
+.settings-group { margin-bottom: 24px; }
+.settings-group h3 { margin: 0 0 7px 2px; font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+.settings-card { border-radius: 12px; background: var(--fill-subtle); overflow: hidden; }
+.settings-row { display: flex; align-items: center; gap: 16px; min-height: 44px; padding: 10px 14px; border-top: 1px solid var(--border); }
+.settings-row:first-child { border-top: 0; }
+.settings-row__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.settings-row__desc { font-size: 12px; line-height: 1.4; color: var(--text-muted); }
+.settings-row__control { flex: none; display: flex; align-items: center; gap: 8px; }
+.settings-value { font-size: 13px; color: var(--text-tertiary); display: inline-flex; align-items: center; gap: 6px; }
+.settings-value--ok svg { color: var(--positive); }
+
+.switch {
+  appearance: none; -webkit-appearance: none; margin: 0; position: relative; width: 38px; height: 22px; flex: none;
+  border-radius: 11px; background: var(--border-strong); transition: background-color var(--motion-base) var(--ease-out);
+}
+.switch::after {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 9px;
+  background: var(--switch-knob); box-shadow: var(--shadow-control); transition: transform var(--motion-base) var(--ease-out);
+}
+.switch:checked { background: var(--accent); }
+.switch:checked::after { transform: translateX(16px); }
+
+.accent-dots { display: flex; gap: 8px; }
+.accent-dot { width: 20px; height: 20px; padding: 0; border: 0; border-radius: 10px; }
+.accent-dot[aria-checked="true"] { box-shadow: 0 0 0 2px var(--panel-bg), 0 0 0 4px var(--text-muted); }
+.accent-dot--system { background: var(--accent-system-swatch); }
+.accent-dot--orange { background: var(--accent-orange); }
+.accent-dot--gold { background: var(--accent-gold); }
+.accent-dot--red { background: var(--accent-red); }
+.accent-dot--magenta { background: var(--accent-magenta); }
+.accent-dot--purple { background: var(--accent-purple); }
+.accent-dot--indigo { background: var(--accent-indigo); }
+.accent-dot--blue { background: var(--accent-blue); }
+.accent-dot--teal { background: var(--accent-teal); }
+.accent-dot--graphite { background: var(--accent-graphite); }

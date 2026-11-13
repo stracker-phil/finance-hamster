@@ -35,6 +35,8 @@ The app binary is also its CLI and talks to the running app:
 hamster status [--json]
 hamster show
 hamster quit
+hamster commands [--json]   # every command id with its shortcut
+hamster run <command-id>    # e.g. go.statements, settings.open
 ```
 
 ## License

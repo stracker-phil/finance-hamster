@@ -1,12 +1,22 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
+
+import { api } from "../api";
 import { HOME } from "../state/route";
 import { useStore } from "../state/store";
+import { renderWithQuery as render } from "../test/renderWithQuery";
 import { Window } from "./Window";
 
+const mocked = vi.mocked(api, true);
+
 beforeEach(() => {
-  useStore.setState({ route: HOME, back: [], forward: [], filter: "", toasts: [], confirmation: null });
+  vi.clearAllMocks();
+  useStore.setState({ route: HOME, back: [], forward: [], filter: "", toasts: [], confirmation: null, paletteOpen: false });
+  mocked.runCommand.mockResolvedValue(undefined);
+  mocked.listCommands.mockResolvedValue([]);
 });
 
 const row = (name: string) => screen.getByRole("button", { name });
@@ -57,6 +67,44 @@ describe("sidebar", () => {
     fireEvent.dragOver(screen.getByText("Drop an invoice PDF"), { dataTransfer: { types: ["text/plain"] } });
 
     expect(screen.queryByText("Release to add")).toBeNull();
+  });
+});
+
+describe("settings button", () => {
+  const settingsButton = () => screen.getByRole("button", { name: "Settings and rules (⌘,)" });
+
+  it("asks Rust to open Settings", async () => {
+    render(<Window />);
+
+    await userEvent.click(settingsButton());
+
+    expect(mocked.runCommand).toHaveBeenCalledWith("settings.open");
+  });
+
+  it("shows the error when Settings cannot be opened", async () => {
+    mocked.runCommand.mockRejectedValue({ kind: "internal", message: "No window available", code: null });
+    render(<Window />);
+
+    await userEvent.click(settingsButton());
+
+    expect((await screen.findByRole("alert")).textContent).toContain("No window available");
+  });
+});
+
+describe("command palette", () => {
+  it("is hidden until it is opened", () => {
+    render(<Window />);
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("shows over the window once opened", async () => {
+    mocked.listCommands.mockResolvedValue([{ id: "go.today", title: "Go to Today", shortcut: null }]);
+    useStore.setState({ paletteOpen: true });
+
+    render(<Window />);
+
+    expect(await screen.findByRole("option", { name: "Go to Today" })).toBeTruthy();
   });
 });
 

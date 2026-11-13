@@ -7,3 +7,4 @@ import "./base.css";
 import "./controls.css";
 import "./shell.css";
 import "./overlays.css";
+import "./settings.css";

@@ -133,6 +133,12 @@ fn messages_have_their_wire_shape() {
         (IpcMessage::Hide, serde_json::json!({ "type": "hide" })),
         (IpcMessage::Quit, serde_json::json!({ "type": "quit" })),
         (IpcMessage::Status, serde_json::json!({ "type": "status" })),
+        (
+            IpcMessage::Run {
+                id: "go.today".into(),
+            },
+            serde_json::json!({ "type": "run", "id": "go.today" }),
+        ),
     ];
     #[cfg(debug_assertions)]
     cases.push((
@@ -262,6 +268,9 @@ async fn messages_round_trip_through_the_socket() {
         IpcMessage::Show { focus: true },
         IpcMessage::Hide,
         IpcMessage::Activate { hidden: true },
+        IpcMessage::Run {
+            id: "go.today".into(),
+        },
         activate(),
     ] {
         assert_eq!(forward(&socket, message.clone()).await, Forward::Delivered);
@@ -317,6 +326,21 @@ async fn two_clients_at_once_are_both_served() {
     let mut received = vec![rx.recv().await.unwrap(), rx.recv().await.unwrap()];
     received.sort_by_key(|m| format!("{m:?}"));
     assert_eq!(received, vec![first, second]);
+}
+
+#[test]
+fn message_kinds_name_the_variant_without_its_payload() {
+    for (message, kind) in [
+        (IpcMessage::Status, "Status"),
+        (
+            IpcMessage::Run {
+                id: "go.today".into(),
+            },
+            "Run",
+        ),
+    ] {
+        assert_eq!(message.kind(), kind);
+    }
 }
 
 #[test]

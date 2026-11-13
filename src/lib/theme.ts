@@ -1,7 +1,5 @@
 import { useEffect, useState } from "react";
-
-export type Appearance = "system" | "light" | "dark";
-export type Accent = "system" | "orange" | "gold" | "red" | "magenta" | "purple" | "indigo" | "blue" | "teal" | "graphite";
+import type { Accent, Appearance } from "../api";
 
 /** The palette's scheme (`styles/palettes/<scheme>.css`). */
 export type Scheme = "light" | "dark";

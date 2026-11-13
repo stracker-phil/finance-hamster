@@ -30,6 +30,9 @@ export interface AppStore {
   goBack: () => void;
   goForward: () => void;
 
+  paletteOpen: boolean;
+  setPaletteOpen: (open: boolean) => void;
+
   /** The header's filter text; each page clears it. */
   filter: string;
   setFilter: (filter: string) => void;
@@ -71,6 +74,9 @@ export const useStore = create<AppStore>((set, get) => ({
     if (!next) return;
     set({ route: next, back: [...back, route], forward: rest, filter: "" });
   },
+
+  paletteOpen: false,
+  setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
 
   filter: "",
   setFilter: (filter) => set({ filter }),

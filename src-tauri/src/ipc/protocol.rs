@@ -27,6 +27,10 @@ pub enum IpcMessage {
     Hide,
     Quit,
     Status,
+    /// Runs a bus command by id.
+    Run {
+        id: String,
+    },
     /// Runs JavaScript in a window (used by scripts/dev to drive the UI).
     #[cfg(debug_assertions)]
     Eval {
@@ -44,6 +48,7 @@ impl IpcMessage {
             IpcMessage::Hide => "Hide",
             IpcMessage::Quit => "Quit",
             IpcMessage::Status => "Status",
+            IpcMessage::Run { .. } => "Run",
             #[cfg(debug_assertions)]
             IpcMessage::Eval { .. } => "Eval",
         }

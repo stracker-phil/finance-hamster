@@ -11,6 +11,9 @@ export interface HeaderTitle {
   crumb?: { label: string; to: Route };
 }
 
+/** The filter field's id, so ⌘F (`filter.focus`) can reach it. */
+export const FILTER_FIELD_ID = "page-filter";
+
 function FilterField({ page }: { page: Route["page"] }) {
   const filter = useStore((s) => s.filter);
   const setFilter = useStore((s) => s.setFilter);
@@ -21,6 +24,7 @@ function FilterField({ page }: { page: Route["page"] }) {
     <label className="filter-field">
       <Search size={14} />
       <input
+        id={FILTER_FIELD_ID}
         value={filter}
         placeholder={placeholder}
         aria-label={placeholder}

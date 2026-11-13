@@ -53,6 +53,10 @@ pub async fn handle(app: AppHandle, message: IpcMessage) -> HandlerResult {
             version: app.package_info().version.to_string(),
             window_visible: window::main_visible(&app),
         }),
+        IpcMessage::Run { id } => {
+            crate::commands::run(&app, &id).map_err(crate::ipc::IpcError::from)?;
+            acknowledged()
+        }
         queued @ (IpcMessage::Activate { .. } | IpcMessage::Error { .. }) => {
             launch::queue(&app, queued);
             acknowledged()

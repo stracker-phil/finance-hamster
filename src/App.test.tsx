@@ -1,25 +1,40 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./api", async (orig) => ({ ...(await orig<object>()), api: (await import("./test/apiMock")).createApiMock() }));
 
-import { api } from "./api";
+import { api, type EventName } from "./api";
 import App from "./App";
+import { createQueryClient } from "./queries/queryClient";
 import { HOME } from "./state/route";
 import { useStore } from "./state/store";
+import { settings } from "./test/settings";
 
 const mocked = vi.mocked(api, true);
+
+const renderApp = () => render(<App client={createQueryClient()} />);
+
+/** Fires the handler the app registered for `event`, as Rust would. */
+async function emit(event: EventName, payload: unknown = null) {
+  await waitFor(() => expect(mocked.listen.mock.calls.some(([name]) => name === event)).toBe(true));
+  const handler = mocked.listen.mock.calls.find(([name]) => name === event)![1] as (payload: unknown) => void;
+  act(() => handler(payload));
+}
 
 describe("App", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useStore.setState({ route: HOME, back: [], forward: [], filter: "", toasts: [], confirmation: null });
+    useStore.setState({ route: HOME, back: [], forward: [], filter: "", toasts: [], confirmation: null, paletteOpen: false });
     mocked.takeLaunchEvents.mockResolvedValue([]);
     mocked.listen.mockResolvedValue(() => {});
+    mocked.getSettings.mockResolvedValue(settings());
+    mocked.listCommands.mockResolvedValue([]);
+    delete document.documentElement.dataset.scheme;
+    delete document.documentElement.dataset.accent;
   });
 
   it("shows the main window on the Today page", async () => {
-    render(<App />);
+    renderApp();
 
     expect(screen.getByRole("heading", { level: 1, name: "Today" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Today" }).getAttribute("aria-current")).toBe("page");
@@ -27,7 +42,7 @@ describe("App", () => {
   });
 
   it("shows no alert when no launch event is queued", async () => {
-    render(<App />);
+    renderApp();
 
     await waitFor(() => expect(mocked.takeLaunchEvents).toHaveBeenCalled());
     expect(screen.queryByRole("alert")).toBeNull();
@@ -36,7 +51,7 @@ describe("App", () => {
   it("shows the message of an error launch event taken on mount as an error toast", async () => {
     mocked.takeLaunchEvents.mockResolvedValue([{ type: "error", message: "Could not open the database" }]);
 
-    render(<App />);
+    renderApp();
 
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toContain("Something went wrong");
@@ -46,32 +61,113 @@ describe("App", () => {
   it("shows the error message when the launch events cannot be taken", async () => {
     mocked.takeLaunchEvents.mockRejectedValue({ kind: "io", message: "Socket closed", code: null });
 
-    render(<App />);
+    renderApp();
 
     expect((await screen.findByRole("alert")).textContent).toContain("Socket closed");
   });
 
   it("takes the launch events again when the launch event fires", async () => {
-    render(<App />);
+    renderApp();
     await waitFor(() => expect(mocked.listen).toHaveBeenCalled());
     expect(screen.queryByRole("alert")).toBeNull();
-    const [event, handler] = mocked.listen.mock.calls[0];
-    expect(event).toBe("launch");
 
     mocked.takeLaunchEvents.mockResolvedValue([{ type: "error", message: "Second launch failed" }]);
-    handler(undefined as never);
+    await emit("launch");
 
     expect((await screen.findByRole("alert")).textContent).toContain("Second launch failed");
   });
 
-  it("unsubscribes from the launch event on unmount", async () => {
+  it("unsubscribes from its events on unmount", async () => {
     const unlisten = vi.fn();
     mocked.listen.mockResolvedValue(unlisten);
-    const { unmount } = render(<App />);
+    const { unmount } = renderApp();
     await waitFor(() => expect(mocked.listen).toHaveBeenCalled());
 
     unmount();
 
     await waitFor(() => expect(unlisten).toHaveBeenCalled());
+  });
+
+  describe("look", () => {
+    it("applies the saved appearance and accent to the window", async () => {
+      mocked.getSettings.mockResolvedValue(settings({ appearance: "dark", accent: "blue" }));
+
+      renderApp();
+
+      await waitFor(() => expect(document.documentElement.dataset.scheme).toBe("dark"));
+      expect(document.documentElement.dataset.accent).toBe("blue");
+    });
+
+    it("applies the new appearance when the settings changed event fires", async () => {
+      mocked.getSettings.mockResolvedValue(settings({ appearance: "light" }));
+      renderApp();
+      await waitFor(() => expect(document.documentElement.dataset.scheme).toBe("light"));
+
+      mocked.getSettings.mockResolvedValue(settings({ appearance: "dark" }));
+      await emit("settings_changed");
+
+      await waitFor(() => expect(document.documentElement.dataset.scheme).toBe("dark"));
+    });
+  });
+
+  describe("page commands from Rust", () => {
+    it.each([
+      ["go.subscriptions", "Subscriptions"],
+      ["go.statements", "Statements"],
+      ["go.documents", "Documents"],
+    ])("opens the page for %s", async (id, title) => {
+      renderApp();
+
+      await emit("run_command", id);
+
+      expect(screen.getByRole("heading", { level: 1, name: title })).toBeTruthy();
+    });
+
+    it("returns to Today for go.today", async () => {
+      renderApp();
+      await emit("run_command", "go.documents");
+
+      await emit("run_command", "go.today");
+
+      expect(screen.getByRole("heading", { level: 1, name: "Today" })).toBeTruthy();
+    });
+
+    it("goes back and forward through the visited pages", async () => {
+      renderApp();
+      await emit("run_command", "go.subscriptions");
+
+      await emit("run_command", "go.back");
+      expect(screen.getByRole("heading", { level: 1, name: "Today" })).toBeTruthy();
+
+      await emit("run_command", "go.forward");
+      expect(screen.getByRole("heading", { level: 1, name: "Subscriptions" })).toBeTruthy();
+    });
+
+    it("opens the command palette for palette.open", async () => {
+      mocked.listCommands.mockResolvedValue([{ id: "go.today", title: "Go to Today", shortcut: "⌘1" }]);
+      renderApp();
+
+      await emit("run_command", "palette.open");
+
+      expect(await screen.findByRole("dialog")).toBeTruthy();
+      expect(await screen.findByRole("option", { name: /Go to Today/ })).toBeTruthy();
+    });
+
+    it("focuses the header filter for filter.focus", async () => {
+      renderApp();
+
+      await emit("run_command", "filter.focus");
+
+      expect(screen.getByPlaceholderText("Search everywhere")).toHaveFocus();
+    });
+
+    it("ignores a command it does not handle", async () => {
+      renderApp();
+
+      await emit("run_command", "settings.open");
+
+      expect(screen.getByRole("heading", { level: 1, name: "Today" })).toBeTruthy();
+      expect(screen.queryByRole("dialog")).toBeNull();
+    });
   });
 });

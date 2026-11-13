@@ -52,6 +52,9 @@
   --accent-system: AccentColor;
   --accent-system-text: oklch(from AccentColor clamp(0.78, l, 1) c h);
 
+  /* The System swatch in Settings → Appearance: every hue around the dot */
+  --accent-system-swatch: conic-gradient(#ef4444, #f59e0b, #22c55e, #3b82f6, #a855f7, #ef4444);
+
   /* The picked accent and the tints mixed from it */
   --accent: var(--accent-blue);
   --accent-text: var(--accent-blue-text);
@@ -73,6 +76,7 @@
   --year-open: #ea580c;
   --year-closed: #71717a;
   --tile-text: #ffffff;
+  --switch-knob: #ffffff;
 
   /* Pills */
   --pill-anv-bg: rgba(234, 88, 12, 0.18);

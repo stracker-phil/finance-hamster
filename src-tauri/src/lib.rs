@@ -2,6 +2,7 @@
 
 mod app;
 pub mod cli;
+pub mod commands;
 #[cfg(debug_assertions)]
 mod dev;
 pub mod error;
@@ -11,7 +12,9 @@ mod instance;
 pub mod ipc;
 pub mod launch;
 pub mod lock;
+mod menu;
 mod remote;
+pub mod settings;
 pub mod state;
 pub mod store;
 #[cfg(any(test, debug_assertions, feature = "test-util"))]

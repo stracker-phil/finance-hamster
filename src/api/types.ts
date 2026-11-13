@@ -13,6 +13,12 @@ export interface EventPayloads {
   launch: null;
   /** The hidden main window was shown again. */
   window_opened: null;
+  /** The main window carries out this page command (menu, shortcut, palette, CLI). */
+  run_command: string;
+  /** The Settings window shows this page or row. */
+  open_settings: string;
+  /** `settings.json` changed. */
+  settings_changed: null;
 }
 
 export type EventName = keyof EventPayloads;

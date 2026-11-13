@@ -1,6 +1,7 @@
 import { ConfirmHost } from "../components/ConfirmSheet";
 import { Toasts } from "../components/Toasts";
 import { TooltipHost } from "../components/TooltipHost";
+import { CommandPalette } from "../palette/CommandPalette";
 import { PageBody } from "../pages/PageBody";
 import { useStore } from "../state/store";
 import { Header } from "./Header";
@@ -21,6 +22,7 @@ export function Window() {
           </section>
         </div>
       </main>
+      <CommandPalette />
       <Toasts />
       <ConfirmHost />
       <TooltipHost />

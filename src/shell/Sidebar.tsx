@@ -1,5 +1,6 @@
 import { useState, type DragEvent } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { api, toAppError } from "../api";
 import { Icon, type IconName } from "../components/icons";
 import { sidebarKey, type Route } from "../state/route";
 import { useStore } from "../state/store";
@@ -32,6 +33,10 @@ function NavArrows() {
     </div>
   );
 }
+
+const openSettings = () => {
+  api.runCommand("settings.open").catch((e: unknown) => useStore.getState().showToast("error", toAppError(e).message));
+};
 
 const hasFiles = (e: DragEvent) => e.dataTransfer.types.includes("Files");
 
@@ -96,7 +101,7 @@ export function Sidebar({ years }: { years: SidebarYear[] }) {
       )}
       <DropZone />
       <div className="sidebar__footer">
-        <button className="icon-btn" disabled title="Settings and rules (⌘,)">
+        <button className="icon-btn" onClick={openSettings} title="Settings and rules (⌘,)">
           <Icon name="settings" />
         </button>
       </div>

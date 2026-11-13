@@ -1,7 +1,7 @@
 import { getName, getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { AppError, AppInfo, ErrorKind, EventName, EventPayloads, LaunchEvent } from "./types";
+import type { AppError, AppInfo, CommandInfo, ErrorKind, EventName, EventPayloads, LaunchEvent, Settings, SettingsPatch } from "./types";
 
 export * from "./types";
 
@@ -14,6 +14,12 @@ export const api = {
     const [name, version] = await Promise.all([getName(), getVersion()]);
     return { name, version };
   },
+  listCommands: () => invoke<CommandInfo[]>("list_commands"),
+  runCommand: (id: string) => invoke<void>("run_command", { id }),
+  getSettings: () => invoke<Settings>("get_settings"),
+  updateSettings: (patch: SettingsPatch) => invoke<Settings>("update_settings", { patch }),
+  showDataFolder: () => invoke<void>("show_data_folder"),
+  dataFolder: () => invoke<string>("data_folder"),
   listen: <E extends EventName>(event: E, handler: (payload: EventPayloads[E]) => void): Promise<UnlistenFn> =>
     listen<EventPayloads[E]>(event, (e) => handler(e.payload)),
 };
