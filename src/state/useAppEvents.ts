@@ -4,7 +4,7 @@ import { useStore } from "./store";
 
 function apply(events: LaunchEvent[]) {
   for (const event of events) {
-    if (event.type === "error") useStore.getState().setLaunchError(event.message);
+    if (event.type === "error") useStore.getState().showToast("error", event.message);
   }
 }
 
@@ -18,7 +18,7 @@ export function useAppEvents() {
           if (active) apply(events);
         },
         (e: unknown) => {
-          if (active) useStore.getState().setLaunchError(toAppError(e).message);
+          if (active) useStore.getState().showToast("error", toAppError(e).message);
         },
       );
     };

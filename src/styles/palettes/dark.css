@@ -1,0 +1,113 @@
+/* The dark palette: every token of palettes/light.css, for dark mode (mockup frame 12). */
+:root[data-scheme="dark"] {
+  color-scheme: dark;
+
+  /* Surfaces */
+  --window-bg: #1c1c1e;
+  --panel-bg: #2a2a2d;
+  --panel-subtle-bg: #2e2e31;
+  --canvas-bg: #242427;
+  --fill-subtle: #333337;
+  --fill-hover: #3a3a3f;
+  --scrim: rgba(0, 0, 0, 0.5);
+  --tooltip-bg: #3f3f46;
+  --tooltip-text: #fafafa;
+  --tooltip-border: rgba(255, 255, 255, 0.08);
+
+  /* Text */
+  --text: #f4f4f5;
+  --text-secondary: #e4e4e7;
+  --text-tertiary: #c4c4ca;
+  --text-muted: #a1a1aa;
+  --text-on-accent: #ffffff;
+  --danger-text: #f87171;
+  --positive-text: #4ade80;
+  --warning-text: #fcd34d;
+
+  /* Lines */
+  --border: #3a3a3f;
+  --border-strong: #4a4a50;
+  --hairline: #343438;
+  --row-hairline: #313135;
+
+  /* Accent colors to pick from: the fill, then the shade for text */
+  --accent-blue: #3b82f6;
+  --accent-blue-text: #93c5fd;
+  --accent-purple: #8b5cf6;
+  --accent-purple-text: #c4b5fd;
+  --accent-indigo: #6366f1;
+  --accent-indigo-text: #a5b4fc;
+  --accent-red: #ef4444;
+  --accent-red-text: #fca5a5;
+  --accent-magenta: #db2777;
+  --accent-magenta-text: #f9a8d4;
+  --accent-orange: #ea580c;
+  --accent-orange-text: #fdba74;
+  --accent-gold: #ca8a04;
+  --accent-gold-text: #fde047;
+  --accent-teal: #0d9488;
+  --accent-teal-text: #5eead4;
+  --accent-graphite: #71717a;
+  --accent-graphite-text: #d4d4d8;
+  --accent-system: AccentColor;
+  --accent-system-text: oklch(from AccentColor clamp(0.78, l, 1) c h);
+
+  /* The picked accent and the tints mixed from it */
+  --accent: var(--accent-blue);
+  --accent-text: var(--accent-blue-text);
+  --selection-bg: color-mix(in srgb, var(--accent) 22%, var(--panel-bg));
+  --selection-text: var(--accent-text);
+  --flash-bg: color-mix(in srgb, var(--accent) 12%, transparent);
+  --focus-ring: color-mix(in srgb, var(--accent) 70%, transparent);
+  --danger: #dc2626;
+  --positive: #16a34a;
+  --warning: #f59e0b;
+
+  /* Shadows */
+  --shadow-panel: 0 1px 3px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  --shadow-popover: 0 12px 32px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  --shadow-raised: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --shadow-control: 0 1px 2px rgba(0, 0, 0, 0.4);
+
+  /* Tax year tiles */
+  --year-open: #ea580c;
+  --year-closed: #71717a;
+  --tile-text: #ffffff;
+
+  /* Pills */
+  --pill-anv-bg: rgba(234, 88, 12, 0.18);
+  --pill-anv-text: #fdba74;
+  --pill-anv-border: rgba(234, 88, 12, 0.35);
+  --pill-teal-bg: rgba(13, 148, 136, 0.2);
+  --pill-teal-text: #5eead4;
+  --pill-teal-border: rgba(13, 148, 136, 0.4);
+  --pill-green-bg: rgba(22, 163, 74, 0.2);
+  --pill-green-text: #86efac;
+  --pill-green-border: rgba(22, 163, 74, 0.4);
+  --pill-blue-bg: rgba(59, 130, 246, 0.2);
+  --pill-blue-text: #93c5fd;
+  --pill-blue-border: rgba(59, 130, 246, 0.4);
+  --pill-red-bg: rgba(220, 38, 38, 0.2);
+  --pill-red-text: #fca5a5;
+  --pill-red-border: rgba(220, 38, 38, 0.4);
+  --pill-violet-bg: rgba(124, 58, 237, 0.22);
+  --pill-violet-text: #c4b5fd;
+  --pill-violet-border: rgba(124, 58, 237, 0.4);
+
+  /* Chips */
+  --chip-sub-bg: rgba(147, 51, 234, 0.22);
+  --chip-sub-text: #d8b4fe;
+  --chip-doc-bg: rgba(14, 165, 233, 0.2);
+  --chip-doc-text: #7dd3fc;
+  --chip-miss-bg: rgba(217, 119, 6, 0.22);
+  --chip-miss-text: #fcd34d;
+
+  /* Banners */
+  --banner-info-bg: rgba(59, 130, 246, 0.14);
+  --banner-info-text: #bfdbfe;
+  --banner-info-border: rgba(59, 130, 246, 0.3);
+  --banner-error-bg: rgba(220, 38, 38, 0.16);
+  --banner-error-text: #fca5a5;
+  --banner-error-border: rgba(220, 38, 38, 0.35);
+  --estimate-note-bg: rgba(217, 119, 6, 0.14);
+}

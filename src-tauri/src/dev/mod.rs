@@ -1,6 +1,9 @@
 //! Debug-build conveniences for driving the app from scripts/dev without disturbing the owner: window
 //! placement, background launches and running JavaScript (ADR 0023). Only compiled into debug builds.
 
+use objc2::runtime::{AnyObject, Bool, Sel};
+use objc2::{msg_send, sel};
+
 /// `HAMSTER_WINDOW_FRAME="x,y,width,height"` (logical points) places the main window.
 pub fn window_frame() -> Option<(f64, f64, f64, f64)> {
     parse_frame(&std::env::var("HAMSTER_WINDOW_FRAME").ok()?)
@@ -9,6 +12,35 @@ pub fn window_frame() -> Option<(f64, f64, f64, f64)> {
 /// `HAMSTER_BACKGROUND=1` keeps the windows from taking focus.
 pub fn background() -> bool {
     std::env::var("HAMSTER_BACKGROUND").is_ok_and(|v| v == "1")
+}
+
+/// With `HAMSTER_BACKGROUND=1`, keeps the webview painting while other windows cover it, so
+/// `scripts/dev/screenshot.sh` captures the page instead of a blank window.
+pub fn keep_painting_when_covered(window: &tauri::WebviewWindow) {
+    if !background() {
+        return;
+    }
+    let result = window.with_webview(|webview| {
+        // SAFETY: on macOS `inner` is the window's WKWebView.
+        if let Some(view) = unsafe { webview.inner().cast::<AnyObject>().as_ref() } {
+            disable_occlusion_detection(view);
+        }
+    });
+    if let Err(e) = result {
+        log::warn!("Couldn't keep the debug window painting: {e}");
+    }
+}
+
+/// WebKit's private switch; sent only when the view answers to it.
+fn disable_occlusion_detection(view: &AnyObject) {
+    let selector: Sel = sel!(_setWindowOcclusionDetectionEnabled:);
+    // SAFETY: both messages take and return plain values, and the second is sent only when the view answers to it.
+    unsafe {
+        let answers: bool = msg_send![view, respondsToSelector: selector];
+        if answers {
+            let _: () = msg_send![view, _setWindowOcclusionDetectionEnabled: Bool::NO];
+        }
+    }
 }
 
 /// Runs JavaScript sent by `scripts/dev/js.sh` in the main window, or in another one named by a first line

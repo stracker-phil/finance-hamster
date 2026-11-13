@@ -7,6 +7,7 @@ type Api = typeof realApi;
 export function createApiMock(overrides: Partial<Api> = {}): Api {
   const api: Api = {
     takeLaunchEvents: vi.fn().mockResolvedValue([]),
+    logFrontendError: vi.fn().mockResolvedValue(undefined),
     appInfo: vi.fn().mockResolvedValue({ name: "Hamster (Debug)", version: "0.1.0" }),
     listen: vi.fn().mockResolvedValue(() => {}),
   };

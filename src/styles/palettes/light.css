@@ -1,0 +1,114 @@
+/* The light palette: every color of the windows (docs/ux.md → Tokens), from the approved mockup. */
+:root[data-scheme="light"] {
+  color-scheme: light;
+
+  /* Surfaces */
+  --window-bg: #ededef;
+  --panel-bg: #ffffff;
+  --panel-subtle-bg: #fafafa;
+  --canvas-bg: #f7f7f8;
+  --fill-subtle: #f4f4f5;
+  --fill-hover: #e4e4e8;
+  --scrim: rgba(0, 0, 0, 0.28);
+  --tooltip-bg: #27272a;
+  --tooltip-text: #ffffff;
+  --tooltip-border: transparent;
+
+  /* Text */
+  --text: #18181b;
+  --text-secondary: #3f3f46;
+  --text-tertiary: #52525b;
+  --text-muted: #71717a;
+  --text-on-accent: #ffffff;
+  --danger-text: #dc2626;
+  --positive-text: #15803d;
+  --warning-text: #b45309;
+
+  /* Lines */
+  --border: #e4e4e7;
+  --border-strong: #d4d4d8;
+  --hairline: #ededf0;
+  --row-hairline: #f1f1f3;
+
+  /* Accent colors to pick from (Settings → Appearance; styles/accents.css): the fill, then the shade for text */
+  --accent-blue: #2563eb;
+  --accent-blue-text: #1d4ed8;
+  --accent-purple: #7c3aed;
+  --accent-purple-text: #6d28d9;
+  --accent-indigo: #4338ca;
+  --accent-indigo-text: #3730a3;
+  --accent-red: #dc2626;
+  --accent-red-text: #b91c1c;
+  --accent-magenta: #be185d;
+  --accent-magenta-text: #9d174d;
+  --accent-orange: #c2410c;
+  --accent-orange-text: #9a3412;
+  --accent-gold: #a16207;
+  --accent-gold-text: #854d0e;
+  --accent-teal: #0f766e;
+  --accent-teal-text: #115e59;
+  --accent-graphite: #52525b;
+  --accent-graphite-text: #3f3f46;
+  /* System: the macOS accent color; its text shade keeps the lightness the panels need. */
+  --accent-system: AccentColor;
+  --accent-system-text: oklch(from AccentColor clamp(0, l, 0.48) c h);
+
+  /* The picked accent and the tints mixed from it */
+  --accent: var(--accent-blue);
+  --accent-text: var(--accent-blue-text);
+  --selection-bg: color-mix(in srgb, var(--accent) 14%, var(--panel-bg));
+  --selection-text: var(--accent-text);
+  --flash-bg: color-mix(in srgb, var(--accent) 12%, transparent);
+  --focus-ring: color-mix(in srgb, var(--accent) 60%, transparent);
+  --danger: #dc2626;
+  --positive: #16a34a;
+  --warning: #f59e0b;
+
+  /* Shadows */
+  --shadow-panel: 0 1px 3px rgba(0, 0, 0, 0.07), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  --shadow-popover: 0 12px 32px rgba(0, 0, 0, 0.16), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  --shadow-raised: 0 4px 12px rgba(0, 0, 0, 0.2);
+  --shadow-control: 0 1px 2px rgba(0, 0, 0, 0.12);
+
+  /* Tax year tiles in the sidebar: an open year, a closed one */
+  --year-open: #ea580c;
+  --year-closed: #71717a;
+  --tile-text: #ffffff;
+
+  /* Pills (state labels): background, text, border */
+  --pill-anv-bg: #ffedd5;
+  --pill-anv-text: #9a3412;
+  --pill-anv-border: #fed7aa;
+  --pill-teal-bg: #ccfbf1;
+  --pill-teal-text: #115e59;
+  --pill-teal-border: #99f6e4;
+  --pill-green-bg: #dcfce7;
+  --pill-green-text: #166534;
+  --pill-green-border: #bbf7d0;
+  --pill-blue-bg: #dbeafe;
+  --pill-blue-text: #1e40af;
+  --pill-blue-border: #bfdbfe;
+  --pill-red-bg: #fee2e2;
+  --pill-red-text: #991b1b;
+  --pill-red-border: #fecaca;
+  --pill-violet-bg: #ede9fe;
+  --pill-violet-text: #5b21b6;
+  --pill-violet-border: #ddd6fe;
+
+  /* Chips (what a bank line is linked to) */
+  --chip-sub-bg: #f3e8ff;
+  --chip-sub-text: #6b21a8;
+  --chip-doc-bg: #e0f2fe;
+  --chip-doc-text: #075985;
+  --chip-miss-bg: #fef3c7;
+  --chip-miss-text: #92400e;
+
+  /* Banners */
+  --banner-info-bg: #eff6ff;
+  --banner-info-text: #1e3a8a;
+  --banner-info-border: #bfdbfe;
+  --banner-error-bg: #fef2f2;
+  --banner-error-text: #991b1b;
+  --banner-error-border: #fecaca;
+  --estimate-note-bg: rgba(217, 119, 6, 0.08);
+}

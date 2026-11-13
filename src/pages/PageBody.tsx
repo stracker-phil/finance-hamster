@@ -1,0 +1,28 @@
+import type { Route } from "../state/route";
+import { EmptyPage } from "./EmptyPage";
+
+/** The body of the current page. */
+export function PageBody({ route }: { route: Route }) {
+  switch (route.page) {
+    case "today":
+      return <EmptyPage title="You're up to date" text="Import a statement to get started." />;
+    case "subscriptions":
+      return <EmptyPage title="No subscriptions" text="Subscriptions show here once you add one." />;
+    case "statements":
+      return <EmptyPage title="No statements" text="Import a bank statement PDF to see its lines." />;
+    case "documents":
+      return <EmptyPage title="No documents" text="Drop an invoice PDF onto the sidebar to add it." />;
+    case "review":
+      return <EmptyPage title="Nothing to review" text="New bank lines show here after an import." />;
+    case "account":
+      return <EmptyPage title="No lines" text="This account has no imported lines yet." />;
+    case "year":
+      return <EmptyPage title={`Tax year ${route.year}`} text="Nothing is recorded for this year yet." />;
+    case "document":
+      return <EmptyPage title="Document" text="This document can't be shown yet." />;
+    case "log":
+      return <EmptyPage title="Log" text="Every change to a document shows here." />;
+    case "archive":
+      return <EmptyPage title="Archive" text="Excluded documents show here." />;
+  }
+}

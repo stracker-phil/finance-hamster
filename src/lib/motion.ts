@@ -1,0 +1,120 @@
+import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
+
+export type MotionToken = "--motion-fast" | "--motion-base" | "--motion-slow";
+
+/** A motion token's duration in ms, as the stylesheet sets it (0 under reduced motion, or without styles). */
+export function motionMs(token: MotionToken): number {
+  const value = getComputedStyle(document.documentElement).getPropertyValue(token).trim();
+  const ms = Number.parseFloat(value);
+  if (!Number.isFinite(ms)) return 0;
+  return value.endsWith("ms") ? ms : ms * 1000;
+}
+
+/** The stylesheet's `--ease-out` curve. */
+function easeOut(): string {
+  return getComputedStyle(document.documentElement).getPropertyValue("--ease-out").trim() || "ease-out";
+}
+
+export type Presence = "open" | "leaving";
+
+/** Keeps something mounted while it fades out: `mounted` stays true for the exit time after `shown` turns
+ *  false, with `state` "leaving" so CSS can play the exit. Showing it again during the exit cancels it. */
+export function usePresence(shown: boolean, token: MotionToken = "--motion-base"): { mounted: boolean; state: Presence } {
+  const [leaving, setLeaving] = useState(false);
+  const [wasShown, setWasShown] = useState(shown);
+  if (shown !== wasShown) {
+    setWasShown(shown);
+    setLeaving(!shown && motionMs(token) > 0);
+  }
+  useEffect(() => {
+    if (!leaving) return;
+    const timer = setTimeout(() => setLeaving(false), motionMs(token));
+    return () => clearTimeout(timer);
+  }, [leaving, token]);
+  return { mounted: shown || leaving, state: shown ? "open" : "leaving" };
+}
+
+/** Where a row of controls had each control, and how wide it was then. */
+interface Places {
+  width: number;
+  lefts: WeakMap<Element, number>;
+}
+
+/** The children of `row` glide to a new place instead of jumping, and a new child fades in (docs/ux.md → Stable
+ *  controls). Only while the row keeps its width: when the window resizes, they follow at once. When `scope`
+ *  changes (another view) the row shows its new state at once, also without its controls' CSS transitions. */
+export function useGlide(row: RefObject<HTMLElement | null>, scope?: unknown) {
+  const before = useRef<Places | null>(null);
+  const shownScope = useRef(scope);
+  useLayoutEffect(() => {
+    const element = row.current;
+    if (!element) return;
+    const switched = shownScope.current !== scope;
+    shownScope.current = scope;
+    if (switched) instantly(element);
+    const now: Places = { width: element.clientWidth, lefts: new WeakMap() };
+    const previous = before.current;
+    const ms = motionMs("--motion-slow");
+    const animates = !switched && previous !== null && previous.width === now.width && ms > 0;
+    const easing = easeOut();
+    for (const child of element.children) {
+      if (!(child instanceof HTMLElement)) continue;
+      const left = child.offsetLeft;
+      now.lefts.set(child, left);
+      if (!animates || typeof child.animate !== "function") continue;
+      const was = previous.lefts.get(child);
+      if (was === undefined) child.animate([{ opacity: 0, transform: "scale(0.92)" }, { opacity: 1, transform: "none" }], { duration: ms, easing });
+      else if (was !== left) child.animate([{ transform: `translateX(${was - left}px)` }, { transform: "none" }], { duration: ms, easing });
+    }
+    before.current = now;
+  });
+}
+
+/** Turns off `element`'s transitions until the frame with its new state is drawn. */
+function instantly(element: HTMLElement) {
+  element.classList.add("motion-off");
+  requestAnimationFrame(() => requestAnimationFrame(() => element.classList.remove("motion-off")));
+}
+
+/** How long a flashed row keeps its highlight: `--motion-highlight`, over which `.flash` fades. */
+const FLASH_MS = 1200;
+
+/** True for a moment after `value` changes while mounted, never on mount: a row flashes when what it shows moved
+ *  (a write settled or an import brought a change). */
+export function useFlash(value: string): boolean {
+  const previous = useRef(value);
+  const [flashing, setFlashing] = useState(false);
+  useEffect(() => {
+    if (previous.current === value) return;
+    previous.current = value;
+    setFlashing(true);
+    const timer = setTimeout(() => setFlashing(false), FLASH_MS);
+    return () => clearTimeout(timer);
+  }, [value]);
+  return flashing;
+}
+
+/** Rows inside `list` marked `data-glide="<key>"` glide to a new place, also into another section, instead of
+ *  jumping. Only while the same keys show: a search that hides or adds rows shows the result at once. */
+export function useListGlide(list: RefObject<HTMLElement | null>) {
+  const before = useRef<Map<string, number> | null>(null);
+  useLayoutEffect(() => {
+    const element = list.current;
+    if (!element) return;
+    const origin = element.getBoundingClientRect().top;
+    const rows = [...element.querySelectorAll<HTMLElement>("[data-glide]")].map((row) => ({ row, key: row.dataset.glide ?? "" }));
+    const now = new Map(rows.map(({ row, key }) => [key, row.getBoundingClientRect().top - origin]));
+    const previous = before.current;
+    before.current = now;
+    const ms = motionMs("--motion-slow");
+    const sameKeys = previous !== null && previous.size === now.size && [...now.keys()].every((key) => previous.has(key));
+    if (!previous || !sameKeys || ms === 0) return;
+    const easing = easeOut();
+    for (const { row, key } of rows) {
+      const was = previous.get(key);
+      const top = now.get(key);
+      if (was === undefined || top === undefined || was === top || typeof row.animate !== "function") continue;
+      row.animate([{ transform: `translateY(${was - top}px)` }, { transform: "none" }], { duration: ms, easing });
+    }
+  });
+}

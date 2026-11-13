@@ -1669,6 +1669,7 @@ dependencies = [
  "hamster",
  "libc",
  "log",
+ "objc2",
  "proptest",
  "rusqlite",
  "serde",

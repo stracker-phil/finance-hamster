@@ -5,6 +5,7 @@ vi.mock("./api", async (orig) => ({ ...(await orig<object>()), api: (await impor
 
 import { api } from "./api";
 import App from "./App";
+import { HOME } from "./state/route";
 import { useStore } from "./state/store";
 
 const mocked = vi.mocked(api, true);
@@ -12,32 +13,34 @@ const mocked = vi.mocked(api, true);
 describe("App", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useStore.setState({ appInfo: null, launchError: null });
+    useStore.setState({ route: HOME, back: [], forward: [], filter: "", toasts: [], confirmation: null });
     mocked.takeLaunchEvents.mockResolvedValue([]);
-    mocked.appInfo.mockResolvedValue({ name: "Hamster (Debug)", version: "0.1.0" });
     mocked.listen.mockResolvedValue(() => {});
   });
 
-  it("shows the app name and version from the app info", async () => {
+  it("shows the main window on the Today page", async () => {
     render(<App />);
 
-    expect(await screen.findByRole("heading", { name: "Hamster (Debug)" })).toBeTruthy();
-    expect(await screen.findByText("Version 0.1.0")).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1, name: "Today" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Today" }).getAttribute("aria-current")).toBe("page");
+    await waitFor(() => expect(mocked.takeLaunchEvents).toHaveBeenCalled());
   });
 
   it("shows no alert when no launch event is queued", async () => {
     render(<App />);
 
-    await screen.findByText("Version 0.1.0");
+    await waitFor(() => expect(mocked.takeLaunchEvents).toHaveBeenCalled());
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  it("shows the message of an error launch event taken on mount", async () => {
+  it("shows the message of an error launch event taken on mount as an error toast", async () => {
     mocked.takeLaunchEvents.mockResolvedValue([{ type: "error", message: "Could not open the database" }]);
 
     render(<App />);
 
-    expect((await screen.findByRole("alert")).textContent).toBe("Could not open the database");
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Something went wrong");
+    expect(alert.textContent).toContain("Could not open the database");
   });
 
   it("shows the error message when the launch events cannot be taken", async () => {
@@ -45,23 +48,12 @@ describe("App", () => {
 
     render(<App />);
 
-    expect((await screen.findByRole("alert")).textContent).toBe("Socket closed");
-  });
-
-  it("shows the plain name without a version when the app info cannot be loaded", async () => {
-    mocked.appInfo.mockRejectedValue({ kind: "internal", message: "No info", code: null });
-    mocked.takeLaunchEvents.mockResolvedValue([{ type: "error", message: "Sync point" }]);
-
-    render(<App />);
-
-    await screen.findByRole("alert");
-    expect(screen.getByRole("heading", { name: "Hamster" })).toBeTruthy();
-    expect(screen.queryByText(/^Version/)).toBeNull();
+    expect((await screen.findByRole("alert")).textContent).toContain("Socket closed");
   });
 
   it("takes the launch events again when the launch event fires", async () => {
     render(<App />);
-    await screen.findByText("Version 0.1.0");
+    await waitFor(() => expect(mocked.listen).toHaveBeenCalled());
     expect(screen.queryByRole("alert")).toBeNull();
     const [event, handler] = mocked.listen.mock.calls[0];
     expect(event).toBe("launch");
@@ -69,14 +61,14 @@ describe("App", () => {
     mocked.takeLaunchEvents.mockResolvedValue([{ type: "error", message: "Second launch failed" }]);
     handler(undefined as never);
 
-    expect((await screen.findByRole("alert")).textContent).toBe("Second launch failed");
+    expect((await screen.findByRole("alert")).textContent).toContain("Second launch failed");
   });
 
   it("unsubscribes from the launch event on unmount", async () => {
     const unlisten = vi.fn();
     mocked.listen.mockResolvedValue(unlisten);
     const { unmount } = render(<App />);
-    await screen.findByText("Version 0.1.0");
+    await waitFor(() => expect(mocked.listen).toHaveBeenCalled());
 
     unmount();
 

@@ -100,7 +100,12 @@ Frontend (`src/`):
 | Path | Holds |
 |---|---|
 | `api/` | the `api` object (only place that imports `@tauri-apps/*`), `toAppError`, generated `types.gen.ts` |
-| `state/` | the zustand store (`window.hamster` in debug builds), `useAppEvents`, `useAppInfo` |
+| `state/` | the zustand store (route and history, filter, toasts, confirmation; `window.hamster` in debug builds), `route.ts` (every page), `useAppEvents` |
+| `shell/` | `Window`, `Sidebar` (pages, tax years, drop zone), `Header` (crumb, title, page controls, filter field, + New), page titles |
+| `pages/` | each page's body (`PageBody`) and the per-page header texts |
+| `components/` | `Modal`, `ConfirmSheet`, `Toasts`, `TooltipHost`, `ErrorBoundary`, the mockup's line icons |
+| `lib/` | `theme.ts` (scheme and accent on `<html>`), `motion.ts` (`usePresence`, `useGlide`, `useFlash`, `useListGlide`) |
+| `styles/` | `palettes/` (every color, light and dark), accents, motion tokens, base, controls, shell, overlays |
 | `test/` | `createApiMock`, the module boundary test |
 
 ## Webview hardening

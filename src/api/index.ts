@@ -8,6 +8,8 @@ export * from "./types";
 /** The app's IPC entry point (ADR 0002). Tests mock this module. */
 export const api = {
   takeLaunchEvents: () => invoke<LaunchEvent[]>("take_launch_events"),
+  /** Writes a page error (a crash, an e2e result) to the app's log. */
+  logFrontendError: (message: string) => invoke<void>("log_frontend_error", { message }),
   appInfo: async (): Promise<AppInfo> => {
     const [name, version] = await Promise.all([getName(), getVersion()]);
     return { name, version };
