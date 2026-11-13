@@ -48,3 +48,4 @@ Why Hamster is built the way it is. One record per decision, in Nygard format, a
 | [0036](0036-no-status-bar.md) | No status bar | Accepted (2026-11-13) |
 | [0037](0037-pdfs-show-in-a-native-pdfview.md) | PDFs show in a native PDFView over the page | Accepted (2026-11-13) |
 | [0038](0038-tax-rules-are-versioned-data-per-year.md) | Tax rules are versioned data per year, split into copy values and preview | Accepted (2026-11-13) |
+| [0039](0039-werbungskosten-only-open-for-other-l1-sections.md) | Werbungskosten only, open for other L1 sections | Accepted (2026-11-13) |

@@ -78,7 +78,8 @@ Document by file and symbol, never by line number.
   previews come from PDFKit: a native `PDFView` over the page, so text can be selected (ADR 0018,
   ADR 0037).
 - Tax rules are versioned data per year: items with stable keys, rules marked "in the copy value" or
-  "preview only", depreciation schedules; no tax constant in code (ADR 0038).
+  "preview only", depreciation schedules; no tax constant in code (ADR 0038). Werbungskosten only; items carry a section and an evidence
+  rule so other L1 sections can be added as data later (ADR 0039).
 - A Dock app: closing hides the window; reminders are scheduled macOS notifications (ADR 0035). No status
   bar (ADR 0036).
 - Repository map: `docs/architecture.md`.
