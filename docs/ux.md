@@ -12,9 +12,9 @@ no context filter: time appears only as tax years and statement coverage.
 
 ### Sidebar (236px, on `--window-bg`)
 Top to bottom: the traffic-light strip (drags the window) · Today · Subscriptions · Statements (count badge =
-lines waiting for review) · section **Tax years**, one row per year (Open, or a lock when closed) · the
-**doc zone** pinned at the bottom (drop a PDF, Choose File…, All · N; it highlights while a PDF is dragged
-anywhere over the window) · footer with the sidebar toggle and Settings. Rows 34px, 8px radius, 14px text;
+lines waiting for review) · Documents (all years) · section **Tax years**, one row per year (Open, or a lock
+when closed) · the **doc zone** pinned at the bottom (drop target plus one Choose File… button; it highlights
+while a PDF is dragged anywhere over the window) · footer with the sidebar toggle and Settings. Rows 34px, 8px radius, 14px text;
 the selected row is an accent wash with accent text.
 
 ### Header (58px, same on every page)
@@ -31,10 +31,9 @@ small menu lists those matches plus Search everywhere ⌘↩; on pages without a
 | Subscriptions | grouped by next charge (next 7 days · next 30 days · later, Ended collapsed); header: active count and cost per month; a detail panel with a 12-month plan timeline |
 | Statements | one coverage bar per account over 12 months (imported, partly, missing) and a status tag per account |
 | Account | the account's lines grouped by statement |
-| Tax year | total Werbungskosten, ruleset version, progress; Needs attention; By Kennzahl (per pool with a copy button) or By month; … menu: Log, Archive, Export Summary PDF, Ruleset |
-| Document | the edit form (Payment → Classification → Private use → Result → Notes → More), PDF preview, History column |
-| All documents | a large "Is it already here?" field, documents by tax year plus Inbox |
-| ANV entries (new, not in the mockup) | per tax year, before closing: the non-document items (trips, Pendlerpauschale, Homeoffice days, entered values), each item shown or hidden per the ruleset; reached from the tax year's Needs attention and … menu |
+| Tax year | hero with the copy total, ruleset version and progress; **Questions for <year>** (number fields from the rules file; empty = unanswered); Needs attention (missing invoices, drafts, undated scans); By Kennzahl: one copy value per Kennzahl with a copy button, its rows below (documents, amounts, trips, slices with a "From 2025" pill; row amounts only when a Kennzahl has several rows), one note line from estimate rules, "+ Add" (Document, Amount or Trip) in an open year, trips added inline (date, destination and purpose, km); By month: Every month, Whole year (amounts and earlier slices), then months with trips in theirs; … menu: Log, Archive, Export Summary PDF, Open Ruleset JSON; Close Year… / Open Snapshot PDF |
+| Document | the edit form (Payment → Classification with the item picker and work share → Result → Notes → More), a GWG line or the Depreciation block (cost, useful life, slices per year, frozen ones marked), PDF preview, History column; breadcrumb "Documents /" or the tax year it was opened from |
+| Documents | sidebar entry; a large "Is it already here?" field, documents by tax year plus Inbox |
 | Log, Archive | a tax year's journal entries; its excluded documents and the delete flow |
 
 ### Hamster-specific rules
@@ -42,10 +41,10 @@ small menu lists those matches plus Search everywhere ⌘↩; on pages without a
   credits in the success hue, foreign amounts as muted meta beside the EUR amount.
 - The detail panel (document preview, subscription details) is 520px on the right, over the list.
 - A finished document shows a blue banner and read-only fields; Unlock… asks first. A closed year shows a lock.
-- The ANV amount is computed text with its formula as a hint, never an input. Share % stays hidden until
-  "Partly private use…".
-- Each Kennzahl shows its copy value (what to type into FinanzOnline) and, quieter and labelled as an
-  estimate, the expected value after rules the tax office applies (caps, offsets, the €132 Pauschale).
+- The ANV amount is computed text with its formula as a hint, never an input. Work share is pre-filled from
+  the item's private share (169: 60 %) and editable per document.
+- Each Kennzahl shows one amount, the copy value. Rules the tax office applies only add one plain note line;
+  the €132 Werbungskostenpauschale note appears only when the total is below it.
 - Copy buttons put the plain number on the clipboard (`1228,40`) and confirm with a toast.
 - The mascot from the app icon appears only in empty and success states.
 - A missing or changed PDF shows a red banner at the top of the content until resolved.

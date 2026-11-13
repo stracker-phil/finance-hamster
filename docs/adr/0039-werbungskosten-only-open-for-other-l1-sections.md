@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-11-13). Hamster's own; extends 0038.
+Accepted (2026-11-13). Hamster's own; extends 0038. Evidence rule and "reported by others" superseded by 0040 (2026-11-13); the scope stands.
 
 ## Context
 

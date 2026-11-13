@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-11-13). Hamster's own. Research behind it: `docs/plan/research-anv.md` (not in the repo).
+Accepted (2026-11-13). Superseded by 0040 (2026-11-13). Hamster's own. Research behind it: `docs/plan/research-anv.md` (not in the repo).
 
 ## Context
 

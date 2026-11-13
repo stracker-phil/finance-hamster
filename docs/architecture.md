@@ -59,6 +59,7 @@ Everything lives in the config dir (ADR 0012), 0700 with files 0600:
   docs/inbox/         undated documents under their original name
   statements/<year>/  <account>-<nr>.pdf, year of the statement's end date
   snapshots/          <year>-tax-year.pdf, written when a year is closed
+  rules/              rules-<year>.json per tax year, rules.schema.json, README.md (ADR 0040)
   settings.json, keybindings.json, ui-state.json
 ```
 
@@ -70,6 +71,8 @@ Everything lives in the config dir (ADR 0012), 0700 with files 0600:
 - **Money** is integer cents plus a currency code; foreign-currency lines also keep the original amount,
   rate and fee. Bank dates are `YYYY-MM-DD` text.
 - **Statement lines** are parsed once at import, stored with the parser layout version and never re-parsed.
+- **Tax rules** are files, not database rows: loaded and validated at launch and on Reload; a closed year
+  stores a frozen copy of its file with its snapshot (ADR 0040).
 - **JSON stores** (`JsonStore`: atomic, 0600, defaults for missing files, unparsable files moved aside) hold
   settings, keybindings and UI state.
 
