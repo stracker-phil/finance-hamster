@@ -81,8 +81,9 @@ Filled in by feature folder, one line each, as the code is added (step 1 onward)
 
 - CSP in `src-tauri/tauri.conf.json` (`csp` and `devCsp`): `script-src 'self'`, `style-src-elem 'self'`, no
   frames, objects, base URI or form actions, `connect-src` only to IPC (ADR 0017).
-- PDFs are never embedded in the webview; previews are PNG pages rendered by PDFKit in Rust and served by id
-  through an app URI scheme (ADR 0018).
+- PDFs are never embedded in the webview. The preview is a native PDFKit `PDFView` placed over a page
+  placeholder by Rust (selectable text, no links, no PDF JavaScript); overlays suspend it (ADR 0037).
+  Thumbnails and the year summary are PNGs served by id through an app URI scheme (ADR 0018).
 - `window/navigation.rs` keeps every webview on the app's own pages; web links go through `open_url`.
 - The bundle is signed with the hardened runtime (`scripts/sign-app.sh`).
 

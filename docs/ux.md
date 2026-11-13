@@ -34,6 +34,7 @@ small menu lists those matches plus Search everywhere ⌘↩; on pages without a
 | Tax year | total Werbungskosten, ruleset version, progress; Needs attention; By Kennzahl (per pool with a copy button) or By month; … menu: Log, Archive, Export Summary PDF, Ruleset |
 | Document | the edit form (Payment → Classification → Private use → Result → Notes → More), PDF preview, History column |
 | All documents | a large "Is it already here?" field, documents by tax year plus Inbox |
+| ANV entries (new, not in the mockup) | per tax year, before closing: the non-document items (trips, Pendlerpauschale, Homeoffice days, entered values), each item shown or hidden per the ruleset; reached from the tax year's Needs attention and … menu |
 | Log, Archive | a tax year's journal entries; its excluded documents and the delete flow |
 
 ### Hamster-specific rules
@@ -43,6 +44,8 @@ small menu lists those matches plus Search everywhere ⌘↩; on pages without a
 - A finished document shows a blue banner and read-only fields; Unlock… asks first. A closed year shows a lock.
 - The ANV amount is computed text with its formula as a hint, never an input. Share % stays hidden until
   "Partly private use…".
+- Each Kennzahl shows its copy value (what to type into FinanzOnline) and, quieter and labelled as an
+  estimate, the expected value after rules the tax office applies (caps, offsets, the €132 Pauschale).
 - Copy buttons put the plain number on the clipboard (`1228,40`) and confirm with a toast.
 - The mascot from the app icon appears only in empty and success states.
 - A missing or changed PDF shows a red banner at the top of the content until resolved.

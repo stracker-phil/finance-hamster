@@ -75,7 +75,10 @@ Document by file and symbol, never by line number.
 - Reads: TanStack Query hooks in `src/queries/`, invalidated by Rust events (ADR 0014).
 - Appearance: Automatic / Light / Dark, one palette each, plus an accent (ADR 0026).
 - Network: none; no HTTP client in the crate, tests check the dependency tree (ADR 0016). PDF text and
-  previews come from PDFKit in Rust (ADR 0018).
+  previews come from PDFKit: a native `PDFView` over the page, so text can be selected (ADR 0018,
+  ADR 0037).
+- Tax rules are versioned data per year: items with stable keys, rules marked "in the copy value" or
+  "preview only", depreciation schedules; no tax constant in code (ADR 0038).
 - A Dock app: closing hides the window; reminders are scheduled macOS notifications (ADR 0035). No status
   bar (ADR 0036).
 - Repository map: `docs/architecture.md`.

@@ -27,7 +27,7 @@ Why Hamster is built the way it is. One record per decision, in Nygard format, a
 | [0015](0015-undo-runs-ops-with-inverses.md) | Undo runs ops with inverses | Accepted (2026-11-13) |
 | [0016](0016-no-network.md) | No network | Accepted (2026-11-13) |
 | [0017](0017-hardened-runtime-strict-csp-and-no-navigation.md) | Hardened runtime, strict CSP and no navigation | Accepted (2026-11-13) |
-| [0018](0018-pdfs-and-bank-text-are-untrusted.md) | PDFs and bank text are untrusted content | Accepted (2026-11-13) |
+| [0018](0018-pdfs-and-bank-text-are-untrusted.md) | PDFs and bank text are untrusted content | Accepted (2026-11-13); preview superseded by 0037 |
 | [0019](0019-signing.md) | Builds are signed with an Apple Development certificate | Accepted (2026-11-13) |
 | [0020](0020-every-release-gets-a-new-version.md) | Every release build gets a new version | Accepted (2026-11-13) |
 | [0021](0021-test-doubles-behind-test-util.md) | Test doubles live behind test-util | Accepted (2026-11-13) |
@@ -46,3 +46,5 @@ Why Hamster is built the way it is. One record per decision, in Nygard format, a
 | [0034](0034-settings-window.md) | Settings is a window of its own | Accepted (2026-11-13) |
 | [0035](0035-closing-the-window-keeps-the-app-running.md) | Closing the window keeps the app running in the Dock | Accepted (2026-11-13) |
 | [0036](0036-no-status-bar.md) | No status bar | Accepted (2026-11-13) |
+| [0037](0037-pdfs-show-in-a-native-pdfview.md) | PDFs show in a native PDFView over the page | Accepted (2026-11-13) |
+| [0038](0038-tax-rules-are-versioned-data-per-year.md) | Tax rules are versioned data per year, split into copy values and preview | Accepted (2026-11-13) |

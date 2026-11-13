@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-11-13). Inherited from the family catalog (app-blueprint: `untrusted-content`); reference implementation: Taskboard ADR 0042.
+Accepted (2026-11-13). Preview superseded by 0037 (2026-11-13). Inherited from the family catalog (app-blueprint: `untrusted-content`); reference implementation: Taskboard ADR 0042.
 
 ## Context
 

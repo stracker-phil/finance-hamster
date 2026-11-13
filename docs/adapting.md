@@ -33,7 +33,7 @@ CLI's Unix socket in the config dir. A new host or listener needs an ADR and a r
   codesigning (`scripts/sign-app.sh`, `scripts/create-signing-cert.sh`).
 - Dev scripts use zsh, Swift (`CGWindowList`) and `screencapture`.
 - PDFKit through objc2 (`platform/pdf`): text extraction for statements and invoices, page rendering for
-  previews and the year summary PDF.
+  thumbnails and the year summary PDF; the native `PDFView` over the page (`platform/pdf_view`, ADR 0037).
 - `NSDateFormatter` through objc2: dates in the macOS region (ADR 0010).
 - The macOS notification center (`platform/notify`): local reminders.
 
