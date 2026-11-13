@@ -255,6 +255,7 @@ pub fn commit(
         ),
         None => None,
     };
+    crate::taxyears::refuse_closed(db, &[line.as_ref().map(|l| l.value_date.as_str())])?;
     let items = rules::items(db)?;
     if let Some(key) = &input.item_key
         && !items.iter().any(|i| &i.key == key)

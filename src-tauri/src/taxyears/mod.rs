@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use crate::db::{Change, Db, Op, Source, Written};
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 use crate::taxrules::{check, files};
 
 pub const TABLE: &str = "tax_years";
@@ -95,6 +95,26 @@ pub fn row(conn: &Connection, year: i32) -> AppResult<Option<TaxYearRow>> {
             from_sql,
         )
         .optional()?)
+}
+
+/// Refuses a change that would touch a closed tax year: a payment date in it, before or after the change.
+pub fn refuse_closed(db: &Db, dates: &[Option<&str>]) -> AppResult<()> {
+    for year in dates
+        .iter()
+        .flatten()
+        .filter_map(|d| d.get(..4)?.parse::<i32>().ok())
+    {
+        if db
+            .read(|c| row(c, year))?
+            .is_some_and(|r| r.state == YearState::Closed)
+        {
+            return Err(AppError::InvalidField {
+                field: "document.payDate".into(),
+                message: format!("Tax year {year} is closed; reopen it to change its documents"),
+            });
+        }
+    }
+    Ok(())
 }
 
 pub fn list(db: &Db) -> AppResult<Vec<TaxYear>> {
@@ -338,6 +358,91 @@ mod tests {
         let row_2025 = db.read(|c| row(c, 2025)).unwrap().unwrap();
         assert_eq!(row_2025.ruleset, "2025 v1");
         assert_eq!(db.read(|c| row(c, 2030)).unwrap(), None);
+    }
+
+    fn add_years(db: &Db, states: &[(i32, YearState)]) {
+        let changes = states
+            .iter()
+            .map(|(year, state)| {
+                let row = TaxYearRow {
+                    state: *state,
+                    closed_at: (*state == YearState::Closed).then_some(5),
+                    ..TaxYearRow::new(*year, format!("{year} v1"), minimal_text(*year), 1)
+                };
+                Change::insert(TABLE, &row).unwrap()
+            })
+            .collect();
+        db.write(Op::new("Add years", changes), Source::App)
+            .unwrap();
+    }
+
+    #[test]
+    fn a_date_in_a_closed_year_is_refused_as_a_payment_date_field() {
+        let (_dir, db) = setup();
+        add_years(&db, &[(2025, YearState::Closed), (2026, YearState::Open)]);
+
+        let err = refuse_closed(&db, &[Some("2025-12-31")]).unwrap_err();
+
+        assert_eq!(
+            err,
+            AppError::InvalidField {
+                field: "document.payDate".into(),
+                message: "Tax year 2025 is closed; reopen it to change its documents".into(),
+            }
+        );
+    }
+
+    #[test]
+    fn any_one_date_in_a_closed_year_refuses_the_whole_change() {
+        let (_dir, db) = setup();
+        add_years(&db, &[(2025, YearState::Closed), (2026, YearState::Open)]);
+
+        for dates in [
+            [Some("2026-03-03"), Some("2025-01-01")],
+            [Some("2025-01-01"), Some("2026-03-03")],
+            [None, Some("2025-06-06")],
+        ] {
+            assert!(refuse_closed(&db, &dates).is_err(), "{dates:?}");
+        }
+    }
+
+    #[test]
+    fn dates_in_open_or_unknown_years_and_missing_dates_pass() {
+        let (_dir, db) = setup();
+        add_years(&db, &[(2025, YearState::Closed), (2026, YearState::Open)]);
+
+        for dates in [
+            vec![Some("2026-03-03")],
+            vec![Some("2031-03-03")],
+            vec![None],
+            vec![None, None],
+            vec![],
+            vec![Some("n/a")],
+        ] {
+            assert_eq!(refuse_closed(&db, &dates), Ok(()), "{dates:?}");
+        }
+    }
+
+    #[test]
+    fn reopening_a_year_lets_its_dates_pass_again() {
+        let (_dir, db) = setup();
+        add_years(&db, &[(2025, YearState::Closed)]);
+        let closed = db.read(|c| row(c, 2025)).unwrap().unwrap();
+        let open = TaxYearRow {
+            state: YearState::Open,
+            closed_at: None,
+            ..closed.clone()
+        };
+        db.write(
+            Op::new(
+                "Reopen",
+                vec![Change::update(TABLE, &closed, &open).unwrap()],
+            ),
+            Source::App,
+        )
+        .unwrap();
+
+        assert_eq!(refuse_closed(&db, &[Some("2025-05-05")]), Ok(()));
     }
 
     #[test]

@@ -219,6 +219,10 @@ fn write(
     source: Source,
 ) -> AppResult<Option<Written>> {
     if &after != before {
+        crate::taxyears::refuse_closed(
+            db,
+            &[before.pay_date.as_deref(), after.pay_date.as_deref()],
+        )?;
         changes.push(Change::update(store::DOCUMENTS, before, &after)?);
     }
     if changes.is_empty() {

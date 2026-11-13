@@ -586,6 +586,15 @@ describe("YearPage", () => {
   describe("More menu", () => {
     const openMenu = () => userEvent.click(screen.getByRole("button", { name: "More" }));
 
+    beforeEach(() => {
+      useStore.setState({ confirmation: null });
+      mocked.yearCloseCheck.mockResolvedValue({ blockers: [], warnings: [] });
+      mocked.yearClose.mockResolvedValue("Close Tax Year 2026");
+      mocked.yearReopen.mockResolvedValue("Reopen Tax Year 2026");
+      mocked.yearOpenSnapshot.mockResolvedValue(undefined);
+      mocked.yearExportSummary.mockResolvedValue(false);
+    });
+
     it("opens the Log of the year", async () => {
       await show();
       await openMenu();
@@ -606,13 +615,6 @@ describe("YearPage", () => {
       expect(useStore.getState().route).toEqual({ page: "archive", year: 2026 });
     });
 
-    it("keeps Export Summary PDF disabled", async () => {
-      await show();
-      await openMenu();
-
-      expect(screen.getByRole<HTMLButtonElement>("menuitem", { name: "Export Summary PDF…" }).disabled).toBe(true);
-    });
-
     it("opens the ruleset JSON of the year and closes the menu", async () => {
       await show();
       await openMenu();
@@ -621,6 +623,213 @@ describe("YearPage", () => {
 
       expect(mocked.rulesOpen).toHaveBeenCalledWith(2026);
       expect(screen.queryByRole("menu")).toBeNull();
+    });
+
+    const itemNames = () => screen.getAllByRole("menuitem").map((i) => i.textContent?.replace(/\d+$/, ""));
+    const toastMessages = () => useStore.getState().toasts.map((t) => t.message);
+
+    describe("of an open year", () => {
+      it("lists Log, Archive, Export Summary PDF, Open Ruleset JSON and Close Year", async () => {
+        await show({ archived: 3 });
+        await openMenu();
+
+        expect(itemNames()).toEqual(["Log", "Archive", "Export Summary PDF…", "Open Ruleset JSON", "Close Year…"]);
+      });
+
+      it("offers neither Reopen Year nor Open Snapshot PDF", async () => {
+        await show();
+        await openMenu();
+
+        expect(screen.queryByRole("menuitem", { name: "Reopen Year…" })).toBeNull();
+        expect(screen.queryByRole("menuitem", { name: "Open Snapshot PDF" })).toBeNull();
+      });
+    });
+
+    describe("of a closed year", () => {
+      const showClosed = async () => {
+        await show({ state: "closed" });
+        await openMenu();
+      };
+
+      it("says in the hero line that the year is closed and read-only", async () => {
+        await show({ state: "closed" });
+
+        expect(screen.getByText(/Closed, read-only/)).toBeTruthy();
+      });
+
+      it("lists Open Snapshot PDF and Reopen Year but no Close Year", async () => {
+        await showClosed();
+
+        expect(itemNames()).toEqual(["Log", "Archive", "Export Summary PDF…", "Open Ruleset JSON", "Open Snapshot PDF", "Reopen Year…"]);
+      });
+
+      it("opens the snapshot PDF of the year", async () => {
+        await showClosed();
+
+        await userEvent.click(screen.getByRole("menuitem", { name: "Open Snapshot PDF" }));
+
+        expect(mocked.yearOpenSnapshot).toHaveBeenCalledWith(2026);
+      });
+
+      it("reports a snapshot that cannot be opened as an error toast", async () => {
+        mocked.yearOpenSnapshot.mockRejectedValue({ kind: "not_found", message: "No snapshot", code: null });
+        await showClosed();
+
+        await userEvent.click(screen.getByRole("menuitem", { name: "Open Snapshot PDF" }));
+
+        await vi.waitFor(() => expect(toastMessages()).toEqual(["No snapshot"]));
+      });
+
+      it("reopens the year after the confirmation and shows the label with Undo", async () => {
+        mocked.yearReopen.mockResolvedValue("Reopen Tax Year 2026");
+        await showClosed();
+
+        await userEvent.click(screen.getByRole("menuitem", { name: "Reopen Year…" }));
+        await vi.waitFor(() => expect(useStore.getState().confirmation?.title).toBe("Reopen Tax Year 2026?"));
+        expect(mocked.yearReopen).not.toHaveBeenCalled();
+        useStore.getState().confirmation?.answer(true);
+
+        await vi.waitFor(() => expect(toastMessages()).toEqual(["Reopen Tax Year 2026"]));
+        expect(mocked.yearReopen).toHaveBeenCalledWith(2026);
+        expect(useStore.getState().toasts[0].action?.label).toBe("Undo");
+      });
+
+      it("reopens nothing when the confirmation is cancelled", async () => {
+        await showClosed();
+
+        await userEvent.click(screen.getByRole("menuitem", { name: "Reopen Year…" }));
+        await vi.waitFor(() => expect(useStore.getState().confirmation).not.toBeNull());
+        useStore.getState().confirmation?.answer(false);
+
+        await vi.waitFor(() => expect(useStore.getState().confirmation).toBeNull());
+        expect(mocked.yearReopen).not.toHaveBeenCalled();
+        expect(toastMessages()).toEqual([]);
+      });
+    });
+
+    describe("Export Summary PDF", () => {
+      const exportSummary = async () => {
+        await show();
+        await openMenu();
+        await userEvent.click(screen.getByRole("menuitem", { name: "Export Summary PDF…" }));
+      };
+
+      it("is enabled and exports the summary of the year", async () => {
+        await exportSummary();
+
+        expect(mocked.yearExportSummary).toHaveBeenCalledWith(2026);
+      });
+
+      it("says the summary was exported when a file was saved", async () => {
+        mocked.yearExportSummary.mockResolvedValue(true);
+
+        await exportSummary();
+
+        await vi.waitFor(() => expect(toastMessages()).toEqual(["Exported the Tax Year 2026 summary"]));
+      });
+
+      it("says nothing when the save dialog was cancelled", async () => {
+        mocked.yearExportSummary.mockResolvedValue(false);
+
+        await exportSummary();
+
+        await vi.waitFor(() => expect(mocked.yearExportSummary).toHaveBeenCalled());
+        expect(toastMessages()).toEqual([]);
+      });
+
+      it("reports a failed export as an error toast", async () => {
+        mocked.yearExportSummary.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
+
+        await exportSummary();
+
+        await vi.waitFor(() => expect(toastMessages()).toEqual(["Disk full"]));
+      });
+    });
+
+    describe("Close Year", () => {
+      const openSheet = async () => {
+        await show();
+        await openMenu();
+        await userEvent.click(screen.getByRole("menuitem", { name: "Close Year…" }));
+        return within(await screen.findByRole("dialog", { name: "Close Tax Year 2026?" }));
+      };
+
+      it("opens the sheet and closes the menu", async () => {
+        await openSheet();
+
+        expect(screen.queryByRole("menu")).toBeNull();
+      });
+
+      it("lists the blockers and warnings of the check", async () => {
+        mocked.yearCloseCheck.mockResolvedValue({ blockers: ["1 invoice is missing"], warnings: ["Question unanswered: Days worked from home"] });
+
+        const sheet = await openSheet();
+
+        expect(await sheet.findByText("1 invoice is missing")).toBeTruthy();
+        expect(sheet.getByText("Question unanswered: Days worked from home")).toBeTruthy();
+        expect(mocked.yearCloseCheck).toHaveBeenCalledWith(2026);
+      });
+
+      it("disables Close Year and says what to do first while something blocks", async () => {
+        mocked.yearCloseCheck.mockResolvedValue({ blockers: ["1 invoice is missing"], warnings: [] });
+
+        const sheet = await openSheet();
+
+        await sheet.findByText("1 invoice is missing");
+        expect(sheet.getByRole<HTMLButtonElement>("button", { name: "Close Year" }).disabled).toBe(true);
+        expect(sheet.getByText("Finish these first, then close the year.")).toBeTruthy();
+      });
+
+      it("keeps Close Year enabled when there are only warnings", async () => {
+        mocked.yearCloseCheck.mockResolvedValue({ blockers: [], warnings: ["Question unanswered: Days worked from home"] });
+
+        const sheet = await openSheet();
+
+        await sheet.findByText("Question unanswered: Days worked from home");
+        expect(sheet.getByRole<HTMLButtonElement>("button", { name: "Close Year" }).disabled).toBe(false);
+        expect(sheet.queryByText("Finish these first, then close the year.")).toBeNull();
+      });
+
+      it("says everything is in place when nothing blocks or warns", async () => {
+        const sheet = await openSheet();
+
+        expect(await sheet.findByText("Everything is in place")).toBeTruthy();
+        expect(sheet.queryByText("Finish these first, then close the year.")).toBeNull();
+      });
+
+      it("closes the year, the sheet, and shows the label with Undo", async () => {
+        mocked.yearClose.mockResolvedValue("Close Tax Year 2026");
+        const sheet = await openSheet();
+        await sheet.findByText("Everything is in place");
+
+        await userEvent.click(sheet.getByRole("button", { name: "Close Year" }));
+
+        expect(mocked.yearClose).toHaveBeenCalledWith(2026);
+        await vi.waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+        expect(toastMessages()).toEqual(["Close Tax Year 2026"]);
+        expect(useStore.getState().toasts[0].action?.label).toBe("Undo");
+      });
+
+      it("shows a rejection in the sheet and keeps it open", async () => {
+        mocked.yearClose.mockRejectedValue({ kind: "conflict", message: "An invoice is still missing", code: null });
+        const sheet = await openSheet();
+        await sheet.findByText("Everything is in place");
+
+        await userEvent.click(sheet.getByRole("button", { name: "Close Year" }));
+
+        expect((await sheet.findByRole("alert")).textContent).toBe("An invoice is still missing");
+        expect(screen.getByRole("dialog", { name: "Close Tax Year 2026?" })).toBeTruthy();
+        expect(toastMessages()).toEqual([]);
+      });
+
+      it("closes the sheet on Cancel without closing the year", async () => {
+        const sheet = await openSheet();
+
+        await userEvent.click(sheet.getByRole("button", { name: "Cancel" }));
+
+        expect(screen.queryByRole("dialog")).toBeNull();
+        expect(mocked.yearClose).not.toHaveBeenCalled();
+      });
     });
   });
 });

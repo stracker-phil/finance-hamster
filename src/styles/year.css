@@ -54,3 +54,8 @@
 .entry-add__pdf { flex: none; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .entry-add__note { padding: 6px 0 0 16px; }
 .entry-add__note--error { color: var(--danger-text); }
+
+/* Close Year */
+.close-list { margin: 4px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.close-list__item { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-secondary); }
+.close-list__item--blocker { color: var(--text); font-weight: 500; }

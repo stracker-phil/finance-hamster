@@ -1,16 +1,16 @@
 import { useEffect, useState } from "react";
-import { Car, Copy, Euro, FileText, Landmark, MoreHorizontal, Trash2 } from "lucide-react";
-import { api, toAppError, type AttentionView, type KennzahlView, type MonthView, type QuestionView, type YearRow } from "../api";
+import { Car, Copy, Euro, FileText, Landmark, Trash2 } from "lucide-react";
+import { api, type AttentionView, type KennzahlView, type MonthView, type QuestionView, type YearRow } from "../api";
 import { startAddDocument } from "../documents/addFlow";
 import { copyText } from "../lib/clipboard";
-import { useCoversPdf } from "../lib/pdfCover";
+import { showError } from "../lib/undoToast";
 import { useYearPage } from "../queries/year";
 import { useStore } from "../state/store";
 import { AddButton, AddEntry } from "../year/AddEntry";
+import { YearMenu } from "../year/YearMenu";
 import { attachEvidence, deleteEntry, openEvidence } from "../year/entryActions";
 import { EmptyPage } from "./EmptyPage";
 
-const showError = (e: unknown) => useStore.getState().showToast("error", toAppError(e).message);
 
 function QuestionRow({ year, question }: { year: number; question: QuestionView }) {
   const [text, setText] = useState(question.value);
@@ -176,40 +176,6 @@ function MonthList({ year, months, open }: { year: number; months: MonthView[]; 
   );
 }
 
-function YearMenu({ year, archived }: { year: number; archived: number }) {
-  const [open, setOpen] = useState(false);
-  const navigate = useStore((s) => s.navigate);
-  useCoversPdf(open);
-  const go = (fn: () => void) => () => {
-    setOpen(false);
-    fn();
-  };
-  return (
-    <div className="year-menu">
-      <button className="icon-btn" aria-label="More" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
-        <MoreHorizontal size={16} />
-      </button>
-      {open && (
-        <div className="menu year-menu__list" role="menu">
-          <button className="menu-row" role="menuitem" onClick={go(() => navigate({ page: "log", year }))}>
-            Log
-          </button>
-          <button className="menu-row" role="menuitem" onClick={go(() => navigate({ page: "archive", year }))}>
-            Archive
-            <span className="menu-row__key">{archived}</span>
-          </button>
-          <button className="menu-row" role="menuitem" disabled>
-            Export Summary PDF…
-          </button>
-          <button className="menu-row" role="menuitem" onClick={go(() => void api.rulesOpen(year).catch(showError))}>
-            Open Ruleset JSON
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
 export function YearPage({ year }: { year: number }) {
   const filter = useStore((s) => s.filter);
   const [view, setView] = useState<"kennzahl" | "month">("kennzahl");
@@ -224,6 +190,7 @@ export function YearPage({ year }: { year: number }) {
           <div className="year-hero__main">
             <div className="add-doc__hint">
               Total to enter for {data.year} · ruleset {data.ruleset}
+              {!open && <span> · Closed, read-only</span>}
             </div>
             <div className="year-hero__total">{data.total}</div>
             {data.pauschaleNote && <div className="add-doc__hint">{data.pauschaleNote}</div>}
@@ -234,7 +201,7 @@ export function YearPage({ year }: { year: number }) {
             </div>
             <div className="add-doc__hint">{data.progress}</div>
           </div>
-          <YearMenu year={data.year} archived={data.archived} />
+          <YearMenu year={data.year} archived={data.archived} closed={!open} />
         </div>
 
         {open && data.questions.length > 0 && (

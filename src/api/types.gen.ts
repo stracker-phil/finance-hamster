@@ -132,6 +132,16 @@ export type ChargeView = { id: string,
  */
 date: string, account: string, amount: string, };
 
+export type CloseCheck = { 
+/**
+ * What has to be done first: drafts, undated documents.
+ */
+blockers: Array<string>, 
+/**
+ * What is allowed but worth knowing: missing invoices, unanswered questions.
+ */
+warnings: Array<string>, };
+
 /**
  * A command as the palette and the Shortcuts page list it.
  */

@@ -101,6 +101,7 @@ pub fn unlock(db: &Db, id: &str, source: Source) -> AppResult<Written> {
             "Only a finished document can be unlocked".into(),
         ));
     }
+    crate::taxyears::refuse_closed(db, &[doc.pay_date.as_deref()])?;
     transition(db, doc, "Unlock", source, |d| {
         d.state = DocState::Draft;
         d.finished_at = None;

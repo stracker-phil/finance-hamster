@@ -208,6 +208,18 @@ pub const MIGRATIONS: &[&str] = &[
         created_at INTEGER NOT NULL
     );
     CREATE INDEX plans_subscription ON plans (subscription_id);",
+    // 11: what a tax year counted when it was closed, kept when it is reopened.
+    "CREATE TABLE snapshots (
+        id TEXT PRIMARY KEY,
+        year INTEGER NOT NULL,
+        closed_at INTEGER NOT NULL,
+        ruleset TEXT NOT NULL,
+        total TEXT NOT NULL,
+        kennzahlen TEXT NOT NULL,
+        documents TEXT NOT NULL,
+        file TEXT NOT NULL
+    );
+    CREATE INDEX snapshots_year ON snapshots (year);",
 ];
 
 pub fn version(conn: &Connection) -> AppResult<usize> {
@@ -271,6 +283,7 @@ mod tests {
             "journal",
             "plans",
             "rules",
+            "snapshots",
             "statements",
             "subscriptions",
             "tax_years",

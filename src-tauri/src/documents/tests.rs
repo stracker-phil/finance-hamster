@@ -2826,6 +2826,133 @@ fn only_a_finished_document_can_be_unlocked() {
     ));
 }
 
+fn close_2026(db: &Db) {
+    let open = db
+        .read(|c| taxyears::row(c, 2026))
+        .unwrap()
+        .expect("the setup starts 2026");
+    let closed = TaxYearRow {
+        state: taxyears::YearState::Closed,
+        closed_at: Some(2),
+        ..open.clone()
+    };
+    db.write(
+        Op::new(
+            "Close",
+            vec![Change::update(taxyears::TABLE, &open, &closed).unwrap()],
+        ),
+        Source::Seed,
+    )
+    .unwrap();
+}
+
+const CLOSED_PAY_DATE: &str = "document.payDate";
+
+#[test]
+fn unlocking_a_finished_document_paid_in_a_closed_year_is_refused_until_it_is_reopened() {
+    let (_dir, db) = setup_with_vendor();
+    complete_draft(&db, "doc-a");
+    lifecycle::finish(&db, "doc-a", noon(2026, 11, 13), Source::Ui).unwrap();
+    close_2026(&db);
+
+    assert_eq!(
+        lifecycle::unlock(&db, "doc-a", Source::Ui).unwrap_err(),
+        AppError::InvalidField {
+            field: CLOSED_PAY_DATE.into(),
+            message: "Tax year 2026 is closed; reopen it to change its documents".into(),
+        }
+    );
+    assert_eq!(document(&db, "doc-a").state, DocState::Finished);
+}
+
+#[test]
+fn a_draft_dated_in_a_closed_year_cannot_be_changed() {
+    let (_dir, db) = setup();
+    let doc = draft(&db, "doc-a", |d| d.pay_date = Some("2026-10-14".into()));
+    close_2026(&db);
+
+    let (field, _) = rejected(apply(&db, "doc-a", DocumentEdit::Note { text: "x".into() }));
+
+    assert_eq!(field, CLOSED_PAY_DATE);
+    assert_eq!(document(&db, "doc-a"), doc);
+}
+
+#[test]
+fn a_draft_cannot_be_dated_into_a_closed_year() {
+    let (_dir, db) = setup();
+    let doc = draft(&db, "doc-a", |_| {});
+    close_2026(&db);
+
+    let (field, _) = rejected(apply(&db, "doc-a", pay_date_edit("2026-10-14")));
+
+    assert_eq!(field, CLOSED_PAY_DATE);
+    assert_eq!(document(&db, "doc-a"), doc);
+}
+
+#[test]
+fn a_draft_cannot_be_moved_out_of_a_closed_year() {
+    let (_dir, db) = setup();
+    draft(&db, "doc-a", |d| d.pay_date = Some("2026-10-14".into()));
+    close_2026(&db);
+
+    let (field, _) = rejected(apply(&db, "doc-a", pay_date_edit("2027-01-05")));
+
+    assert_eq!(field, CLOSED_PAY_DATE);
+    assert_eq!(
+        document(&db, "doc-a").pay_date.as_deref(),
+        Some("2026-10-14")
+    );
+}
+
+#[test]
+fn drafts_of_other_years_stay_editable_while_one_year_is_closed() {
+    let (_dir, db) = setup();
+    draft(&db, "doc-a", |d| d.pay_date = Some("2027-01-05".into()));
+    close_2026(&db);
+
+    let written = apply(&db, "doc-a", DocumentEdit::Note { text: "x".into() }).unwrap();
+
+    assert!(written.is_some());
+    assert_eq!(document(&db, "doc-a").note, "x");
+}
+
+#[test]
+fn adding_a_document_on_a_line_of_a_closed_year_is_refused_before_anything_is_written() {
+    let (dir, db) = setup();
+    add_lines(&db, &[dollar_debit("l-fx", "2026-11-10", -11_871)]);
+    let pending = pixelforge_pending(&db);
+    close_2026(&db);
+
+    let result = commit(
+        &db,
+        dir.path(),
+        pending,
+        &input("Pixelforge Ltd.", Some("phone"), Some("l-fx")),
+    );
+
+    assert_eq!(failed_field(result), CLOSED_PAY_DATE);
+    assert_eq!(count(&db, store::DOCUMENTS), 0);
+    assert_eq!(count(&db, store::VENDORS), 0);
+    assert_eq!(count(&db, store::LINKS), 0);
+}
+
+#[test]
+fn adding_a_document_without_a_line_still_works_while_a_year_is_closed() {
+    let (dir, db) = setup();
+    let pending = pixelforge_pending(&db);
+    close_2026(&db);
+
+    commit(
+        &db,
+        dir.path(),
+        pending,
+        &input("Pixelforge Ltd.", None, None),
+    )
+    .unwrap();
+
+    assert_eq!(count(&db, store::DOCUMENTS), 1);
+}
+
 #[test]
 fn excluding_stores_the_trimmed_reason_and_time_and_undo_brings_the_document_back() {
     for (state, finished_at) in [

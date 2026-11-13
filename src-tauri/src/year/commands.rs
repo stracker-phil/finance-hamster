@@ -1,10 +1,12 @@
 use std::path::Path;
 
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Manager, State};
 use tauri_plugin_dialog::{DialogExt, FilePath};
 
+use super::close::{self, CloseCheck};
 use super::entries::{self, NewEntry};
 use super::page::{self, YearPage};
+use super::report;
 use crate::date::DateOrder;
 use crate::db::Source;
 use crate::db::commands::announce;
@@ -34,7 +36,7 @@ pub fn year_answer(
     question: String,
     value: String,
 ) -> AppResult<Option<String>> {
-    let ruleset: Ruleset = serde_json::from_str(&year_row(&state, year)?.rules)?;
+    let ruleset: Ruleset = serde_json::from_str(&open_year(&state, year)?.rules)?;
     let written = super::answers::answer(
         &state.db,
         &ruleset,
@@ -152,4 +154,86 @@ pub fn year_evidence_open(state: State<'_, AppState>, year: i32, id: String) -> 
     let path = entries::evidence_path(&state.db, &crate::config_dir(), year, &id)?;
     tauri_plugin_opener::open_path(&path, None::<&str>)
         .map_err(|e| AppError::Internal(format!("Couldn't open {}: {e}", path.display())))
+}
+
+fn stamp(prefix: &str) -> String {
+    let today = chrono::Local::now().date_naive();
+    format!(
+        "{prefix} {}",
+        crate::date::day_month_year(today, DateOrder::system())
+    )
+}
+
+#[tauri::command]
+pub fn year_close_check(state: State<'_, AppState>, year: i32) -> AppResult<CloseCheck> {
+    let page = page::page(
+        &state.db,
+        year,
+        "",
+        state.settings.get().number_format,
+        DateOrder::system(),
+    )?;
+    Ok(close::check(&page))
+}
+
+/// Closes the year, storing its snapshot and summary PDF; returns the label of the change.
+#[tauri::command]
+pub fn year_close(app: AppHandle, state: State<'_, AppState>, year: i32) -> AppResult<String> {
+    let written = close::close(
+        &state.db,
+        &crate::config_dir(),
+        year,
+        state.settings.get().number_format,
+        DateOrder::system(),
+        &stamp("Closed on"),
+        chrono::Utc::now().timestamp_millis(),
+        Source::Ui,
+    )?;
+    announce(&app, &written);
+    Ok(written.label)
+}
+
+#[tauri::command]
+pub fn year_reopen(app: AppHandle, state: State<'_, AppState>, year: i32) -> AppResult<String> {
+    let written = close::reopen(&state.db, year, Source::Ui)?;
+    announce(&app, &written);
+    Ok(written.label)
+}
+
+/// Opens the newest snapshot's summary PDF in the default viewer.
+#[tauri::command]
+pub fn year_open_snapshot(state: State<'_, AppState>, year: i32) -> AppResult<()> {
+    let path = close::snapshot_file(&state.db, &crate::config_dir(), year)?;
+    tauri_plugin_opener::open_path(&path, None::<&str>)
+        .map_err(|e| AppError::Internal(format!("Couldn't open {}: {e}", path.display())))
+}
+
+/// Asks where to save the year's summary PDF and writes it; false when cancelled.
+#[tauri::command]
+pub async fn year_export_summary(app: AppHandle, year: i32) -> AppResult<bool> {
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    app.dialog()
+        .file()
+        .set_title("Export Summary PDF")
+        .set_file_name(format!("Tax year {year} summary.pdf"))
+        .add_filter("PDF", &["pdf"])
+        .save_file(move |path| {
+            let _ = tx.send(path);
+        });
+    let chosen = rx
+        .await
+        .map_err(|_| AppError::Io("The file panel closed without an answer".into()))?;
+    let Some(path) = chosen.map(chosen_path).transpose()? else {
+        return Ok(false);
+    };
+    let state = app.state::<AppState>();
+    let page = page::page(
+        &state.db,
+        year,
+        "",
+        state.settings.get().number_format,
+        DateOrder::system(),
+    )?;
+    std::fs::write(&path, report::summary_pdf(&page, &stamp("Exported on")))?;
+    Ok(true)
 }
