@@ -1,5 +1,5 @@
-//! Reminders as macOS notifications (ADR 0035). Until the real center is wired (step 20), and always in
-//! tests and the debug build, notifications are recorded instead of posted (ADR 0022).
+//! Reminders as macOS notifications (ADR 0042). The release build hands them to the notification center; the
+//! debug build and tests only record them (ADR 0022).
 
 use crate::lock::MutexExt;
 
@@ -19,6 +19,26 @@ impl Notifier {
     pub fn post(&self, notification: Notification) {
         log::info!("Notification recorded: {}", notification.title);
         self.recorded.lock_unpoisoned().push(notification);
+    }
+
+    /// Records it, and in the release build shows it in the notification center.
+    pub fn deliver(&self, app: &tauri::AppHandle, notification: Notification) {
+        #[cfg(not(debug_assertions))]
+        {
+            use tauri_plugin_notification::NotificationExt;
+            let shown = app
+                .notification()
+                .builder()
+                .title(&notification.title)
+                .body(&notification.body)
+                .show();
+            if let Err(e) = shown {
+                log::warn!("Couldn't show a notification: {e}");
+            }
+        }
+        #[cfg(debug_assertions)]
+        let _ = app;
+        self.post(notification);
     }
 
     pub fn recorded(&self) -> Vec<Notification> {

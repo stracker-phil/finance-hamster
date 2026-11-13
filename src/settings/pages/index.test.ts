@@ -42,6 +42,19 @@ describe("SETTINGS_PAGES", () => {
     expect(found(query)).toContain(hit);
   });
 
+  it.each([
+    ["Default reminder", "reminders/default-reminder"],
+    ["renewal", "reminders/default-reminder"],
+    ["price changes", "reminders/price-changes"],
+    ["Remind me to import", "reminders/import-after"],
+    ["overdue", "reminders/import-after"],
+    ["gaps", "reminders/gaps"],
+    ["Filing reminder", "reminders/filing"],
+    ["november", "reminders/year-questions"],
+  ])("finds the Reminders row for %s", (query, hit) => {
+    expect(found(query)).toContain(hit);
+  });
+
   it("finds the Finance pages by their group name", () => {
     expect(found("finance")).toEqual(expect.arrayContaining(["rules", "vendors", "accounts", "taxrules"]));
   });

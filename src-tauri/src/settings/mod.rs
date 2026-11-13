@@ -10,6 +10,7 @@ use ts_rs::TS;
 use crate::error::AppResult;
 use crate::lock::MutexExt;
 use crate::store::json_file::JsonFile;
+use crate::subscriptions::store::Reminder;
 
 pub const FILE_NAME: &str = "settings.json";
 
@@ -63,6 +64,18 @@ pub struct Settings {
     pub hide_own_transfers: bool,
     /// Days an excluded document stays in the Archive before it can be deleted.
     pub archive_days: u32,
+    /// The reminder a new subscription starts with.
+    pub default_reminder: Reminder,
+    /// A notification when a charge differs from its subscription's plan.
+    pub remind_price_changes: bool,
+    /// Days after an account's last statement ends before the import reminder.
+    pub import_after_days: u32,
+    /// A notification when the statements of an account have a gap.
+    pub remind_gaps: bool,
+    /// On 1 March, once the previous tax year can be closed.
+    pub remind_filing: bool,
+    /// On 1 November, while the open tax year has unanswered questions.
+    pub remind_questions: bool,
 }
 
 impl Default for Settings {
@@ -74,6 +87,12 @@ impl Default for Settings {
             show_original_currency: true,
             hide_own_transfers: true,
             archive_days: 7,
+            default_reminder: Reminder::ThreeDays,
+            remind_price_changes: true,
+            import_after_days: 30,
+            remind_gaps: true,
+            remind_filing: true,
+            remind_questions: true,
         }
     }
 }
@@ -89,6 +108,12 @@ pub struct SettingsPatch {
     pub show_original_currency: Option<bool>,
     pub hide_own_transfers: Option<bool>,
     pub archive_days: Option<u32>,
+    pub default_reminder: Option<Reminder>,
+    pub remind_price_changes: Option<bool>,
+    pub import_after_days: Option<u32>,
+    pub remind_gaps: Option<bool>,
+    pub remind_filing: Option<bool>,
+    pub remind_questions: Option<bool>,
 }
 
 impl Settings {
@@ -110,6 +135,24 @@ impl Settings {
         }
         if let Some(days) = patch.archive_days {
             self.archive_days = days.max(1);
+        }
+        if let Some(reminder) = patch.default_reminder {
+            self.default_reminder = reminder;
+        }
+        if let Some(on) = patch.remind_price_changes {
+            self.remind_price_changes = on;
+        }
+        if let Some(days) = patch.import_after_days {
+            self.import_after_days = days.max(1);
+        }
+        if let Some(on) = patch.remind_gaps {
+            self.remind_gaps = on;
+        }
+        if let Some(on) = patch.remind_filing {
+            self.remind_filing = on;
+        }
+        if let Some(on) = patch.remind_questions {
+            self.remind_questions = on;
         }
     }
 }
@@ -154,7 +197,8 @@ mod tests {
     }
 
     #[test]
-    fn defaults_are_system_look_dot_decimal_original_currency_shown_and_own_transfers_hidden() {
+    fn defaults_are_system_look_dot_decimal_original_currency_shown_own_transfers_hidden_and_all_reminders_on()
+     {
         assert_eq!(
             serde_json::to_value(Settings::default()).unwrap(),
             json!({
@@ -163,9 +207,92 @@ mod tests {
                 "numberFormat": "dot_decimal",
                 "showOriginalCurrency": true,
                 "hideOwnTransfers": true,
-                "archiveDays": 7
+                "archiveDays": 7,
+                "defaultReminder": "three_days",
+                "remindPriceChanges": true,
+                "importAfterDays": 30,
+                "remindGaps": true,
+                "remindFiling": true,
+                "remindQuestions": true
             })
         );
+    }
+
+    #[test]
+    fn import_after_days_are_patched_with_a_minimum_of_one_day_and_survive_reopening() {
+        for (days, expected) in [(45, 45), (1, 1), (0, 1)] {
+            let dir = temp_config_dir();
+            let updated = store_in(&dir)
+                .update(SettingsPatch {
+                    import_after_days: Some(days),
+                    ..SettingsPatch::default()
+                })
+                .unwrap();
+
+            assert_eq!(updated.import_after_days, expected, "{days}");
+            assert_eq!(store_in(&dir).get().import_after_days, expected, "{days}");
+        }
+    }
+
+    #[test]
+    fn the_reminder_settings_are_patched_one_by_one_and_survive_reopening() {
+        let dir = temp_config_dir();
+        store_in(&dir)
+            .update(SettingsPatch {
+                default_reminder: Some(Reminder::OneWeek),
+                remind_price_changes: Some(false),
+                remind_gaps: Some(false),
+                remind_filing: Some(false),
+                remind_questions: Some(false),
+                ..SettingsPatch::default()
+            })
+            .unwrap();
+
+        assert_eq!(
+            store_in(&dir).get(),
+            Settings {
+                default_reminder: Reminder::OneWeek,
+                remind_price_changes: false,
+                remind_gaps: false,
+                remind_filing: false,
+                remind_questions: false,
+                ..Settings::default()
+            }
+        );
+    }
+
+    #[test]
+    fn a_patch_reads_the_reminder_fields_in_camel_case() {
+        let patch: SettingsPatch = serde_json::from_value(json!({
+            "defaultReminder": "one_day",
+            "remindPriceChanges": false,
+            "importAfterDays": 10,
+            "remindGaps": false,
+            "remindFiling": false,
+            "remindQuestions": false
+        }))
+        .unwrap();
+
+        assert_eq!(patch.default_reminder, Some(Reminder::OneDay));
+        assert_eq!(patch.remind_price_changes, Some(false));
+        assert_eq!(patch.import_after_days, Some(10));
+        assert_eq!(patch.remind_gaps, Some(false));
+        assert_eq!(patch.remind_filing, Some(false));
+        assert_eq!(patch.remind_questions, Some(false));
+    }
+
+    #[test]
+    fn an_old_settings_file_without_reminder_fields_loads_their_defaults() {
+        let dir = temp_config_dir();
+        std::fs::write(dir.path().join(FILE_NAME), r#"{"appearance":"dark"}"#).unwrap();
+
+        let settings = store_in(&dir).get();
+        assert_eq!(settings.default_reminder, Reminder::ThreeDays);
+        assert_eq!(settings.import_after_days, 30);
+        assert!(settings.remind_price_changes);
+        assert!(settings.remind_gaps);
+        assert!(settings.remind_filing);
+        assert!(settings.remind_questions);
     }
 
     #[test]

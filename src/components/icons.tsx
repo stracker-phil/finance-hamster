@@ -1,4 +1,4 @@
-import { Activity, Check, FilePlus, FileText, House, Info, Keyboard, Landmark, Store, Layers, ListChecks, Lock, Palette, PanelLeft, Repeat, Scale, Settings, ShieldCheck, type LucideIcon } from "lucide-react";
+import { Activity, Bell, Check, FilePlus, FileText, House, Info, Keyboard, Landmark, Store, Layers, ListChecks, Lock, Palette, PanelLeft, Repeat, Scale, Settings, ShieldCheck, type LucideIcon } from "lucide-react";
 
 /** The app's icons by role, from lucide like the family's other apps (Taskboard); the mockup's drawn icons were
  *  placeholders. */
@@ -12,6 +12,7 @@ const ICONS = {
   settings: Settings,
   lock: Lock,
   privacy: ShieldCheck,
+  reminders: Bell,
   appearance: Palette,
   shortcuts: Keyboard,
   status: Activity,

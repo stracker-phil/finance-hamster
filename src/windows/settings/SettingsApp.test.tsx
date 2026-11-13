@@ -45,7 +45,7 @@ describe("SettingsApp", () => {
 
       const group = within(screen.getByRole("group", { name: "App" }));
       const labels = group.getAllByRole("button").map((b) => b.textContent);
-      expect(labels).toEqual(["Privacy & Data", "Appearance", "Shortcuts", "Status", "About"]);
+      expect(labels).toEqual(["Reminders", "Privacy & Data", "Appearance", "Shortcuts", "Status", "About"]);
     });
 
     it("shows the first page by default", () => {

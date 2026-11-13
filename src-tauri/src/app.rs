@@ -25,6 +25,7 @@ pub fn start(
         .plugin(init_logging(log_level))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
         .register_asynchronous_uri_scheme_protocol(
             crate::preview::scheme::SCHEME,
             crate::preview::scheme::handle,
@@ -53,6 +54,7 @@ pub fn start(
             add_builtin_rules(app);
             start_tax_years(app);
             check_files(app.handle().clone());
+            start_reminders(app.handle().clone());
             take_initial(app.handle(), initial);
             #[cfg(debug_assertions)]
             apply_dev_frame(app);
@@ -150,6 +152,32 @@ fn check_files(app: AppHandle) {
                 let _ = tauri::Emitter::emit(&app, crate::events::FILES_CHECKED, ());
             }
             Err(e) => log::warn!("Couldn't check the stored files: {e}"),
+        }
+    });
+}
+
+/// How often the running app looks for due reminders.
+const REMINDER_INTERVAL: std::time::Duration = std::time::Duration::from_secs(30 * 60);
+
+/// Tells due reminders now and every half hour while the app runs (ADR 0042).
+fn start_reminders(app: AppHandle) {
+    std::thread::spawn(move || {
+        loop {
+            let state = app.state::<AppState>();
+            let told = crate::reminders::tell(
+                &state.db,
+                &crate::config_dir(),
+                &state.settings.get(),
+                chrono::Local::now().date_naive(),
+                crate::date::DateOrder::system(),
+                |notification| state.notifier.deliver(&app, notification),
+            );
+            match told {
+                Ok(0) => {}
+                Ok(n) => log::info!("Told {n} reminders"),
+                Err(e) => log::warn!("Couldn't tell the reminders: {e}"),
+            }
+            std::thread::sleep(REMINDER_INTERVAL);
         }
     });
 }

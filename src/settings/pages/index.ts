@@ -3,6 +3,7 @@ import { AboutPage } from "./AboutPage";
 import { AccountsPage } from "./AccountsPage";
 import { AppearancePage } from "./AppearancePage";
 import { PrivacyPage } from "./PrivacyPage";
+import { RemindersPage } from "./RemindersPage";
 import { RulesPage } from "./RulesPage";
 import { ShortcutsPage } from "./ShortcutsPage";
 import { StatusPage } from "./StatusPage";
@@ -60,6 +61,22 @@ export const SETTINGS_PAGES: SettingsPage[] = [
       { id: "import", title: "Import a JSON file", keywords: ["rules"] },
       { id: "duplicate", title: "Start next year", keywords: ["duplicate", "rules"] },
       { id: "rules-folder", title: "Rules folder", keywords: ["finder"] },
+    ],
+  },
+  {
+    id: "reminders",
+    group: "App",
+    label: "Reminders",
+    icon: "reminders",
+    intro: "Reminders are macOS notifications. Nothing is sent anywhere.",
+    Body: RemindersPage,
+    rows: [
+      { id: "default-reminder", title: "Default reminder for new subscriptions", keywords: ["renewal", "notification"] },
+      { id: "price-changes", title: "Tell me when a price changes", keywords: ["plan", "notification"] },
+      { id: "import-after", title: "Remind me to import after", keywords: ["statement", "overdue"] },
+      { id: "gaps", title: "Tell me about gaps", keywords: ["statement", "missing"] },
+      { id: "filing", title: "Filing reminder", keywords: ["tax year", "march", "close"] },
+      { id: "year-questions", title: "Year questions", keywords: ["november", "questions"] },
     ],
   },
   {

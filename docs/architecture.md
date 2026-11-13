@@ -61,6 +61,7 @@ Everything lives in the config dir (ADR 0012), 0700 with files 0600:
   statements/<year>/  <account>-<nr>.pdf, year of the statement's end date
   snapshots/          <year>-summary.pdf, written when a year is closed; -2, -3 after a reopen
   rules/              rules-<year>.json per tax year, rules.schema.json, README.md (ADR 0040)
+  reminders.json      the keys of the reminders already told (ADR 0042)
   settings.json, keybindings.json, ui-state.json
 ```
 
@@ -103,11 +104,12 @@ Rust (`src-tauri/src/`):
 | `year/` | the tax year page: `page.rs` (the page view; filtered by the header's text), `facts.rs` (what counts in the year: documents by their payments or depreciation slices, needs attention), `rows.rs` (amounts, trips and ANV lines without a document), `summary.rs` (questions, progress, Kennzahlen, months with Whole year, the Pauschale note), `notes.rs` (the one note line from the estimate rules), `answers.rs` (the `answers` table), `close.rs` (Close: drafts and undated documents block, missing invoices and questions warn; a `snapshots` row with the summary PDF in `snapshots/`; Reopen keeps it), `report.rs` (the summary PDF), `entries.rs` (the `entries` table: amounts as typed with an evidence PDF under `docs/<year>/evidence/`, trips valued at the rules' Kilometergeld rate on their date), `commands.rs` |
 | `search.rs` | "matches elsewhere": documents and bank lines containing the filter text, for the filter field's menu and the palette |
 | `integrity/` | `verify` (every document and statement PDF against its stored hash, at launch in the background and on Verify Now; the result in `LastCheck` with the `files_checked` event), `status.rs` (Settings → Status: statement chains and balances, checksums, journal against the database, inbox, rules files), `commands.rs` (also `settings_show` to open Settings at a row) |
+| `reminders/` | `due_today` (renewals, price changes, overdue imports, gaps, filing, year questions), `tell` (each once, keys in `reminders.json` via `sent.rs`); the app runs it at launch and every half hour; `notify::Notifier::deliver` shows them in release builds (ADR 0042) |
 | `today/` | the Today page: `today_view` (the next step by priority: review, invoices to attach, an overdue statement, questions, drafts; the next five charges, the newest open tax year, how far the statements reach), `commands.rs` |
 | `subscriptions/` | subscriptions (ADR 0041): `store.rs` (`subscriptions` and `plans` rows), `matcher.rs` (`Matchers`: bank text plus the tolerance of the plan on the line's date; `plan_changed`), `schedule.rs` (next charge, cost per month), `edit.rs` (New/Edit form, Change Plan, End/Resume, Delete; each re-matches the lines in the same op), `view.rs` (the list by next charge, the live match count, a New form prefilled from a line), `detail.rs` (the detail panel), `commands.rs` |
 | `review/` | Review: `queue` (undecided lines newest first, with the key, suggestion and last item for it), `plan_changed` and the active subscriptions for the Subscription choice; `decide` (a hand decision, optionally with an "Always do this" rule applied to the other lines in the same op), `undecided_by_account` |
 | `preview/` | PDFs by id (`PdfSource`, `resolve`), the `pdf_view_*` commands and the `pdf-page://` scheme serving page PNGs (in the CSP's `img-src`) |
-| `notify.rs` | `Notifier`: notifications recorded, not posted (the real center comes with reminders) |
+| `notify.rs` | `Notifier`: records every notification; `deliver` also shows it in the notification center in release builds |
 | `settings/` | `settings.json`: appearance, accent, number format, original currency, own transfers, days in the Archive (`SettingsStore`, `get_settings`, `update_settings`) |
 | `instance.rs`, `ipc/` | single instance: lock file, Unix socket, one JSON line per request |
 | `remote/` | handles each `IpcMessage` from another process |

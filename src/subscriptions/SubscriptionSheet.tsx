@@ -2,6 +2,7 @@ import { useId, useState, type FormEvent } from "react";
 import { api, toAppError, type Interval, type Reminder, type SubscriptionForm } from "../api";
 import { Modal } from "../components/Modal";
 import { undoToast } from "../lib/undoToast";
+import { useSettings } from "../queries/settings";
 import { useMatchCount, useSubscriptions } from "../queries/subscriptions";
 import { Segmented } from "../settings/controls";
 import { useStore } from "../state/store";
@@ -68,7 +69,8 @@ function toleranceChoice(value: string | null) {
 export function SubscriptionSheet({ id, initial, onClose }: { id: string | null; initial: SubscriptionForm | null; onClose: () => void }) {
   const titleId = useId();
   const field = (name: string) => `${titleId}-${name}`;
-  const [form, setForm] = useState<SubscriptionForm>(() => initial ?? empty());
+  const { data: settings } = useSettings();
+  const [form, setForm] = useState<SubscriptionForm>(() => initial ?? { ...empty(), reminder: settings?.defaultReminder ?? "three_days" });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const { data: view } = useSubscriptions("");

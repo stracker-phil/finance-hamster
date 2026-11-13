@@ -22,6 +22,7 @@ pub mod money;
 pub mod notify;
 pub mod platform;
 pub mod preview;
+pub mod reminders;
 mod remote;
 pub mod review;
 pub mod rules;

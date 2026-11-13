@@ -646,12 +646,36 @@ hideOwnTransfers: boolean,
 /**
  * Days an excluded document stays in the Archive before it can be deleted.
  */
-archiveDays: number, };
+archiveDays: number, 
+/**
+ * The reminder a new subscription starts with.
+ */
+defaultReminder: Reminder, 
+/**
+ * A notification when a charge differs from its subscription's plan.
+ */
+remindPriceChanges: boolean, 
+/**
+ * Days after an account's last statement ends before the import reminder.
+ */
+importAfterDays: number, 
+/**
+ * A notification when the statements of an account have a gap.
+ */
+remindGaps: boolean, 
+/**
+ * On 1 March, once the previous tax year can be closed.
+ */
+remindFiling: boolean, 
+/**
+ * On 1 November, while the open tax year has unanswered questions.
+ */
+remindQuestions: boolean, };
 
 /**
  * The fields to change; absent ones keep their value.
  */
-export type SettingsPatch = { appearance?: Appearance, accent?: Accent, numberFormat?: NumberFormat, showOriginalCurrency?: boolean, hideOwnTransfers?: boolean, archiveDays?: number, };
+export type SettingsPatch = { appearance?: Appearance, accent?: Accent, numberFormat?: NumberFormat, showOriginalCurrency?: boolean, hideOwnTransfers?: boolean, archiveDays?: number, defaultReminder?: Reminder, remindPriceChanges?: boolean, importAfterDays?: number, remindGaps?: boolean, remindFiling?: boolean, remindQuestions?: boolean, };
 
 export type SliceView = { year: number, amount: string, 
 /**

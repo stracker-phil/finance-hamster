@@ -1,12 +1,16 @@
-import { act, fireEvent, screen, waitFor } from "@testing-library/react";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
 
 import { api, type SubscriptionForm } from "../api";
+import { createQueryClient } from "../queries/queryClient";
+import { SETTINGS_KEY } from "../queries/settings";
 import { useStore } from "../state/store";
 import { renderWithQuery } from "../test/renderWithQuery";
+import { settings } from "../test/settings";
 import { subscriptionForm, subscriptionsView } from "../test/subscriptions";
 import { SubscriptionSheet, SubscriptionSheetHost } from "./SubscriptionSheet";
 
@@ -23,7 +27,7 @@ const EMPTY_FORM: SubscriptionForm = {
   currency: "EUR",
   interval: "monthly",
   start: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
-  reminder: "off",
+  reminder: "three_days",
   itemKey: null,
   matchText: "",
   tolerance: "0",
@@ -86,6 +90,22 @@ describe("SubscriptionSheet", () => {
       await submit();
 
       expect(mocked.subscriptionSave).toHaveBeenCalledWith(null, { ...EMPTY_FORM, name: "Lumen AI", amount: "5", interval: "yearly", reminder: "one_week", category: "Media", currency: "USD", matchText: "LUMEN" });
+    });
+
+    it("starts with the default reminder from Settings", async () => {
+      const client = createQueryClient();
+      client.setQueryData(SETTINGS_KEY, settings({ defaultReminder: "one_week" }));
+      render(
+        <QueryClientProvider client={client}>
+          <SubscriptionSheet id={null} initial={null} onClose={vi.fn()} />
+        </QueryClientProvider>,
+      );
+      await userEvent.type(screen.getByLabelText("Name"), "Lumen AI");
+      await userEvent.type(screen.getByLabelText("Amount"), "20.00");
+
+      await submit();
+
+      expect(mocked.subscriptionSave).toHaveBeenCalledWith(null, { ...EMPTY_FORM, name: "Lumen AI", amount: "20.00", reminder: "one_week" });
     });
 
     it("marks the chosen repeat interval pressed", async () => {
