@@ -14,9 +14,19 @@ append-only journal, finished documents and closed tax years are locked, and del
 
 Not included: budgeting, bookkeeping, tax calculation, bank APIs, multiple users or sync.
 
+## Screens
+
+All from the debug build on its demo data (`scripts/dev/screens.sh`).
+
+| | |
+|---|---|
+| ![Today](docs/screens/today-dark.png) | ![Tax year](docs/screens/year-light.png) |
+| ![Subscriptions](docs/screens/subscriptions-dark.png) | ![Review](docs/screens/review-light.png) |
+| ![Statements](docs/screens/statements-dark.png) | ![Documents](docs/screens/documents-light.png) |
+
 ## Status
 
-Early development; built step by step. macOS on Apple Silicon only.
+Feature complete, in acceptance before 1.0. macOS on Apple Silicon only.
 
 ## Install
 
