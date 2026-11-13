@@ -36,3 +36,21 @@
 .year-row__detail { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .year-row__amount { margin-left: auto; font-variant-numeric: tabular-nums; font-size: 13px; }
 .year-more { margin-top: 10px; font-size: 12px; }
+
+/* Amounts and trips */
+.year-dot--accent { background: var(--accent); }
+.kennzahl__add { margin-right: 6px; font-size: 12.5px; font-weight: 500; }
+.year-row-wrap { position: relative; }
+.year-row-wrap:has(.year-row__actions) .year-row { padding-right: 40px; }
+.year-row-wrap:has(.year-row__actions .btn) .year-row { padding-right: 150px; }
+.year-row__actions { position: absolute; top: 0; right: 4px; height: 44px; display: flex; align-items: center; gap: 6px; }
+.entry-add { padding: 10px 4px 0 50px; animation: fade-in 0.15s ease-out; }
+.entry-add__row { display: flex; align-items: center; gap: 8px; }
+.entry-add__row .field { width: auto; height: 28px; }
+.entry-add__date { flex: none; width: 130px; }
+.entry-add__text { flex: 1; min-width: 0; }
+.entry-add__value { flex: none; width: 80px; text-align: right; font-variant-numeric: tabular-nums; }
+.entry-add__rate { flex: none; width: 92px; text-align: right; }
+.entry-add__pdf { flex: none; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.entry-add__note { padding: 6px 0 0 16px; }
+.entry-add__note--error { color: var(--danger-text); }

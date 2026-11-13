@@ -1,7 +1,7 @@
 import { getName, getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { Account, AccountEdit, AccountLines, Action, Elsewhere, YearPage, AddInput, AddPreview, ArchivedDocument, DeletionView, DocumentEdit, DocumentGroup, DocumentStep, DocumentView, HistoryEntry, VendorChange, VendorsView, Estimate, LineChoice, Coverage, ReviewQueue, RuleForm, RulesView, Frame, ImportPreview, PdfSource, AppError, AppInfo, CommandInfo, ErrorKind, EventName, EventPayloads, Imported, LaunchEvent, NewAccount, ReloadPreview, RulesFile, Settings, SettingsPatch, TaxYear } from "./types";
+import type { Account, AccountEdit, AccountLines, Action, Elsewhere, YearPage, NewEntry, AddInput, AddPreview, ArchivedDocument, DeletionView, DocumentEdit, DocumentGroup, DocumentStep, DocumentView, HistoryEntry, VendorChange, VendorsView, Estimate, LineChoice, Coverage, ReviewQueue, RuleForm, RulesView, Frame, ImportPreview, PdfSource, AppError, AppInfo, CommandInfo, ErrorKind, EventName, EventPayloads, Imported, LaunchEvent, NewAccount, ReloadPreview, RulesFile, Settings, SettingsPatch, TaxYear } from "./types";
 
 export * from "./types";
 
@@ -50,6 +50,14 @@ export const api = {
   yearPage: (year: number, query: string) => invoke<YearPage>("year_page", { year, query }),
   /** The label of the change, or null when nothing changed. */
   yearAnswer: (year: number, question: string, value: string) => invoke<string | null>("year_answer", { year, question, value }),
+  /** Adds an amount or a trip; the label of the change. */
+  yearEntryAdd: (year: number, entry: NewEntry) => invoke<string>("year_entry_add", { year, entry }),
+  yearEntryDelete: (year: number, id: string) => invoke<string>("year_entry_delete", { year, id }),
+  /** Attaches the PDF at `path` to an amount; the label of the change. */
+  yearEntryAttach: (year: number, id: string, path: string) => invoke<string>("year_entry_attach", { year, id, path }),
+  /** Asks for an evidence PDF; its full path, or null when cancelled. */
+  yearEvidenceChoose: () => invoke<string | null>("year_evidence_choose"),
+  yearEvidenceOpen: (year: number, id: string) => invoke<void>("year_evidence_open", { year, id }),
   /** Where else the filter text turns up. */
   searchElsewhere: (query: string) => invoke<Elsewhere[]>("search_elsewhere", { query }),
   rulesView: () => invoke<RulesView>("rules_view"),

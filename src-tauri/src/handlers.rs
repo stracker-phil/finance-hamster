@@ -58,6 +58,11 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static
         crate::documents::commands::deletion_log,
         crate::year::commands::year_page,
         crate::year::commands::year_answer,
+        crate::year::commands::year_entry_add,
+        crate::year::commands::year_entry_delete,
+        crate::year::commands::year_entry_attach,
+        crate::year::commands::year_evidence_choose,
+        crate::year::commands::year_evidence_open,
         crate::search::search_elsewhere,
     ]
 }

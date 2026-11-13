@@ -9,6 +9,7 @@ use crate::db::{Change, Db, Op, Source};
 use crate::error::AppResult;
 
 mod documents;
+mod entries;
 mod statements;
 
 type Seeder = fn() -> AppResult<Option<Op>>;
@@ -91,6 +92,11 @@ pub fn seed_if_empty(db: &Db, config_dir: &Path, today: chrono::NaiveDate) -> Ap
     }
     count += statements::seed(db, config_dir, today)?;
     count += documents::seed(db, config_dir, today)?;
+    let now = today
+        .and_hms_opt(12, 0, 0)
+        .map(|t| t.and_utc().timestamp_millis())
+        .unwrap_or_default();
+    count += entries::seed(db, config_dir, chrono::Datelike::year(&today), now)?;
     Ok(count)
 }
 
@@ -174,13 +180,26 @@ mod tests {
     }
 
     #[test]
-    fn seeding_writes_the_accounts_the_rules_each_statement_the_tax_year_each_invoice_and_the_file_move()
+    fn seeding_writes_the_accounts_the_rules_each_statement_the_tax_year_each_invoice_the_file_move_and_the_entries()
      {
         let dir = temp_config_dir();
         let db = Db::open(dir.path()).unwrap();
         assert_eq!(
             seed_if_empty(&db, dir.path(), today()).unwrap(),
-            2 + 24 + 1 + 4 + 2 + 1
+            2 + 24 + 1 + 4 + 2 + 1 + 3
+        );
+        let kinds: Vec<_> = crate::year::entries::entries(&db, 2026)
+            .unwrap()
+            .into_iter()
+            .map(|e| e.kind)
+            .collect();
+        assert_eq!(
+            kinds,
+            [
+                crate::year::entries::EntryKind::Amount,
+                crate::year::entries::EntryKind::Trip,
+                crate::year::entries::EntryKind::Trip
+            ]
         );
 
         let accounts = accounts::list(&db).unwrap();

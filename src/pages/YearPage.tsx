@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
-import { Copy, FileText, Landmark, MoreHorizontal } from "lucide-react";
+import { Car, Copy, Euro, FileText, Landmark, MoreHorizontal, Trash2 } from "lucide-react";
 import { api, toAppError, type AttentionView, type KennzahlView, type MonthView, type QuestionView, type YearRow } from "../api";
 import { startAddDocument } from "../documents/addFlow";
 import { copyText } from "../lib/clipboard";
 import { useCoversPdf } from "../lib/pdfCover";
 import { useYearPage } from "../queries/year";
 import { useStore } from "../state/store";
+import { AddButton, AddEntry } from "../year/AddEntry";
+import { attachEvidence, deleteEntry, openEvidence } from "../year/entryActions";
 import { EmptyPage } from "./EmptyPage";
 
 const showError = (e: unknown) => useStore.getState().showToast("error", toAppError(e).message);
@@ -40,25 +42,50 @@ function QuestionRow({ year, question }: { year: number; question: QuestionView 
   );
 }
 
-function Row({ row, year, withAmount }: { row: YearRow; year: number; withAmount: boolean }) {
-  const navigate = useStore((s) => s.navigate);
-  const open = () => {
-    if (row.kind === "document") navigate({ page: "document", documentId: row.id, year });
-  };
-  const Icon = row.kind === "document" ? FileText : Landmark;
+const ROW_ICONS = { document: FileText, line: Landmark, amount: Euro, trip: Car };
+
+function AttachButton({ year, entryId }: { year: number; entryId: string }) {
   return (
-    <button className="year-row" onClick={open} disabled={row.kind !== "document"}>
-      <Icon size={15} strokeWidth={1.8} className="docs-row__icon" />
-      <span className="year-row__title">{row.title}</span>
-      {row.draft && <span className="pill pill--dashed">Draft</span>}
-      {row.carriedFrom && <span className="pill">From {row.carriedFrom}</span>}
-      <span className="add-doc__hint year-row__detail">{row.detail}</span>
-      {withAmount && <span className="year-row__amount">{row.amount}</span>}
+    <button className="btn btn--small" onClick={() => attachEvidence(year, entryId)}>
+      Attach PDF…
     </button>
   );
 }
 
-function Kennzahl({ item, year }: { item: KennzahlView; year: number }) {
+function Row({ row, year, withAmount, open }: { row: YearRow; year: number; withAmount: boolean; open: boolean }) {
+  const navigate = useStore((s) => s.navigate);
+  const isEntry = row.kind === "amount" || row.kind === "trip";
+  const onOpen =
+    row.kind === "document"
+      ? () => navigate({ page: "document", documentId: row.id, year })
+      : row.kind === "amount" && !row.attach
+        ? () => openEvidence(year, row.id)
+        : undefined;
+  const Icon = ROW_ICONS[row.kind];
+  return (
+    <div className="year-row-wrap">
+      <button className="year-row" onClick={onOpen} disabled={!onOpen}>
+        <Icon size={15} strokeWidth={1.8} className="docs-row__icon" />
+        <span className="year-row__title">{row.title}</span>
+        {row.draft && <span className="pill pill--dashed">Draft</span>}
+        {row.carriedFrom && <span className="pill">From {row.carriedFrom}</span>}
+        <span className="add-doc__hint year-row__detail">{row.detail}</span>
+        {withAmount && <span className="year-row__amount">{row.amount}</span>}
+      </button>
+      {isEntry && open && (
+        <span className="year-row__actions">
+          {row.attach && <AttachButton year={year} entryId={row.id} />}
+          <button className="icon-btn" aria-label={`Delete ${row.title}`} onClick={() => deleteEntry(year, row.id)}>
+            <Trash2 size={14} />
+          </button>
+        </span>
+      )}
+    </div>
+  );
+}
+
+function Kennzahl({ item, year, open }: { item: KennzahlView; year: number; open: boolean }) {
+  const [adding, setAdding] = useState(false);
   const copy = () =>
     copyText(item.copy)
       .then(() => useStore.getState().showToast("success", `Copied ${item.copy} for KZ ${item.kz}`))
@@ -68,14 +95,20 @@ function Kennzahl({ item, year }: { item: KennzahlView; year: number }) {
       <div className="kennzahl__head">
         <span className="mono kennzahl__kz">KZ {item.kz}</span>
         <span className="kennzahl__name">{item.name}</span>
-        <button className="copy-btn" onClick={() => void copy()} aria-label={`Copy ${item.copy} for KZ ${item.kz}`}>
-          {item.copy}
-          <Copy size={13} />
-        </button>
+        {open && <AddButton item={item} adding={adding} onToggle={() => setAdding((a) => !a)} />}
+        {item.reported ? (
+          <span className="pill">Not counted</span>
+        ) : (
+          <button className="copy-btn" onClick={() => void copy()} aria-label={`Copy ${item.copy} for KZ ${item.kz}`}>
+            {item.copy}
+            <Copy size={13} />
+          </button>
+        )}
       </div>
       {item.rows.map((row) => (
-        <Row key={row.id} row={row} year={year} withAmount={item.rows.length > 1} />
+        <Row key={row.id} row={row} year={year} withAmount={item.rows.length > 1} open={open} />
       ))}
+      {open && adding && <AddEntry year={year} item={item} onDone={() => setAdding(false)} />}
       {item.note && <div className="kennzahl__note">{item.note}</div>}
     </section>
   );
@@ -93,7 +126,7 @@ function AttentionList({ year, items }: { year: number; items: AttentionView[] }
     <section aria-label="Needs attention">
       <h3 className="year-heading">Needs attention</h3>
       {shown.map((item, i) => {
-        const documentId = item.documentId;
+        const { documentId, entryId } = item;
         return (
           <div key={i} className="year-line">
             <span className="year-dot year-dot--warn" />
@@ -105,6 +138,8 @@ function AttentionList({ year, items }: { year: number; items: AttentionView[] }
               <button className="btn btn--small" onClick={() => navigate({ page: "document", documentId, year })}>
                 {item.kind === "draft" ? "Open Draft" : "Open"}
               </button>
+            ) : entryId ? (
+              <AttachButton year={year} entryId={entryId} />
             ) : (
               <button className="btn btn--small" onClick={startAddDocument}>
                 Attach PDF…
@@ -122,7 +157,7 @@ function AttentionList({ year, items }: { year: number; items: AttentionView[] }
   );
 }
 
-function MonthList({ year, months }: { year: number; months: MonthView[] }) {
+function MonthList({ year, months, open }: { year: number; months: MonthView[]; open: boolean }) {
   if (months.length === 0) return <p className="add-doc__hint">Nothing counts in {year} yet.</p>;
   return (
     <>
@@ -133,7 +168,7 @@ function MonthList({ year, months }: { year: number; months: MonthView[] }) {
             <span className="year-row__amount">{month.total}</span>
           </div>
           {month.rows.map((row) => (
-            <Row key={row.id} row={row} year={year} withAmount />
+            <Row key={row.id} row={row} year={year} withAmount open={open} />
           ))}
         </section>
       ))}
@@ -223,9 +258,9 @@ export function YearPage({ year }: { year: number }) {
         </div>
 
         {view === "kennzahl" ? (
-          data.kennzahlen.map((item) => <Kennzahl key={item.key} item={item} year={data.year} />)
+          data.kennzahlen.map((item) => <Kennzahl key={item.key} item={item} year={data.year} open={open} />)
         ) : (
-          <MonthList year={data.year} months={data.months} />
+          <MonthList year={data.year} months={data.months} open={open} />
         )}
       </div>
     </div>

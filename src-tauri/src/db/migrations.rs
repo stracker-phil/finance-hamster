@@ -169,6 +169,20 @@ pub const MIGRATIONS: &[&str] = &[
     );",
     // 8: a document's own useful life, overriding its item's asset class.
     "ALTER TABLE documents ADD COLUMN useful_life INTEGER;",
+    // 9: amounts and trips entered on the tax year page; a trip's value comes from the rate valid on its date.
+    "CREATE TABLE entries (
+        id TEXT PRIMARY KEY,
+        year INTEGER NOT NULL,
+        item_key TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        date TEXT NOT NULL,
+        cents INTEGER,
+        km INTEGER,
+        text TEXT NOT NULL,
+        evidence TEXT,
+        created_at INTEGER NOT NULL
+    );
+    CREATE INDEX entries_year ON entries (year);",
 ];
 
 pub fn version(conn: &Connection) -> AppResult<usize> {
@@ -228,6 +242,7 @@ mod tests {
             "deletions",
             "document_links",
             "documents",
+            "entries",
             "journal",
             "rules",
             "statements",
@@ -237,6 +252,32 @@ mod tests {
         ]
         .map(String::from)
         .to_vec()
+    }
+
+    #[test]
+    fn a_file_at_version_eight_gains_the_entries_table_and_keeps_its_documents() {
+        let dir = temp_config_dir();
+        let mut conn = Connection::open(dir.path().join("v8.sqlite")).unwrap();
+        for sql in &MIGRATIONS[..8] {
+            conn.execute_batch(sql).unwrap();
+        }
+        conn.pragma_update(None, "user_version", 8i64).unwrap();
+        conn.execute(
+            "INSERT INTO documents (id, state, file, original_name, file_hash, work_share, note, created_at) \
+             VALUES ('doc-1', 'draft', 'docs/inbox/a.pdf', 'a.pdf', 'hash', 100, '', 1)",
+            [],
+        )
+        .unwrap();
+        assert!(!tables(&conn).contains(&"entries".to_string()));
+
+        migrate(&mut conn).unwrap();
+
+        assert_eq!(version(&conn).unwrap(), MIGRATIONS.len());
+        assert_eq!(tables(&conn), all_tables());
+        let documents: i64 = conn
+            .query_row("SELECT COUNT(*) FROM documents", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(documents, 1);
     }
 
     fn document_columns(conn: &Connection) -> Vec<String> {

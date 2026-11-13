@@ -495,10 +495,25 @@ fn a_year_without_entries_is_all_zero_and_asks_for_its_answers() {
             ("720", "0,00"),
             ("721", "0,00"),
             ("722", "0,00"),
-            ("724", "0,00")
+            ("724", "0,00"),
+            ("726", "0,00")
         ]
     );
-    assert!(page.kennzahlen.iter().all(|k| k.note.is_none()));
+    let notes: Vec<(&str, bool)> = page
+        .kennzahlen
+        .iter()
+        .map(|k| (k.kz.as_str(), k.note.is_some()))
+        .collect();
+    assert_eq!(
+        notes,
+        [
+            ("720", false),
+            ("721", false),
+            ("722", false),
+            ("724", false),
+            ("726", true)
+        ]
+    );
 }
 
 #[test]
@@ -528,6 +543,7 @@ fn a_document_counts_what_was_paid_times_its_work_share_and_other_years_stay_out
             draft: false,
             carried_from: None,
             kz: "720".into(),
+            attach: false,
         }]
     );
     assert_eq!(
@@ -541,6 +557,7 @@ fn a_document_counts_what_was_paid_times_its_work_share_and_other_years_stay_out
             draft: false,
             carried_from: None,
             kz: "721".into(),
+            attach: false,
         }]
     );
 }
@@ -562,13 +579,14 @@ fn an_anv_bank_line_on_an_item_without_a_document_counts_at_the_items_default_wo
             draft: false,
             carried_from: None,
             kz: "722".into(),
+            attach: false,
         }]
     );
     assert_eq!(amounts(rows_of(&page, "724")), ["€25.00"]);
 }
 
 #[test]
-fn kennzahlen_follow_the_rules_file_with_a_copy_value_and_skip_hidden_and_reported_items() {
+fn kennzahlen_follow_the_rules_file_with_a_copy_value_and_skip_hidden_items() {
     let (_dir, db) = counted_entries();
     finished(&db, "doc-h", "secret", "2026-02-02", 2_000, 100);
 
@@ -580,11 +598,12 @@ fn kennzahlen_follow_the_rules_file_with_a_copy_value_and_skip_hidden_and_report
             ("720", "46,90"),
             ("721", "72,00"),
             ("722", "40,00"),
-            ("724", "25,00")
+            ("724", "25,00"),
+            ("726", "0,00")
         ]
     );
     let names: Vec<&str> = page.kennzahlen.iter().map(|k| k.name.as_str()).collect();
-    assert_eq!(names, ["Books", "Phone", "Tips", "Parking"]);
+    assert_eq!(names, ["Books", "Phone", "Tips", "Parking", "Employer"]);
     assert_eq!(page.total, "€183.90");
 }
 
@@ -612,7 +631,8 @@ fn a_kennzahl_has_a_note_only_when_it_has_rows() {
             Some("Enter the full amount. The tax office counts up to €300.00 per year."),
             None,
             Some("Answer the question above."),
-            None
+            None,
+            Some("Reported by others; shown for reference, never counted here")
         ]
     );
 }
@@ -723,9 +743,11 @@ fn a_document_on_an_item_reported_by_others_is_never_placed() {
             ("720", "0,00"),
             ("721", "0,00"),
             ("722", "0,00"),
-            ("724", "0,00")
+            ("724", "0,00"),
+            ("726", "0,00")
         ]
     );
+    assert!(rows_of(&page, "726").is_empty());
 }
 
 #[test]
@@ -743,7 +765,7 @@ fn an_anv_line_decided_on_an_item_reported_by_others_is_never_placed() {
     assert!(page.months.is_empty());
     assert!(page.attention.is_empty());
     assert!(page.kennzahlen.iter().all(|k| k.rows.is_empty()));
-    assert!(page.kennzahlen.iter().all(|k| k.kz != "726"));
+    assert!(rows_of(&page, "726").is_empty());
 }
 
 #[test]
@@ -803,6 +825,7 @@ fn drafts_are_listed_under_attention_and_marked_in_their_rows() {
         title: id.into(),
         detail: "Finish it to lock its values for the tax year".into(),
         document_id: Some(id.into()),
+        entry_id: None,
     };
     assert_eq!(attention, [&expected("doc-d1"), &expected("doc-d2")]);
     assert_eq!(
@@ -816,6 +839,7 @@ fn drafts_are_listed_under_attention_and_marked_in_their_rows() {
             draft: true,
             carried_from: None,
             kz: "720".into(),
+            attach: false,
         }]
     );
     assert_eq!(page.progress, "2 drafts to finish · 2 answers missing");
@@ -839,6 +863,7 @@ fn a_document_without_a_payment_date_is_listed_as_undated_and_counts_nowhere() {
             title: "doc-u".into(),
             detail: "Set its payment date to place it in a tax year".into(),
             document_id: Some("doc-u".into()),
+            entry_id: None,
         }]
     );
     assert_eq!(page.total, "€0.00");
@@ -881,6 +906,7 @@ fn an_anv_line_on_an_item_that_needs_an_invoice_is_missing_its_invoice_and_does_
             title: "Lastschrift SEITENWEISE · €58.30".into(),
             detail: "5 Oct · KZ 720 needs the invoice before it counts".into(),
             document_id: None,
+            entry_id: None,
         }]
     );
     assert_eq!(amounts(rows_of(&page, "720")), ["€10.00"]);
@@ -1097,6 +1123,7 @@ fn slice_row(
         draft,
         carried_from,
         kz: "720".into(),
+        attach: false,
     }
 }
 
@@ -1251,6 +1278,7 @@ fn a_draft_needs_attention_only_in_the_purchase_year_but_its_slices_stay_marked_
             title: "pc".into(),
             detail: "Finish it to lock its values for the tax year".into(),
             document_id: Some("pc".into()),
+            entry_id: None,
         }]
     );
     assert!(later.attention.is_empty());
@@ -1354,7 +1382,8 @@ fn a_carried_row_travels_with_its_purchase_year_in_camel_case() {
             "amount": "€500.00",
             "draft": false,
             "carriedFrom": 2026,
-            "kz": "720"
+            "kz": "720",
+            "attach": false
         })
     );
 }

@@ -1,23 +1,22 @@
 //! Gathering what counts in a tax year: its documents (placed by their payments in the year) and the ANV bank
-//! lines without a document, plus what still needs attention.
+//! lines without a document, amounts and trips (`rows`), plus what still needs attention.
 
 use chrono::Datelike;
 
 use super::page::{AttentionKind, AttentionView, RowKind, YearRow};
+use super::rows;
 use crate::date::{self, DateOrder};
 use crate::db::Db;
-use crate::documents::amounts::{anv_cents, default_work_share};
+use crate::documents::amounts::anv_cents;
 use crate::documents::depreciation::{self, Schedule};
 use crate::documents::store::{self as documents, DocState, DocumentRow};
 use crate::documents::title_of;
 use crate::error::AppResult;
 use crate::money::{Money, format_money};
-use crate::review::title_of as line_title;
 use crate::rules;
-use crate::rules::store::{self as decisions, Action};
 use crate::settings::NumberFormat;
 use crate::statements::store::{self as statements, TransactionRow};
-use crate::taxrules::model::{Evidence, Item, ItemKind, Ruleset};
+use crate::taxrules::model::{Item, ItemKind, Ruleset};
 
 pub fn eur(cents: i64, format: NumberFormat) -> String {
     format_money(&Money::eur(cents), format)
@@ -27,7 +26,7 @@ pub fn in_year(text: &str, year: i32) -> bool {
     date::parse(text).is_some_and(|d| d.year() == year)
 }
 
-fn day_text(text: &str, order: DateOrder) -> String {
+pub(super) fn day_text(text: &str, order: DateOrder) -> String {
     date::parse(text)
         .map(|d| date::day_month(d, order))
         .unwrap_or_default()
@@ -38,7 +37,7 @@ pub fn is_countable(item: &Item) -> bool {
     item.visible && item.kind != ItemKind::ReportedByOthers
 }
 
-fn countable<'a>(items: &'a [Item], key: Option<&String>) -> Option<&'a Item> {
+pub(super) fn countable<'a>(items: &'a [Item], key: Option<&String>) -> Option<&'a Item> {
     key.and_then(|k| items.iter().find(|i| &i.key == k && is_countable(i)))
 }
 
@@ -63,6 +62,25 @@ pub struct Facts {
     pub archived: usize,
 }
 
+impl Facts {
+    /// A payment that counts only once its invoice or evidence is there.
+    pub(super) fn flag_missing_invoice(
+        &mut self,
+        title: String,
+        detail: String,
+        entry_id: Option<String>,
+    ) {
+        self.missing_invoices += 1;
+        self.attention.push(AttentionView {
+            kind: AttentionKind::MissingInvoice,
+            title,
+            detail,
+            document_id: None,
+            entry_id,
+        });
+    }
+}
+
 /// Everything that counts in `year`, newest first, and what needs attention.
 pub fn gather(
     db: &Db,
@@ -73,7 +91,8 @@ pub fn gather(
 ) -> AppResult<Facts> {
     let mut facts = Facts::default();
     document_rows(db, year, &ruleset.items, format, order, &mut facts)?;
-    decided_lines(db, year, ruleset, format, order, &mut facts)?;
+    rows::decided_lines(db, year, ruleset, format, order, &mut facts)?;
+    rows::entry_rows(db, year, ruleset, format, order, &mut facts)?;
     // Whole-year rows first, as in the months view; then the newest payment first.
     facts.placed.sort_by(|a, b| {
         a.date
@@ -108,6 +127,7 @@ fn document_rows(
                 detail: "Set its payment date to place it in a tax year".into(),
                 title,
                 document_id: Some(doc.id.clone()),
+                entry_id: None,
             });
             continue;
         };
@@ -171,6 +191,7 @@ fn count_state(doc: &DocumentRow, title: &str, facts: &mut Facts) {
             detail: "Finish it to lock its values for the tax year".into(),
             title: title.to_string(),
             document_id: Some(doc.id.clone()),
+            entry_id: None,
         });
     } else {
         facts.finished += 1;
@@ -305,6 +326,7 @@ fn document_placed(
             draft: doc.state == DocState::Draft,
             carried_from,
             kz: item.kz.clone(),
+            attach: false,
         },
     }
 }
@@ -328,61 +350,4 @@ fn placed_document(
         None => format!("{shown} · amount paid missing"),
     };
     document_placed(doc, item, title, Some(day), detail, counted, None, format)
-}
-
-fn decided_lines(
-    db: &Db,
-    year: i32,
-    ruleset: &Ruleset,
-    format: NumberFormat,
-    order: DateOrder,
-    facts: &mut Facts,
-) -> AppResult<()> {
-    let linked: Vec<String> = db
-        .read(documents::links)?
-        .into_iter()
-        .map(|l| l.transaction_id)
-        .collect();
-    let decided = db.read(decisions::decisions)?;
-    for line in db.read(statements::all_transactions)? {
-        if !in_year(&line.value_date, year) || linked.contains(&line.id) {
-            continue;
-        }
-        let Some(decision) = decided.get(&line.id).filter(|d| d.kind == Action::Anv) else {
-            continue;
-        };
-        let Some(item) = countable(&ruleset.items, decision.item_key.as_ref()) else {
-            continue;
-        };
-        let title = line_title(&line);
-        let day = day_text(&line.value_date, order);
-        if item.evidence() == Evidence::Required {
-            facts.missing_invoices += 1;
-            facts.attention.push(AttentionView {
-                kind: AttentionKind::MissingInvoice,
-                title: format!("{title} · {}", eur(line.cents.abs(), format)),
-                detail: format!("{day} · KZ {} needs the invoice before it counts", item.kz),
-                document_id: None,
-            });
-            continue;
-        }
-        let share = default_work_share(Some(ruleset), Some(&item.key));
-        let counted = anv_cents(line.cents, share);
-        facts.placed.push(Placed {
-            item: item.key.clone(),
-            date: Some(line.value_date.clone()),
-            cents: counted,
-            row: YearRow {
-                id: line.id.clone(),
-                kind: RowKind::Line,
-                title,
-                detail: format!("{day} · bank line"),
-                amount: eur(counted, format),
-                draft: false,
-                carried_from: None,
-                kz: item.kz.clone(),
-            },
-        });
-    }
-    Ok(())
 }

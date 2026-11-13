@@ -11,13 +11,14 @@ export function yearRow(patch: Partial<YearRow> = {}): YearRow {
     draft: false,
     carriedFrom: null,
     kz: "720",
+    attach: false,
     ...patch,
   };
 }
 
 /** A demo Kennzahl section with one row, with `patch` applied. */
 export function kennzahlView(patch: Partial<KennzahlView> = {}): KennzahlView {
-  return { key: "720", kz: "720", name: "Fachliteratur", copy: "1228,40", rows: [yearRow()], note: null, ...patch };
+  return { key: "720", kz: "720", name: "Fachliteratur", copy: "1228,40", rows: [yearRow()], note: null, add: null, rate: null, reported: false, ...patch };
 }
 
 /** A demo question of an open year, with `patch` applied. */
@@ -27,7 +28,7 @@ export function questionView(patch: Partial<QuestionView> = {}): QuestionView {
 
 /** A demo attention entry, with `patch` applied. */
 export function attentionView(patch: Partial<AttentionView> = {}): AttentionView {
-  return { kind: "draft", title: "Example Market", detail: "Still a draft", documentId: "doc-2", ...patch };
+  return { kind: "draft", title: "Example Market", detail: "Still a draft", documentId: "doc-2", entryId: null, ...patch };
 }
 
 /** A demo month section, with `patch` applied. */

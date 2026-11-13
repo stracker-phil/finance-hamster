@@ -46,6 +46,8 @@ pub struct AttentionView {
     pub detail: String,
     /// The document to open; None for a missing invoice.
     pub document_id: Option<String>,
+    /// The amount that waits for its evidence PDF.
+    pub entry_id: Option<String>,
 }
 
 #[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq, TS)]
@@ -55,6 +57,18 @@ pub enum RowKind {
     Document,
     /// An ANV bank line on an item that needs no document.
     Line,
+    Amount,
+    Trip,
+}
+
+/// What "+ Add" offers for a Kennzahl in an open year.
+#[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export, export_to = "src/api/types.gen.ts")]
+pub enum AddKind {
+    Document,
+    Amount,
+    Trip,
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
@@ -72,6 +86,8 @@ pub struct YearRow {
     /// The purchase year of a depreciation slice counted in a later year.
     pub carried_from: Option<i32>,
     pub kz: String,
+    /// An amount without its evidence PDF.
+    pub attach: bool,
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
@@ -85,6 +101,12 @@ pub struct KennzahlView {
     pub copy: String,
     pub rows: Vec<YearRow>,
     pub note: Option<String>,
+    /// None for an item others report, which never counts.
+    pub add: Option<AddKind>,
+    /// A trips item's rate, `× €0.50 / km`.
+    pub rate: Option<String>,
+    /// Reported by others: shown for reference, never counted.
+    pub reported: bool,
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
@@ -162,6 +184,7 @@ pub fn page(
         progress_percent,
         pauschale_note: summary::pauschale_note(&ruleset, total, format),
         kennzahlen: summary::kennzahlen(
+            year,
             &ruleset,
             &facts,
             &given,

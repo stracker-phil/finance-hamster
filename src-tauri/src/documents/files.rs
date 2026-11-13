@@ -72,7 +72,12 @@ pub fn copy_in(
     bytes: &[u8],
     hash: &str,
 ) -> AppResult<String> {
-    let name = free_name(config_dir, &format!("{INBOX}/{original_name}"), hash);
+    copy_to(config_dir, &format!("{INBOX}/{original_name}"), bytes, hash)
+}
+
+/// Copies bytes to the relative path `base`, numbered when another file holds the name; returns the path.
+pub fn copy_to(config_dir: &Path, base: &str, bytes: &[u8], hash: &str) -> AppResult<String> {
+    let name = free_name(config_dir, base, hash);
     let path = config_dir.join(&name);
     ensure_parent(&path)?;
     if !path.exists() {

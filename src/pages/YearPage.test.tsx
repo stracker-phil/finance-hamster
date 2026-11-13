@@ -7,6 +7,7 @@ vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await impo
 import { api } from "../api";
 import { HOME } from "../state/route";
 import { useStore } from "../state/store";
+import { addPreview } from "../test/documents";
 import { renderWithQuery } from "../test/renderWithQuery";
 import { attentionView, kennzahlView, monthView, questionView, yearPage, yearRow } from "../test/year";
 import { YearPage } from "./YearPage";
@@ -250,6 +251,299 @@ describe("YearPage", () => {
       await show({ kennzahlen: [kennzahlView({ rows: [yearRow({ id: "line-1", kind: "line", title: "Example Union dues" })] })] });
 
       expect(screen.getByRole<HTMLButtonElement>("button", { name: /Example Union dues/ }).disabled).toBe(true);
+    });
+  });
+
+  describe("adding to a Kennzahl", () => {
+    const amountRow = (patch: Parameters<typeof yearRow>[0] = {}) => yearRow({ id: "e1", kind: "amount", title: "Example Desk Lamp", ...patch });
+    const tripRow = () => yearRow({ id: "t1", kind: "trip", title: "Linz · client workshop" });
+    const toastMessages = () => useStore.getState().toasts.map((t) => t.message);
+    const group = (name: string) => within(screen.getByRole("group", { name }));
+
+    beforeEach(() => {
+      mocked.documentAddChoose.mockResolvedValue(null);
+      mocked.yearEvidenceChoose.mockResolvedValue(null);
+      mocked.yearEntryAdd.mockResolvedValue("Add entry");
+      mocked.yearEntryDelete.mockResolvedValue("Delete entry");
+    });
+
+    describe("buttons in the Kennzahl head", () => {
+      it.each([
+        ["document", "+ Document"],
+        ["amount", "+ Amount"],
+        ["trip", "+ Trip"],
+      ] as const)("shows %s as %s in an open year", async (add, name) => {
+        await show({ kennzahlen: [kennzahlView({ add })] });
+
+        expect(screen.getByRole("button", { name })).toBeTruthy();
+      });
+
+      it("shows no add button when the Kennzahl takes nothing to add", async () => {
+        await show();
+
+        expect(screen.queryByRole("button", { name: /^\+ / })).toBeNull();
+      });
+
+      it("shows no add button in a closed year", async () => {
+        await show({ state: "closed", kennzahlen: [kennzahlView({ add: "amount" })] });
+
+        expect(screen.queryByRole("button", { name: /^\+ / })).toBeNull();
+      });
+
+      it("shows Not counted instead of the copy button and no add button for a reported item", async () => {
+        await show({ kennzahlen: [kennzahlView({ add: "amount", reported: true })] });
+
+        expect(screen.getByText("Not counted")).toBeTruthy();
+        expect(screen.queryByRole("button", { name: /^Copy / })).toBeNull();
+        expect(screen.queryByRole("button", { name: /^\+ / })).toBeNull();
+      });
+    });
+
+    describe("document", () => {
+      it("opens the add sheet with the Kennzahl's item preset", async () => {
+        const preview = addPreview();
+        mocked.documentAddChoose.mockResolvedValue(preview);
+        await show({ kennzahlen: [kennzahlView({ key: "720", add: "document" })] });
+
+        await userEvent.click(screen.getByRole("button", { name: "+ Document" }));
+
+        await vi.waitFor(() => expect(useStore.getState().addPreview?.itemKey).toBe("720"));
+      });
+
+      it("opens nothing when no PDF is chosen", async () => {
+        await show({ kennzahlen: [kennzahlView({ add: "document" })] });
+
+        await userEvent.click(screen.getByRole("button", { name: "+ Document" }));
+
+        await vi.waitFor(() => expect(mocked.documentAddChoose).toHaveBeenCalled());
+        expect(useStore.getState().addPreview).toBeNull();
+      });
+    });
+
+    describe("trip", () => {
+      const showTrip = () => show({ kennzahlen: [kennzahlView({ key: "trips", kz: "721", name: "Trips", add: "trip", rate: "€0.50 per km" })] });
+      const openTrip = async () => {
+        await showTrip();
+        await userEvent.click(screen.getByRole("button", { name: "+ Trip" }));
+      };
+      const fillTrip = async () => {
+        const fields = group("Add a trip to KZ 721");
+        const date = fields.getByLabelText("Date");
+        await userEvent.clear(date);
+        await userEvent.type(date, "2026-11-05");
+        await userEvent.type(fields.getByRole("textbox", { name: "Destination and purpose" }), "Linz · client workshop");
+        await userEvent.type(fields.getByRole("textbox", { name: "Kilometres" }), "312");
+      };
+
+      it("opens an inline group with date, destination, kilometres and the rate", async () => {
+        await openTrip();
+
+        const fields = group("Add a trip to KZ 721");
+        expect(fields.getByLabelText("Date")).toBeTruthy();
+        expect(fields.getByRole("textbox", { name: "Destination and purpose" })).toBeTruthy();
+        expect(fields.getByRole("textbox", { name: "Kilometres" })).toBeTruthy();
+        expect(fields.getByText("€0.50 per km")).toBeTruthy();
+      });
+
+      it("closes the group when + Trip is clicked again", async () => {
+        await openTrip();
+
+        await userEvent.click(screen.getByRole("button", { name: "+ Trip" }));
+
+        expect(screen.queryByRole("group", { name: "Add a trip to KZ 721" })).toBeNull();
+      });
+
+      it("sends the trip, closes the row and shows the label with Undo", async () => {
+        mocked.yearEntryAdd.mockResolvedValue("Add trip Linz");
+        await openTrip();
+        await fillTrip();
+
+        await userEvent.click(group("Add a trip to KZ 721").getByRole("button", { name: "Add" }));
+
+        expect(mocked.yearEntryAdd).toHaveBeenCalledWith(2026, { kind: "trip", itemKey: "trips", date: "2026-11-05", km: "312", text: "Linz · client workshop" });
+        await vi.waitFor(() => expect(screen.queryByRole("group", { name: "Add a trip to KZ 721" })).toBeNull());
+        expect(toastMessages()).toEqual(["Add trip Linz"]);
+        expect(useStore.getState().toasts[0].action?.label).toBe("Undo");
+      });
+
+      it("adds on Enter", async () => {
+        await openTrip();
+        await fillTrip();
+
+        await userEvent.type(group("Add a trip to KZ 721").getByRole("textbox", { name: "Kilometres" }), "{Enter}");
+
+        expect(mocked.yearEntryAdd).toHaveBeenCalledWith(2026, expect.objectContaining({ kind: "trip", km: "312" }));
+      });
+
+      it("closes on Escape without adding", async () => {
+        await openTrip();
+
+        await userEvent.type(group("Add a trip to KZ 721").getByRole("textbox", { name: "Kilometres" }), "{Escape}");
+
+        expect(screen.queryByRole("group", { name: "Add a trip to KZ 721" })).toBeNull();
+        expect(mocked.yearEntryAdd).not.toHaveBeenCalled();
+      });
+
+      it("shows only the field's message when the rejection names a field", async () => {
+        mocked.yearEntryAdd.mockRejectedValue({ kind: "invalid_input", message: "entry.km: Whole kilometres", code: null, field: { path: "entry.km", message: "Whole kilometres" } });
+        await openTrip();
+
+        await userEvent.click(group("Add a trip to KZ 721").getByRole("button", { name: "Add" }));
+
+        expect((await screen.findByRole("alert")).textContent).toBe("Whole kilometres");
+      });
+
+      it("shows the error under the row and keeps it open when the add is rejected", async () => {
+        mocked.yearEntryAdd.mockRejectedValue({ kind: "invalid_input", message: "Enter the kilometres", code: null });
+        await openTrip();
+
+        await userEvent.click(group("Add a trip to KZ 721").getByRole("button", { name: "Add" }));
+
+        expect((await screen.findByRole("alert")).textContent).toBe("Enter the kilometres");
+        expect(screen.getByRole("group", { name: "Add a trip to KZ 721" })).toBeTruthy();
+        expect(toastMessages()).toEqual([]);
+      });
+    });
+
+    describe("amount", () => {
+      const showAmount = async () => {
+        await show({ kennzahlen: [kennzahlView({ key: "other", kz: "722", name: "Other", add: "amount" })] });
+        await userEvent.click(screen.getByRole("button", { name: "+ Amount" }));
+      };
+      const name = "Add an amount to KZ 722";
+
+      it("opens an inline group with note, amount and a PDF button", async () => {
+        await showAmount();
+
+        const fields = group(name);
+        expect(fields.getByRole("textbox", { name: "Note" })).toBeTruthy();
+        expect(fields.getByRole("textbox", { name: "Amount" })).toBeTruthy();
+        expect(fields.getByRole("button", { name: "PDF…" })).toBeTruthy();
+      });
+
+      it("sends the amount without evidence when no PDF is chosen", async () => {
+        await showAmount();
+        await userEvent.type(group(name).getByRole("textbox", { name: "Note" }), "Desk lamp");
+        await userEvent.type(group(name).getByRole("textbox", { name: "Amount" }), "29,90");
+
+        await userEvent.click(group(name).getByRole("button", { name: "Add" }));
+
+        expect(mocked.yearEntryAdd).toHaveBeenCalledWith(2026, expect.objectContaining({ kind: "amount", itemKey: "other", amount: "29,90", text: "Desk lamp", evidence: null }));
+      });
+
+      it("shows the chosen PDF's file name on the button and sends its path as evidence", async () => {
+        mocked.yearEvidenceChoose.mockResolvedValue("/Users/example/Receipts/lamp-receipt.pdf");
+        await showAmount();
+
+        await userEvent.click(group(name).getByRole("button", { name: "PDF…" }));
+
+        expect(await group(name).findByRole("button", { name: "lamp-receipt.pdf" })).toBeTruthy();
+        await userEvent.type(group(name).getByRole("textbox", { name: "Amount" }), "29,90");
+        await userEvent.click(group(name).getByRole("button", { name: "Add" }));
+        expect(mocked.yearEntryAdd).toHaveBeenCalledWith(2026, expect.objectContaining({ kind: "amount", evidence: "/Users/example/Receipts/lamp-receipt.pdf" }));
+      });
+
+      it("keeps PDF… on the button when the file dialog is cancelled", async () => {
+        await showAmount();
+
+        await userEvent.click(group(name).getByRole("button", { name: "PDF…" }));
+
+        await vi.waitFor(() => expect(mocked.yearEvidenceChoose).toHaveBeenCalled());
+        expect(group(name).getByRole("button", { name: "PDF…" })).toBeTruthy();
+      });
+    });
+
+    describe("entry rows", () => {
+      it.each([
+        ["amount", amountRow(), "Delete Example Desk Lamp"],
+        ["trip", tripRow(), "Delete Linz · client workshop"],
+      ] as const)("deletes a %s row with its Delete button", async (_kind, row, label) => {
+        mocked.yearEntryDelete.mockResolvedValue("Delete entry");
+        await show({ kennzahlen: [kennzahlView({ rows: [row] })] });
+
+        await userEvent.click(screen.getByRole("button", { name: label }));
+
+        expect(mocked.yearEntryDelete).toHaveBeenCalledWith(2026, row.id);
+        await vi.waitFor(() => expect(toastMessages()).toEqual(["Delete entry"]));
+      });
+
+      it("reports a rejected delete as an error toast", async () => {
+        mocked.yearEntryDelete.mockRejectedValue({ kind: "conflict", message: "Entry is locked", code: null });
+        await show({ kennzahlen: [kennzahlView({ rows: [amountRow()] })] });
+
+        await userEvent.click(screen.getByRole("button", { name: "Delete Example Desk Lamp" }));
+
+        await vi.waitFor(() => expect(toastMessages()).toEqual(["Entry is locked"]));
+      });
+
+      it("offers neither Delete nor Attach PDF in a closed year", async () => {
+        await show({ state: "closed", kennzahlen: [kennzahlView({ rows: [amountRow({ attach: true }), tripRow()] })] });
+
+        expect(screen.queryByRole("button", { name: /^Delete / })).toBeNull();
+        expect(screen.queryByRole("button", { name: "Attach PDF…" })).toBeNull();
+      });
+
+      it("offers no Delete for a document row", async () => {
+        await show();
+
+        expect(screen.queryByRole("button", { name: /^Delete / })).toBeNull();
+      });
+
+      it("attaches the chosen PDF to an amount row that lacks one", async () => {
+        mocked.yearEvidenceChoose.mockResolvedValue("/Users/example/Receipts/lamp-receipt.pdf");
+        await show({ kennzahlen: [kennzahlView({ rows: [amountRow({ attach: true })] })] });
+
+        await userEvent.click(screen.getByRole("button", { name: "Attach PDF…" }));
+
+        await vi.waitFor(() => expect(mocked.yearEntryAttach).toHaveBeenCalledWith(2026, "e1", "/Users/example/Receipts/lamp-receipt.pdf"));
+      });
+
+      it("attaches nothing when the file dialog is cancelled", async () => {
+        await show({ kennzahlen: [kennzahlView({ rows: [amountRow({ attach: true })] })] });
+
+        await userEvent.click(screen.getByRole("button", { name: "Attach PDF…" }));
+
+        await vi.waitFor(() => expect(mocked.yearEvidenceChoose).toHaveBeenCalled());
+        expect(mocked.yearEntryAttach).not.toHaveBeenCalled();
+      });
+
+      it("shows no Attach PDF button on an amount row that has its evidence", async () => {
+        await show({ kennzahlen: [kennzahlView({ rows: [amountRow()] })] });
+
+        expect(screen.queryByRole("button", { name: "Attach PDF…" })).toBeNull();
+      });
+
+      it("opens the evidence of an amount row that has one", async () => {
+        await show({ kennzahlen: [kennzahlView({ rows: [amountRow()] })] });
+
+        await userEvent.click(screen.getByRole("button", { name: /^Example Desk Lamp/ }));
+
+        expect(mocked.yearEvidenceOpen).toHaveBeenCalledWith(2026, "e1");
+      });
+
+      it("keeps an amount row without evidence from being opened", async () => {
+        await show({ kennzahlen: [kennzahlView({ rows: [amountRow({ attach: true })] })] });
+
+        expect(screen.getByRole<HTMLButtonElement>("button", { name: /^Example Desk Lamp/ }).disabled).toBe(true);
+      });
+
+      it("keeps a trip row from being opened", async () => {
+        await show({ kennzahlen: [kennzahlView({ rows: [tripRow()] })] });
+
+        expect(screen.getByRole<HTMLButtonElement>("button", { name: /^Linz · client workshop/ }).disabled).toBe(true);
+      });
+    });
+
+    describe("needs attention", () => {
+      it("attaches a PDF to the entry of an attention item that names one", async () => {
+        mocked.yearEvidenceChoose.mockResolvedValue("/Users/example/Receipts/lamp-receipt.pdf");
+        await show({ attention: [attentionView({ kind: "missing_invoice", title: "Example Desk Lamp", documentId: null, entryId: "e1" })] });
+
+        await userEvent.click(screen.getByRole("button", { name: "Attach PDF…" }));
+
+        await vi.waitFor(() => expect(mocked.yearEntryAttach).toHaveBeenCalledWith(2026, "e1", "/Users/example/Receipts/lamp-receipt.pdf"));
+        expect(mocked.documentAddChoose).not.toHaveBeenCalled();
+      });
     });
   });
 

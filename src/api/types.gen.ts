@@ -49,6 +49,11 @@ export type Action = "ignore" | "anv" | "subscription";
 export type AddInput = { token: string, vendor: string, itemKey: string | null, lineId: string | null, };
 
 /**
+ * What "+ Add" offers for a Kennzahl in an open year.
+ */
+export type AddKind = "document" | "amount" | "trip";
+
+/**
  * What the Add document sheet shows.
  */
 export type AddPreview = { token: string, fileName: string, 
@@ -113,7 +118,11 @@ export type AttentionView = { kind: AttentionKind, title: string, detail: string
 /**
  * The document to open; None for a missing invoice.
  */
-documentId: string | null, };
+documentId: string | null, 
+/**
+ * The amount that waits for its evidence PDF.
+ */
+entryId: string | null, };
 
 export type ChainKind = "first" | "continues" | "gap";
 
@@ -258,6 +267,8 @@ label: string,
  */
 place: string, target: Target, };
 
+export type EntryKind = "amount" | "trip";
+
 export type ErrorKind = "io" | "invalid_input" | "not_found" | "internal";
 
 export type Estimate = { workShare: number, 
@@ -344,7 +355,19 @@ export type KennzahlView = { key: string, kz: string, name: string,
 /**
  * The plain number to copy into FinanzOnline, `1228,40`.
  */
-copy: string, rows: Array<YearRow>, note: string | null, };
+copy: string, rows: Array<YearRow>, note: string | null, 
+/**
+ * None for an item others report, which never counts.
+ */
+add: AddKind | null, 
+/**
+ * A trips item's rate, `× €0.50 / km`.
+ */
+rate: string | null, 
+/**
+ * Reported by others: shown for reference, never counted.
+ */
+reported: boolean, };
 
 /**
  * Something the page acts on once it listens: from the launch that started the app or a later one.
@@ -399,6 +422,15 @@ export type MonthView = {
 label: string, total: string, rows: Array<YearRow>, };
 
 export type NewAccount = { name: string, bank: string, iban: string, own: boolean, };
+
+/**
+ * Input for `add`, tagged by kind.
+ */
+export type NewEntry = { "kind": "amount", itemKey: string, date: string, amount: string, text: string, 
+/**
+ * The chosen evidence PDF's full path, copied in on add.
+ */
+evidence: string | null, } | { "kind": "trip", itemKey: string, date: string, km: string, text: string, };
 
 /**
  * How amounts read: `1,234.56` or `1.234,56`.
@@ -460,7 +492,7 @@ export type ReviewQueue = {
  */
 lines: Array<ReviewLine>, items: Array<ItemOption>, };
 
-export type RowKind = "document" | "line";
+export type RowKind = "document" | "line" | "amount" | "trip";
 
 /**
  * A rule as the Rule sheet edits it; amounts as typed.
@@ -623,6 +655,10 @@ amount: string, draft: boolean,
 /**
  * The purchase year of a depreciation slice counted in a later year.
  */
-carriedFrom: number | null, kz: string, };
+carriedFrom: number | null, kz: string, 
+/**
+ * An amount without its evidence PDF.
+ */
+attach: boolean, };
 
 export type YearState = "open" | "closed";

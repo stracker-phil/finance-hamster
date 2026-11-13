@@ -5,13 +5,14 @@ use std::collections::{BTreeMap, HashMap};
 
 use chrono::Datelike;
 
+use super::entries;
 use super::facts::{Facts, Placed, eur, is_countable};
 use super::notes;
-use super::page::{KennzahlView, MonthView, QuestionView};
+use super::page::{AddKind, KennzahlView, MonthView, QuestionView};
 use crate::date;
 use crate::money::{copy_value, format_plain};
 use crate::settings::NumberFormat;
-use crate::taxrules::model::{Item, QuestionType, Ruleset};
+use crate::taxrules::model::{Item, ItemKind, QuestionType, Ruleset};
 
 pub fn question_views(
     ruleset: &Ruleset,
@@ -74,8 +75,10 @@ pub fn progress_text(facts: &Facts, unanswered: usize, questions: usize) -> (Str
     (text, percent)
 }
 
-/// One view per countable item in rules-file order; `shown` decides which of its rows the filter keeps.
+/// One view per visible item in rules-file order; `shown` decides which of its rows the filter keeps.
+#[allow(clippy::too_many_arguments)]
 pub fn kennzahlen(
+    year: i32,
     ruleset: &Ruleset,
     facts: &Facts,
     given: &HashMap<String, i64>,
@@ -86,7 +89,7 @@ pub fn kennzahlen(
     ruleset
         .items
         .iter()
-        .filter(|i| is_countable(i))
+        .filter(|i| i.visible)
         .map(|item| {
             let own: Vec<&Placed> = facts.placed.iter().filter(|p| p.item == item.key).collect();
             KennzahlView {
@@ -94,14 +97,29 @@ pub fn kennzahlen(
                 kz: item.kz.clone(),
                 name: item.name.clone(),
                 copy: copy_value(own.iter().map(|p| p.cents).sum()),
-                note: (!own.is_empty())
-                    .then(|| notes::note(item, &ruleset.questions, given, format))
-                    .flatten(),
+                note: if is_countable(item) {
+                    (!own.is_empty())
+                        .then(|| notes::note(item, &ruleset.questions, given, format))
+                        .flatten()
+                } else {
+                    Some("Reported by others; shown for reference, never counted here".into())
+                },
                 rows: own
                     .into_iter()
                     .filter(|p| shown(p, item))
                     .map(|p| p.row.clone())
                     .collect(),
+                add: match item.kind {
+                    ItemKind::Documents => Some(AddKind::Document),
+                    ItemKind::Amount => Some(AddKind::Amount),
+                    ItemKind::Trips => Some(AddKind::Trip),
+                    ItemKind::ReportedByOthers => None,
+                },
+                rate: (item.kind == ItemKind::Trips)
+                    .then(|| entries::rate_on(ruleset, &item.key, &format!("{year}-07-01")))
+                    .flatten()
+                    .map(|cents| format!("× {} / km", eur(cents, format))),
+                reported: !is_countable(item),
             }
         })
         .filter(|k| !filtering || !k.rows.is_empty())

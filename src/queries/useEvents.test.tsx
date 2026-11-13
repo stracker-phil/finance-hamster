@@ -342,6 +342,7 @@ describe("useEvents", () => {
 
     it.each([
       ["answers", ["year"]],
+      ["entries", ["year"]],
       ["documents", ["year", "elsewhere"]],
       ["vendors", ["year", "elsewhere"]],
       ["document_links", ["year", "elsewhere"]],
