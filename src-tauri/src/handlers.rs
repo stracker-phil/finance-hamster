@@ -29,6 +29,11 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static
         crate::preview::commands::pdf_view_suspend,
         crate::preview::commands::pdf_view_resume,
         crate::preview::commands::pdf_view_visible,
+        crate::statements::commands::statement_import_choose,
+        crate::statements::commands::statement_import_commit,
+        crate::statements::commands::statement_import_cancel,
+        crate::statements::commands::statements_coverage,
+        crate::statements::commands::account_lines,
     ]
 }
 

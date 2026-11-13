@@ -11,10 +11,28 @@ export type Account = { id: string, name: string, bank: string,
  */
 ibanMasked: string, own: boolean, };
 
+export type AccountCoverage = { id: string, name: string, 
+/**
+ * `Nr. 003 · until 10 Nov`.
+ */
+last: string, state: AccountState, 
+/**
+ * `Up to date`, `13 days behind`.
+ */
+stateLabel: string, months: Array<MonthCover>, 
+/**
+ * A gap in the chain of statements, in words.
+ */
+note: string | null, };
+
 /**
  * The fields to change; the IBAN stays, as statements are matched by it.
  */
 export type AccountEdit = { name: string, bank: string, own: boolean, };
+
+export type AccountLines = { id: string, name: string, ibanMasked: string, groups: Array<StatementGroup>, };
+
+export type AccountState = "ok" | "behind";
 
 /**
  * The JSON shape of an `AppError`.
@@ -32,6 +50,8 @@ export type AppErrorField = { path: string, message: string, };
 
 export type Appearance = "system" | "light" | "dark";
 
+export type ChainKind = "first" | "continues" | "gap";
+
 /**
  * A command as the palette and the Shortcuts page list it.
  */
@@ -40,6 +60,10 @@ export type CommandInfo = { id: string, title: string,
  * The shortcut as macOS draws it (`⇧⌘K`).
  */
 shortcut: string | null, };
+
+export type Cover = "full" | "part" | "missing";
+
+export type Coverage = { months: Array<MonthHead>, accounts: Array<AccountCoverage>, };
 
 /**
  * Payload of `data_changed`: the tables a write touched, so the page refetches only what shows them.
@@ -52,6 +76,28 @@ export type ErrorKind = "io" | "invalid_input" | "not_found" | "internal";
  * The placeholder's box in CSS pixels, relative to the webview's top left.
  */
 export type Frame = { x: number, y: number, width: number, height: number, };
+
+/**
+ * What the Import sheet shows.
+ */
+export type ImportPreview = { token: string, fileName: string, 
+/**
+ * `Kontoauszug Nr. 010/2026 · 4 pages · 1 Nov – 10 Nov 2026`.
+ */
+summary: string, accountName: string, lines: number, 
+/**
+ * `1,412.30 + 2,250.00 − 1,986.44 = 1,675.86`.
+ */
+balance: string, chain: ChainKind, chainTitle: string, chainDetail: string, 
+/**
+ * Where the PDF is copied, relative to the data folder.
+ */
+file: string, };
+
+/**
+ * Payload of `import_ready`: a dropped statement read and waiting, or why it can't be imported.
+ */
+export type ImportReady = { preview: ImportPreview | null, error: string | null, };
 
 export type Imported = { fileName: string, year: number, 
 /**
@@ -67,6 +113,32 @@ needsReload: boolean, };
  * Something the page acts on once it listens: from the launch that started the app or a later one.
  */
 export type LaunchEvent = { "type": "error", message: string, } | { "type": "activate" };
+
+export type LineView = { id: string, 
+/**
+ * `10 Nov`.
+ */
+date: string, 
+/**
+ * The merchant, the counterparty or the booking text.
+ */
+title: string, 
+/**
+ * The foreign amount of a card payment, `USD 24.00`.
+ */
+original: string | null, 
+/**
+ * `−€22.48`, `+€2,850.00`.
+ */
+amount: string, credit: boolean, transfer: boolean, };
+
+export type MonthCover = { cover: Cover, tip: string, };
+
+export type MonthHead = { label: string, 
+/**
+ * The first month of a year, which gets a stronger mark.
+ */
+january: boolean, };
 
 export type NewAccount = { name: string, bank: string, iban: string, own: boolean, };
 
@@ -132,6 +204,20 @@ hideOwnTransfers: boolean, };
 export type SettingsPatch = { appearance?: Appearance, accent?: Accent, numberFormat?: NumberFormat, showOriginalCurrency?: boolean, hideOwnTransfers?: boolean, };
 
 export type SourceKind = "document" | "statement";
+
+export type StatementGroup = { id: string, 
+/**
+ * `Nr. 003/2026`.
+ */
+label: string, 
+/**
+ * `7 Sep – 10 Nov`.
+ */
+range: string, 
+/**
+ * `62 lines`.
+ */
+count: string, lines: Array<LineView>, };
 
 /**
  * What the sidebar lists.

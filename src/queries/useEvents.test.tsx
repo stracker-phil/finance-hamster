@@ -6,7 +6,9 @@ vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await impo
 import { api } from "../api";
 import { account } from "../test/accounts";
 import { renderWithQuery } from "../test/renderWithQuery";
+import { accountCoverage, accountLines, coverage, statementGroup } from "../test/statements";
 import { useAccounts } from "./accounts";
+import { useAccountLines, useCoverage } from "./statements";
 import { useTaxYears } from "./taxYears";
 import { useEvents } from "./useEvents";
 
@@ -61,6 +63,56 @@ describe("useEvents", () => {
 
     expect(await screen.findByText("Years: 2027, 2026")).toBeTruthy();
     expect(screen.getByText("Accounts: Private")).toBeTruthy();
+  });
+
+  describe("statement tables", () => {
+    function StatementsProbe() {
+      useEvents();
+      const { data: coverage } = useCoverage();
+      const { data: lines } = useAccountLines("acc-1");
+      return (
+        <>
+          <p>Coverage: {coverage?.accounts.map((a) => a.last).join(", ")}</p>
+          <p>Lines: {lines?.groups.map((g) => g.label).join(", ")}</p>
+        </>
+      );
+    }
+
+    const loaded = async () => {
+      renderWithQuery(<StatementsProbe />);
+      await screen.findByText("Coverage: Nr. 009 · until 31 Oct");
+      await screen.findByText("Lines: Nr. 009/2026");
+    };
+
+    const newer = () => {
+      mocked.statementsCoverage.mockResolvedValue(coverage({ accounts: [accountCoverage({ last: "Nr. 010 · until 10 Nov" })] }));
+      mocked.accountLines.mockResolvedValue(accountLines({ groups: [statementGroup({ label: "Nr. 010/2026" }), statementGroup({ id: "st-0", label: "Nr. 009/2026" })] }));
+    };
+
+    beforeEach(() => {
+      mocked.statementsCoverage.mockResolvedValue(coverage({ accounts: [accountCoverage({ last: "Nr. 009 · until 31 Oct" })] }));
+      mocked.accountLines.mockResolvedValue(accountLines({ groups: [statementGroup({ label: "Nr. 009/2026" })] }));
+    });
+
+    it.each(["statements", "accounts"])("refetches the coverage and the account lines when data_changed names the %s table", async (table) => {
+      await loaded();
+      newer();
+
+      await emitDataChanged([table]);
+
+      expect(await screen.findByText("Coverage: Nr. 010 · until 10 Nov")).toBeTruthy();
+      expect(await screen.findByText("Lines: Nr. 010/2026, Nr. 009/2026")).toBeTruthy();
+    });
+
+    it("refetches only the account lines when data_changed names the transactions table", async () => {
+      await loaded();
+      newer();
+
+      await emitDataChanged(["transactions"]);
+
+      expect(await screen.findByText("Lines: Nr. 010/2026, Nr. 009/2026")).toBeTruthy();
+      expect(screen.getByText("Coverage: Nr. 009 · until 31 Oct")).toBeTruthy();
+    });
   });
 
   it("ignores tables it shows nothing of", async () => {

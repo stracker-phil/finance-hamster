@@ -1,3 +1,4 @@
+import type { ImportPreview } from "../api";
 import { create } from "zustand";
 import { HOME, sameRoute, type Route } from "./route";
 
@@ -40,6 +41,10 @@ export interface AppStore {
   toasts: Toast[];
   showToast: (kind: ToastKind, message: string, action?: Toast["action"]) => void;
   dismissToast: (id: number) => void;
+
+  /** A read statement waiting in the Import sheet. */
+  importPreview: ImportPreview | null;
+  setImportPreview: (preview: ImportPreview | null) => void;
 
   /** How many overlays (sheets, menus, toasts, tooltips) are open; the native PDF preview hides while any is. */
   pdfCovers: number;
@@ -97,6 +102,9 @@ export const useStore = create<AppStore>((set, get) => ({
     set({ toasts: [...toasts, { id: nextToastId++, kind, message, count: 1, action }] });
   },
   dismissToast: (id) => set({ toasts: get().toasts.filter((t) => t.id !== id) }),
+
+  importPreview: null,
+  setImportPreview: (importPreview) => set({ importPreview }),
 
   pdfCovers: 0,
   coverPdf: () => set({ pdfCovers: get().pdfCovers + 1 }),

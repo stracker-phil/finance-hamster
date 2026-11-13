@@ -32,12 +32,18 @@ pub fn start(
         .plugin(tauri_plugin_deep_link::init())
         .menu(crate::menu::build)
         .on_menu_event(crate::menu::on_event)
-        .on_window_event(|window, event| {
-            if let WindowEvent::CloseRequested { api, .. } = event
-                && window::close_requested(window.app_handle(), window.label())
+        .on_window_event(|window, event| match event {
+            WindowEvent::CloseRequested { api, .. }
+                if window::close_requested(window.app_handle(), window.label()) =>
             {
                 api.prevent_close();
             }
+            WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. })
+                if window.label() == window::MAIN =>
+            {
+                crate::statements::commands::dropped(window.app_handle(), paths.clone());
+            }
+            _ => {}
         })
         .setup(move |app| {
             log::info!("Hamster {} started", env!("CARGO_PKG_VERSION"));
@@ -125,7 +131,11 @@ fn start_tax_years(app: &tauri::App) {
 #[cfg(debug_assertions)]
 fn seed_demo(app: &tauri::App) {
     let state = app.state::<AppState>();
-    match crate::test_support::demo::seed_if_empty(&state.db) {
+    match crate::test_support::demo::seed_if_empty(
+        &state.db,
+        &crate::config_dir(),
+        chrono::Local::now().date_naive(),
+    ) {
         Ok(0) => {}
         Ok(count) => log::info!("Seeded the demo data ({count} ops)"),
         Err(e) => log::warn!("Couldn't seed the demo data: {e}"),

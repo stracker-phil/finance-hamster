@@ -12,3 +12,6 @@ pub const OPEN_SETTINGS_EVENT: &str = "open_settings";
 pub const DATA_CHANGED_EVENT: &str = "data_changed";
 /// No payload; `settings.json` changed and every window reads it again.
 pub const SETTINGS_CHANGED_EVENT: &str = "settings_changed";
+
+/// A dropped statement was read (or refused); payload `ImportReady`.
+pub const IMPORT_READY_EVENT: &str = "import_ready";

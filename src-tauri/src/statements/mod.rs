@@ -1,10 +1,18 @@
 //! Bank statements: reading the bank's text PDF (`parse`), checking it (`check`) and its file hash.
 
 pub mod check;
+pub mod commands;
+pub mod import;
 pub mod parse;
+pub mod store;
+pub mod view;
 
 #[cfg(test)]
 mod check_tests;
+#[cfg(test)]
+mod import_tests;
+#[cfg(test)]
+mod view_tests;
 
 use std::fmt::Write as _;
 

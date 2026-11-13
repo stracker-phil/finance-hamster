@@ -76,7 +76,10 @@ fn app_menu(app: &AppHandle) -> tauri::Result<Submenu<Wry>> {
 
 pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let app_menu = app_menu(app)?;
-    let file = SubmenuBuilder::new(app, "File").close_window().build()?;
+    let file = with_command(app, SubmenuBuilder::new(app, "File"), "statement.import")?
+        .separator()
+        .close_window()
+        .build()?;
     let edit = with_command(app, SubmenuBuilder::new(app, "Edit"), "edit.undo")?;
     let edit = with_command(app, edit, "edit.redo")?
         .separator()

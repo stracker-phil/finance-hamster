@@ -532,9 +532,7 @@ fn an_unreadable_booking_on_a_later_page_names_that_page() {
     let mut pages = long_statement().text_pages();
     let last = pages.len();
     assert!(last >= 2);
-    edit_line(&mut pages, "Rate 29", |l| {
-        l.replace("-10,00", " 10,00")
-    });
+    edit_line(&mut pages, "Rate 29", |l| l.replace("-10,00", " 10,00"));
     let edited = pages[last - 1]
         .iter()
         .find(|l| l.starts_with("Rate 29"))

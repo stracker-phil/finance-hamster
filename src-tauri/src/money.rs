@@ -49,6 +49,12 @@ pub fn format_money(money: &Money, format: NumberFormat) -> String {
     }
 }
 
+/// Without a currency, as in a balance equation: `1,234.56`, `−12.00`.
+pub fn format_plain(cents: i64, format: NumberFormat) -> String {
+    let sign = if cents < 0 { "\u{2212}" } else { "" };
+    format!("{sign}{}", number(cents, format))
+}
+
 /// With an explicit sign for bank lines: `+€1,200.00`, `−€9.99`.
 pub fn format_signed(money: &Money, format: NumberFormat) -> String {
     if money.cents > 0 {

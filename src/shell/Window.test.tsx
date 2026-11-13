@@ -1,4 +1,4 @@
-import { act, fireEvent, screen, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -10,13 +10,14 @@ import { HOME } from "../state/route";
 import { useStore } from "../state/store";
 import { account } from "../test/accounts";
 import { renderWithQuery as render } from "../test/renderWithQuery";
+import { accountLines, importPreview } from "../test/statements";
 import { Window } from "./Window";
 
 const mocked = vi.mocked(api, true);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useStore.setState({ route: HOME, back: [], forward: [], filter: "", toasts: [], confirmation: null, paletteOpen: false, pdfCovers: 0 });
+  useStore.setState({ route: HOME, back: [], forward: [], filter: "", toasts: [], confirmation: null, paletteOpen: false, pdfCovers: 0, importPreview: null });
   mocked.runCommand.mockResolvedValue(undefined);
   mocked.listCommands.mockResolvedValue([]);
   mocked.listAccounts.mockResolvedValue([account()]);
@@ -179,6 +180,96 @@ describe("first run", () => {
     expect(await screen.findByRole("complementary", { name: "Sidebar" })).toBeTruthy();
     expect(title()).toBe("Today");
   });
+
+  it("asks for a statement file when Import Statement… is chosen on the statement step", async () => {
+    const preview = importPreview();
+    mocked.statementImportChoose.mockResolvedValue(preview);
+    render(<Window />);
+    await addFirstAccount();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Import Statement…" }));
+
+    expect(await screen.findByRole("dialog", { name: "Import statement" })).toBeTruthy();
+    expect(useStore.getState().importPreview).toEqual(preview);
+  });
+
+  it("shows the Import sheet over the first run, and leads to the main window once imported", async () => {
+    mocked.addAccount.mockImplementation(async () => {
+      mocked.listAccounts.mockResolvedValue([account()]);
+      return account();
+    });
+    mocked.statementImportCommit.mockResolvedValue("Imported Nr. 010/2026");
+    render(<WithEvents />);
+    await addFirstAccount();
+    await screen.findByRole("heading", { name: "Import your first statement" });
+    const handler = mocked.listen.mock.calls.find(([name]) => name === "data_changed")![1] as (payload: unknown) => void;
+    await act(async () => handler({ tables: ["accounts"] }));
+    act(() => useStore.getState().setImportPreview(importPreview()));
+
+    await userEvent.click(await screen.findByRole("button", { name: "Import" }));
+
+    expect(await screen.findByRole("complementary", { name: "Sidebar" })).toBeTruthy();
+    expect(screen.queryByRole("dialog", { name: "Import statement" })).toBeNull();
+  });
+
+  it("shows the Import sheet of a dropped statement while no account exists", async () => {
+    useStore.setState({ importPreview: importPreview() });
+
+    render(<Window />);
+
+    expect(await screen.findByRole("dialog", { name: "Import statement" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "Add your first account", hidden: true })).toBeTruthy();
+    expect(screen.queryByRole("complementary", { name: "Sidebar", hidden: true })).toBeNull();
+  });
+});
+
+describe("account page", () => {
+  beforeEach(() => {
+    useStore.setState({ route: { page: "account", accountId: "acc-2" } });
+    mocked.listAccounts.mockResolvedValue([account(), account({ id: "acc-2", name: "Savings" })]);
+    mocked.accountLines.mockResolvedValue(accountLines({ id: "acc-2", name: "Savings" }));
+  });
+
+  it("titles the header with the account's name and offers the crumb back to Statements", async () => {
+    render(<Window />);
+
+    await waitFor(() => expect(title()).toBe("Savings"));
+    expect(screen.getByRole("button", { name: "Back to Statements" })).toBeTruthy();
+  });
+
+  it("shows the account's statements", async () => {
+    render(<Window />);
+
+    expect(await screen.findByRole("region", { name: "Nr. 010/2026" })).toBeTruthy();
+    expect(mocked.accountLines).toHaveBeenCalledWith("acc-2");
+  });
+});
+
+describe("Import sheet", () => {
+  it("shows over the main window once a statement was read", async () => {
+    useStore.setState({ importPreview: importPreview() });
+
+    render(<Window />);
+
+    expect(await screen.findByRole("dialog", { name: "Import statement" })).toBeTruthy();
+    expect(screen.getByText("statement-010-2026.pdf")).toBeTruthy();
+  });
+
+  it("is absent while nothing was read", async () => {
+    render(<Window />);
+
+    await screen.findByRole("complementary", { name: "Sidebar" });
+    expect(screen.queryByRole("dialog", { name: "Import statement" })).toBeNull();
+  });
+
+  it("closes on Cancel", async () => {
+    useStore.setState({ importPreview: importPreview() });
+    render(<Window />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Cancel" }));
+
+    expect(screen.queryByRole("dialog", { name: "Import statement" })).toBeNull();
+  });
 });
 
 describe("command palette", () => {
@@ -300,6 +391,29 @@ describe("New menu", () => {
 
     await userEvent.keyboard("{Escape}");
     expect(useStore.getState().pdfCovers).toBe(0);
+  });
+
+  it("starts the statement import when Import Statement… is chosen, and closes the menu", async () => {
+    const preview = importPreview();
+    mocked.statementImportChoose.mockResolvedValue(preview);
+    render(<Window />);
+    await openMenu();
+
+    const item = screen.getByRole("menuitem", { name: /Import Statement…/ });
+    expect(item).toBeEnabled();
+    await userEvent.click(item);
+
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(await screen.findByRole("dialog", { name: "Import statement" })).toBeTruthy();
+    expect(useStore.getState().importPreview).toEqual(preview);
+  });
+
+  it("keeps the items of later features disabled", async () => {
+    render(<Window />);
+    await openMenu();
+
+    expect(screen.getByRole("menuitem", { name: /Add Invoice PDF…/ })).toBeDisabled();
+    expect(screen.getByRole("menuitem", { name: /New Subscription/ })).toBeDisabled();
   });
 
   it("closes on Escape", async () => {

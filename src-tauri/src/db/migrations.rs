@@ -39,6 +39,50 @@ pub const MIGRATIONS: &[&str] = &[
         rules_loaded_at INTEGER NOT NULL,
         closed_at INTEGER
     );",
+    // 3: imported statements and their lines, stored once with the layout that read them.
+    "CREATE TABLE statements (
+        id TEXT PRIMARY KEY,
+        account_id TEXT NOT NULL REFERENCES accounts (id),
+        number INTEGER NOT NULL,
+        year INTEGER NOT NULL,
+        from_date TEXT NOT NULL,
+        to_date TEXT NOT NULL,
+        old_balance INTEGER NOT NULL,
+        credits INTEGER NOT NULL,
+        debits INTEGER NOT NULL,
+        new_balance INTEGER NOT NULL,
+        layout TEXT NOT NULL,
+        file_hash TEXT NOT NULL UNIQUE,
+        file TEXT NOT NULL,
+        pages INTEGER NOT NULL,
+        imported_at INTEGER NOT NULL,
+        UNIQUE (account_id, year, number)
+    );
+    CREATE TABLE transactions (
+        id TEXT PRIMARY KEY,
+        statement_id TEXT NOT NULL REFERENCES statements (id),
+        account_id TEXT NOT NULL REFERENCES accounts (id),
+        page INTEGER NOT NULL,
+        row INTEGER NOT NULL,
+        value_date TEXT NOT NULL,
+        cents INTEGER NOT NULL,
+        text TEXT NOT NULL,
+        extra TEXT NOT NULL,
+        counterparty TEXT,
+        counterparty_iban TEXT,
+        card_kind TEXT,
+        card_date TEXT,
+        card_time TEXT,
+        merchant TEXT,
+        original_cents INTEGER,
+        original_currency TEXT,
+        fx_fee INTEGER,
+        fx_rate TEXT,
+        fx_date TEXT,
+        transfer INTEGER NOT NULL
+    );
+    CREATE INDEX transactions_statement ON transactions (statement_id);
+    CREATE INDEX transactions_value_date ON transactions (value_date);",
 ];
 
 pub fn version(conn: &Connection) -> AppResult<usize> {
@@ -87,18 +131,43 @@ mod tests {
         assert_eq!(version(&conn).unwrap(), 0);
         migrate(&mut conn).unwrap();
         assert_eq!(version(&conn).unwrap(), MIGRATIONS.len());
-        assert_eq!(
-            tables(&conn),
-            vec![
-                "accounts".to_string(),
-                "journal".to_string(),
-                "tax_years".to_string()
-            ]
-        );
+        assert_eq!(tables(&conn), all_tables());
+    }
+
+    fn all_tables() -> Vec<String> {
+        [
+            "accounts",
+            "journal",
+            "statements",
+            "tax_years",
+            "transactions",
+        ]
+        .map(String::from)
+        .to_vec()
     }
 
     #[test]
-    fn a_file_at_version_one_gains_accounts_and_tax_years_and_keeps_its_journal() {
+    fn a_file_at_version_two_gains_statements_and_transactions() {
+        let dir = temp_config_dir();
+        let mut conn = Connection::open(dir.path().join("v2.sqlite")).unwrap();
+        conn.execute_batch(MIGRATIONS[0]).unwrap();
+        conn.execute_batch(MIGRATIONS[1]).unwrap();
+        conn.pragma_update(None, "user_version", 2i64).unwrap();
+        assert_eq!(
+            tables(&conn),
+            ["accounts", "journal", "tax_years"]
+                .map(String::from)
+                .to_vec()
+        );
+
+        migrate(&mut conn).unwrap();
+
+        assert_eq!(version(&conn).unwrap(), MIGRATIONS.len());
+        assert_eq!(tables(&conn), all_tables());
+    }
+
+    #[test]
+    fn a_file_at_version_one_gains_every_later_table_and_keeps_its_journal() {
         let dir = temp_config_dir();
         let mut conn = Connection::open(dir.path().join("v1.sqlite")).unwrap();
         conn.execute_batch(MIGRATIONS[0]).unwrap();
@@ -112,14 +181,7 @@ mod tests {
         migrate(&mut conn).unwrap();
 
         assert_eq!(version(&conn).unwrap(), MIGRATIONS.len());
-        assert_eq!(
-            tables(&conn),
-            vec![
-                "accounts".to_string(),
-                "journal".to_string(),
-                "tax_years".to_string()
-            ]
-        );
+        assert_eq!(tables(&conn), all_tables());
         let rows: i64 = conn
             .query_row("SELECT COUNT(*) FROM journal", [], |r| r.get(0))
             .unwrap();

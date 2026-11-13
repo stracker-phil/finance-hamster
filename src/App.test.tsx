@@ -10,6 +10,7 @@ import { createQueryClient } from "./queries/queryClient";
 import { HOME } from "./state/route";
 import { useStore } from "./state/store";
 import { settings } from "./test/settings";
+import { importPreview } from "./test/statements";
 
 const mocked = vi.mocked(api, true);
 
@@ -25,7 +26,7 @@ async function emit(event: EventName, payload: unknown = null) {
 describe("App", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useStore.setState({ route: HOME, back: [], forward: [], filter: "", toasts: [], confirmation: null, paletteOpen: false, pdfCovers: 0 });
+    useStore.setState({ route: HOME, back: [], forward: [], filter: "", toasts: [], confirmation: null, paletteOpen: false, pdfCovers: 0, importPreview: null });
     mocked.takeLaunchEvents.mockResolvedValue([]);
     mocked.listen.mockResolvedValue(() => {});
     mocked.getSettings.mockResolvedValue(settings());
@@ -216,6 +217,42 @@ describe("App", () => {
         expect(execCommand).toHaveBeenCalledWith(method);
         expect(mocked[method]).not.toHaveBeenCalled();
       });
+    });
+
+    it("opens the Import sheet for the statement the owner chose for statement.import", async () => {
+      mocked.statementImportChoose.mockResolvedValue(importPreview());
+      renderApp();
+
+      await emit("run_command", "statement.import");
+
+      expect(await screen.findByRole("dialog", { name: "Import statement" })).toBeTruthy();
+      expect(screen.getByText("statement-010-2026.pdf")).toBeTruthy();
+    });
+
+    it("opens no sheet for statement.import when the file dialog is cancelled", async () => {
+      mocked.statementImportChoose.mockResolvedValue(null);
+      renderApp();
+
+      await emit("run_command", "statement.import");
+
+      await waitFor(() => expect(mocked.statementImportChoose).toHaveBeenCalled());
+      expect(screen.queryByRole("dialog")).toBeNull();
+    });
+
+    it("opens the Import sheet when a statement dropped on the window was read", async () => {
+      renderApp();
+
+      await emit("import_ready", { preview: importPreview(), error: null });
+
+      expect(await screen.findByRole("dialog", { name: "Import statement" })).toBeTruthy();
+    });
+
+    it("shows why a dropped file was refused", async () => {
+      renderApp();
+
+      await emit("import_ready", { preview: null, error: "No account matches this IBAN" });
+
+      expect((await screen.findByRole("alert")).textContent).toContain("No account matches this IBAN");
     });
 
     it("ignores a command it does not handle", async () => {

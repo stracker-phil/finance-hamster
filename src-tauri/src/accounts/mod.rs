@@ -113,7 +113,7 @@ fn from_sql(row: &rusqlite::Row) -> rusqlite::Result<AccountRow> {
     })
 }
 
-fn rows(conn: &Connection) -> AppResult<Vec<AccountRow>> {
+pub fn rows(conn: &Connection) -> AppResult<Vec<AccountRow>> {
     let mut query = conn.prepare(&format!(
         "SELECT {COLUMNS} FROM {TABLE} ORDER BY created_at, name"
     ))?;

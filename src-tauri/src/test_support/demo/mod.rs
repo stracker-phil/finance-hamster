@@ -8,6 +8,8 @@ use crate::accounts::{self, AccountRow};
 use crate::db::{Change, Db, Op, Source};
 use crate::error::AppResult;
 
+mod statements;
+
 type Seeder = fn() -> AppResult<Option<Op>>;
 
 /// The ops that build the demo data set, in order.
@@ -40,8 +42,8 @@ fn demo_accounts() -> AppResult<Option<Op>> {
     Ok(Some(Op::new("Add the demo accounts", changes)))
 }
 
-/// Seeds the demo data when the database has never been written to.
-pub fn seed_if_empty(db: &Db) -> AppResult<usize> {
+/// Seeds the demo data when the database has never been written to; returns how many ops and statements.
+pub fn seed_if_empty(db: &Db, config_dir: &Path, today: chrono::NaiveDate) -> AppResult<usize> {
     let written: i64 =
         db.read(|conn| Ok(conn.query_row("SELECT COUNT(*) FROM journal", [], |r| r.get(0))?))?;
     if written > 0 {
@@ -54,6 +56,7 @@ pub fn seed_if_empty(db: &Db) -> AppResult<usize> {
             count += 1;
         }
     }
+    count += statements::seed(db, config_dir, today)?;
     Ok(count)
 }
 
@@ -91,11 +94,26 @@ mod tests {
             .unwrap()
     }
 
+    fn today() -> chrono::NaiveDate {
+        chrono::NaiveDate::from_ymd_opt(2026, 11, 13).unwrap()
+    }
+
+    fn statement_numbers(db: &Db, account_id: &str) -> Vec<u32> {
+        let mut numbers: Vec<u32> = db
+            .read(|c| crate::statements::store::statements_of(c, account_id))
+            .unwrap()
+            .into_iter()
+            .map(|s| s.number)
+            .collect();
+        numbers.sort_unstable();
+        numbers
+    }
+
     #[test]
-    fn seeding_an_empty_database_writes_one_op_with_the_three_demo_accounts() {
+    fn seeding_an_empty_database_writes_the_accounts_op_and_one_op_per_demo_statement() {
         let dir = temp_config_dir();
         let db = Db::open(dir.path()).unwrap();
-        assert_eq!(seed_if_empty(&db).unwrap(), 1);
+        assert_eq!(seed_if_empty(&db, dir.path(), today()).unwrap(), 1 + 24);
 
         let accounts = accounts::list(&db).unwrap();
         let shown: Vec<(&str, &str, bool)> = accounts
@@ -114,15 +132,50 @@ mod tests {
     }
 
     #[test]
+    fn every_account_gets_statements_and_household_lacks_february() {
+        let dir = temp_config_dir();
+        let db = Db::open(dir.path()).unwrap();
+        seed_if_empty(&db, dir.path(), today()).unwrap();
+
+        assert_eq!(
+            statement_numbers(&db, "demo-account-1"),
+            (1..=11).collect::<Vec<u32>>()
+        );
+        assert_eq!(
+            statement_numbers(&db, "demo-account-2"),
+            vec![1, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+        );
+        assert_eq!(statement_numbers(&db, "demo-account-3"), vec![9, 10, 11]);
+    }
+
+    #[test]
+    fn the_current_months_statement_ends_three_days_before_today() {
+        let dir = temp_config_dir();
+        let db = Db::open(dir.path()).unwrap();
+        seed_if_empty(&db, dir.path(), today()).unwrap();
+
+        let newest = db
+            .read(|c| crate::statements::store::statements_of(c, "demo-account-1"))
+            .unwrap()
+            .remove(0);
+
+        assert_eq!((newest.number, newest.year), (11, 2026));
+        assert_eq!(newest.to_date, "2026-11-10");
+        assert_eq!(newest.file, "statements/2026/private-011.pdf");
+        assert!(dir.path().join(&newest.file).exists());
+    }
+
+    #[test]
     fn seeding_twice_changes_nothing_the_second_time() {
         let dir = temp_config_dir();
         let db = Db::open(dir.path()).unwrap();
-        seed_if_empty(&db).unwrap();
+        seed_if_empty(&db, dir.path(), today()).unwrap();
         let before = journal_rows(&db);
 
-        assert_eq!(seed_if_empty(&db).unwrap(), 0);
+        assert_eq!(seed_if_empty(&db, dir.path(), today()).unwrap(), 0);
         assert_eq!(journal_rows(&db), before);
         assert_eq!(accounts::list(&db).unwrap().len(), 3);
+        assert_eq!(statement_numbers(&db, "demo-account-1").len(), 11);
     }
 
     #[test]
@@ -165,7 +218,7 @@ mod tests {
         db.write(op, Source::Ui).unwrap();
         let before = journal_rows(&db);
 
-        assert_eq!(seed_if_empty(&db).unwrap(), 0);
+        assert_eq!(seed_if_empty(&db, dir.path(), today()).unwrap(), 0);
         assert_eq!(journal_rows(&db), before);
     }
 

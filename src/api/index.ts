@@ -1,7 +1,7 @@
 import { getName, getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { Account, AccountEdit, Frame, PdfSource, AppError, AppInfo, CommandInfo, ErrorKind, EventName, EventPayloads, Imported, LaunchEvent, NewAccount, ReloadPreview, RulesFile, Settings, SettingsPatch, TaxYear } from "./types";
+import type { Account, AccountEdit, AccountLines, Coverage, Frame, ImportPreview, PdfSource, AppError, AppInfo, CommandInfo, ErrorKind, EventName, EventPayloads, Imported, LaunchEvent, NewAccount, ReloadPreview, RulesFile, Settings, SettingsPatch, TaxYear } from "./types";
 
 export * from "./types";
 
@@ -37,6 +37,13 @@ export const api = {
   rulesDuplicate: () => invoke<string>("rules_duplicate"),
   rulesOpen: (year: number) => invoke<void>("rules_open", { year }),
   rulesShowFolder: () => invoke<void>("rules_show_folder"),
+  /** Asks for a statement PDF and reads it; null when the panel was cancelled. */
+  statementImportChoose: () => invoke<ImportPreview | null>("statement_import_choose"),
+  /** The label of the import. */
+  statementImportCommit: (token: string) => invoke<string>("statement_import_commit", { token }),
+  statementImportCancel: (token: string) => invoke<void>("statement_import_cancel", { token }),
+  statementsCoverage: () => invoke<Coverage>("statements_coverage"),
+  accountLines: (accountId: string) => invoke<AccountLines>("account_lines", { accountId }),
   pdfViewShow: (source: PdfSource, frame: Frame) => invoke<void>("pdf_view_show", { source, frame }),
   pdfViewMove: (frame: Frame) => invoke<void>("pdf_view_move", { frame }),
   pdfViewHide: () => invoke<void>("pdf_view_hide"),

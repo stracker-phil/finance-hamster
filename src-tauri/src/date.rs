@@ -77,11 +77,13 @@ const WEEKDAYS: [&str; 7] = [
     "Sunday",
 ];
 
-fn month(date: NaiveDate) -> &'static str {
+/// `November`.
+pub fn month(date: NaiveDate) -> &'static str {
     MONTHS[date.month0() as usize]
 }
 
-fn short_month(date: NaiveDate) -> &'static str {
+/// `Nov`.
+pub fn short_month(date: NaiveDate) -> &'static str {
     &month(date)[..3]
 }
 

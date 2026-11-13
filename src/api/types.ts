@@ -1,6 +1,6 @@
 // Re-exports the IPC types generated from Rust (`bun run types`); everything defined below is frontend-only.
 export type * from "./types.gen";
-import type { DataChanged } from "./types.gen";
+import type { DataChanged, ImportReady } from "./types.gen";
 
 /** The app as macOS knows it (the bundle's name and version). */
 export interface AppInfo {
@@ -22,6 +22,8 @@ export interface EventPayloads {
   data_changed: DataChanged;
   /** `settings.json` changed. */
   settings_changed: null;
+  /** A dropped statement was read, or refused. */
+  import_ready: ImportReady;
 }
 
 export type EventName = keyof EventPayloads;

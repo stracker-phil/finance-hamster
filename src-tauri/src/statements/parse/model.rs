@@ -51,6 +51,16 @@ pub enum CardKind {
     Terminal,
 }
 
+impl CardKind {
+    /// How it is stored.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            CardKind::Online => "online",
+            CardKind::Terminal => "terminal",
+        }
+    }
+}
+
 /// A card payment's details from its booking text.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Card {

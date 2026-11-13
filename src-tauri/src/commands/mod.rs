@@ -50,6 +50,7 @@ pub const COMMANDS: &[CommandDef] = &[
     page("go.back", "Back", Some("CmdOrCtrl+[")),
     page("go.forward", "Forward", Some("CmdOrCtrl+]")),
     page("palette.open", "Command Palette…", Some("CmdOrCtrl+K")),
+    page("statement.import", "Import Statement…", Some("CmdOrCtrl+I")),
     page("filter.focus", "Filter This Page", Some("CmdOrCtrl+F")),
     CommandDef {
         id: "settings.open",
@@ -175,6 +176,14 @@ mod tests {
         };
         assert_eq!(shortcut("edit.undo"), Some(("Undo", Some("⌘Z"))));
         assert_eq!(shortcut("edit.redo"), Some(("Redo", Some("⇧⌘Z"))));
+    }
+
+    #[test]
+    fn import_statement_is_listed_with_its_shortcut() {
+        let listed = list();
+        let import = listed.iter().find(|c| c.id == "statement.import").unwrap();
+        assert_eq!(import.title, "Import Statement…");
+        assert_eq!(import.shortcut.as_deref(), Some("⌘I"));
     }
 
     #[test]

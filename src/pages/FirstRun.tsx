@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { AccountForm } from "../accounts/AccountForm";
 import { useTaxYears } from "../queries/taxYears";
+import { startImport } from "../statements/importFlow";
 
 interface Props {
   onAccountAdded: () => void;
@@ -42,7 +43,7 @@ export function FirstRun({ onAccountAdded, onDone }: Props) {
               <button type="button" className="btn" onClick={onDone}>
                 Skip for Now
               </button>
-              <button type="button" className="btn btn--primary" disabled>
+              <button type="button" className="btn btn--primary" onClick={startImport}>
                 Import Statement…
               </button>
             </div>

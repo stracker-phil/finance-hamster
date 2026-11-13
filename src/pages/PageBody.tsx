@@ -1,6 +1,8 @@
 import type { Route } from "../state/route";
+import { AccountPage } from "./AccountPage";
 import { DocumentPage } from "./DocumentPage";
 import { EmptyPage } from "./EmptyPage";
+import { StatementsPage } from "./StatementsPage";
 
 /** The body of the current page. */
 export function PageBody({ route }: { route: Route }) {
@@ -10,13 +12,13 @@ export function PageBody({ route }: { route: Route }) {
     case "subscriptions":
       return <EmptyPage title="No subscriptions" text="Subscriptions show here once you add one." />;
     case "statements":
-      return <EmptyPage title="No statements" text="Import a bank statement PDF to see its lines." />;
+      return <StatementsPage />;
     case "documents":
       return <EmptyPage title="No documents" text="Drop an invoice PDF onto the sidebar to add it." />;
     case "review":
       return <EmptyPage title="Nothing to review" text="New bank lines show here after an import." />;
     case "account":
-      return <EmptyPage title="No lines" text="This account has no imported lines yet." />;
+      return <AccountPage accountId={route.accountId} />;
     case "year":
       return <EmptyPage title={`Tax year ${route.year}`} text="Nothing is recorded for this year yet." />;
     case "document":

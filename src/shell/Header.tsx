@@ -4,6 +4,7 @@ import { FILTER_PLACEHOLDER } from "../pages/pages";
 import type { Route } from "../state/route";
 import { useStore } from "../state/store";
 import { useCoversPdf } from "../lib/pdfCover";
+import { startImport } from "../statements/importFlow";
 
 /** The title and, for a nested page, the crumb back to its parent. */
 export interface HeaderTitle {
@@ -48,8 +49,9 @@ function FilterField({ page }: { page: Route["page"] }) {
   );
 }
 
-const NEW_ITEMS = [
-  { label: "Import Statement…", key: "⌘I" },
+/** The + New menu; an item without `run` arrives with a later feature and stays in its slot, disabled. */
+const NEW_ITEMS: { label: string; key: string; run?: () => void }[] = [
+  { label: "Import Statement…", key: "⌘I", run: startImport },
   { label: "Add Invoice PDF…", key: "⌘O" },
   { label: "New Subscription", key: "⌘N" },
 ];
@@ -83,7 +85,16 @@ function NewMenu() {
       {open && (
         <div className="menu new-menu" role="menu">
           {NEW_ITEMS.map((item) => (
-            <button key={item.label} className="menu-row" role="menuitem" disabled>
+            <button
+              key={item.label}
+              className="menu-row"
+              role="menuitem"
+              disabled={!item.run}
+              onClick={() => {
+                setOpen(false);
+                item.run?.();
+              }}
+            >
               {item.label}
               <span className="menu-row__key">{item.key}</span>
             </button>
