@@ -49,6 +49,7 @@ pub fn start(
             log::info!("Hamster {} started", env!("CARGO_PKG_VERSION"));
             #[cfg(debug_assertions)]
             seed_demo(app);
+            add_builtin_rules(app);
             start_tax_years(app);
             take_initial(app.handle(), initial);
             #[cfg(debug_assertions)]
@@ -117,6 +118,14 @@ fn init_logging(level: LogLevel) -> tauri::plugin::TauriPlugin<tauri::Wry> {
             Ok(())
         })
         .build()
+}
+
+fn add_builtin_rules(app: &tauri::App) {
+    let state = app.state::<AppState>();
+    let now = chrono::Utc::now().timestamp_millis();
+    if let Err(e) = crate::rules::ensure_builtins(&state.db, now, crate::db::Source::App) {
+        log::warn!("Couldn't add the built-in rules: {e}");
+    }
 }
 
 fn start_tax_years(app: &tauri::App) {

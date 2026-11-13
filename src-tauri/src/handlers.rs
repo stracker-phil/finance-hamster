@@ -34,6 +34,10 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static
         crate::statements::commands::statement_import_cancel,
         crate::statements::commands::statements_coverage,
         crate::statements::commands::account_lines,
+        crate::rules::commands::rules_view,
+        crate::rules::commands::rule_save,
+        crate::rules::commands::rule_delete,
+        crate::rules::commands::rules_rerun,
     ]
 }
 

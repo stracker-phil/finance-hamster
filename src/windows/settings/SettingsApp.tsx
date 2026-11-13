@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import { api } from "../../api";
+import { ConfirmHost } from "../../components/ConfirmSheet";
 import { Toasts } from "../../components/Toasts";
 import { TooltipHost } from "../../components/TooltipHost";
 import { queryClient as defaultClient } from "../../queries/queryClient";
@@ -26,6 +27,7 @@ function SettingsRoot() {
     <>
       <SettingsWindow request={request} onOpen={open} />
       <Toasts />
+      <ConfirmHost />
       <TooltipHost />
     </>
   );

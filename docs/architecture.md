@@ -95,8 +95,9 @@ Rust (`src-tauri/src/`):
 | `taxyears/` | the `tax_years` rows (state, applied rules text), `start_from_rules` at launch, `list_tax_years` |
 | `taxrules/` | the rules files: `model.rs` (typed file, unknown fields fail), `check.rs` (schema constraints and Reload checks), `files.rs` (the `rules/` folder, seed, backups, next year's draft), `diff.rs` (the Reload preview lines), `overview`/`preview`/`apply`/`import`/`duplicate`, `commands.rs` (Settings → Tax Rules) |
 | `../resources/rules/` | the schema, README and seed `rules-2026.json` the app writes to `rules/` |
-| `statements/` | bank statements: `parse/` (one parser per bank layout in `PARSERS`; `sparkasse.rs` reads the Sparkasse/Erste text layer into `ParsedStatement` with lines, card and FX details), `check.rs` (balance and line-sum checks naming the page, the chain to the previous statement), `file_hash`; `store.rs` (the `statements` and `transactions` rows), `import.rs` (`prepare` reads and checks a PDF and refuses duplicates and unknown IBANs, `ImportQueue` holds it by token, `commit` copies it to `statements/<year>/` and stores its lines as one undoable op, tagging transfers between own accounts), `view.rs` (the Statements coverage and the Account page lines, formatted), `commands.rs` (choose, commit, cancel, coverage, lines; `dropped` offers PDFs dropped on the main window through `import_ready`) |
+| `statements/` | bank statements: `parse/` (one parser per bank layout in `PARSERS`; `sparkasse.rs` reads the Sparkasse/Erste text layer into `ParsedStatement` with lines, card and FX details), `check.rs` (balance and line-sum checks naming the page, the chain to the previous statement), `file_hash`; `store.rs` (the `statements` and `transactions` rows), `import.rs` (`prepare` reads and checks a PDF and refuses duplicates and unknown IBANs, `ImportQueue` holds it by token, `commit` copies it to `statements/<year>/` and stores its lines as one undoable op, tagging transfers between own accounts and letting the rules decide), `view.rs` (the Statements coverage and the Account page lines, formatted), `commands.rs` (choose, commit, cancel, coverage, lines; `dropped` offers PDFs dropped on the main window through `import_ready`) |
 | `platform/` | macOS frameworks: `pdf/` (PDFKit: `Pdf` text with the layout kept via `layout.rs`, pages as PNG; `write.rs`, a small PDF writer), `pdf_view.rs` (the native `PDFView` over the page placeholder, links swallowed) |
+| `rules/` | line rules: `store.rs` (`rules` and `decisions` rows; a decision shares its line's id, no rule = by hand), `engine.rs` (`matches`, `decide`: first matching rule wins), `apply.rs` (the decision changes a set of rules makes, never touching hand decisions), `mod.rs` (`save`, `delete`, `rerun`, built-ins for transfers and bank fees, items from the newest open year), `view.rs` (Settings → Rules in words), `commands.rs` |
 | `preview/` | PDFs by id (`PdfSource`, `resolve`), the `pdf_view_*` commands and the `pdf-page://` scheme serving page PNGs (in the CSP's `img-src`) |
 | `notify.rs` | `Notifier`: notifications recorded, not posted (the real center comes with reminders) |
 | `settings/` | `settings.json`: appearance, accent, number format, original currency, own transfers (`SettingsStore`, `get_settings`, `update_settings`) |
@@ -107,7 +108,7 @@ Rust (`src-tauri/src/`):
 | `error.rs`, `events.rs`, `lock.rs`, `state.rs`, `handlers.rs` | `AppError`, event names, poison-tolerant locks, managed state, the command list |
 | `store/` | `json_file.rs`: private dir creation, atomic JSON files |
 | `dev/` | debug-only hooks: window frame, background launches, `eval` |
-| `test_support/` | fixtures for tests; `statements.rs` builds synthetic statements in the bank's layout (fixtures, demo data, the debug build's sample document); `demo/` seeds the debug build's made-up data on its first launch (`SEEDERS`; `demo/statements.rs` imports a year of statements through the real pipeline, Household missing February) and `reset` backs `hamster dev seed --yes` |
+| `test_support/` | fixtures for tests; `statements.rs` builds synthetic statements in the bank's layout (fixtures, demo data, the debug build's sample document); `demo/` seeds the debug build's made-up data on its first launch (`SEEDERS`; the demo rules decide some lines; `demo/statements.rs` imports a year of statements through the real pipeline, Household missing February) and `reset` backs `hamster dev seed --yes` |
 | `../tests/no_network.rs` | no network crate in `Cargo.toml` or the resolved dependency tree (ADR 0016) |
 
 Frontend (`src/`):
@@ -122,11 +123,11 @@ Frontend (`src/`):
 | `accounts/` | `AccountForm` (first run and Settings) and `AccountSheet` |
 | `commands/` | `pageCommands.ts` (what the main window does for each page command), `pageKeys.ts` (single keys a page answers to) |
 | `palette/` | the ⌘K command palette |
-| `queries/` | TanStack Query: the client, `useEvents` (event → stale keys, `data_changed` table → stale keys), settings, commands, accounts, tax years and rules, statements (coverage, account lines), `useLook` |
-| `settings/`, `windows/settings/` | the Settings window: page registry and search, row controls, the pages |
+| `queries/` | TanStack Query: the client, `useEvents` (event → stale keys, `data_changed` table → stale keys), settings, commands, accounts, tax years and rules, statements (coverage, account lines), line rules (`lineRules.ts`), `useLook` |
+| `settings/`, `windows/settings/` | the Settings window: page registry and search, row controls, the pages (`RulesPage` with `RuleSheet`) |
 | `components/` | `PdfPreview` (the placeholder the native preview follows), `Modal`, `ConfirmSheet`, `Toasts`, `TooltipHost`, `ErrorBoundary`, `icons.tsx` (lucide icons by role) |
 | `lib/` | `pdfCover.ts` (overlays hide the native preview: `useCoversPdf`, `usePdfCovers`), `theme.ts` (scheme and accent on `<html>`), `motion.ts` (`usePresence`, `useGlide`, `useFlash`, `useListGlide`) |
-| `styles/` | `palettes/` (every color, light and dark), accents, motion tokens, base, controls, shell, overlays, statements |
+| `styles/` | `palettes/` (every color, light and dark), accents, motion tokens, base, controls, shell, overlays, statements, rules |
 | `test/` | `createApiMock`, the module boundary test |
 
 ## Webview hardening

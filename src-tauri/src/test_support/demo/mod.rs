@@ -13,7 +13,7 @@ mod statements;
 type Seeder = fn() -> AppResult<Option<Op>>;
 
 /// The ops that build the demo data set, in order.
-const SEEDERS: &[Seeder] = &[demo_accounts];
+const SEEDERS: &[Seeder] = &[demo_accounts, demo_rules];
 
 /// Made-up accounts at a made-up bank code; the IBANs' check digits are valid.
 pub const DEMO_ACCOUNTS: [(&str, &str); 3] = [
@@ -40,6 +40,38 @@ fn demo_accounts() -> AppResult<Option<Op>> {
         })
         .collect::<AppResult<_>>()?;
     Ok(Some(Op::new("Add the demo accounts", changes)))
+}
+
+/// The built-in rules and a few of the owner's, so some demo lines arrive decided and some wait for Review.
+fn demo_rules() -> AppResult<Option<Op>> {
+    use crate::rules::store::{Action, RULES, RuleRow};
+    let rule = |n: i64, token: &str, action: Action, item_key: Option<&str>| RuleRow {
+        id: format!("demo-rule-{n}"),
+        position: n,
+        builtin: None,
+        contains: serde_json::json!([token]).to_string(),
+        amount_cents: None,
+        tolerance_cents: 0,
+        account_id: None,
+        own_counterparty: false,
+        action,
+        item_key: item_key.map(Into::into),
+        subscription_id: None,
+        document_id: None,
+        created_at: n,
+    };
+    let mut rows = crate::rules::builtin_rules(0);
+    rows.extend([
+        rule(1, "NORDWIND", Action::Ignore, None),
+        rule(2, "HAUSVERWALTUNG", Action::Ignore, None),
+        rule(3, "TANKSTELLE", Action::Ignore, None),
+        rule(4, "SEITENWEISE", Action::Anv, Some("literature")),
+    ]);
+    let changes = rows
+        .iter()
+        .map(|r| Change::insert(RULES, r))
+        .collect::<AppResult<_>>()?;
+    Ok(Some(Op::new("Add the demo rules", changes)))
 }
 
 /// Seeds the demo data when the database has never been written to; returns how many ops and statements.
@@ -87,6 +119,7 @@ pub fn reset(config_dir: &Path) -> AppResult<()> {
 mod tests {
     use super::*;
     use crate::db::Change;
+    use crate::rules::store::Action;
     use crate::test_support::temp_config_dir;
 
     fn journal_rows(db: &Db) -> i64 {
@@ -109,11 +142,41 @@ mod tests {
         numbers
     }
 
+    /// Kind, item and rule of the decision of every line whose text or detail lines contain `needle`.
+    type Outcome = Option<(Action, Option<String>, Option<String>)>;
+
+    fn outcomes_of_lines_containing(db: &Db, needle: &str) -> Vec<Outcome> {
+        let decisions = db.read(crate::rules::store::decisions).unwrap();
+        let lines: Vec<_> = db
+            .read(crate::statements::store::all_transactions)
+            .unwrap()
+            .into_iter()
+            .filter(|l| format!("{} {}", l.text, l.extra).contains(needle))
+            .collect();
+        assert!(!lines.is_empty(), "no line with {needle}");
+        lines
+            .iter()
+            .map(|l| {
+                decisions
+                    .get(&l.id)
+                    .map(|d| (d.kind, d.item_key.clone(), d.rule_id.clone()))
+            })
+            .collect()
+    }
+
+    fn all_decided_as(db: &Db, needle: &str, kind: Action, item: Option<&str>, rule: &str) {
+        let expected = Some((kind, item.map(String::from), Some(rule.to_string())));
+        for outcome in outcomes_of_lines_containing(db, needle) {
+            assert_eq!(outcome, expected, "{needle}");
+        }
+    }
+
     #[test]
-    fn seeding_an_empty_database_writes_the_accounts_op_and_one_op_per_demo_statement() {
+    fn seeding_an_empty_database_writes_the_accounts_op_the_rules_op_and_one_op_per_demo_statement()
+    {
         let dir = temp_config_dir();
         let db = Db::open(dir.path()).unwrap();
-        assert_eq!(seed_if_empty(&db, dir.path(), today()).unwrap(), 1 + 24);
+        assert_eq!(seed_if_empty(&db, dir.path(), today()).unwrap(), 2 + 24);
 
         let accounts = accounts::list(&db).unwrap();
         let shown: Vec<(&str, &str, bool)> = accounts
@@ -129,6 +192,65 @@ mod tests {
             ]
         );
         assert_eq!(db.undo().unwrap(), None);
+    }
+
+    #[test]
+    fn the_seed_has_the_built_in_rules_and_four_demo_rules_in_running_order() {
+        let dir = temp_config_dir();
+        let db = Db::open(dir.path()).unwrap();
+        seed_if_empty(&db, dir.path(), today()).unwrap();
+
+        let ids: Vec<String> = db
+            .read(crate::rules::store::rules)
+            .unwrap()
+            .into_iter()
+            .map(|r| r.id)
+            .collect();
+
+        assert_eq!(
+            ids,
+            [
+                "builtin-transfers",
+                "builtin-bank-fees",
+                "demo-rule-1",
+                "demo-rule-2",
+                "demo-rule-3",
+                "demo-rule-4"
+            ]
+        );
+    }
+
+    #[test]
+    fn seeded_lines_arrive_decided_by_the_demo_rules_and_the_rest_wait_for_review() {
+        let dir = temp_config_dir();
+        let db = Db::open(dir.path()).unwrap();
+        seed_if_empty(&db, dir.path(), today()).unwrap();
+
+        all_decided_as(&db, "NORDWIND", Action::Ignore, None, "demo-rule-1");
+        all_decided_as(&db, "HAUSVERWALTUNG", Action::Ignore, None, "demo-rule-2");
+        all_decided_as(&db, "TANKSTELLE", Action::Ignore, None, "demo-rule-3");
+        all_decided_as(
+            &db,
+            "SEITENWEISE",
+            Action::Anv,
+            Some("literature"),
+            "demo-rule-4",
+        );
+        for waiting in ["STREAMFLIX", "LUMEN AI", "CAFE"] {
+            for outcome in outcomes_of_lines_containing(&db, waiting) {
+                assert_eq!(outcome, None, "{waiting}");
+            }
+        }
+    }
+
+    #[test]
+    fn seeded_transfers_to_household_are_ignored_by_the_built_in_rule() {
+        let dir = temp_config_dir();
+        let db = Db::open(dir.path()).unwrap();
+        seed_if_empty(&db, dir.path(), today()).unwrap();
+
+        all_decided_as(&db, "HOUSEHOLD", Action::Ignore, None, "builtin-transfers");
+        assert_eq!(outcomes_of_lines_containing(&db, "HOUSEHOLD").len(), 11);
     }
 
     #[test]

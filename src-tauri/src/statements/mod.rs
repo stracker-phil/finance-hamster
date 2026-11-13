@@ -10,7 +10,7 @@ pub mod view;
 #[cfg(test)]
 mod check_tests;
 #[cfg(test)]
-mod import_tests;
+pub(crate) mod import_tests;
 #[cfg(test)]
 mod view_tests;
 

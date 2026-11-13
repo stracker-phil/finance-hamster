@@ -15,7 +15,7 @@ use crate::test_support::temp_config_dir;
 const NOW: i64 = 1_700_000_000;
 
 /// A database holding the demo accounts as `account-1` (Private), `account-2` and `account-3`.
-pub(super) fn open_with_accounts() -> (tempfile::TempDir, Db) {
+pub(crate) fn open_with_accounts() -> (tempfile::TempDir, Db) {
     let dir = temp_config_dir();
     let db = Db::open(dir.path()).unwrap();
     let changes = DEMO_ACCOUNTS
@@ -41,7 +41,7 @@ pub(super) fn open_with_accounts() -> (tempfile::TempDir, Db) {
     (dir, db)
 }
 
-pub(super) fn october() -> Statement {
+pub(crate) fn october() -> Statement {
     demo_month(10, 2026, 10, 141_230)
 }
 

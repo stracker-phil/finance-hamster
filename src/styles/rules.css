@@ -1,0 +1,6 @@
+/* Settings → Rules: the rule sheet's form. */
+.rule-form { display: flex; flex-direction: column; gap: 6px; }
+.rule-form__pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.rule-form .form-field__label { font-weight: 500; color: var(--text-secondary); }
+.rule-form .actions .rule-form__delete { margin-right: auto; }
+.btn--danger-text { color: var(--danger); }

@@ -82,3 +82,14 @@ pub struct Fx {
     pub rate: String,
     pub rate_date: NaiveDate,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn card_kinds_are_stored_as_online_and_terminal() {
+        assert_eq!(CardKind::Online.as_str(), "online");
+        assert_eq!(CardKind::Terminal.as_str(), "terminal");
+    }
+}

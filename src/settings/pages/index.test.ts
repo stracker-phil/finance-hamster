@@ -5,12 +5,21 @@ import { SETTINGS_PAGES } from "./index";
 const found = (query: string) => searchSettings(SETTINGS_PAGES, query).map((m) => (m.row ? `${m.page.id}/${m.row.id}` : m.page.id));
 
 describe("SETTINGS_PAGES", () => {
-  it("puts Accounts and Tax Rules in the Finance group ahead of the App pages", () => {
+  it("puts Rules, Accounts and Tax Rules in the Finance group ahead of the App pages", () => {
     const [finance, app] = groupsOf(SETTINGS_PAGES);
 
     expect(finance.group).toBe("Finance");
-    expect(finance.pages.map((p) => p.label)).toEqual(["Accounts", "Tax Rules"]);
+    expect(finance.pages.map((p) => p.label)).toEqual(["Rules", "Accounts", "Tax Rules"]);
     expect(app.group).toBe("App");
+  });
+
+  it.each([
+    ["New rule", "rules/add-rule"],
+    ["Apply rules again", "rules/rerun"],
+    ["bank text", "rules/add-rule"],
+    ["rerun", "rules/rerun"],
+  ])("finds the Rules row for %s", (query, hit) => {
+    expect(found(query)).toContain(hit);
   });
 
   it.each([
@@ -24,6 +33,6 @@ describe("SETTINGS_PAGES", () => {
   });
 
   it("finds the Finance pages by their group name", () => {
-    expect(found("finance")).toEqual(expect.arrayContaining(["accounts", "taxrules"]));
+    expect(found("finance")).toEqual(expect.arrayContaining(["rules", "accounts", "taxrules"]));
   });
 });

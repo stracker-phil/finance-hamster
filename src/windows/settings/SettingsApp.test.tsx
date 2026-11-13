@@ -30,7 +30,7 @@ describe("SettingsApp", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.history.replaceState(null, "", "/");
-    useStore.setState({ toasts: [] });
+    useStore.setState({ toasts: [], confirmation: null });
     mocked.listen.mockResolvedValue(() => {});
     mocked.getSettings.mockResolvedValue(settings());
     mocked.listAccounts.mockResolvedValue([account()]);
@@ -53,6 +53,22 @@ describe("SettingsApp", () => {
 
       expect(pageTitle()).toBe(FIRST_PAGE);
       expect(nav().getByRole("button", { name: FIRST_PAGE }).getAttribute("aria-current")).toBe("page");
+    });
+
+    it("shows Rules as the first page, in the Finance group", () => {
+      renderSettings();
+
+      expect(pageTitle()).toBe("Rules");
+      const labels = within(screen.getByRole("group", { name: "Finance" })).getAllByRole("button").map((b) => b.textContent);
+      expect(labels).toEqual(["Rules", "Accounts", "Tax Rules"]);
+    });
+
+    it("asks for confirmation in the Settings window when Re-run… is clicked", async () => {
+      renderSettings();
+
+      await userEvent.click(await screen.findByRole("button", { name: "Re-run…" }));
+
+      expect(screen.getByRole("alertdialog", { name: "Apply the rules again?" })).toBeTruthy();
     });
 
     it("opens the page named by ?page= in the location", () => {

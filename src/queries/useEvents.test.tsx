@@ -6,8 +6,10 @@ vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await impo
 import { api } from "../api";
 import { account } from "../test/accounts";
 import { renderWithQuery } from "../test/renderWithQuery";
+import { ruleView, rulesView } from "../test/lineRules";
 import { accountCoverage, accountLines, coverage, statementGroup } from "../test/statements";
 import { useAccounts } from "./accounts";
+import { useLineRules } from "./lineRules";
 import { useAccountLines, useCoverage } from "./statements";
 import { useTaxYears } from "./taxYears";
 import { useEvents } from "./useEvents";
@@ -112,6 +114,36 @@ describe("useEvents", () => {
 
       expect(await screen.findByText("Lines: Nr. 010/2026, Nr. 009/2026")).toBeTruthy();
       expect(screen.getByText("Coverage: Nr. 009 · until 31 Oct")).toBeTruthy();
+    });
+  });
+
+  describe("line rules", () => {
+    function RulesProbe() {
+      useEvents();
+      const { data } = useLineRules();
+      return <p>Rules: {data?.groups.flatMap((g) => g.rules.map((r) => r.label)).join(", ")}</p>;
+    }
+
+    it.each(["rules", "decisions", "transactions", "accounts", "tax_years"])("refetches the line rules when data_changed names the %s table", async (table) => {
+      mocked.rulesView.mockResolvedValue(rulesView());
+      renderWithQuery(<RulesProbe />);
+      await screen.findByText("Rules: Bank text contains ALPENMARKT");
+      mocked.rulesView.mockResolvedValue(rulesView({ groups: [{ title: "Ignore", rules: [ruleView({ label: "Bank text contains BILLA" })] }] }));
+
+      await emitDataChanged([table]);
+
+      expect(await screen.findByText("Rules: Bank text contains BILLA")).toBeTruthy();
+    });
+
+    it("keeps the line rules when data_changed names an unrelated table", async () => {
+      mocked.rulesView.mockResolvedValue(rulesView());
+      renderWithQuery(<RulesProbe />);
+      await screen.findByText("Rules: Bank text contains ALPENMARKT");
+      mocked.rulesView.mockResolvedValue(rulesView({ groups: [] }));
+
+      await emitDataChanged(["documents"]);
+
+      expect(screen.getByText("Rules: Bank text contains ALPENMARKT")).toBeTruthy();
     });
   });
 

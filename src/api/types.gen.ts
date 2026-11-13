@@ -35,6 +35,11 @@ export type AccountLines = { id: string, name: string, ibanMasked: string, group
 export type AccountState = "ok" | "behind";
 
 /**
+ * What a rule or a hand decision does with a line.
+ */
+export type Action = "ignore" | "anv" | "subscription";
+
+/**
  * The JSON shape of an `AppError`.
  */
 export type AppError = { kind: ErrorKind, message: string, 
@@ -110,6 +115,15 @@ backup: string | null,
 needsReload: boolean, };
 
 /**
+ * An item the ANV action can assign.
+ */
+export type ItemOption = { key: string, 
+/**
+ * `KZ 169 · Digitale Arbeitsmittel`.
+ */
+label: string, kz: string, };
+
+/**
  * Something the page acts on once it listens: from the launch that started the app or a later one.
  */
 export type LaunchEvent = { "type": "error", message: string, } | { "type": "activate" };
@@ -158,6 +172,27 @@ export type PdfSource = { kind: SourceKind, id: string, };
 export type ReloadPreview = { year: number, from: string, to: string | null, changes: Array<string>, problems: Array<string>, };
 
 /**
+ * A rule as the Rule sheet edits it; amounts as typed.
+ */
+export type RuleForm = { 
+/**
+ * Any of these in the bank text matches, ignoring case.
+ */
+contains: Array<string>, amount: string | null, tolerance: string | null, accountId: string | null, ownCounterparty: boolean, action: Action, itemKey: string | null, };
+
+export type RuleGroup = { title: string, rules: Array<RuleView>, };
+
+export type RuleView = { id: string, 
+/**
+ * `Bank text contains CLOUDBOX and amount 25.95`.
+ */
+label: string, 
+/**
+ * `→ assign item KZ 724 · 10 matches · last 7 Nov`.
+ */
+detail: string, builtin: boolean, form: RuleForm, };
+
+/**
  * One row of Settings → Tax Rules.
  */
 export type RulesFile = { fileName: string, year: number, state: RulesState, 
@@ -187,6 +222,8 @@ closedOn: string | null,
 loadedOn: string | null, };
 
 export type RulesState = "draft" | "open" | "closed";
+
+export type RulesView = { groups: Array<RuleGroup>, items: Array<ItemOption>, };
 
 export type Settings = { appearance: Appearance, accent: Accent, numberFormat: NumberFormat, 
 /**

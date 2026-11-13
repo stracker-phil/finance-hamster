@@ -173,6 +173,22 @@ mod tests {
     }
 
     #[test]
+    fn plain_amounts_have_no_currency_and_a_true_minus_sign() {
+        for (cents, format, expected) in [
+            (123_456, DOT, "1,234.56"),
+            (123_456, COMMA, "1.234,56"),
+            (-1_200, DOT, "\u{2212}12.00"),
+            (-123_456, COMMA, "\u{2212}1.234,56"),
+            (0, DOT, "0.00"),
+            (5, COMMA, "0,05"),
+            (-5, DOT, "\u{2212}0.05"),
+            (100_000_000, DOT, "1,000,000.00"),
+        ] {
+            assert_eq!(format_plain(cents, format), expected, "{cents} {format:?}");
+        }
+    }
+
+    #[test]
     fn copy_values_use_a_decimal_comma_and_no_grouping() {
         for (cents, expected) in [
             (122_840, "1228,40"),

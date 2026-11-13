@@ -3,12 +3,25 @@ import { AboutPage } from "./AboutPage";
 import { AccountsPage } from "./AccountsPage";
 import { AppearancePage } from "./AppearancePage";
 import { PrivacyPage } from "./PrivacyPage";
+import { RulesPage } from "./RulesPage";
 import { ShortcutsPage } from "./ShortcutsPage";
 import { StatusPage } from "./StatusPage";
 import { TaxRulesPage } from "./TaxRulesPage";
 
 /** Every Settings page in nav order (mockup Settings). */
 export const SETTINGS_PAGES: SettingsPage[] = [
+  {
+    id: "rules",
+    group: "Finance",
+    label: "Rules",
+    icon: "rules",
+    intro: "Rules run on every import, top to bottom. Most are created right in Review with “Always do this”. Your own choice on a line always wins.",
+    Body: RulesPage,
+    rows: [
+      { id: "add-rule", title: "New rule", keywords: ["ignore", "assign", "item", "bank text"] },
+      { id: "rerun", title: "Apply rules again", keywords: ["re-run", "rerun"] },
+    ],
+  },
   {
     id: "accounts",
     group: "Finance",

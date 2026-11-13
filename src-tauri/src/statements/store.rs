@@ -150,6 +150,16 @@ pub fn transactions_of(conn: &Connection, statement_id: &str) -> AppResult<Vec<T
     Ok(rows.collect::<Result<_, _>>()?)
 }
 
+/// Every line, oldest first.
+pub fn all_transactions(conn: &Connection) -> AppResult<Vec<TransactionRow>> {
+    let sql = format!(
+        "SELECT {TRANSACTION_COLUMNS} FROM {TRANSACTIONS} ORDER BY value_date, statement_id, page, row"
+    );
+    let mut query = conn.prepare(&sql)?;
+    let rows = query.query_map([], transaction)?;
+    Ok(rows.collect::<Result<_, _>>()?)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -296,6 +306,55 @@ mod tests {
             .collect();
 
         assert_eq!(ids, ["t1", "t2", "t3"]);
+    }
+
+    #[test]
+    fn all_lines_come_oldest_first_then_by_statement_page_and_row() {
+        let (_dir, db) = open_with_accounts();
+        assert_eq!(db.read(all_transactions).unwrap(), vec![]);
+        insert_all(
+            &db,
+            STATEMENTS,
+            &[
+                statement_row("a", "account-1", 1, 2026),
+                statement_row("b", "account-1", 2, 2026),
+            ],
+        );
+        let on = |id: &str, statement: &str, page: u32, row: u32, date: &str| TransactionRow {
+            value_date: date.into(),
+            ..transaction_row(id, statement, page, row)
+        };
+        insert_all(
+            &db,
+            TRANSACTIONS,
+            &[
+                on("late", "b", 1, 1, "2026-02-03"),
+                on("a-page-2", "a", 2, 1, "2026-01-05"),
+                on("b-same-day", "b", 1, 3, "2026-01-05"),
+                on("a-row-2", "a", 1, 2, "2026-01-05"),
+                on("early", "b", 1, 2, "2026-01-02"),
+                on("a-row-1", "a", 1, 1, "2026-01-05"),
+            ],
+        );
+
+        let ids: Vec<String> = db
+            .read(all_transactions)
+            .unwrap()
+            .into_iter()
+            .map(|t| t.id)
+            .collect();
+
+        assert_eq!(
+            ids,
+            [
+                "early",
+                "a-row-1",
+                "a-row-2",
+                "a-page-2",
+                "b-same-day",
+                "late"
+            ]
+        );
     }
 
     #[test]

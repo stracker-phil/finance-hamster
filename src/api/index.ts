@@ -1,7 +1,7 @@
 import { getName, getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { Account, AccountEdit, AccountLines, Coverage, Frame, ImportPreview, PdfSource, AppError, AppInfo, CommandInfo, ErrorKind, EventName, EventPayloads, Imported, LaunchEvent, NewAccount, ReloadPreview, RulesFile, Settings, SettingsPatch, TaxYear } from "./types";
+import type { Account, AccountEdit, AccountLines, Coverage, RuleForm, RulesView, Frame, ImportPreview, PdfSource, AppError, AppInfo, CommandInfo, ErrorKind, EventName, EventPayloads, Imported, LaunchEvent, NewAccount, ReloadPreview, RulesFile, Settings, SettingsPatch, TaxYear } from "./types";
 
 export * from "./types";
 
@@ -44,6 +44,12 @@ export const api = {
   statementImportCancel: (token: string) => invoke<void>("statement_import_cancel", { token }),
   statementsCoverage: () => invoke<Coverage>("statements_coverage"),
   accountLines: (accountId: string) => invoke<AccountLines>("account_lines", { accountId }),
+  rulesView: () => invoke<RulesView>("rules_view"),
+  /** Adds a rule (`id` null) or changes one; the label of the change. */
+  ruleSave: (id: string | null, form: RuleForm) => invoke<string>("rule_save", { id, form }),
+  ruleDelete: (id: string) => invoke<string>("rule_delete", { id }),
+  /** How many lines changed, in words. */
+  rulesRerun: () => invoke<string>("rules_rerun"),
   pdfViewShow: (source: PdfSource, frame: Frame) => invoke<void>("pdf_view_show", { source, frame }),
   pdfViewMove: (frame: Frame) => invoke<void>("pdf_view_move", { frame }),
   pdfViewHide: () => invoke<void>("pdf_view_hide"),

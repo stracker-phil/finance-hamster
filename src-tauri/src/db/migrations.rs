@@ -83,6 +83,32 @@ pub const MIGRATIONS: &[&str] = &[
     );
     CREATE INDEX transactions_statement ON transactions (statement_id);
     CREATE INDEX transactions_value_date ON transactions (value_date);",
+    // 4: rules, and how each line was decided (by a rule or by hand); the lines themselves stay as imported.
+    "CREATE TABLE rules (
+        id TEXT PRIMARY KEY,
+        position INTEGER NOT NULL,
+        builtin TEXT,
+        contains TEXT NOT NULL,
+        amount_cents INTEGER,
+        tolerance_cents INTEGER NOT NULL,
+        account_id TEXT,
+        own_counterparty INTEGER NOT NULL,
+        action TEXT NOT NULL,
+        item_key TEXT,
+        subscription_id TEXT,
+        document_id TEXT,
+        created_at INTEGER NOT NULL
+    );
+    CREATE TABLE decisions (
+        id TEXT PRIMARY KEY REFERENCES transactions (id),
+        kind TEXT NOT NULL,
+        item_key TEXT,
+        subscription_id TEXT,
+        document_id TEXT,
+        rule_id TEXT,
+        decided_at INTEGER NOT NULL
+    );
+    CREATE INDEX decisions_rule ON decisions (rule_id);",
 ];
 
 pub fn version(conn: &Connection) -> AppResult<usize> {
@@ -137,7 +163,9 @@ mod tests {
     fn all_tables() -> Vec<String> {
         [
             "accounts",
+            "decisions",
             "journal",
+            "rules",
             "statements",
             "tax_years",
             "transactions",
@@ -158,6 +186,33 @@ mod tests {
             ["accounts", "journal", "tax_years"]
                 .map(String::from)
                 .to_vec()
+        );
+
+        migrate(&mut conn).unwrap();
+
+        assert_eq!(version(&conn).unwrap(), MIGRATIONS.len());
+        assert_eq!(tables(&conn), all_tables());
+    }
+
+    #[test]
+    fn a_file_at_version_three_gains_rules_and_decisions() {
+        let dir = temp_config_dir();
+        let mut conn = Connection::open(dir.path().join("v3.sqlite")).unwrap();
+        for sql in &MIGRATIONS[..3] {
+            conn.execute_batch(sql).unwrap();
+        }
+        conn.pragma_update(None, "user_version", 3i64).unwrap();
+        assert_eq!(
+            tables(&conn),
+            [
+                "accounts",
+                "journal",
+                "statements",
+                "tax_years",
+                "transactions"
+            ]
+            .map(String::from)
+            .to_vec()
         );
 
         migrate(&mut conn).unwrap();

@@ -21,6 +21,7 @@ use crate::error::{AppError, AppResult};
 use crate::lock::MutexExt;
 use crate::money::{Money, format_money, format_plain, format_signed};
 use crate::platform::pdf::Pdf;
+use crate::rules;
 use crate::settings::NumberFormat;
 use crate::store::json_file::create_private_dir;
 
@@ -308,7 +309,7 @@ fn transaction_row(
 }
 
 /// Copies the PDF and stores the statement with its lines as one op; transfers to the owner's other accounts
-/// are tagged.
+/// are tagged and the rules decide what they can.
 pub fn commit(
     db: &Db,
     config_dir: &Path,
@@ -348,11 +349,18 @@ pub fn commit(
         pages: pending.pages,
         imported_at: now,
     };
+    let rules = db.read(rules::store::rules)?;
+    let own_accounts = db.read(rules::apply::own_accounts)?;
     let mut changes = vec![Change::insert(store::STATEMENTS, &statement)?];
+    let mut decisions = Vec::new();
     for line in &p.lines {
         let row = transaction_row(&statement, line, &own)?;
         changes.push(Change::insert(store::TRANSACTIONS, &row)?);
+        if let Some(decision) = rules::engine::decide(&rules, &row, &own_accounts, now) {
+            decisions.push(Change::insert(rules::store::DECISIONS, &decision)?);
+        }
     }
+    changes.extend(decisions);
     let op = Op::new(
         format!("Import Statement {}", number_label(p.number, p.year)),
         changes,
