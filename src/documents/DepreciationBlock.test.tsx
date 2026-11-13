@@ -1,0 +1,87 @@
+import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
+
+import { depreciationView } from "../test/documents";
+import { DepreciationBlock } from "./DepreciationBlock";
+
+const renderBlock = (patch: Parameters<typeof depreciationView>[0] = {}, disabled = false) => {
+  const onYears = vi.fn();
+  render(<DepreciationBlock depreciation={depreciationView(patch)} disabled={disabled} onYears={onYears} />);
+  return onYears;
+};
+
+describe("DepreciationBlock", () => {
+  it("shows the heading, the rule beside the useful life and why the purchase is spread", () => {
+    renderBlock();
+
+    expect(screen.getByRole("heading", { name: "Depreciation" })).toBeTruthy();
+    expect(screen.getByText("3 years for computer in ruleset 2026 v1")).toBeTruthy();
+    expect(screen.getByText("Why")).toBeTruthy();
+    expect(screen.getByText("€1,500.00 is above the GWG limit, so it is spread over its useful life")).toBeTruthy();
+  });
+
+  describe("useful life", () => {
+    it("shows As the rules say while the years are the rule's", () => {
+      renderBlock({ own: false });
+
+      expect(screen.getByLabelText("Useful life")).toHaveDisplayValue("As the rules say");
+    });
+
+    it("shows the document's own years once they differ from the rule", () => {
+      renderBlock({ own: true, years: 5 });
+
+      expect(screen.getByLabelText("Useful life")).toHaveDisplayValue("5 years");
+    });
+
+    it("uses the singular for one year", () => {
+      renderBlock({ own: true, years: 1 });
+
+      expect(screen.getByLabelText("Useful life")).toHaveDisplayValue("1 year");
+    });
+
+    it("reports the chosen number of years", async () => {
+      const onYears = renderBlock();
+
+      await userEvent.selectOptions(screen.getByLabelText("Useful life"), "5 years");
+
+      expect(onYears).toHaveBeenCalledWith(5);
+    });
+
+    it("reports null when As the rules say is chosen again", async () => {
+      const onYears = renderBlock({ own: true, years: 5 });
+
+      await userEvent.selectOptions(screen.getByLabelText("Useful life"), "As the rules say");
+
+      expect(onYears).toHaveBeenCalledWith(null);
+    });
+
+    it("is disabled when the document is locked", () => {
+      renderBlock({}, true);
+
+      expect(screen.getByLabelText("Useful life")).toBeDisabled();
+    });
+  });
+
+  describe("slices", () => {
+    it("lists one slice per year with its amount and note", () => {
+      renderBlock();
+
+      const items = within(screen.getByRole("list", { name: "Slices" })).getAllByRole("listitem");
+      expect(items.map((li) => li.textContent)).toEqual(["2026€250.00half year", "2027€500.00", "2028€500.00", "2029€250.00"]);
+    });
+
+    it("shows the frozen note on a slice of a closed year", () => {
+      renderBlock({
+        slices: [
+          { year: 2026, amount: "€250.00", note: "frozen" },
+          { year: 2027, amount: "€500.00", note: null },
+        ],
+      });
+
+      const items = within(screen.getByRole("list", { name: "Slices" })).getAllByRole("listitem");
+      expect(items[0].textContent).toBe("2026€250.00frozen");
+      expect(items[1].textContent).toBe("2027€500.00");
+    });
+  });
+});

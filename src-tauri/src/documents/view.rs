@@ -4,6 +4,7 @@ use serde::Serialize;
 use ts_rs::TS;
 
 use super::amounts::{self, Estimate};
+use super::depreciation::{self, Schedule};
 use super::guess::Guess;
 use super::payments::{self, LineChoice};
 use super::store::{self, DocState, DocumentRow, VendorRow};
@@ -63,6 +64,34 @@ pub struct DocumentView {
     /// `2 Nov 2026`, while excluded.
     pub excluded_on: Option<String>,
     pub exclude_reason: Option<String>,
+    /// The schedule of a purchase above the GWG limit.
+    pub depreciation: Option<DepreciationView>,
+}
+
+#[derive(Serialize, Clone, Debug, PartialEq, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "src/api/types.gen.ts")]
+pub struct SliceView {
+    pub year: i32,
+    pub amount: String,
+    /// `half year`, `frozen`.
+    pub note: Option<String>,
+}
+
+#[derive(Serialize, Clone, Debug, PartialEq, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "src/api/types.gen.ts")]
+pub struct DepreciationView {
+    /// What is spread: the counted amount, `€1,500.00`.
+    pub cost: String,
+    pub years: u32,
+    /// The years the rules give, shown beside the choice: `3 years for computer in ruleset 2026 v1`.
+    pub rule: String,
+    /// Changed from the rule's years for this document.
+    pub own: bool,
+    /// Why it is spread, in words.
+    pub why: String,
+    pub slices: Vec<SliceView>,
 }
 
 fn year_of(date: &str) -> Option<i32> {
@@ -178,6 +207,24 @@ pub fn document(
                 crate::date::day_month_year(t.with_timezone(&chrono::Local).date_naive(), order)
             })
     };
+    let mut estimate = paid.map(|p| {
+        amounts::estimate(
+            ruleset.as_ref(),
+            p,
+            doc.item_key.as_deref(),
+            doc.work_share,
+            year.unwrap_or_default(),
+            format,
+        )
+    });
+    let depreciation = depreciation_view(db, &doc, paid, format)?;
+    // A depreciated purchase counts only its first slice in the year it was paid.
+    if let (Some(estimate), Some(spread)) = (estimate.as_mut(), depreciation.as_ref())
+        && let Some(first) = spread.slices.first()
+    {
+        estimate.formula = format!("year 1 of {} · {} in total", spread.years, spread.cost);
+        estimate.anv = first.amount.clone();
+    }
     Ok(DocumentView {
         title: title_of(&doc, &vendors),
         id: doc.id.clone(),
@@ -197,16 +244,7 @@ pub fn document(
             .unwrap_or_default(),
         item_key: doc.item_key.clone(),
         work_share: doc.work_share,
-        estimate: paid.map(|p| {
-            amounts::estimate(
-                ruleset.as_ref(),
-                p,
-                doc.item_key.as_deref(),
-                doc.work_share,
-                year.unwrap_or_default(),
-                format,
-            )
-        }),
+        estimate,
         note: doc.note.clone(),
         invoice_amount: doc.invoice_cents.map(|c| format_plain(c, format)),
         invoice_currency: doc.invoice_currency.clone().unwrap_or_else(|| "EUR".into()),
@@ -214,6 +252,7 @@ pub fn document(
         finished_on: on(doc.finished_at),
         excluded_on: on(doc.excluded_at),
         exclude_reason: doc.exclude_reason.clone(),
+        depreciation,
     })
 }
 
@@ -246,4 +285,83 @@ pub fn editable(doc: &DocumentRow) -> AppResult<()> {
             "This document is excluded; restore it to change it".into(),
         )),
     }
+}
+
+/// The Depreciation block of a document whose counted amount is spread over several years.
+fn depreciation_view(
+    db: &Db,
+    doc: &DocumentRow,
+    paid: Option<i64>,
+    format: NumberFormat,
+) -> AppResult<Option<DepreciationView>> {
+    let (Some(paid), Some(day), Some(key)) = (
+        paid,
+        doc.pay_date.as_deref().and_then(crate::date::parse),
+        doc.item_key.as_ref(),
+    ) else {
+        return Ok(None);
+    };
+    let year = chrono::Datelike::year(&day);
+    let Some(ruleset) = rules::ruleset_for_year(db, year)? else {
+        return Ok(None);
+    };
+    let Some(item) = ruleset.items.iter().find(|i| &i.key == key) else {
+        return Ok(None);
+    };
+    let cost = amounts::anv_cents(paid, doc.work_share);
+    let schedule = depreciation::schedule(cost, day, item, &ruleset, doc.useful_life);
+    let Schedule::Spread {
+        asset_class,
+        rule_years,
+        years,
+        half_year,
+        slices,
+    } = schedule
+    else {
+        return Ok(None);
+    };
+    let eur = |c: i64| format_money(&Money::eur(c), format);
+    let closed: Vec<i32> = db
+        .read(crate::taxyears::rows)?
+        .into_iter()
+        .filter(|y| y.state == crate::taxyears::YearState::Closed)
+        .map(|y| y.year)
+        .collect();
+    let mut why = format!(
+        "{} is above the GWG limit of {}, so it counts over {years} {}",
+        eur(cost),
+        eur(ruleset.settings.gwg_limit.0),
+        if years == 1 { "year" } else { "years" }
+    );
+    if half_year {
+        why.push_str(&format!(
+            "; bought on or after {}, the first and the last year count half",
+            ruleset.settings.half_year_from
+        ));
+    }
+    why.push('.');
+    Ok(Some(DepreciationView {
+        cost: eur(cost),
+        years,
+        rule: format!(
+            "{rule_years} years for {asset_class} in ruleset {}",
+            ruleset.ruleset
+        ),
+        own: doc.useful_life.is_some_and(|y| y != rule_years),
+        why,
+        slices: slices
+            .iter()
+            .map(|s| SliceView {
+                year: s.year,
+                amount: eur(s.cents),
+                note: if closed.contains(&s.year) {
+                    Some("frozen".into())
+                } else if s.half {
+                    Some("half year".into())
+                } else {
+                    None
+                },
+            })
+            .collect(),
+    }))
 }

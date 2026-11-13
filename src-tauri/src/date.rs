@@ -267,6 +267,20 @@ mod tests {
     }
 
     #[test]
+    fn a_month_number_gives_its_english_name_and_stays_within_the_year() {
+        for (month, name) in [
+            (1, "January"),
+            (7, "July"),
+            (11, "November"),
+            (12, "December"),
+            (0, "January"),
+            (13, "December"),
+        ] {
+            assert_eq!(month_name(month), name, "{month}");
+        }
+    }
+
+    #[test]
     fn a_month_heading_names_month_and_year() {
         assert_eq!(month_year(day(2026, 11, 13)), "November 2026");
     }

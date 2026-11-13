@@ -1,4 +1,4 @@
-import type { AddPreview, ArchivedDocument, DeletionView, DocumentGroup, HistoryEntry, DocumentRowView, DocumentView, Estimate, LineChoice, VendorView, VendorsView } from "../api";
+import type { AddPreview, ArchivedDocument, DeletionView, DepreciationView, DocumentGroup, HistoryEntry, DocumentRowView, DocumentView, Estimate, LineChoice, VendorView, VendorsView } from "../api";
 
 /** A demo draft document with a payment date, one linked bank line and an estimate, with `patch` applied. */
 export function documentView(patch: Partial<DocumentView> = {}): DocumentView {
@@ -32,6 +32,7 @@ export function documentView(patch: Partial<DocumentView> = {}): DocumentView {
     finishedOn: null,
     excludedOn: null,
     excludeReason: null,
+    depreciation: null,
     ...patch,
   };
 }
@@ -100,6 +101,24 @@ export function addPreview(patch: Partial<AddPreview> = {}): AddPreview {
     itemKey: "kz-169",
     itemWhy: "last used for Demo Cloud Ltd",
     lines: [lineChoice(), lineChoice({ id: "line-2", title: "Example Market", detail: "Business · Mon, 9 Nov · EUR 12.00", amount: "−€12.00" })],
+    ...patch,
+  };
+}
+
+/** A demo depreciation of a €1,500.00 purchase over three years by the rules, with `patch` applied. */
+export function depreciationView(patch: Partial<DepreciationView> = {}): DepreciationView {
+  return {
+    cost: "€1,500.00",
+    years: 3,
+    rule: "3 years for computer in ruleset 2026 v1",
+    own: false,
+    why: "€1,500.00 is above the GWG limit, so it is spread over its useful life",
+    slices: [
+      { year: 2026, amount: "€250.00", note: "half year" },
+      { year: 2027, amount: "€500.00", note: null },
+      { year: 2028, amount: "€500.00", note: null },
+      { year: 2029, amount: "€250.00", note: null },
+    ],
     ...patch,
   };
 }

@@ -307,6 +307,7 @@ pub fn commit(
         finished_at: None,
         excluded_at: None,
         exclude_reason: None,
+        useful_life: None,
     };
     changes.push(Change::insert(store::DOCUMENTS, &doc)?);
     if let Some(line) = &line {

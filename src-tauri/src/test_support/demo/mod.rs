@@ -180,7 +180,7 @@ mod tests {
         let db = Db::open(dir.path()).unwrap();
         assert_eq!(
             seed_if_empty(&db, dir.path(), today()).unwrap(),
-            2 + 24 + 1 + 3 + 1
+            2 + 24 + 1 + 4 + 2 + 1
         );
 
         let accounts = accounts::list(&db).unwrap();
@@ -293,7 +293,8 @@ mod tests {
     }
 
     #[test]
-    fn the_seed_has_three_invoices_two_linked_and_filed_by_date_and_one_undated_in_the_inbox() {
+    fn the_seed_has_four_invoices_filed_by_date_two_linked_one_typed_and_one_undated_in_the_inbox()
+    {
         let dir = temp_config_dir();
         let db = Db::open(dir.path()).unwrap();
         seed_if_empty(&db, dir.path(), today()).unwrap();
@@ -324,6 +325,12 @@ mod tests {
                     Some("literature".to_string()),
                 ),
                 (
+                    "Ergomoebel Studio".to_string(),
+                    Some("2026-08-17".to_string()),
+                    "docs/2026/2026-08-17-ergomoebel-studio.pdf".to_string(),
+                    Some("work-equipment".to_string()),
+                ),
+                (
                     "Lumen AI".to_string(),
                     Some("2026-11-10".to_string()),
                     "docs/2026/2026-11-10-lumen-ai.pdf".to_string(),
@@ -346,6 +353,36 @@ mod tests {
                 .exists()
         );
         assert_eq!(db.read(crate::documents::store::links).unwrap().len(), 2);
+    }
+
+    #[test]
+    fn the_seeded_desk_is_paid_by_a_typed_amount_and_depreciates_over_the_furniture_life() {
+        let dir = temp_config_dir();
+        let db = Db::open(dir.path()).unwrap();
+        seed_if_empty(&db, dir.path(), today()).unwrap();
+        let desk = db
+            .read(crate::documents::store::documents)
+            .unwrap()
+            .into_iter()
+            .find(|d| d.pay_date.as_deref() == Some("2026-08-17"))
+            .unwrap();
+
+        let view = crate::documents::view::document(
+            &db,
+            &desk.id,
+            crate::settings::NumberFormat::DotDecimal,
+            crate::date::DateOrder::DayFirst,
+        )
+        .unwrap();
+
+        assert_eq!(desk.paid_cents, Some(148_000));
+        assert!(!view.paid_from_lines);
+        let depreciation = view.depreciation.unwrap();
+        assert_eq!(depreciation.cost, "€1,480.00");
+        assert_eq!(depreciation.years, 10);
+        assert_eq!(depreciation.slices.len(), 11);
+        assert_eq!(depreciation.slices[0].amount, "€74.00");
+        assert_eq!(depreciation.slices[0].note.as_deref(), Some("half year"));
     }
 
     #[test]

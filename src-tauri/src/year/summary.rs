@@ -108,17 +108,26 @@ pub fn kennzahlen(
         .collect()
 }
 
+/// "Whole year" first (rows without a month, such as slices of earlier purchases), then each month.
 pub fn months(placed: &[&Placed], format: NumberFormat) -> Vec<MonthView> {
+    // Month 0 holds the whole-year rows.
     let mut by_month: BTreeMap<u32, Vec<&Placed>> = BTreeMap::new();
     for p in placed {
-        if let Some(day) = date::parse(&p.date) {
-            by_month.entry(day.month()).or_default().push(p);
-        }
+        let month = p
+            .date
+            .as_deref()
+            .and_then(date::parse)
+            .map_or(0, |day| day.month());
+        by_month.entry(month).or_default().push(p);
     }
     by_month
         .into_iter()
         .map(|(month, rows)| MonthView {
-            label: date::month_name(month).to_string(),
+            label: if month == 0 {
+                "Whole year".to_string()
+            } else {
+                date::month_name(month).to_string()
+            },
             total: eur(rows.iter().map(|p| p.cents).sum(), format),
             rows: rows.into_iter().map(|p| p.row.clone()).collect(),
         })

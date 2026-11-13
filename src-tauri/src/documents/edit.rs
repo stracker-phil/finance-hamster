@@ -43,6 +43,10 @@ pub enum DocumentEdit {
         amount: Option<String>,
         currency: String,
     },
+    /// Years to depreciate over; none returns to the item's asset class.
+    UsefulLife {
+        years: Option<u32>,
+    },
     Link {
         line: String,
     },
@@ -162,6 +166,12 @@ pub fn edit(
             }
             after.invoice_cents = amount_cents(amount, "invoice")?;
             after.invoice_currency = after.invoice_cents.map(|_| code);
+        }
+        DocumentEdit::UsefulLife { years } => {
+            if years.is_some_and(|y| !(1..=50).contains(&y)) {
+                return Err(invalid("usefulLife", "Between 1 and 50 years"));
+            }
+            after.useful_life = *years;
         }
         DocumentEdit::Link { line } => {
             let row = db

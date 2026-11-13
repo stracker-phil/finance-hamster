@@ -51,7 +51,7 @@ function Row({ row, year, withAmount }: { row: YearRow; year: number; withAmount
       <Icon size={15} strokeWidth={1.8} className="docs-row__icon" />
       <span className="year-row__title">{row.title}</span>
       {row.draft && <span className="pill pill--dashed">Draft</span>}
-      {row.carried && <span className="pill">Earlier year</span>}
+      {row.carriedFrom && <span className="pill">From {row.carriedFrom}</span>}
       <span className="add-doc__hint year-row__detail">{row.detail}</span>
       {withAmount && <span className="year-row__amount">{row.amount}</span>}
     </button>

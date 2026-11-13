@@ -90,3 +90,10 @@
 .archive-row { display: flex; align-items: center; gap: 12px; min-height: 58px; padding: 0 24px; border-bottom: 1px solid var(--row-hairline); }
 .archive-row__file { font-size: 13px; }
 .docs-group__link { font-size: 12px; font-weight: 500; }
+.depreciation__life { width: auto; }
+.depreciation__why { padding-top: 7px; font-size: 12.5px; line-height: 1.45; color: var(--text-secondary); }
+.depreciation__slices { list-style: none; margin: 12px 0 0 132px; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.slice { min-width: 96px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; display: flex; flex-direction: column; gap: 2px; font-size: 12px; }
+.slice--frozen { background: var(--fill-subtle); }
+.slice__year { color: var(--text-muted); }
+.slice__amount { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text); }

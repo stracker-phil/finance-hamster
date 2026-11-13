@@ -4,6 +4,7 @@
 pub mod add;
 pub mod amounts;
 pub mod commands;
+pub mod depreciation;
 pub mod edit;
 pub mod files;
 pub mod guess;

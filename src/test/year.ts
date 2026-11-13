@@ -9,7 +9,7 @@ export function yearRow(patch: Partial<YearRow> = {}): YearRow {
     detail: "10 Nov · 60 % of €22.48",
     amount: "€13.49",
     draft: false,
-    carried: false,
+    carriedFrom: null,
     kz: "720",
     ...patch,
   };

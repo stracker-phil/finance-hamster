@@ -167,6 +167,8 @@ pub const MIGRATIONS: &[&str] = &[
         answered_at INTEGER NOT NULL,
         UNIQUE (year, question)
     );",
+    // 8: a document's own useful life, overriding its item's asset class.
+    "ALTER TABLE documents ADD COLUMN useful_life INTEGER;",
 ];
 
 pub fn version(conn: &Connection) -> AppResult<usize> {
@@ -235,6 +237,46 @@ mod tests {
         ]
         .map(String::from)
         .to_vec()
+    }
+
+    fn document_columns(conn: &Connection) -> Vec<String> {
+        let mut query = conn.prepare("PRAGMA table_info(documents)").unwrap();
+        query
+            .query_map([], |r| r.get(1))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect()
+    }
+
+    #[test]
+    fn a_file_at_version_seven_gains_the_useful_life_column_and_keeps_its_documents() {
+        let dir = temp_config_dir();
+        let mut conn = Connection::open(dir.path().join("v7.sqlite")).unwrap();
+        for sql in &MIGRATIONS[..7] {
+            conn.execute_batch(sql).unwrap();
+        }
+        conn.pragma_update(None, "user_version", 7i64).unwrap();
+        conn.execute(
+            "INSERT INTO documents (id, state, file, original_name, file_hash, work_share, note, created_at) \
+             VALUES ('doc-1', 'draft', 'docs/inbox/a.pdf', 'a.pdf', 'hash', 100, '', 1)",
+            [],
+        )
+        .unwrap();
+        assert!(!document_columns(&conn).contains(&"useful_life".to_string()));
+
+        migrate(&mut conn).unwrap();
+
+        assert_eq!(version(&conn).unwrap(), MIGRATIONS.len());
+        assert_eq!(tables(&conn), all_tables());
+        assert!(document_columns(&conn).contains(&"useful_life".to_string()));
+        let life: Option<i64> = conn
+            .query_row(
+                "SELECT useful_life FROM documents WHERE id = 'doc-1'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(life, None);
     }
 
     #[test]

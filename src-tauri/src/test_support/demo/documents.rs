@@ -6,6 +6,7 @@ use std::path::Path;
 use chrono::NaiveDate;
 
 use crate::db::{Db, Source};
+use crate::documents::edit::{self, DocumentEdit};
 use crate::documents::{add, files};
 use crate::error::AppResult;
 use crate::platform::pdf::write::{self, Font, Run};
@@ -18,9 +19,11 @@ struct DemoInvoice {
     item: Option<&'static str>,
     /// The bank line it is linked to: merchant token and value date.
     paid_by: Option<(&'static str, &'static str)>,
+    /// Paid without an imported bank line: the payment date and the amount as typed.
+    paid_typed: Option<(&'static str, &'static str)>,
 }
 
-const INVOICES: [DemoInvoice; 3] = [
+const INVOICES: [DemoInvoice; 4] = [
     DemoInvoice {
         file: "seitenweise-rechnung-2026-1014.pdf",
         lines: &[
@@ -33,6 +36,7 @@ const INVOICES: [DemoInvoice; 3] = [
         vendor: "Buchhandlung Seitenweise",
         item: Some("literature"),
         paid_by: Some(("SEITENWEISE", "2026-10-14")),
+        paid_typed: None,
     },
     DemoInvoice {
         file: "lumen-invoice-LUM-2026-1110.pdf",
@@ -46,6 +50,7 @@ const INVOICES: [DemoInvoice; 3] = [
         vendor: "Lumen AI",
         item: Some("digital-equipment"),
         paid_by: Some(("LUMEN", "2026-11-10")),
+        paid_typed: None,
     },
     DemoInvoice {
         file: "nordbook-air-14.pdf",
@@ -58,6 +63,21 @@ const INVOICES: [DemoInvoice; 3] = [
         vendor: "Nordbook",
         item: None,
         paid_by: None,
+        paid_typed: None,
+    },
+    DemoInvoice {
+        file: "ergomoebel-rechnung-4410.pdf",
+        lines: &[
+            "Ergomoebel Studio",
+            "Rechnungsnummer: EM-4410",
+            "Datum: 17.08.2026",
+            "1 x Schreibtisch hoehenverstellbar 1.480,00",
+            "Gesamtbetrag EUR 1.480,00",
+        ],
+        vendor: "Ergomoebel Studio",
+        item: Some("work-equipment"),
+        paid_by: None,
+        paid_typed: Some(("2026-08-17", "1480,00")),
     },
 ];
 
@@ -110,6 +130,28 @@ pub fn seed(db: &Db, config_dir: &Path, today: NaiveDate) -> AppResult<usize> {
         };
         add::commit(db, config_dir, pending, &input, now, Source::Seed)?;
         count += 1;
+        if let Some((day, amount)) = invoice.paid_typed {
+            let id = db
+                .read(crate::documents::store::documents)?
+                .into_iter()
+                .rev()
+                .find(|d| d.original_name == invoice.file)
+                .map(|d| d.id);
+            if let Some(id) = id {
+                for change in [
+                    DocumentEdit::PayDate {
+                        value: Some(day.into()),
+                    },
+                    DocumentEdit::Paid {
+                        value: Some(amount.into()),
+                    },
+                ] {
+                    if edit::edit(db, &id, &change, now, Source::Seed)?.is_some() {
+                        count += 1;
+                    }
+                }
+            }
+        }
     }
     if files::relocate(db, config_dir)?.is_some() {
         count += 1;

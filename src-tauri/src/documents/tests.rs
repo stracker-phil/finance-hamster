@@ -16,7 +16,7 @@ use super::list::{DocumentGroup, DocumentRowView};
 use super::payments::{self, LineChoice};
 use super::store::{self, DocState, DocumentRow, LinkRow, VendorRow};
 use super::vendors::{self, VendorView, VendorsView};
-use super::view::{self, DocumentView, VendorOption};
+use super::view::{self, DepreciationView, DocumentView, SliceView, VendorOption};
 use super::{files, list, title_of};
 use crate::date::DateOrder;
 use crate::db::{Change, Db, Op, Source, Written};
@@ -117,6 +117,7 @@ fn blank_document(id: &str) -> DocumentRow {
         finished_at: None,
         excluded_at: None,
         exclude_reason: None,
+        useful_life: None,
     }
 }
 
@@ -957,6 +958,7 @@ fn adding_with_a_line_stores_a_draft_a_new_vendor_and_the_link_in_one_op() {
             finished_at: None,
             excluded_at: None,
             exclude_reason: None,
+            useful_life: None,
         }
     );
     let links = db.read(store::links).unwrap();
@@ -1281,6 +1283,7 @@ fn the_page_of_a_dated_document_shows_its_lines_amount_vendor_items_and_estimate
             finished_on: None,
             excluded_on: None,
             exclude_reason: None,
+            depreciation: None,
         }
     );
 }
@@ -1476,7 +1479,8 @@ fn a_document_page_travels_in_camel_case() {
             "missing": ["payment date", "amount paid", "vendor", "item"],
             "finishedOn": null,
             "excludedOn": null,
-            "excludeReason": null
+            "excludeReason": null,
+            "depreciation": null
         })
     );
 }
@@ -2092,6 +2096,7 @@ fn an_edit_that_changes_nothing_writes_nothing() {
             amount: Some("12.00".into()),
             currency: "usd".into(),
         },
+        DocumentEdit::UsefulLife { years: Some(5) },
     ];
     for change in edits {
         let (_dir, db) = setup();
@@ -2159,6 +2164,14 @@ fn document_edits_are_read_from_the_pages_tagged_json() {
                 amount: Some("12.00".into()),
                 currency: "USD".into(),
             },
+        ),
+        (
+            json!({ "field": "usefulLife", "years": 5 }),
+            DocumentEdit::UsefulLife { years: Some(5) },
+        ),
+        (
+            json!({ "field": "usefulLife", "years": null }),
+            DocumentEdit::UsefulLife { years: None },
         ),
         (
             json!({ "field": "link", "line": "l-1" }),
@@ -3756,4 +3769,301 @@ fn vendor_changes_are_read_from_the_pages_tagged_json() {
             "{wire}"
         );
     }
+}
+
+/// An open 2026 year (GWG limit 1,000; computers over 3 years from 07-01 on half) and the years in `closed`.
+fn depreciation_setup(closed: &[i32]) -> (TempDir, Db) {
+    let (dir, db) = open_with_accounts();
+    for year in [2026, 2027, 2028, 2029] {
+        let mut rules = minimal_rules(year);
+        set(&mut rules, "/usefulLife", json!({ "computer": 3 }));
+        set(
+            &mut rules,
+            "/items",
+            json!([
+                {
+                    "key": "computer", "kz": "720", "name": "Computer", "section": "main",
+                    "kind": "documents", "depreciation": { "assetClass": "computer" }
+                },
+                { "key": "books", "kz": "721", "name": "Books", "section": "main", "kind": "documents" }
+            ]),
+        );
+        let closing = closed.contains(&year);
+        insert(
+            &db,
+            taxyears::TABLE,
+            &TaxYearRow {
+                state: if closing {
+                    taxyears::YearState::Closed
+                } else {
+                    taxyears::YearState::Open
+                },
+                closed_at: closing.then_some(2),
+                ..TaxYearRow::new(year, format!("{year} v1"), rules_text(&rules), 1)
+            },
+        );
+    }
+    (dir, db)
+}
+
+fn computer_draft(db: &Db, date: &str, cents: i64, patch: impl FnOnce(&mut DocumentRow)) {
+    draft(db, "pc", |d| {
+        d.item_key = Some("computer".into());
+        d.pay_date = Some(date.into());
+        d.paid_cents = Some(cents);
+        patch(d);
+    });
+}
+
+fn slice_view(year: i32, amount: &str, note: Option<&str>) -> SliceView {
+    SliceView {
+        year,
+        amount: amount.into(),
+        note: note.map(String::from),
+    }
+}
+
+#[test]
+fn a_purchase_above_the_gwg_limit_shows_its_schedule_with_the_rule_and_the_reason() {
+    let (_dir, db) = depreciation_setup(&[]);
+    computer_draft(&db, "2026-03-10", 150_000, |_| {});
+
+    assert_eq!(
+        page(&db, "pc").depreciation,
+        Some(DepreciationView {
+            cost: "€1,500.00".into(),
+            years: 3,
+            rule: "3 years for computer in ruleset 2026 v1".into(),
+            own: false,
+            why: "€1,500.00 is above the GWG limit of €1,000.00, so it counts over 3 years.".into(),
+            slices: vec![
+                slice_view(2026, "€500.00", None),
+                slice_view(2027, "€500.00", None),
+                slice_view(2028, "€500.00", None),
+            ],
+        })
+    );
+}
+
+#[test]
+fn a_purchase_in_the_second_half_says_so_and_marks_its_half_year_slices() {
+    let (_dir, db) = depreciation_setup(&[]);
+    computer_draft(&db, "2026-09-01", 150_000, |_| {});
+
+    let view = page(&db, "pc").depreciation.unwrap();
+
+    assert_eq!(
+        view.why,
+        "€1,500.00 is above the GWG limit of €1,000.00, so it counts over 3 years; bought on or after 07-01, the first and the last year count half."
+    );
+    assert_eq!(
+        view.slices,
+        [
+            slice_view(2026, "€250.00", Some("half year")),
+            slice_view(2027, "€500.00", None),
+            slice_view(2028, "€500.00", None),
+            slice_view(2029, "€250.00", Some("half year")),
+        ]
+    );
+}
+
+#[test]
+fn slices_in_closed_tax_years_are_frozen_even_when_they_are_half_slices() {
+    let (_dir, db) = depreciation_setup(&[2027, 2029]);
+    computer_draft(&db, "2026-09-01", 150_000, |_| {});
+
+    let view = page(&db, "pc").depreciation.unwrap();
+
+    let notes: Vec<Option<&str>> = view.slices.iter().map(|s| s.note.as_deref()).collect();
+    assert_eq!(
+        notes,
+        [Some("half year"), Some("frozen"), None, Some("frozen")]
+    );
+}
+
+#[test]
+fn an_own_useful_life_is_flagged_only_when_it_differs_from_the_rule() {
+    for (own, years, flagged) in [(Some(5), 5, true), (Some(3), 3, false), (None, 3, false)] {
+        let (_dir, db) = depreciation_setup(&[]);
+        computer_draft(&db, "2026-03-10", 150_000, |d| d.useful_life = own);
+
+        let view = page(&db, "pc").depreciation.unwrap();
+
+        assert_eq!((view.years, view.own), (years, flagged), "{own:?}");
+        assert_eq!(
+            view.rule, "3 years for computer in ruleset 2026 v1",
+            "{own:?}"
+        );
+        assert_eq!(view.slices.len(), years as usize, "{own:?}");
+    }
+}
+
+#[test]
+fn the_cost_is_the_work_share_of_what_was_paid() {
+    let (_dir, db) = depreciation_setup(&[]);
+    computer_draft(&db, "2026-03-10", 200_000, |d| d.work_share = 75);
+
+    let view = page(&db, "pc").depreciation.unwrap();
+
+    assert_eq!(view.cost, "€1,500.00");
+    assert_eq!(view.slices[0].amount, "€500.00");
+}
+
+#[test]
+fn a_document_that_counts_in_full_or_lacks_facts_has_no_schedule() {
+    type Patch = fn(&mut DocumentRow);
+    let cases: [(&str, Patch); 6] = [
+        ("at the GWG limit", |d| d.paid_cents = Some(100_000)),
+        ("below the GWG limit", |d| d.paid_cents = Some(500)),
+        ("an item without a class", |d| {
+            d.item_key = Some("books".into())
+        }),
+        ("no item", |d| d.item_key = None),
+        ("no payment date", |d| d.pay_date = None),
+        ("no amount", |d| d.paid_cents = None),
+    ];
+    for (name, patch) in cases {
+        let (_dir, db) = depreciation_setup(&[]);
+        computer_draft(&db, "2026-03-10", 150_000, patch);
+
+        assert_eq!(page(&db, "pc").depreciation, None, "{name}");
+    }
+}
+
+#[test]
+fn a_depreciated_documents_estimate_counts_only_the_first_slice_with_a_year_one_formula() {
+    for (date, years, cents, anv, formula) in [
+        (
+            "2026-03-10",
+            Some(10),
+            148_000,
+            "€148.00",
+            "year 1 of 10 · €1,480.00 in total",
+        ),
+        (
+            "2026-09-01",
+            None,
+            150_000,
+            "€250.00",
+            "year 1 of 3 · €1,500.00 in total",
+        ),
+    ] {
+        let (_dir, db) = depreciation_setup(&[]);
+        computer_draft(&db, date, cents, |d| d.useful_life = years);
+
+        let estimate = page(&db, "pc").estimate.unwrap();
+
+        assert_eq!(estimate.anv, anv, "{date}");
+        assert_eq!(estimate.formula, formula, "{date}");
+    }
+}
+
+#[test]
+fn a_depreciated_estimate_uses_the_work_share_cost_in_its_formula() {
+    let (_dir, db) = depreciation_setup(&[]);
+    computer_draft(&db, "2026-03-10", 200_000, |d| d.work_share = 75);
+
+    let estimate = page(&db, "pc").estimate.unwrap();
+
+    assert_eq!(estimate.anv, "€500.00");
+    assert_eq!(estimate.formula, "year 1 of 3 · €1,500.00 in total");
+}
+
+#[test]
+fn a_document_counted_in_full_keeps_its_share_formula_and_full_estimate() {
+    let (_dir, db) = depreciation_setup(&[]);
+    computer_draft(&db, "2026-03-10", 90_000, |d| d.work_share = 50);
+
+    let estimate = page(&db, "pc").estimate.unwrap();
+
+    assert_eq!(page(&db, "pc").depreciation, None);
+    assert_eq!(estimate.anv, "€450.00");
+    assert_eq!(estimate.formula, "€900.00 × 50 %");
+}
+
+#[test]
+fn a_depreciation_view_travels_in_camel_case() {
+    let (_dir, db) = depreciation_setup(&[2027]);
+    computer_draft(&db, "2026-09-01", 150_000, |d| d.useful_life = Some(1));
+
+    assert_eq!(
+        serde_json::to_value(page(&db, "pc").depreciation).unwrap(),
+        json!({
+            "cost": "€1,500.00",
+            "years": 1,
+            "rule": "3 years for computer in ruleset 2026 v1",
+            "own": true,
+            "why": "€1,500.00 is above the GWG limit of €1,000.00, so it counts over 1 year; bought on or after 07-01, the first and the last year count half.",
+            "slices": [
+                { "year": 2026, "amount": "€750.00", "note": "half year" },
+                { "year": 2027, "amount": "€750.00", "note": "frozen" }
+            ]
+        })
+    );
+}
+
+#[test]
+fn the_useful_life_is_stored_between_one_and_fifty_years_and_none_returns_to_the_rule() {
+    for (years, stored) in [
+        (Some(1), Some(1)),
+        (Some(50), Some(50)),
+        (Some(7), Some(7)),
+        (None, None),
+    ] {
+        let (_dir, db) = depreciation_setup(&[]);
+        computer_draft(&db, "2026-03-10", 150_000, |d| d.useful_life = Some(2));
+
+        apply(&db, "pc", DocumentEdit::UsefulLife { years }).unwrap();
+
+        assert_eq!(document(&db, "pc").useful_life, stored, "{years:?}");
+    }
+}
+
+#[test]
+fn a_useful_life_outside_one_to_fifty_years_is_refused_and_stores_nothing() {
+    for years in [0, 51, 1_000] {
+        let (_dir, db) = depreciation_setup(&[]);
+        computer_draft(&db, "2026-03-10", 150_000, |_| {});
+
+        assert_eq!(
+            rejected(apply(
+                &db,
+                "pc",
+                DocumentEdit::UsefulLife { years: Some(years) }
+            )),
+            (
+                "document.usefulLife".into(),
+                "Between 1 and 50 years".into()
+            ),
+            "{years}"
+        );
+        assert_eq!(document(&db, "pc").useful_life, None, "{years}");
+    }
+}
+
+#[test]
+fn undoing_a_useful_life_edit_restores_the_rules_years() {
+    let (_dir, db) = depreciation_setup(&[]);
+    computer_draft(&db, "2026-03-10", 150_000, |_| {});
+    apply(&db, "pc", DocumentEdit::UsefulLife { years: Some(5) }).unwrap();
+    assert_eq!(page(&db, "pc").depreciation.unwrap().years, 5);
+
+    db.undo().unwrap();
+
+    assert_eq!(document(&db, "pc").useful_life, None);
+    assert_eq!(page(&db, "pc").depreciation.unwrap().years, 3);
+}
+
+#[test]
+fn a_finished_document_refuses_a_useful_life_change() {
+    let (_dir, db) = depreciation_setup(&[]);
+    computer_draft(&db, "2026-03-10", 150_000, |d| d.state = DocState::Finished);
+
+    let result = apply(&db, "pc", DocumentEdit::UsefulLife { years: Some(5) });
+
+    assert!(
+        matches!(result, Err(AppError::InvalidInput(_))),
+        "{result:?}"
+    );
+    assert_eq!(document(&db, "pc").useful_life, None);
 }

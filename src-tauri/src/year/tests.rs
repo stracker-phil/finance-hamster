@@ -128,6 +128,7 @@ pub(crate) fn document(id: &str, patch: impl FnOnce(&mut DocumentRow)) -> Docume
         finished_at: None,
         excluded_at: None,
         exclude_reason: None,
+        useful_life: None,
     };
     patch(&mut doc);
     doc
@@ -525,7 +526,7 @@ fn a_document_counts_what_was_paid_times_its_work_share_and_other_years_stay_out
             detail: "14 Oct".into(),
             amount: "€46.90".into(),
             draft: false,
-            carried: false,
+            carried_from: None,
             kz: "720".into(),
         }]
     );
@@ -538,7 +539,7 @@ fn a_document_counts_what_was_paid_times_its_work_share_and_other_years_stay_out
             detail: "2 Nov · 60 % of €120.00".into(),
             amount: "€72.00".into(),
             draft: false,
-            carried: false,
+            carried_from: None,
             kz: "721".into(),
         }]
     );
@@ -559,7 +560,7 @@ fn an_anv_bank_line_on_an_item_without_a_document_counts_at_the_items_default_wo
             detail: "9 Sep · bank line".into(),
             amount: "€40.00".into(),
             draft: false,
-            carried: false,
+            carried_from: None,
             kz: "722".into(),
         }]
     );
@@ -813,7 +814,7 @@ fn drafts_are_listed_under_attention_and_marked_in_their_rows() {
             detail: "3 Mar · amount paid missing".into(),
             amount: "€0.00".into(),
             draft: true,
-            carried: false,
+            carried_from: None,
             kz: "720".into(),
         }]
     );
@@ -1023,6 +1024,339 @@ fn the_pauschale_note_shows_while_the_total_is_below_it() {
 
         assert_eq!(page.pauschale_note.as_deref(), note, "{paid}");
     }
+}
+
+/// Rules for `year` with a computer item (3 years) and a books item, spreading purchases above `gwg`.
+fn depreciating_rules(year: i32, gwg: f64) -> Value {
+    let mut rules = minimal_rules(year);
+    set(&mut rules, "/settings/gwgLimit", json!(gwg));
+    set(&mut rules, "/usefulLife", json!({ "computer": 3 }));
+    set(
+        &mut rules,
+        "/items",
+        json!([
+            {
+                "key": "computer", "kz": "720", "name": "Computer", "section": "main",
+                "kind": "documents", "depreciation": { "assetClass": "computer" }
+            },
+            { "key": "books", "kz": "721", "name": "Books", "section": "main", "kind": "documents" }
+        ]),
+    );
+    rules
+}
+
+/// 2026 (GWG limit 400) to 2029 (GWG limit 2,000), each an open year with its own rules.
+fn depreciation_years() -> (TempDir, Db) {
+    let (dir, db) = open_with_accounts();
+    for (year, gwg) in [
+        (2026, 400.0),
+        (2027, 2_000.0),
+        (2028, 2_000.0),
+        (2029, 2_000.0),
+    ] {
+        insert(
+            &db,
+            taxyears::TABLE,
+            &TaxYearRow::new(
+                year,
+                format!("{year} v1"),
+                rules_text(&depreciating_rules(year, gwg)),
+                1,
+            ),
+        );
+    }
+    (dir, db)
+}
+
+fn computer(db: &Db, id: &str, date: &str, cents: i64, patch: impl FnOnce(&mut DocumentRow)) {
+    add_document(db, id, |d| {
+        d.item_key = Some("computer".into());
+        d.pay_date = Some(date.into());
+        d.paid_cents = Some(cents);
+        patch(d);
+    });
+}
+
+fn page_of(db: &Db, year: i32) -> YearPage {
+    page(db, year, "", NumberFormat::DotDecimal, DateOrder::DayFirst).unwrap()
+}
+
+fn slice_row(
+    id: &str,
+    detail: &str,
+    amount: &str,
+    carried_from: Option<i32>,
+    draft: bool,
+) -> YearRow {
+    YearRow {
+        id: id.into(),
+        kind: RowKind::Document,
+        title: id.into(),
+        detail: detail.into(),
+        amount: amount.into(),
+        draft,
+        carried_from,
+        kz: "720".into(),
+    }
+}
+
+#[test]
+fn a_depreciated_purchase_counts_its_first_slice_in_the_purchase_year_dated_by_its_pay_date() {
+    let (_dir, db) = depreciation_years();
+    computer(&db, "pc", "2026-03-10", 150_000, |_| {});
+
+    let page = page_of(&db, 2026);
+
+    assert_eq!(
+        rows_of(&page, "720"),
+        [slice_row(
+            "pc",
+            "10 Mar · year 1 of depreciating €1,500.00 over 3 years",
+            "€500.00",
+            None,
+            false
+        )]
+    );
+    assert_eq!(page.total, "€500.00");
+    assert_eq!(kennzahlen(&page), [("720", "500,00"), ("721", "0,00")]);
+    assert_eq!(page.months.len(), 1);
+    assert_eq!(page.months[0].label, "March");
+}
+
+#[test]
+fn later_years_count_the_next_slice_as_a_carried_row_listed_first_under_the_whole_year() {
+    let (_dir, db) = depreciation_years();
+    computer(&db, "pc", "2026-03-10", 150_000, |_| {});
+    add_document(&db, "book", |d| {
+        d.item_key = Some("books".into());
+        d.pay_date = Some("2027-02-05".into());
+        d.paid_cents = Some(1_000);
+    });
+
+    let page = page_of(&db, 2027);
+
+    assert_eq!(
+        rows_of(&page, "720"),
+        [slice_row(
+            "pc",
+            "From 2026 · year 2 of depreciating €1,500.00 over 3 years",
+            "€500.00",
+            Some(2026),
+            false
+        )]
+    );
+    let months: Vec<(&str, &str, Vec<&str>)> = page
+        .months
+        .iter()
+        .map(|m| {
+            (
+                m.label.as_str(),
+                m.total.as_str(),
+                m.rows.iter().map(|r| r.id.as_str()).collect(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        months,
+        [
+            ("Whole year", "€500.00", vec!["pc"]),
+            ("February", "€10.00", vec!["book"]),
+        ]
+    );
+    assert_eq!(page.total, "€510.00");
+}
+
+#[test]
+fn years_without_a_slice_show_nothing_of_the_purchase() {
+    let (_dir, db) = depreciation_years();
+    computer(&db, "pc", "2026-03-10", 150_000, |_| {});
+
+    let last = page_of(&db, 2028);
+    let after = page_of(&db, 2029);
+
+    assert_eq!(amounts(rows_of(&last, "720")), ["€500.00"]);
+    assert!(rows_of(&after, "720").is_empty());
+    assert!(after.months.is_empty());
+    assert_eq!(after.total, "€0.00");
+}
+
+#[test]
+fn a_purchase_in_the_second_half_counts_half_slices_and_runs_one_year_longer() {
+    let (_dir, db) = depreciation_years();
+    computer(&db, "pc", "2026-09-01", 150_000, |_| {});
+
+    let slices: Vec<(i32, Vec<String>)> = [2026, 2027, 2028, 2029]
+        .into_iter()
+        .map(|year| {
+            let page = page_of(&db, year);
+            (
+                year,
+                rows_of(&page, "720")
+                    .iter()
+                    .map(|r| r.amount.clone())
+                    .collect(),
+            )
+        })
+        .collect();
+
+    assert_eq!(
+        slices,
+        [
+            (2026, vec!["€250.00".to_string()]),
+            (2027, vec!["€500.00".to_string()]),
+            (2028, vec!["€500.00".to_string()]),
+            (2029, vec!["€250.00".to_string()]),
+        ]
+    );
+    assert_eq!(
+        rows_of(&page_of(&db, 2029), "720")[0].detail,
+        "From 2026 · year 4 of depreciating €1,500.00 over 3 years"
+    );
+}
+
+#[test]
+fn the_documents_own_useful_life_sets_how_many_years_it_spreads_over() {
+    let (_dir, db) = depreciation_years();
+    computer(&db, "pc", "2026-03-10", 150_000, |d| {
+        d.useful_life = Some(2)
+    });
+
+    let first = page_of(&db, 2026);
+    let second = page_of(&db, 2027);
+    let third = page_of(&db, 2028);
+
+    assert_eq!(
+        rows_of(&first, "720")[0].detail,
+        "10 Mar · year 1 of depreciating €1,500.00 over 2 years"
+    );
+    assert_eq!(amounts(rows_of(&first, "720")), ["€750.00"]);
+    assert_eq!(amounts(rows_of(&second, "720")), ["€750.00"]);
+    assert!(rows_of(&third, "720").is_empty());
+}
+
+#[test]
+fn a_draft_needs_attention_only_in_the_purchase_year_but_its_slices_stay_marked_as_drafts() {
+    let (_dir, db) = depreciation_years();
+    computer(&db, "pc", "2026-03-10", 150_000, |d| {
+        d.state = DocState::Draft
+    });
+
+    let purchase = page_of(&db, 2026);
+    let later = page_of(&db, 2027);
+
+    assert_eq!(
+        purchase.attention,
+        [AttentionView {
+            kind: AttentionKind::Draft,
+            title: "pc".into(),
+            detail: "Finish it to lock its values for the tax year".into(),
+            document_id: Some("pc".into()),
+        }]
+    );
+    assert!(later.attention.is_empty());
+    assert!(rows_of(&purchase, "720")[0].draft);
+    assert!(rows_of(&later, "720")[0].draft);
+}
+
+#[test]
+fn the_purchase_years_gwg_limit_decides_whatever_the_later_years_limits_are() {
+    let (_dir, db) = depreciation_years();
+    computer(&db, "pc-2026", "2026-03-10", 150_000, |_| {});
+    computer(&db, "pc-2027", "2027-01-10", 150_000, |_| {});
+
+    let in_2027 = page_of(&db, 2027);
+
+    assert_eq!(
+        rows_of(&in_2027, "720"),
+        [
+            slice_row(
+                "pc-2026",
+                "From 2026 · year 2 of depreciating €1,500.00 over 3 years",
+                "€500.00",
+                Some(2026),
+                false
+            ),
+            slice_row("pc-2027", "10 Jan", "€1,500.00", None, false),
+        ]
+    );
+    assert_eq!(in_2027.total, "€2,000.00");
+}
+
+#[test]
+fn a_purchase_at_the_gwg_limit_counts_fully_and_one_cent_above_it_spreads() {
+    for (cents, expected, detail) in [
+        (40_000, "€400.00", "10 Mar"),
+        (
+            40_001,
+            "€133.33",
+            "10 Mar · year 1 of depreciating €400.01 over 3 years",
+        ),
+    ] {
+        let (_dir, db) = depreciation_years();
+        computer(&db, "pc", "2026-03-10", cents, |_| {});
+
+        let page = page_of(&db, 2026);
+
+        assert_eq!(amounts(rows_of(&page, "720")), [expected], "{cents}");
+        assert_eq!(rows_of(&page, "720")[0].detail, detail, "{cents}");
+    }
+}
+
+#[test]
+fn the_work_share_is_applied_before_the_gwg_limit_is_compared() {
+    let (_dir, db) = depreciation_years();
+    computer(&db, "pc", "2026-03-10", 100_000, |d| d.work_share = 40);
+
+    let page = page_of(&db, 2026);
+
+    assert_eq!(
+        rows_of(&page, "720"),
+        [slice_row(
+            "pc",
+            "10 Mar · 40 % of €1,000.00",
+            "€400.00",
+            None,
+            false
+        )]
+    );
+    assert!(rows_of(&page_of(&db, 2027), "720").is_empty());
+}
+
+#[test]
+fn without_a_payment_date_in_any_year_a_depreciable_document_is_only_listed_as_undated() {
+    let (_dir, db) = depreciation_years();
+    add_document(&db, "pc", |d| {
+        d.item_key = Some("computer".into());
+        d.paid_cents = Some(150_000);
+    });
+
+    let page = page_of(&db, 2026);
+
+    assert_eq!(page.total, "€0.00");
+    assert_eq!(page.attention.len(), 1);
+    assert_eq!(page.attention[0].kind, AttentionKind::Undated);
+}
+
+#[test]
+fn a_carried_row_travels_with_its_purchase_year_in_camel_case() {
+    let (_dir, db) = depreciation_years();
+    computer(&db, "pc", "2026-03-10", 150_000, |_| {});
+
+    let page = page_of(&db, 2027);
+
+    assert_eq!(
+        serde_json::to_value(&rows_of(&page, "720")[0]).unwrap(),
+        json!({
+            "id": "pc",
+            "kind": "document",
+            "title": "pc",
+            "detail": "From 2026 · year 2 of depreciating €1,500.00 over 3 years",
+            "amount": "€500.00",
+            "draft": false,
+            "carriedFrom": 2026,
+            "kz": "720"
+        })
+    );
 }
 
 #[test]

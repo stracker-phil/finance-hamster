@@ -7,11 +7,13 @@ use super::page::{AttentionKind, AttentionView, RowKind, YearRow};
 use crate::date::{self, DateOrder};
 use crate::db::Db;
 use crate::documents::amounts::{anv_cents, default_work_share};
+use crate::documents::depreciation::{self, Schedule};
 use crate::documents::store::{self as documents, DocState, DocumentRow};
 use crate::documents::title_of;
 use crate::error::AppResult;
 use crate::money::{Money, format_money};
 use crate::review::title_of as line_title;
+use crate::rules;
 use crate::rules::store::{self as decisions, Action};
 use crate::settings::NumberFormat;
 use crate::statements::store::{self as statements, TransactionRow};
@@ -44,7 +46,8 @@ fn countable<'a>(items: &'a [Item], key: Option<&String>) -> Option<&'a Item> {
 #[derive(Clone)]
 pub struct Placed {
     pub item: String,
-    pub date: String,
+    /// None for a row of the whole year, such as a slice of an earlier purchase.
+    pub date: Option<String>,
     pub cents: i64,
     pub row: YearRow,
 }
@@ -71,7 +74,13 @@ pub fn gather(
     let mut facts = Facts::default();
     document_rows(db, year, &ruleset.items, format, order, &mut facts)?;
     decided_lines(db, year, ruleset, format, order, &mut facts)?;
-    facts.placed.sort_by(|a, b| b.date.cmp(&a.date));
+    // Whole-year rows first, as in the months view; then the newest payment first.
+    facts.placed.sort_by(|a, b| {
+        a.date
+            .is_some()
+            .cmp(&b.date.is_some())
+            .then(b.date.cmp(&a.date))
+    });
     Ok(facts)
 }
 
@@ -110,6 +119,14 @@ fn document_rows(
                 lines.push(line);
             }
         }
+        match spread_in(db, &doc, &lines, year)? {
+            Spreading::Whole => {}
+            Spreading::OtherYear => continue,
+            Spreading::Here(spread) => {
+                place_slice(&doc, title, &pay_date, &spread, year, format, order, facts);
+                continue;
+            }
+        }
         let this_year: Vec<&TransactionRow> = lines
             .iter()
             .filter(|l| in_year(&l.value_date, year))
@@ -128,17 +145,7 @@ fn document_rows(
         if !belongs {
             continue;
         }
-        if doc.state == DocState::Draft {
-            facts.drafts += 1;
-            facts.attention.push(AttentionView {
-                kind: AttentionKind::Draft,
-                detail: "Finish it to lock its values for the tax year".into(),
-                title: title.clone(),
-                document_id: Some(doc.id.clone()),
-            });
-        } else {
-            facts.finished += 1;
-        }
+        count_state(&doc, &title, facts);
         let Some(item) = countable(items, doc.item_key.as_ref()) else {
             continue;
         };
@@ -153,6 +160,153 @@ fn document_rows(
             .push(placed_document(&doc, item, title, day, paid, format, order));
     }
     Ok(())
+}
+
+/// Counts a document as finished, or as a draft that needs attention.
+fn count_state(doc: &DocumentRow, title: &str, facts: &mut Facts) {
+    if doc.state == DocState::Draft {
+        facts.drafts += 1;
+        facts.attention.push(AttentionView {
+            kind: AttentionKind::Draft,
+            detail: "Finish it to lock its values for the tax year".into(),
+            title: title.to_string(),
+            document_id: Some(doc.id.clone()),
+        });
+    } else {
+        facts.finished += 1;
+    }
+}
+
+/// A depreciated document's slice in one year.
+struct Spread {
+    item: Item,
+    purchase_year: i32,
+    cost: i64,
+    years: u32,
+    slice: i64,
+}
+
+enum Spreading {
+    /// Counts in full where it was paid: the usual way.
+    Whole,
+    /// Depreciated, with no slice in this year.
+    OtherYear,
+    Here(Box<Spread>),
+}
+
+/// Whether the document is depreciated, and its slice in `year`. The purchase year's rules decide.
+fn spread_in(
+    db: &Db,
+    doc: &DocumentRow,
+    lines: &[TransactionRow],
+    year: i32,
+) -> AppResult<Spreading> {
+    let (Some(day), Some(key)) = (
+        doc.pay_date.as_deref().and_then(date::parse),
+        doc.item_key.as_ref(),
+    ) else {
+        return Ok(Spreading::Whole);
+    };
+    let paid = if lines.is_empty() {
+        doc.paid_cents
+    } else {
+        Some(lines.iter().map(|l| l.cents.abs()).sum())
+    };
+    let Some(paid) = paid else {
+        return Ok(Spreading::Whole);
+    };
+    let Some(ruleset) = rules::ruleset_for_year(db, day.year())? else {
+        return Ok(Spreading::Whole);
+    };
+    let Some(item) = countable(&ruleset.items, Some(key)) else {
+        return Ok(Spreading::Whole);
+    };
+    let cost = anv_cents(paid, doc.work_share);
+    match depreciation::schedule(cost, day, item, &ruleset, doc.useful_life) {
+        Schedule::Full => Ok(Spreading::Whole),
+        Schedule::Spread { years, slices, .. } => {
+            Ok(match slices.iter().find(|s| s.year == year) {
+                None => Spreading::OtherYear,
+                Some(slice) => Spreading::Here(Box::new(Spread {
+                    item: item.clone(),
+                    purchase_year: day.year(),
+                    cost,
+                    years,
+                    slice: slice.cents,
+                })),
+            })
+        }
+    }
+}
+
+/// A depreciated document's slice in `year`; it counts as a draft or finished only in its purchase year.
+#[allow(clippy::too_many_arguments)]
+fn place_slice(
+    doc: &DocumentRow,
+    title: String,
+    pay_date: &str,
+    spread: &Spread,
+    year: i32,
+    format: NumberFormat,
+    order: DateOrder,
+    facts: &mut Facts,
+) {
+    let carried = year > spread.purchase_year;
+    if !carried {
+        count_state(doc, &title, facts);
+    }
+    let when = if carried {
+        format!("From {}", spread.purchase_year)
+    } else {
+        day_text(pay_date, order)
+    };
+    let year_no = year - spread.purchase_year + 1;
+    let detail = format!(
+        "{when} · year {year_no} of depreciating {} over {} {}",
+        eur(spread.cost, format),
+        spread.years,
+        if spread.years == 1 { "year" } else { "years" }
+    );
+    // Slices of earlier purchases belong to the whole year, not to a month.
+    let date = (!carried).then(|| pay_date.to_string());
+    facts.placed.push(document_placed(
+        doc,
+        &spread.item,
+        title,
+        date,
+        detail,
+        spread.slice,
+        carried.then_some(spread.purchase_year),
+        format,
+    ));
+}
+
+#[allow(clippy::too_many_arguments)]
+fn document_placed(
+    doc: &DocumentRow,
+    item: &Item,
+    title: String,
+    date: Option<String>,
+    detail: String,
+    cents: i64,
+    carried_from: Option<i32>,
+    format: NumberFormat,
+) -> Placed {
+    Placed {
+        item: item.key.clone(),
+        date,
+        cents,
+        row: YearRow {
+            id: doc.id.clone(),
+            kind: RowKind::Document,
+            title,
+            detail,
+            amount: eur(cents, format),
+            draft: doc.state == DocState::Draft,
+            carried_from,
+            kz: item.kz.clone(),
+        },
+    }
 }
 
 fn placed_document(
@@ -173,21 +327,7 @@ fn placed_document(
         Some(_) => shown,
         None => format!("{shown} · amount paid missing"),
     };
-    Placed {
-        item: item.key.clone(),
-        date: day,
-        cents: counted,
-        row: YearRow {
-            id: doc.id.clone(),
-            kind: RowKind::Document,
-            title,
-            detail,
-            amount: eur(counted, format),
-            draft: doc.state == DocState::Draft,
-            carried: false,
-            kz: item.kz.clone(),
-        },
-    }
+    document_placed(doc, item, title, Some(day), detail, counted, None, format)
 }
 
 fn decided_lines(
@@ -230,7 +370,7 @@ fn decided_lines(
         let counted = anv_cents(line.cents, share);
         facts.placed.push(Placed {
             item: item.key.clone(),
-            date: line.value_date.clone(),
+            date: Some(line.value_date.clone()),
             cents: counted,
             row: YearRow {
                 id: line.id.clone(),
@@ -239,7 +379,7 @@ fn decided_lines(
                 detail: format!("{day} · bank line"),
                 amount: eur(counted, format),
                 draft: false,
-                carried: false,
+                carried_from: None,
                 kz: item.kz.clone(),
             },
         });

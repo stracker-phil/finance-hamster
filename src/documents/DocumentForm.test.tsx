@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -6,7 +6,7 @@ vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await impo
 
 import { api } from "../api";
 import { useStore } from "../state/store";
-import { documentView, estimate, lineChoice } from "../test/documents";
+import { depreciationView, documentView, estimate, lineChoice } from "../test/documents";
 import { renderWithQuery } from "../test/renderWithQuery";
 import { DocumentForm } from "./DocumentForm";
 
@@ -256,10 +256,20 @@ describe("DocumentForm", () => {
       expect(screen.queryByRole("button", { name: "Partly private use…" })).toBeNull();
     });
 
-    it("shows the GWG line when the estimate has one", () => {
-      renderForm({ estimate: estimate({ gwg: "€121.23 is below the GWG limit (€1,000.00): counts fully in 2026." }) });
+    describe("GWG line", () => {
+      const gwg = "€121.23 is below the GWG limit (€1,000.00): counts fully in 2026.";
 
-      expect(screen.getByText("€121.23 is below the GWG limit (€1,000.00): counts fully in 2026.")).toBeTruthy();
+      it("shows the text with a check icon when the purchase is not spread", () => {
+        renderForm({ estimate: estimate({ gwg }) });
+
+        expect(screen.getByText(gwg).querySelector("svg")).not.toBeNull();
+      });
+
+      it("shows the same text without the check icon when the purchase is spread", () => {
+        renderForm({ estimate: estimate({ gwg }), depreciation: depreciationView() });
+
+        expect(screen.getByText(gwg).querySelector("svg")).toBeNull();
+      });
     });
 
     it("hides the work share behind Partly private use… while it is 100", async () => {
@@ -286,6 +296,54 @@ describe("DocumentForm", () => {
       await userEvent.tab();
 
       expect(mocked.documentEdit).toHaveBeenCalledWith("doc-1", { field: "workShare", value: 75 });
+    });
+  });
+
+  describe("depreciation", () => {
+    it("is absent when the purchase is not spread", () => {
+      renderForm();
+
+      expect(screen.queryByRole("heading", { name: "Depreciation" })).toBeNull();
+      expect(screen.queryByLabelText("Useful life")).toBeNull();
+    });
+
+    it("shows the block with its slices when the purchase is spread", () => {
+      renderForm({ depreciation: depreciationView() });
+
+      expect(screen.getByRole("heading", { name: "Depreciation" })).toBeTruthy();
+      expect(within(screen.getByRole("list", { name: "Slices" })).getAllByRole("listitem")).toHaveLength(4);
+    });
+
+    it("saves the chosen useful life", async () => {
+      renderForm({ depreciation: depreciationView() });
+
+      await userEvent.selectOptions(screen.getByLabelText("Useful life"), "5 years");
+
+      expect(mocked.documentEdit).toHaveBeenCalledWith("doc-1", { field: "usefulLife", years: 5 });
+    });
+
+    it("saves null when the rules' years are chosen again", async () => {
+      renderForm({ depreciation: depreciationView({ own: true, years: 5 }) });
+
+      await userEvent.selectOptions(screen.getByLabelText("Useful life"), "As the rules say");
+
+      expect(mocked.documentEdit).toHaveBeenCalledWith("doc-1", { field: "usefulLife", years: null });
+    });
+
+    it("shows a field error of the useful life", async () => {
+      mocked.documentEdit.mockRejectedValue({ kind: "invalid_input", message: "x", code: null, field: { path: "document.usefulLife", message: "Useful life must be 1 to 15 years" } });
+      renderForm({ depreciation: depreciationView() });
+
+      await userEvent.selectOptions(screen.getByLabelText("Useful life"), "5 years");
+
+      expect((await screen.findByRole("alert")).textContent).toBe("Useful life must be 1 to 15 years");
+      expect(useStore.getState().toasts).toEqual([]);
+    });
+
+    it("is locked on a finished document", () => {
+      renderForm({ state: "finished", depreciation: depreciationView() });
+
+      expect(screen.getByLabelText("Useful life")).toBeDisabled();
     });
   });
 

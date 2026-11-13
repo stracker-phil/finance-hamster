@@ -206,10 +206,16 @@ describe("YearPage", () => {
       expect(within(row).getByText("10 Nov · 60 % of €22.48")).toBeTruthy();
     });
 
-    it("marks a row that counts from an earlier year", async () => {
-      await show({ kennzahlen: [kennzahlView({ rows: [yearRow({ carried: true })] })] });
+    it("names the year a row is carried from", async () => {
+      await show({ kennzahlen: [kennzahlView({ rows: [yearRow({ carriedFrom: 2025 })] })] });
 
-      expect(within(screen.getByRole("button", { name: /Demo Books Ltd/ })).getByText("Earlier year")).toBeTruthy();
+      expect(within(screen.getByRole("button", { name: /Demo Books Ltd/ })).getByText("From 2025")).toBeTruthy();
+    });
+
+    it("shows no From pill on a row that is not carried", async () => {
+      await show();
+
+      expect(within(screen.getByRole("button", { name: /Demo Books Ltd/ })).queryByText(/^From /)).toBeNull();
     });
 
     it("shows row amounts only when a Kennzahl has several rows", async () => {

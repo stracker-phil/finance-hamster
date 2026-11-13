@@ -69,8 +69,8 @@ pub struct YearRow {
     /// What it counts, `€13.49`.
     pub amount: String,
     pub draft: bool,
-    /// Counts from an earlier year (a depreciation slice).
-    pub carried: bool,
+    /// The purchase year of a depreciation slice counted in a later year.
+    pub carried_from: Option<i32>,
     pub kz: String,
 }
 

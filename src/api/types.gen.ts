@@ -144,12 +144,30 @@ export type DeletionView = { title: string, file: string,
  */
 dates: string, reason: string, };
 
+export type DepreciationView = { 
+/**
+ * What is spread: the counted amount, `€1,500.00`.
+ */
+cost: string, years: number, 
+/**
+ * The years the rules give, shown beside the choice: `3 years for computer in ruleset 2026 v1`.
+ */
+rule: string, 
+/**
+ * Changed from the rule's years for this document.
+ */
+own: boolean, 
+/**
+ * Why it is spread, in words.
+ */
+why: string, slices: Array<SliceView>, };
+
 export type DocState = "draft" | "finished" | "excluded";
 
 /**
  * One field of the Document page.
  */
-export type DocumentEdit = { "field": "payDate", value: string | null, } | { "field": "paid", value: string | null, } | { "field": "vendor", name: string, } | { "field": "item", key: string | null, } | { "field": "workShare", value: number, } | { "field": "note", text: string, } | { "field": "invoice", amount: string | null, currency: string, } | { "field": "link", line: string, } | { "field": "unlink", line: string, };
+export type DocumentEdit = { "field": "payDate", value: string | null, } | { "field": "paid", value: string | null, } | { "field": "vendor", name: string, } | { "field": "item", key: string | null, } | { "field": "workShare", value: number, } | { "field": "note", text: string, } | { "field": "invoice", amount: string | null, currency: string, } | { "field": "usefulLife", years: number | null, } | { "field": "link", line: string, } | { "field": "unlink", line: string, };
 
 export type DocumentGroup = { 
 /**
@@ -224,7 +242,11 @@ finishedOn: string | null,
 /**
  * `2 Nov 2026`, while excluded.
  */
-excludedOn: string | null, excludeReason: string | null, };
+excludedOn: string | null, excludeReason: string | null, 
+/**
+ * The schedule of a purchase above the GWG limit.
+ */
+depreciation: DepreciationView | null, };
 
 export type Elsewhere = { 
 /**
@@ -513,6 +535,12 @@ archiveDays: number, };
  */
 export type SettingsPatch = { appearance?: Appearance, accent?: Accent, numberFormat?: NumberFormat, showOriginalCurrency?: boolean, hideOwnTransfers?: boolean, archiveDays?: number, };
 
+export type SliceView = { year: number, amount: string, 
+/**
+ * `half year`, `frozen`.
+ */
+note: string | null, };
+
 export type SourceKind = "document" | "statement";
 
 export type StatementGroup = { id: string, 
@@ -593,8 +621,8 @@ detail: string,
  */
 amount: string, draft: boolean, 
 /**
- * Counts from an earlier year (a depreciation slice).
+ * The purchase year of a depreciation slice counted in a later year.
  */
-carried: boolean, kz: string, };
+carriedFrom: number | null, kz: string, };
 
 export type YearState = "open" | "closed";

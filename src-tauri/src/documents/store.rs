@@ -57,6 +57,9 @@ pub struct DocumentRow {
     pub finished_at: Option<i64>,
     pub excluded_at: Option<i64>,
     pub exclude_reason: Option<String>,
+    /// Years to depreciate over, overriding the item's asset class.
+    #[serde(default)]
+    pub useful_life: Option<u32>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -78,7 +81,7 @@ pub struct LinkRow {
 
 const DOCUMENT_COLUMNS: &str = "id, state, file, original_name, file_hash, vendor_id, pay_date, paid_cents, \
      item_key, work_share, note, invoice_cents, invoice_currency, invoice_number, invoice_date, created_at, \
-     finished_at, excluded_at, exclude_reason";
+     finished_at, excluded_at, exclude_reason, useful_life";
 
 fn document(row: &rusqlite::Row) -> rusqlite::Result<DocumentRow> {
     let state: String = row.get(1)?;
@@ -102,6 +105,7 @@ fn document(row: &rusqlite::Row) -> rusqlite::Result<DocumentRow> {
         finished_at: row.get(16)?,
         excluded_at: row.get(17)?,
         exclude_reason: row.get(18)?,
+        useful_life: row.get(19)?,
     })
 }
 

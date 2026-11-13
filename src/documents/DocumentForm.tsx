@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Check, Link2, X } from "lucide-react";
 import { api, toAppError, type DocumentEdit, type DocumentView } from "../api";
 import { useStore } from "../state/store";
+import { DepreciationBlock } from "./DepreciationBlock";
 import { runStep } from "./lifecycle";
 import { LinePicker } from "./LinePicker";
 
@@ -205,10 +206,13 @@ export function DocumentForm({ doc, onExclude }: { doc: DocumentView; onExclude:
           </div>
         )}
         {doc.estimate?.gwg && (
-          <div className="add-doc__ok add-doc__gwg">
-            <Check size={12} /> {doc.estimate.gwg}
+          <div className={doc.depreciation ? "add-doc__hint add-doc__gwg" : "add-doc__ok add-doc__gwg"}>
+            {!doc.depreciation && <Check size={12} />} {doc.estimate.gwg}
           </div>
         )}
+
+        {doc.depreciation && <DepreciationBlock depreciation={doc.depreciation} disabled={locked} onYears={(years) => save({ field: "usefulLife", years })} />}
+        <FieldError message={errors["document.usefulLife"]} />
 
         <h3 className="doc-form__heading">Note</h3>
         <NoteField value={doc.note} onSave={(text) => save({ field: "note", text })} />
