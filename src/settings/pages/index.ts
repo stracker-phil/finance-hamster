@@ -71,6 +71,8 @@ export const SETTINGS_PAGES: SettingsPage[] = [
     Body: PrivacyPage,
     rows: [
       { id: "data-folder", title: "Data folder", keywords: ["location", "finder"] },
+      { id: "archive", title: "Days in Archive before delete", keywords: ["delete", "exclude", "archive"] },
+      { id: "deletion-log", title: "Deletion log", keywords: ["deleted", "delete"] },
       { id: "network", title: "Internet access", keywords: ["network", "offline"] },
     ],
   },

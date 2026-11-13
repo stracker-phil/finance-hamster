@@ -1,4 +1,4 @@
-import type { AddPreview, DocumentGroup, DocumentRowView, DocumentView, Estimate, LineChoice, VendorView, VendorsView } from "../api";
+import type { AddPreview, ArchivedDocument, DeletionView, DocumentGroup, HistoryEntry, DocumentRowView, DocumentView, Estimate, LineChoice, VendorView, VendorsView } from "../api";
 
 /** A demo draft document with a payment date, one linked bank line and an estimate, with `patch` applied. */
 export function documentView(patch: Partial<DocumentView> = {}): DocumentView {
@@ -29,8 +29,26 @@ export function documentView(patch: Partial<DocumentView> = {}): DocumentView {
     invoiceAmount: null,
     invoiceCurrency: "EUR",
     missing: [],
+    finishedOn: null,
+    excludedOn: null,
+    excludeReason: null,
     ...patch,
   };
+}
+
+/** A demo History line of a document, with `patch` applied. */
+export function historyEntry(patch: Partial<HistoryEntry> = {}): HistoryEntry {
+  return { kind: "changed", text: "Vendor: Demo Cloud → Demo Cloud Ltd", when: "13 Nov 2026, 14:32", document: "Demo Cloud Ltd", documentId: "doc-1", ...patch };
+}
+
+/** A demo excluded document of the Archive, deletable by default, with `patch` applied. */
+export function archivedDocument(patch: Partial<ArchivedDocument> = {}): ArchivedDocument {
+  return { id: "doc-3", title: "Sample Books", file: "Documents/2026/sample-books.pdf", reason: "Duplicate of another invoice", excluded: "Excluded 2 Nov 2026", deletable: true, deletableNote: null, ...patch };
+}
+
+/** A demo entry of the deletion log, with `patch` applied. */
+export function deletionView(patch: Partial<DeletionView> = {}): DeletionView {
+  return { title: "Sample Books", file: "sample-books.pdf", dates: "Added 2 Mar 2026 · deleted 13 Nov 2026", reason: "Scanned twice", ...patch };
 }
 
 /** A demo row of the Documents list, with `patch` applied. */

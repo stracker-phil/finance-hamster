@@ -7,6 +7,8 @@ pub mod commands;
 pub mod edit;
 pub mod files;
 pub mod guess;
+pub mod history;
+pub mod lifecycle;
 pub mod list;
 pub mod payments;
 pub mod store;

@@ -57,6 +57,27 @@ describe("DocumentsPage", () => {
       expect(screen.queryByRole("button", { name: "Inbox" })).toBeNull();
     });
 
+    it.each([
+      ["Log", "log"],
+      ["Archive", "archive"],
+    ] as const)("opens the %s of a tax year from its button", async (name, page) => {
+      renderWithQuery(<DocumentsPage />);
+      const year = await screen.findByRole("region", { name: "Tax year 2026" });
+
+      await userEvent.click(within(year).getByRole("button", { name }));
+
+      expect(useStore.getState().route).toEqual({ page, year: 2026 });
+    });
+
+    it("offers no Log or Archive for the Inbox", async () => {
+      renderWithQuery(<DocumentsPage />);
+
+      const inboxGroup = await screen.findByRole("region", { name: "Inbox" });
+
+      expect(within(inboxGroup).queryByRole("button", { name: "Log" })).toBeNull();
+      expect(within(inboxGroup).queryByRole("button", { name: "Archive" })).toBeNull();
+    });
+
     it("opens a document when its row is clicked", async () => {
       renderWithQuery(<DocumentsPage />);
 

@@ -58,6 +58,11 @@ pub struct DocumentView {
     pub invoice_currency: String,
     /// The facts still missing before it can be finished, e.g. `payment date`.
     pub missing: Vec<String>,
+    /// `3 Apr 2026`, while finished.
+    pub finished_on: Option<String>,
+    /// `2 Nov 2026`, while excluded.
+    pub excluded_on: Option<String>,
+    pub exclude_reason: Option<String>,
 }
 
 fn year_of(date: &str) -> Option<i32> {
@@ -163,16 +168,16 @@ pub fn document(
     };
     let paid = paid_cents(&doc, &lines);
     let vendor = vendor_name(&doc, &vendors);
-    let missing = [
-        (doc.pay_date.is_none(), "payment date"),
-        (paid.is_none(), "amount paid"),
-        (vendor.is_none(), "vendor"),
-        (doc.item_key.is_none(), "item"),
-    ]
-    .into_iter()
-    .filter(|(gone, _)| *gone)
-    .map(|(_, name)| name.to_string())
-    .collect();
+    let missing = super::lifecycle::missing(db, &doc)?
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let on = |at: Option<i64>| {
+        at.and_then(chrono::DateTime::from_timestamp_millis)
+            .map(|t| {
+                crate::date::day_month_year(t.with_timezone(&chrono::Local).date_naive(), order)
+            })
+    };
     Ok(DocumentView {
         title: title_of(&doc, &vendors),
         id: doc.id.clone(),
@@ -206,6 +211,9 @@ pub fn document(
         invoice_amount: doc.invoice_cents.map(|c| format_plain(c, format)),
         invoice_currency: doc.invoice_currency.clone().unwrap_or_else(|| "EUR".into()),
         missing,
+        finished_on: on(doc.finished_at),
+        excluded_on: on(doc.excluded_at),
+        exclude_reason: doc.exclude_reason.clone(),
     })
 }
 

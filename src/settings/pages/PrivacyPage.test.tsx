@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -6,7 +6,9 @@ vi.mock("../../api", async (orig) => ({ ...(await orig<object>()), api: (await i
 
 import { api } from "../../api";
 import { useStore } from "../../state/store";
+import { deletionView } from "../../test/documents";
 import { renderWithQuery } from "../../test/renderWithQuery";
+import { settings } from "../../test/settings";
 import { PrivacyPage } from "./PrivacyPage";
 
 const mocked = vi.mocked(api, true);
@@ -17,6 +19,9 @@ describe("PrivacyPage", () => {
     useStore.setState({ toasts: [] });
     mocked.dataFolder.mockResolvedValue("/Users/demo/Library/Application Support/com.example.hamster/");
     mocked.showDataFolder.mockResolvedValue(undefined);
+    mocked.getSettings.mockResolvedValue(settings());
+    mocked.updateSettings.mockResolvedValue(settings());
+    mocked.deletionLog.mockResolvedValue([]);
   });
 
   it("shows the data folder path", async () => {
@@ -40,6 +45,50 @@ describe("PrivacyPage", () => {
     await userEvent.click(screen.getByRole("button", { name: "Show in Finder" }));
 
     await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toEqual(["The folder is gone"]));
+  });
+
+  describe("days in Archive before delete", () => {
+    it("shows the configured days", async () => {
+      mocked.getSettings.mockResolvedValue(settings({ archiveDays: 14 }));
+      renderWithQuery(<PrivacyPage />);
+
+      await waitFor(() => expect(screen.getByLabelText<HTMLInputElement>("Days in Archive before delete").value).toBe("14"));
+    });
+
+    it("saves a valid number of days", async () => {
+      renderWithQuery(<PrivacyPage />);
+
+      fireEvent.change(screen.getByLabelText("Days in Archive before delete"), { target: { value: "30" } });
+
+      await waitFor(() => expect(mocked.updateSettings).toHaveBeenCalledWith({ archiveDays: 30 }));
+    });
+
+    it.each(["0", "-3", ""])("ignores %j", (value) => {
+      renderWithQuery(<PrivacyPage />);
+
+      fireEvent.change(screen.getByLabelText("Days in Archive before delete"), { target: { value: "5" } });
+      mocked.updateSettings.mockClear();
+      fireEvent.change(screen.getByLabelText("Days in Archive before delete"), { target: { value } });
+
+      expect(mocked.updateSettings).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("deletion log", () => {
+    it("lists each deletion with its file, dates and reason", async () => {
+      mocked.deletionLog.mockResolvedValue([deletionView()]);
+      renderWithQuery(<PrivacyPage />);
+
+      expect(await screen.findByText("Sample Books")).toBeTruthy();
+      expect(screen.getByText("sample-books.pdf · Added 2 Mar 2026 · deleted 13 Nov 2026 · Scanned twice")).toBeTruthy();
+      expect(screen.queryByText("Nothing deleted")).toBeNull();
+    });
+
+    it("says nothing was deleted when the log is empty", async () => {
+      renderWithQuery(<PrivacyPage />);
+
+      expect(await screen.findByText("Nothing deleted")).toBeTruthy();
+    });
   });
 
   it("states that Hamster uses no internet", () => {

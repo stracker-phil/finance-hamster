@@ -10,6 +10,8 @@ use tempfile::TempDir;
 use super::add::{self, AddInput, AddPending, AddPreview};
 use super::amounts::Estimate;
 use super::edit::{self, DocumentEdit};
+use super::history::{self, HistoryKind};
+use super::lifecycle::{self, ArchivedDocument, DeletionRow, DeletionView};
 use super::list::{DocumentGroup, DocumentRowView};
 use super::payments::{self, LineChoice};
 use super::store::{self, DocState, DocumentRow, LinkRow, VendorRow};
@@ -1276,6 +1278,9 @@ fn the_page_of_a_dated_document_shows_its_lines_amount_vendor_items_and_estimate
             invoice_amount: Some("46.90".into()),
             invoice_currency: "EUR".into(),
             missing: vec![],
+            finished_on: None,
+            excluded_on: None,
+            exclude_reason: None,
         }
     );
 }
@@ -1468,7 +1473,10 @@ fn a_document_page_travels_in_camel_case() {
             "note": "",
             "invoiceAmount": null,
             "invoiceCurrency": "EUR",
-            "missing": ["payment date", "amount paid", "vendor", "item"]
+            "missing": ["payment date", "amount paid", "vendor", "item"],
+            "finishedOn": null,
+            "excludedOn": null,
+            "excludeReason": null
         })
     );
 }
@@ -2623,6 +2631,1059 @@ fn a_vendor_with_documents_cannot_be_deleted_and_an_unused_one_can() {
     assert_eq!(vendor_names(&db), ["Nordbook", "Pixelforge Ltd.", "Zeta"]);
     db.undo().unwrap();
     assert_eq!(count(&db, store::VENDORS), 4);
+}
+
+const WEEK: i64 = 7 * 24 * 60 * 60 * 1000;
+
+fn noon(year: i32, month: u32, day: u32) -> i64 {
+    use chrono::TimeZone;
+    chrono::Utc
+        .with_ymd_and_hms(year, month, day, 12, 0, 0)
+        .unwrap()
+        .timestamp_millis()
+}
+
+fn setup_with_vendor() -> (TempDir, Db) {
+    let (dir, db) = setup();
+    with_pixelforge_vendor(&db);
+    (dir, db)
+}
+
+/// A draft with every required fact set.
+fn complete_draft(db: &Db, id: &str) -> DocumentRow {
+    draft(db, id, |d| {
+        d.vendor_id = Some("vendor-1".into());
+        d.pay_date = Some("2026-10-14".into());
+        d.paid_cents = Some(4_690);
+        d.item_key = Some("books".into());
+    })
+}
+
+fn excluded(db: &Db, id: &str, at: i64) -> DocumentRow {
+    draft(db, id, |d| {
+        d.state = DocState::Excluded;
+        d.excluded_at = Some(at);
+        d.exclude_reason = Some("Duplicate".into());
+    })
+}
+
+fn excluded_with_file(db: &Db, dir: &Path, at: i64) -> DocumentRow {
+    stored_draft(db, dir, "scan.pdf", "one", |d| {
+        d.state = DocState::Excluded;
+        d.excluded_at = Some(at);
+        d.exclude_reason = Some("Duplicate".into());
+        d.vendor_id = Some("vendor-1".into());
+        d.created_at = noon(2026, 3, 2);
+    })
+}
+
+fn refused(result: AppResult<Written>) -> String {
+    match result {
+        Err(AppError::InvalidInput(message)) => message,
+        other => panic!("expected a refusal, got {other:?}"),
+    }
+}
+
+fn erase(
+    db: &Db,
+    dir: &Path,
+    id: &str,
+    reason: &str,
+    understood: bool,
+    now: i64,
+) -> AppResult<Written> {
+    lifecycle::delete(db, dir, id, reason, understood, 7, now)
+}
+
+fn entries_of(db: &Db, id: &str) -> Vec<(HistoryKind, String)> {
+    history::document_history(db, id, FORMAT, ORDER)
+        .unwrap()
+        .into_iter()
+        .map(|e| (e.kind, e.text))
+        .collect()
+}
+
+#[test]
+fn finishing_a_complete_draft_locks_it_and_undo_makes_it_a_draft_again() {
+    let (_dir, db) = setup_with_vendor();
+    complete_draft(&db, "doc-a");
+
+    let written = lifecycle::finish(&db, "doc-a", noon(2026, 11, 13), Source::Ui).unwrap();
+
+    assert_eq!(written.label, "Finish Pixelforge Ltd. invoice");
+    let doc = document(&db, "doc-a");
+    assert_eq!(doc.state, DocState::Finished);
+    assert_eq!(doc.finished_at, Some(noon(2026, 11, 13)));
+
+    db.undo().unwrap();
+
+    let doc = document(&db, "doc-a");
+    assert_eq!(doc.state, DocState::Draft);
+    assert_eq!(doc.finished_at, None);
+}
+
+#[test]
+fn finishing_names_every_missing_fact_in_order_and_changes_nothing() {
+    let (_dir, db) = setup_with_vendor();
+    let with_vendor = draft(&db, "doc-a", |d| d.vendor_id = Some("vendor-1".into()));
+    let empty = draft(&db, "doc-b", |_| {});
+
+    assert_eq!(
+        refused(lifecycle::finish(&db, "doc-a", 1, Source::Ui)),
+        "Set the payment date, amount paid, item first"
+    );
+    assert_eq!(
+        refused(lifecycle::finish(&db, "doc-b", 1, Source::Ui)),
+        "Set the payment date, amount paid, vendor, item first"
+    );
+    assert_eq!(document(&db, "doc-a"), with_vendor);
+    assert_eq!(document(&db, "doc-b"), empty);
+}
+
+#[test]
+fn a_linked_line_counts_as_the_amount_paid_when_finishing() {
+    let (_dir, db) = setup_with_vendor();
+    two_october_lines(&db);
+    let doc = draft(&db, "doc-a", |d| {
+        d.vendor_id = Some("vendor-1".into());
+        d.pay_date = Some("2026-10-14".into());
+        d.item_key = Some("books".into());
+    });
+    assert_eq!(lifecycle::missing(&db, &doc).unwrap(), vec!["amount paid"]);
+    link(&db, "doc-a", "l-1");
+
+    assert_eq!(lifecycle::missing(&db, &doc).unwrap(), Vec::<&str>::new());
+    lifecycle::finish(&db, "doc-a", 1, Source::Ui).unwrap();
+    assert_eq!(document(&db, "doc-a").state, DocState::Finished);
+}
+
+#[test]
+fn only_a_draft_can_be_finished_and_only_an_existing_document() {
+    let (_dir, db) = setup_with_vendor();
+    for (id, state) in [("doc-f", DocState::Finished), ("doc-x", DocState::Excluded)] {
+        draft(&db, id, |d| d.state = state);
+
+        assert_eq!(
+            refused(lifecycle::finish(&db, id, 1, Source::Ui)),
+            "Only a draft can be finished",
+            "{id}"
+        );
+    }
+    assert!(matches!(
+        lifecycle::finish(&db, "nope", 1, Source::Ui),
+        Err(AppError::NotFound(_))
+    ));
+}
+
+#[test]
+fn unlocking_a_finished_document_makes_it_a_draft_and_undo_finishes_it_again() {
+    let (_dir, db) = setup_with_vendor();
+    complete_draft(&db, "doc-a");
+    lifecycle::finish(&db, "doc-a", noon(2026, 11, 13), Source::Ui).unwrap();
+
+    let written = lifecycle::unlock(&db, "doc-a", Source::Ui).unwrap();
+
+    assert_eq!(written.label, "Unlock Pixelforge Ltd. invoice");
+    let doc = document(&db, "doc-a");
+    assert_eq!(doc.state, DocState::Draft);
+    assert_eq!(doc.finished_at, None);
+
+    db.undo().unwrap();
+
+    let doc = document(&db, "doc-a");
+    assert_eq!(doc.state, DocState::Finished);
+    assert_eq!(doc.finished_at, Some(noon(2026, 11, 13)));
+}
+
+#[test]
+fn only_a_finished_document_can_be_unlocked() {
+    let (_dir, db) = setup_with_vendor();
+    for (id, state) in [("doc-d", DocState::Draft), ("doc-x", DocState::Excluded)] {
+        draft(&db, id, |d| d.state = state);
+
+        assert_eq!(
+            refused(lifecycle::unlock(&db, id, Source::Ui)),
+            "Only a finished document can be unlocked",
+            "{id}"
+        );
+    }
+    assert!(matches!(
+        lifecycle::unlock(&db, "nope", Source::Ui),
+        Err(AppError::NotFound(_))
+    ));
+}
+
+#[test]
+fn excluding_stores_the_trimmed_reason_and_time_and_undo_brings_the_document_back() {
+    for (state, finished_at) in [
+        (DocState::Draft, None),
+        (DocState::Finished, Some(noon(2026, 11, 1))),
+    ] {
+        let (_dir, db) = setup_with_vendor();
+        let before = draft(&db, "doc-b", |d| {
+            d.vendor_id = Some("vendor-1".into());
+            d.state = state;
+            d.finished_at = finished_at;
+        });
+
+        let written = lifecycle::exclude(
+            &db,
+            "doc-b",
+            "  Scanned twice ",
+            noon(2026, 11, 2),
+            Source::Ui,
+        )
+        .unwrap();
+
+        assert_eq!(written.label, "Exclude Pixelforge Ltd. invoice");
+        let doc = document(&db, "doc-b");
+        assert_eq!(doc.state, DocState::Excluded);
+        assert_eq!(doc.excluded_at, Some(noon(2026, 11, 2)));
+        assert_eq!(doc.exclude_reason.as_deref(), Some("Scanned twice"));
+        assert_eq!(doc.finished_at, None, "{state:?}");
+
+        db.undo().unwrap();
+
+        assert_eq!(document(&db, "doc-b"), before, "{state:?}");
+    }
+}
+
+#[test]
+fn excluding_needs_a_reason_and_an_included_document() {
+    let (_dir, db) = setup_with_vendor();
+    let before = complete_draft(&db, "doc-a");
+    excluded(&db, "doc-x", 1);
+
+    for reason in ["", "   "] {
+        match lifecycle::exclude(&db, "doc-a", reason, 1, Source::Ui) {
+            Err(AppError::InvalidField { field, .. }) => {
+                assert_eq!(field, "document.reason", "{reason:?}");
+            }
+            other => panic!("expected a refusal for {reason:?}, got {other:?}"),
+        }
+    }
+    assert_eq!(document(&db, "doc-a"), before);
+    assert_eq!(
+        refused(lifecycle::exclude(&db, "doc-x", "Again", 1, Source::Ui)),
+        "This document is excluded already"
+    );
+    assert!(matches!(
+        lifecycle::exclude(&db, "nope", "Reason", 1, Source::Ui),
+        Err(AppError::NotFound(_))
+    ));
+}
+
+#[test]
+fn restoring_an_excluded_document_makes_it_a_draft_without_its_exclusion_and_undo_excludes_it_again()
+ {
+    let (_dir, db) = setup_with_vendor();
+    let before = excluded(&db, "doc-a", noon(2026, 11, 2));
+
+    let written = lifecycle::restore(&db, "doc-a", Source::Ui).unwrap();
+
+    assert_eq!(written.label, "Restore doc-a");
+    let doc = document(&db, "doc-a");
+    assert_eq!(doc.state, DocState::Draft);
+    assert_eq!(doc.excluded_at, None);
+    assert_eq!(doc.exclude_reason, None);
+
+    db.undo().unwrap();
+
+    assert_eq!(document(&db, "doc-a"), before);
+}
+
+#[test]
+fn only_an_excluded_document_can_be_restored() {
+    let (_dir, db) = setup_with_vendor();
+    for (id, state) in [("doc-d", DocState::Draft), ("doc-f", DocState::Finished)] {
+        draft(&db, id, |d| d.state = state);
+
+        assert_eq!(
+            refused(lifecycle::restore(&db, id, Source::Ui)),
+            "Only an excluded document can be restored",
+            "{id}"
+        );
+    }
+    assert!(matches!(
+        lifecycle::restore(&db, "nope", Source::Ui),
+        Err(AppError::NotFound(_))
+    ));
+}
+
+#[test]
+fn a_document_can_be_deleted_once_it_waited_the_archive_days_after_its_exclusion() {
+    let doc = |excluded_at| DocumentRow {
+        excluded_at,
+        ..blank_document("doc-a")
+    };
+
+    assert_eq!(
+        lifecycle::deletable_from(&doc(Some(1_000)), 7),
+        Some(1_000 + WEEK)
+    );
+    assert_eq!(
+        lifecycle::deletable_from(&doc(Some(1_000)), 1),
+        Some(1_000 + WEEK / 7)
+    );
+    assert_eq!(lifecycle::deletable_from(&doc(None), 7), None);
+}
+
+#[test]
+fn deleting_removes_the_file_links_and_document_and_keeps_a_log_entry() {
+    let (dir, db) = setup_with_vendor();
+    add_lines(
+        &db,
+        &[debit(
+            "l-1",
+            "2026-10-14",
+            -4_690,
+            "Lastschrift SEITENWEISE",
+        )],
+    );
+    let excluded_at = noon(2026, 11, 2);
+    let doc = excluded_with_file(&db, dir.path(), excluded_at);
+    link(&db, "doc-one", "l-1");
+    assert!(exists(dir.path(), &doc.file));
+
+    let written = erase(
+        &db,
+        dir.path(),
+        "doc-one",
+        "  Scanned twice ",
+        true,
+        excluded_at + WEEK,
+    )
+    .unwrap();
+
+    assert_eq!(written.label, "Delete Pixelforge Ltd. invoice");
+    assert_eq!(count(&db, store::DOCUMENTS), 0);
+    assert_eq!(count(&db, store::LINKS), 0);
+    assert_eq!(count(&db, statements::TRANSACTIONS), 1);
+    assert!(!exists(dir.path(), &doc.file));
+    let log = lifecycle::deletions(&db).unwrap();
+    assert_eq!(
+        log,
+        vec![DeletionRow {
+            id: log[0].id.clone(),
+            document_id: "doc-one".into(),
+            title: "Pixelforge Ltd. invoice".into(),
+            original_name: "scan.pdf".into(),
+            file: "docs/inbox/scan.pdf".into(),
+            file_hash: doc.file_hash.clone(),
+            created_at: noon(2026, 3, 2),
+            excluded_at: Some(excluded_at),
+            deleted_at: excluded_at + WEEK,
+            reason: "Scanned twice".into(),
+        }]
+    );
+}
+
+#[test]
+fn a_deletion_is_not_undoable() {
+    let (dir, db) = setup_with_vendor();
+    let excluded_at = noon(2026, 11, 2);
+    excluded_with_file(&db, dir.path(), excluded_at);
+    erase(
+        &db,
+        dir.path(),
+        "doc-one",
+        "Scanned twice",
+        true,
+        excluded_at + WEEK,
+    )
+    .unwrap();
+
+    assert_eq!(db.undo().unwrap(), None);
+
+    assert_eq!(count(&db, store::DOCUMENTS), 0);
+    assert_eq!(lifecycle::deletions(&db).unwrap().len(), 1);
+}
+
+#[test]
+fn a_document_whose_file_is_already_gone_can_still_be_deleted() {
+    let (dir, db) = setup_with_vendor();
+    let excluded_at = noon(2026, 11, 2);
+    let doc = excluded_with_file(&db, dir.path(), excluded_at);
+    std::fs::remove_file(dir.path().join(&doc.file)).unwrap();
+
+    erase(
+        &db,
+        dir.path(),
+        "doc-one",
+        "Scanned twice",
+        true,
+        excluded_at + WEEK,
+    )
+    .unwrap();
+
+    assert_eq!(count(&db, store::DOCUMENTS), 0);
+    assert_eq!(lifecycle::deletions(&db).unwrap().len(), 1);
+}
+
+#[test]
+fn deleting_before_the_waiting_time_is_over_changes_nothing() {
+    let (dir, db) = setup_with_vendor();
+    let excluded_at = noon(2026, 11, 2);
+    let doc = excluded_with_file(&db, dir.path(), excluded_at);
+
+    let message = refused(erase(
+        &db,
+        dir.path(),
+        "doc-one",
+        "Scanned twice",
+        true,
+        excluded_at + WEEK - 1,
+    ));
+
+    assert_eq!(
+        message,
+        "An excluded document can be deleted after 7 days in the Archive"
+    );
+    assert_eq!(document(&db, "doc-one"), doc);
+    assert!(exists(dir.path(), &doc.file));
+    assert_eq!(count(&db, lifecycle::DELETIONS), 0);
+}
+
+#[test]
+fn deleting_needs_a_reason_and_the_confirmation_that_it_cannot_be_undone() {
+    let (dir, db) = setup_with_vendor();
+    let excluded_at = noon(2026, 11, 2);
+    let doc = excluded_with_file(&db, dir.path(), excluded_at);
+
+    for (reason, understood, field) in [
+        ("  ", true, "deletion.reason"),
+        ("  ", false, "deletion.reason"),
+        ("Scanned twice", false, "deletion.understood"),
+    ] {
+        let result = erase(
+            &db,
+            dir.path(),
+            "doc-one",
+            reason,
+            understood,
+            excluded_at + WEEK,
+        );
+
+        assert_eq!(failed_field(result), field, "{reason:?} {understood}");
+    }
+    assert_eq!(document(&db, "doc-one"), doc);
+    assert!(exists(dir.path(), &doc.file));
+    assert_eq!(count(&db, lifecycle::DELETIONS), 0);
+}
+
+#[test]
+fn only_an_excluded_document_can_be_deleted() {
+    let (dir, db) = setup_with_vendor();
+    for (id, state) in [("doc-d", DocState::Draft), ("doc-f", DocState::Finished)] {
+        draft(&db, id, |d| d.state = state);
+
+        assert_eq!(
+            refused(erase(&db, dir.path(), id, "Reason", true, i64::MAX)),
+            "Only an excluded document can be deleted",
+            "{id}"
+        );
+    }
+    assert!(matches!(
+        erase(&db, dir.path(), "nope", "Reason", true, i64::MAX),
+        Err(AppError::NotFound(_))
+    ));
+    assert_eq!(count(&db, store::DOCUMENTS), 2);
+}
+
+#[test]
+fn deletions_are_listed_newest_first() {
+    let (dir, db) = setup_with_vendor();
+    for (id, name, deleted_at) in [
+        ("doc-1", "first.pdf", noon(2026, 11, 10)),
+        ("doc-2", "second.pdf", noon(2026, 11, 12)),
+        ("doc-3", "third.pdf", noon(2026, 11, 11)),
+    ] {
+        draft(&db, id, |d| {
+            d.state = DocState::Excluded;
+            d.excluded_at = Some(1);
+            d.original_name = name.into();
+        });
+        erase(&db, dir.path(), id, "Reason", true, deleted_at).unwrap();
+    }
+
+    let titles: Vec<String> = lifecycle::deletions(&db)
+        .unwrap()
+        .into_iter()
+        .map(|d| d.title)
+        .collect();
+
+    assert_eq!(titles, ["second", "third", "first"]);
+}
+
+#[test]
+fn the_archive_lists_the_years_excluded_documents_newest_exclusion_first_with_their_waiting_notes()
+{
+    let (_dir, db) = setup_with_vendor();
+    let now = noon(2026, 11, 10);
+    for (id, pay_date, created_at, at) in [
+        ("a", Some("2026-03-01"), 1, noon(2026, 11, 2)),
+        ("b", Some("2026-04-01"), 1, noon(2026, 11, 9)),
+        ("c", None, noon(2026, 5, 1), noon(2026, 11, 5)),
+        ("d", Some("2025-12-31"), 1, noon(2026, 11, 6)),
+        ("e", None, noon(2024, 6, 1), noon(2026, 11, 7)),
+    ] {
+        draft(&db, id, |doc| {
+            doc.state = DocState::Excluded;
+            doc.pay_date = pay_date.map(String::from);
+            doc.created_at = created_at;
+            doc.excluded_at = Some(at);
+            doc.exclude_reason = Some("Duplicate".into());
+        });
+    }
+    for (id, state) in [("f", DocState::Draft), ("g", DocState::Finished)] {
+        draft(&db, id, |doc| {
+            doc.state = state;
+            doc.pay_date = Some("2026-06-01".into());
+        });
+    }
+    let archived = |id: &str, excluded: &str, note: Option<&str>| ArchivedDocument {
+        id: id.into(),
+        title: id.into(),
+        file: format!("docs/inbox/{id}.pdf"),
+        reason: "Duplicate".into(),
+        excluded: excluded.into(),
+        deletable: note.is_none(),
+        deletable_note: note.map(String::from),
+    };
+
+    assert_eq!(
+        lifecycle::archive(&db, 2026, 7, now, ORDER).unwrap(),
+        vec![
+            archived(
+                "b",
+                "Excluded 9 Nov 2026",
+                Some("Can be deleted from 16 Nov 2026")
+            ),
+            archived(
+                "c",
+                "Excluded 5 Nov 2026",
+                Some("Can be deleted from 12 Nov 2026")
+            ),
+            archived("a", "Excluded 2 Nov 2026", None),
+        ]
+    );
+    let ids_of_2024: Vec<String> = lifecycle::archive(&db, 2024, 7, now, ORDER)
+        .unwrap()
+        .into_iter()
+        .map(|d| d.id)
+        .collect();
+    assert_eq!(ids_of_2024, ["e"]);
+}
+
+#[test]
+fn the_archive_waiting_time_follows_the_archive_days_and_the_date_order() {
+    let (_dir, db) = setup_with_vendor();
+    draft(&db, "a", |d| {
+        d.state = DocState::Excluded;
+        d.pay_date = Some("2026-03-01".into());
+        d.excluded_at = Some(noon(2026, 11, 2));
+        d.exclude_reason = Some("Duplicate".into());
+    });
+    let now = noon(2026, 11, 3);
+
+    let one_day = lifecycle::archive(&db, 2026, 1, now, ORDER).unwrap();
+    let thirty_days = lifecycle::archive(&db, 2026, 30, now, DateOrder::MonthFirst).unwrap();
+
+    assert!(one_day[0].deletable);
+    assert_eq!(one_day[0].deletable_note, None);
+    assert!(!thirty_days[0].deletable);
+    assert_eq!(thirty_days[0].excluded, "Excluded Nov 2, 2026");
+    assert_eq!(
+        thirty_days[0].deletable_note.as_deref(),
+        Some("Can be deleted from Dec 2, 2026")
+    );
+}
+
+#[test]
+fn the_deletion_log_shows_title_file_dates_and_reason_newest_first() {
+    let (_dir, db) = setup();
+    let row = |id: &str, title: &str, created: i64, deleted: i64, reason: &str| DeletionRow {
+        id: id.into(),
+        document_id: format!("doc-{id}"),
+        title: title.into(),
+        original_name: format!("{id}.pdf"),
+        file: format!("docs/2026/{id}.pdf"),
+        file_hash: file_hash(id.as_bytes()),
+        created_at: created,
+        excluded_at: None,
+        deleted_at: deleted,
+        reason: reason.into(),
+    };
+    insert(
+        &db,
+        lifecycle::DELETIONS,
+        &row(
+            "old",
+            "scan-001",
+            noon(2026, 1, 5),
+            noon(2026, 11, 1),
+            "Wrong person",
+        ),
+    );
+    insert(
+        &db,
+        lifecycle::DELETIONS,
+        &row(
+            "new",
+            "Pixelforge Ltd. invoice",
+            noon(2026, 3, 2),
+            noon(2026, 11, 13),
+            "Scanned twice",
+        ),
+    );
+
+    assert_eq!(
+        lifecycle::deletion_log(&db, ORDER).unwrap(),
+        vec![
+            DeletionView {
+                title: "Pixelforge Ltd. invoice".into(),
+                file: "docs/2026/new.pdf".into(),
+                dates: "Added 2 Mar 2026 · deleted 13 Nov 2026".into(),
+                reason: "Scanned twice".into(),
+            },
+            DeletionView {
+                title: "scan-001".into(),
+                file: "docs/2026/old.pdf".into(),
+                dates: "Added 5 Jan 2026 · deleted 1 Nov 2026".into(),
+                reason: "Wrong person".into(),
+            },
+        ]
+    );
+    assert_eq!(
+        lifecycle::deletion_log(&db, DateOrder::MonthFirst).unwrap()[0].dates,
+        "Added Mar 2, 2026 · deleted Nov 13, 2026"
+    );
+}
+
+#[test]
+fn the_archive_and_deletion_log_travel_in_camel_case() {
+    assert_eq!(
+        serde_json::to_value(ArchivedDocument {
+            id: "a".into(),
+            title: "Pixelforge Ltd. invoice".into(),
+            file: "docs/2026/a.pdf".into(),
+            reason: "Duplicate".into(),
+            excluded: "Excluded 2 Nov 2026".into(),
+            deletable: false,
+            deletable_note: Some("Can be deleted from 9 Nov 2026".into()),
+        })
+        .unwrap(),
+        json!({
+            "id": "a",
+            "title": "Pixelforge Ltd. invoice",
+            "file": "docs/2026/a.pdf",
+            "reason": "Duplicate",
+            "excluded": "Excluded 2 Nov 2026",
+            "deletable": false,
+            "deletableNote": "Can be deleted from 9 Nov 2026"
+        })
+    );
+    assert_eq!(
+        serde_json::to_value(DeletionView {
+            title: "scan-001".into(),
+            file: "docs/2026/a.pdf".into(),
+            dates: "Added 2 Mar 2026 · deleted 13 Nov 2026".into(),
+            reason: "Duplicate".into(),
+        })
+        .unwrap(),
+        json!({
+            "title": "scan-001",
+            "file": "docs/2026/a.pdf",
+            "dates": "Added 2 Mar 2026 · deleted 13 Nov 2026",
+            "reason": "Duplicate"
+        })
+    );
+}
+
+#[test]
+fn the_page_shows_when_a_document_was_finished_or_excluded_and_why() {
+    for (state, finished_at, excluded_at, expected) in [
+        (DocState::Draft, None, None, (None, None, None)),
+        (
+            DocState::Finished,
+            Some(noon(2026, 4, 3)),
+            None,
+            (Some("3 Apr 2026"), None, None),
+        ),
+        (
+            DocState::Excluded,
+            None,
+            Some(noon(2026, 11, 2)),
+            (None, Some("2 Nov 2026"), Some("Duplicate")),
+        ),
+    ] {
+        let (_dir, db) = setup();
+        draft(&db, "doc-a", |d| {
+            d.state = state;
+            d.finished_at = finished_at;
+            d.excluded_at = excluded_at;
+            d.exclude_reason = excluded_at.map(|_| "Duplicate".to_string());
+        });
+
+        let page = page(&db, "doc-a");
+
+        assert_eq!(
+            (
+                page.finished_on.as_deref(),
+                page.excluded_on.as_deref(),
+                page.exclude_reason.as_deref()
+            ),
+            expected,
+            "{state:?}"
+        );
+    }
+}
+
+#[test]
+fn document_steps_are_read_from_the_pages_tagged_json() {
+    use super::commands::DocumentStep;
+
+    for (wire, expected) in [
+        (json!({ "kind": "finish" }), DocumentStep::Finish),
+        (json!({ "kind": "unlock" }), DocumentStep::Unlock),
+        (
+            json!({ "kind": "exclude", "reason": "Scanned twice" }),
+            DocumentStep::Exclude {
+                reason: "Scanned twice".into(),
+            },
+        ),
+        (json!({ "kind": "restore" }), DocumentStep::Restore),
+    ] {
+        assert_eq!(
+            serde_json::from_value::<DocumentStep>(wire.clone()).unwrap(),
+            expected,
+            "{wire}"
+        );
+    }
+}
+
+#[test]
+fn a_documents_history_tells_its_life_newest_first() {
+    let (_dir, db) = setup_with_vendor();
+    complete_draft(&db, "doc-a");
+    lifecycle::finish(&db, "doc-a", 1, Source::Ui).unwrap();
+    lifecycle::unlock(&db, "doc-a", Source::Ui).unwrap();
+    lifecycle::exclude(&db, "doc-a", "Scanned twice", 2, Source::Ui).unwrap();
+    lifecycle::restore(&db, "doc-a", Source::Ui).unwrap();
+
+    assert_eq!(
+        entries_of(&db, "doc-a"),
+        vec![
+            (HistoryKind::Restored, "Restored".to_string()),
+            (HistoryKind::Excluded, "Excluded: Scanned twice".to_string()),
+            (HistoryKind::Unlocked, "Unlocked".to_string()),
+            (HistoryKind::Finished, "Finished".to_string()),
+            (HistoryKind::Added, "Added".to_string()),
+        ]
+    );
+}
+
+#[test]
+fn excluding_a_finished_document_reads_as_excluded_not_unlocked() {
+    let (_dir, db) = setup_with_vendor();
+    complete_draft(&db, "doc-a");
+    lifecycle::finish(&db, "doc-a", 1, Source::Ui).unwrap();
+    lifecycle::exclude(&db, "doc-a", "Duplicate", 2, Source::Ui).unwrap();
+
+    let entries = entries_of(&db, "doc-a");
+
+    assert_eq!(
+        entries[0],
+        (HistoryKind::Excluded, "Excluded: Duplicate".to_string())
+    );
+}
+
+#[test]
+fn each_changed_field_reads_as_label_old_to_new_with_names_dates_and_amounts_resolved() {
+    let (_dir, db) = setup_with_vendor();
+    draft(&db, "doc-a", |d| {
+        d.vendor_id = Some("vendor-1".into());
+        d.note = "Seminar".into();
+    });
+    let steps = vec![
+        (
+            pay_date_edit("2026-10-14"),
+            vec!["Payment date: — → 14 Oct 2026"],
+        ),
+        (
+            DocumentEdit::Paid {
+                value: Some("46.90".into()),
+            },
+            vec!["Paid: — → 46.90"],
+        ),
+        (
+            DocumentEdit::Vendor {
+                name: "Nordbook".into(),
+            },
+            vec!["Vendor: Pixelforge Ltd. → Nordbook"],
+        ),
+        (
+            DocumentEdit::Item {
+                key: Some("books".into()),
+            },
+            vec!["Item: — → books"],
+        ),
+        (
+            DocumentEdit::WorkShare { value: 50 },
+            vec!["Work share: 100 % → 50 %"],
+        ),
+        (
+            DocumentEdit::Note {
+                text: "Workshop".into(),
+            },
+            vec!["Note: Seminar → Workshop"],
+        ),
+        (
+            DocumentEdit::Invoice {
+                amount: Some("129.00".into()),
+                currency: "usd".into(),
+            },
+            vec!["Invoice amount: — → 129.00", "Invoice currency: — → USD"],
+        ),
+        (
+            DocumentEdit::PayDate { value: None },
+            vec!["Payment date: 14 Oct 2026 → —"],
+        ),
+    ];
+
+    for (change, expected) in steps {
+        let before = entries_of(&db, "doc-a").len();
+
+        apply(&db, "doc-a", change).unwrap().unwrap();
+
+        let entries = entries_of(&db, "doc-a");
+        let added = &entries[..entries.len() - before];
+        assert!(
+            added.iter().all(|(kind, _)| *kind == HistoryKind::Changed),
+            "{expected:?}"
+        );
+        let mut texts: Vec<&str> = added.iter().map(|(_, text)| text.as_str()).collect();
+        texts.sort_unstable();
+        assert_eq!(texts, expected, "{expected:?}");
+    }
+}
+
+#[test]
+fn an_invoice_date_change_reads_as_a_date() {
+    let (_dir, db) = setup_with_vendor();
+    let before = draft(&db, "doc-a", |_| {});
+    let after = DocumentRow {
+        invoice_date: Some("2026-11-09".into()),
+        ..before.clone()
+    };
+    db.write(
+        Op::new(
+            "Edit",
+            vec![Change::update(store::DOCUMENTS, &before, &after).unwrap()],
+        ),
+        Source::Ui,
+    )
+    .unwrap();
+
+    assert_eq!(
+        entries_of(&db, "doc-a")[0],
+        (
+            HistoryKind::Changed,
+            "Invoice date: — → 9 Nov 2026".to_string()
+        )
+    );
+}
+
+#[test]
+fn money_in_the_history_follows_the_number_format() {
+    let (_dir, db) = setup_with_vendor();
+    draft(&db, "doc-a", |_| {});
+    apply(
+        &db,
+        "doc-a",
+        DocumentEdit::Paid {
+            value: Some("46.90".into()),
+        },
+    )
+    .unwrap();
+
+    let entries =
+        history::document_history(&db, "doc-a", NumberFormat::CommaDecimal, ORDER).unwrap();
+
+    assert_eq!(entries[0].text, "Paid: — → 46,90");
+}
+
+#[test]
+fn linking_and_unlinking_a_line_name_the_line_and_its_amount() {
+    let (_dir, db) = setup_with_vendor();
+    two_october_lines(&db);
+    draft(&db, "doc-a", |d| d.pay_date = Some("2026-10-14".into()));
+
+    apply(&db, "doc-a", DocumentEdit::Link { line: "l-1".into() }).unwrap();
+    apply(&db, "doc-a", DocumentEdit::Unlink { line: "l-1".into() }).unwrap();
+
+    assert_eq!(
+        entries_of(&db, "doc-a"),
+        vec![
+            (
+                HistoryKind::Unlinked,
+                "Unlinked Lastschrift SEITENWEISE · \u{2212}€46.90".to_string()
+            ),
+            (
+                HistoryKind::Linked,
+                "Linked Lastschrift SEITENWEISE · \u{2212}€46.90".to_string()
+            ),
+            (HistoryKind::Added, "Added".to_string()),
+        ]
+    );
+}
+
+#[test]
+fn moving_a_documents_file_adds_no_history_entry() {
+    let (dir, db) = setup_with_vendor();
+    pixelforge_draft(&db, dir.path(), "scan.pdf", "one");
+    files::relocate(&db, dir.path()).unwrap().unwrap();
+    assert_eq!(document(&db, "doc-one").file, MOVED);
+
+    assert_eq!(
+        entries_of(&db, "doc-one"),
+        vec![(HistoryKind::Added, "Added".to_string())]
+    );
+}
+
+#[test]
+fn a_deleted_documents_history_ends_with_its_deletion() {
+    let (dir, db) = setup_with_vendor();
+    let excluded_at = noon(2026, 11, 2);
+    excluded_with_file(&db, dir.path(), excluded_at);
+    erase(
+        &db,
+        dir.path(),
+        "doc-one",
+        "Scanned twice",
+        true,
+        excluded_at + WEEK,
+    )
+    .unwrap();
+
+    assert_eq!(
+        entries_of(&db, "doc-one"),
+        vec![
+            (HistoryKind::Deleted, "Deleted".to_string()),
+            (HistoryKind::Added, "Added".to_string()),
+        ]
+    );
+}
+
+#[test]
+fn an_entry_names_its_document_and_when_it_happened_in_local_time() {
+    let (_dir, db) = setup_with_vendor();
+    complete_draft(&db, "doc-a");
+
+    let entries = history::document_history(&db, "doc-a", FORMAT, ORDER).unwrap();
+
+    assert_eq!(entries.len(), 1);
+    let entry = &entries[0];
+    assert_eq!(entry.document, "Pixelforge Ltd. invoice");
+    assert_eq!(entry.document_id, "doc-a");
+    let (day, time) = entry.when.split_once(", ").unwrap();
+    assert!(
+        chrono::NaiveTime::parse_from_str(time, "%H:%M").is_ok(),
+        "{}",
+        entry.when
+    );
+    let parts: Vec<&str> = day.split(' ').collect();
+    assert_eq!(parts.len(), 3, "{}", entry.when);
+    assert!(parts[0].parse::<u32>().is_ok(), "{}", entry.when);
+    assert_eq!(parts[1].len(), 3, "{}", entry.when);
+    assert!(parts[2].parse::<i32>().is_ok(), "{}", entry.when);
+}
+
+#[test]
+fn a_history_entry_travels_in_camel_case_with_a_snake_case_kind() {
+    let (_dir, db) = setup_with_vendor();
+    complete_draft(&db, "doc-a");
+    let entry = history::document_history(&db, "doc-a", FORMAT, ORDER)
+        .unwrap()
+        .remove(0);
+
+    let mut wire = serde_json::to_value(&entry).unwrap();
+
+    assert!(wire["when"].is_string());
+    wire.as_object_mut().unwrap().remove("when");
+    assert_eq!(
+        wire,
+        json!({
+            "kind": "added",
+            "text": "Added",
+            "document": "Pixelforge Ltd. invoice",
+            "documentId": "doc-a"
+        })
+    );
+}
+
+#[test]
+fn the_year_log_covers_documents_paid_that_year_and_those_deleted_from_its_folder() {
+    let (dir, db) = setup_with_vendor();
+    let excluded_at = noon(2026, 11, 2);
+    draft(&db, "doc-a", |d| {
+        d.pay_date = Some("2026-10-14".into());
+        d.note = "Seminar".into();
+    });
+    apply(
+        &db,
+        "doc-a",
+        DocumentEdit::Note {
+            text: "Workshop".into(),
+        },
+    )
+    .unwrap();
+    draft(&db, "doc-b", |d| d.pay_date = Some("2025-05-01".into()));
+    for (id, file, pay_date) in [
+        (
+            "doc-c",
+            "docs/2026/2026-03-01-seitenweise.pdf",
+            "2026-03-01",
+        ),
+        (
+            "doc-d",
+            "docs/2025/2025-03-01-seitenweise.pdf",
+            "2025-03-01",
+        ),
+    ] {
+        draft(&db, id, |d| {
+            d.state = DocState::Excluded;
+            d.excluded_at = Some(excluded_at);
+            d.file = file.into();
+            d.pay_date = Some(pay_date.into());
+        });
+        erase(
+            &db,
+            dir.path(),
+            id,
+            "Scanned twice",
+            true,
+            excluded_at + WEEK,
+        )
+        .unwrap();
+    }
+
+    let log = history::year_log(&db, 2026, FORMAT, ORDER).unwrap();
+
+    let mut seen: Vec<(&str, &str, HistoryKind)> = log
+        .iter()
+        .map(|e| (e.document.as_str(), e.text.as_str(), e.kind))
+        .collect();
+    seen.sort_unstable_by_key(|(document, text, _)| (*document, *text));
+    assert_eq!(
+        seen,
+        vec![
+            ("doc-a", "Added", HistoryKind::Added),
+            ("doc-a", "Note: Seminar → Workshop", HistoryKind::Changed),
+            ("doc-c", "Added", HistoryKind::Added),
+            ("doc-c", "Deleted: Scanned twice", HistoryKind::Deleted),
+        ]
+    );
 }
 
 #[test]

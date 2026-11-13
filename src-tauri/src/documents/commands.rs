@@ -11,6 +11,8 @@ use super::add::{self, AddInput, AddPreview};
 use super::amounts::{self, Estimate};
 use super::edit::{self, DocumentEdit};
 use super::files;
+use super::history::{self, HistoryEntry};
+use super::lifecycle::{self, ArchivedDocument, DeletionView};
 use super::list::{self, DocumentGroup};
 use super::payments::LineChoice;
 use super::vendors::{self, VendorsView};
@@ -84,7 +86,7 @@ pub fn document_add_commit(
         &crate::config_dir(),
         pending,
         &input,
-        chrono::Utc::now().timestamp_millis(),
+        now(),
         Source::Ui,
     )?;
     state.adds.take(&input.token);
@@ -255,4 +257,98 @@ pub fn vendor_change(
     announce(&app, &written);
     relocate(&app, &state);
     Ok(written.label)
+}
+
+/// A step in a document's life; returns the label of the change.
+#[derive(serde::Deserialize, Clone, Debug, PartialEq, TS)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+#[ts(export, export_to = "src/api/types.gen.ts")]
+pub enum DocumentStep {
+    Finish,
+    Unlock,
+    Exclude { reason: String },
+    Restore,
+}
+
+fn now() -> i64 {
+    chrono::Utc::now().timestamp_millis()
+}
+
+#[tauri::command]
+pub fn document_step(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    id: String,
+    step: DocumentStep,
+) -> AppResult<String> {
+    let db = &state.db;
+    let written = match step {
+        DocumentStep::Finish => lifecycle::finish(db, &id, now(), Source::Ui)?,
+        DocumentStep::Unlock => lifecycle::unlock(db, &id, Source::Ui)?,
+        DocumentStep::Exclude { reason } => {
+            lifecycle::exclude(db, &id, &reason, now(), Source::Ui)?
+        }
+        DocumentStep::Restore => lifecycle::restore(db, &id, Source::Ui)?,
+    };
+    announce(&app, &written);
+    relocate(&app, &state);
+    Ok(written.label)
+}
+
+/// Deletes an excluded document for good; returns the label of the change.
+#[tauri::command]
+pub fn document_delete(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    id: String,
+    reason: String,
+    understood: bool,
+) -> AppResult<String> {
+    let written = lifecycle::delete(
+        &state.db,
+        &crate::config_dir(),
+        &id,
+        &reason,
+        understood,
+        state.settings.get().archive_days,
+        now(),
+    )?;
+    announce(&app, &written);
+    Ok(written.label)
+}
+
+#[tauri::command]
+pub fn document_history(state: State<'_, AppState>, id: String) -> AppResult<Vec<HistoryEntry>> {
+    history::document_history(
+        &state.db,
+        &id,
+        state.settings.get().number_format,
+        DateOrder::system(),
+    )
+}
+
+#[tauri::command]
+pub fn year_log(state: State<'_, AppState>, year: i32) -> AppResult<Vec<HistoryEntry>> {
+    history::year_log(
+        &state.db,
+        year,
+        state.settings.get().number_format,
+        DateOrder::system(),
+    )
+}
+
+#[tauri::command]
+pub fn archive_list(state: State<'_, AppState>, year: i32) -> AppResult<Vec<ArchivedDocument>> {
+    lifecycle::archive(
+        &state.db,
+        year,
+        state.settings.get().archive_days,
+        now(),
+        DateOrder::system(),
+    )
+}
+
+#[tauri::command]
+pub fn deletion_log(state: State<'_, AppState>) -> AppResult<Vec<DeletionView>> {
+    lifecycle::deletion_log(&state.db, DateOrder::system())
 }

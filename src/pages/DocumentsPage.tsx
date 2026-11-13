@@ -40,6 +40,16 @@ export function DocumentsPage() {
                 <span className="docs-group__title">{group.title}</span>
               )}
               <span className="add-doc__hint">{group.count}</span>
+              {group.year && (
+                <>
+                  <button className="link-btn docs-group__link" onClick={() => group.year && navigate({ page: "log", year: group.year })}>
+                    Log
+                  </button>
+                  <button className="link-btn docs-group__link" onClick={() => group.year && navigate({ page: "archive", year: group.year })}>
+                    Archive
+                  </button>
+                </>
+              )}
               <span className="docs-group__total">{group.total}</span>
             </div>
             {group.documents.map((doc) => (

@@ -1,8 +1,10 @@
 import type { Route } from "../state/route";
 import { AccountPage } from "./AccountPage";
+import { ArchivePage } from "./ArchivePage";
 import { DocumentPage } from "./DocumentPage";
 import { DocumentsPage } from "./DocumentsPage";
 import { EmptyPage } from "./EmptyPage";
+import { LogPage } from "./LogPage";
 import { ReviewPage } from "./ReviewPage";
 import { StatementsPage } from "./StatementsPage";
 
@@ -26,8 +28,8 @@ export function PageBody({ route }: { route: Route }) {
     case "document":
       return <DocumentPage documentId={route.documentId} />;
     case "log":
-      return <EmptyPage title="Log" text="Every change to a document shows here." />;
+      return <LogPage year={route.year} />;
     case "archive":
-      return <EmptyPage title="Archive" text="Excluded documents show here." />;
+      return <ArchivePage year={route.year} />;
   }
 }

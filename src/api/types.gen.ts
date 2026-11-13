@@ -94,6 +94,19 @@ export type AppErrorField = { path: string, message: string, };
 
 export type Appearance = "system" | "light" | "dark";
 
+/**
+ * An excluded document as its year's Archive lists it.
+ */
+export type ArchivedDocument = { id: string, title: string, file: string, reason: string, 
+/**
+ * `Excluded 2 Nov 2026`.
+ */
+excluded: string, deletable: boolean, 
+/**
+ * `Can be deleted from 9 Nov 2026`, while it can't yet.
+ */
+deletableNote: string | null, };
+
 export type ChainKind = "first" | "continues" | "gap";
 
 /**
@@ -113,6 +126,15 @@ export type Coverage = { months: Array<MonthHead>, accounts: Array<AccountCovera
  * Payload of `data_changed`: the tables a write touched, so the page refetches only what shows them.
  */
 export type DataChanged = { tables: Array<string>, };
+
+/**
+ * A deletion as Settings → Privacy & Data lists it.
+ */
+export type DeletionView = { title: string, file: string, 
+/**
+ * `Added 2 Mar 2026 · deleted 13 Nov 2026`.
+ */
+dates: string, reason: string, };
 
 export type DocState = "draft" | "finished" | "excluded";
 
@@ -149,6 +171,11 @@ sub: string, state: DocState,
  */
 anv: string, };
 
+/**
+ * A step in a document's life; returns the label of the change.
+ */
+export type DocumentStep = { "kind": "finish" } | { "kind": "unlock" } | { "kind": "exclude", reason: string, } | { "kind": "restore" };
+
 export type DocumentView = { id: string, title: string, state: DocState, 
 /**
  * Relative to the data folder.
@@ -181,7 +208,15 @@ estimate: Estimate | null, note: string, invoiceAmount: string | null, invoiceCu
 /**
  * The facts still missing before it can be finished, e.g. `payment date`.
  */
-missing: Array<string>, };
+missing: Array<string>, 
+/**
+ * `3 Apr 2026`, while finished.
+ */
+finishedOn: string | null, 
+/**
+ * `2 Nov 2026`, while excluded.
+ */
+excludedOn: string | null, excludeReason: string | null, };
 
 export type ErrorKind = "io" | "invalid_input" | "not_found" | "internal";
 
@@ -207,6 +242,22 @@ gwg: string | null, };
  * The placeholder's box in CSS pixels, relative to the webview's top left.
  */
 export type Frame = { x: number, y: number, width: number, height: number, };
+
+export type HistoryEntry = { kind: HistoryKind, 
+/**
+ * `Vendor: Pixel Print → Pixelforge Ltd.`.
+ */
+text: string, 
+/**
+ * `13 Nov 2026, 14:32`.
+ */
+when: string, 
+/**
+ * The document it is about, for the year's Log.
+ */
+document: string, documentId: string, };
+
+export type HistoryKind = "added" | "changed" | "linked" | "unlinked" | "finished" | "unlocked" | "excluded" | "restored" | "deleted";
 
 /**
  * What the Import sheet shows.
@@ -413,12 +464,16 @@ showOriginalCurrency: boolean,
 /**
  * Transfers between two of the owner's accounts show as Transfer and never count twice.
  */
-hideOwnTransfers: boolean, };
+hideOwnTransfers: boolean, 
+/**
+ * Days an excluded document stays in the Archive before it can be deleted.
+ */
+archiveDays: number, };
 
 /**
  * The fields to change; absent ones keep their value.
  */
-export type SettingsPatch = { appearance?: Appearance, accent?: Accent, numberFormat?: NumberFormat, showOriginalCurrency?: boolean, hideOwnTransfers?: boolean, };
+export type SettingsPatch = { appearance?: Appearance, accent?: Accent, numberFormat?: NumberFormat, showOriginalCurrency?: boolean, hideOwnTransfers?: boolean, archiveDays?: number, };
 
 export type SourceKind = "document" | "statement";
 

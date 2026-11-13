@@ -6,12 +6,12 @@ vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await impo
 import { api } from "../api";
 import { account } from "../test/accounts";
 import { renderWithQuery } from "../test/renderWithQuery";
-import { documentGroup, documentRow, documentView, lineChoice, vendorView, vendorsView } from "../test/documents";
+import { archivedDocument, deletionView, documentGroup, documentRow, documentView, historyEntry, lineChoice, vendorView, vendorsView } from "../test/documents";
 import { ruleView, rulesView } from "../test/lineRules";
 import { reviewLine, reviewQueue } from "../test/review";
 import { accountCoverage, accountLines, coverage, lineView, statementGroup } from "../test/statements";
 import { useAccounts } from "./accounts";
-import { useDocument, useDocumentLineOptions, useDocuments, useVendors } from "./documents";
+import { useArchive, useDeletions, useDocument, useDocumentHistory, useDocumentLineOptions, useDocuments, useVendors, useYearLog } from "./documents";
 import { useLineRules } from "./lineRules";
 import { useReviewQueue } from "./review";
 import { useAccountLines, useCoverage } from "./statements";
@@ -251,6 +251,60 @@ describe("useEvents", () => {
       mocked.documentsList.mockResolvedValue([documentGroup({ documents: [documentRow({ title: "New Invoice" })] })]);
       mocked.vendorsView.mockResolvedValue(vendorsView({ vendors: [vendorView({ name: "New Vendor" })] }));
       mocked.documentLineOptions.mockResolvedValue([lineChoice({ title: "New Line" })]);
+
+      await emitDataChanged([table]);
+
+      for (const key of refreshed) expect(await screen.findByText(shown[key][1])).toBeTruthy();
+      for (const key of Object.keys(shown) as (keyof typeof shown)[]) {
+        if (!(refreshed as readonly string[]).includes(key)) expect(screen.getByText(shown[key][0])).toBeTruthy();
+      }
+    });
+  });
+
+  describe("history, log and archive", () => {
+    function LifecycleProbe() {
+      useEvents();
+      const { data: history } = useDocumentHistory("doc-1");
+      const { data: log } = useYearLog(2026);
+      const { data: archive } = useArchive(2026);
+      const { data: deletions } = useDeletions();
+      return (
+        <>
+          <p>History: {history?.map((h) => h.text).join(", ")}</p>
+          <p>Log: {log?.map((h) => h.text).join(", ")}</p>
+          <p>Archive: {archive?.map((a) => a.title).join(", ")}</p>
+          <p>Deletions: {deletions?.map((d) => d.title).join(", ")}</p>
+        </>
+      );
+    }
+
+    const shown = {
+      history: ["History: Old entry", "History: New entry"],
+      log: ["Log: Old entry", "Log: New entry"],
+      archive: ["Archive: Old Archived", "Archive: New Archived"],
+      deletions: ["Deletions: Old Deleted", "Deletions: New Deleted"],
+    } as const;
+
+    beforeEach(() => {
+      mocked.documentHistory.mockResolvedValue([historyEntry({ text: "Old entry" })]);
+      mocked.yearLog.mockResolvedValue([historyEntry({ text: "Old entry" })]);
+      mocked.archiveList.mockResolvedValue([archivedDocument({ title: "Old Archived" })]);
+      mocked.deletionLog.mockResolvedValue([deletionView({ title: "Old Deleted" })]);
+    });
+
+    it.each([
+      ["documents", ["history", "log", "archive"]],
+      ["vendors", ["history", "log"]],
+      ["document_links", ["history", "log"]],
+      ["deletions", ["deletions", "log", "archive"]],
+      ["accounts", []],
+    ] as const)("when data_changed names the %s table, refetches %j and keeps the rest", async (table, refreshed) => {
+      renderWithQuery(<LifecycleProbe />);
+      for (const [old] of Object.values(shown)) await screen.findByText(old);
+      mocked.documentHistory.mockResolvedValue([historyEntry({ text: "New entry" })]);
+      mocked.yearLog.mockResolvedValue([historyEntry({ text: "New entry" })]);
+      mocked.archiveList.mockResolvedValue([archivedDocument({ title: "New Archived" })]);
+      mocked.deletionLog.mockResolvedValue([deletionView({ title: "New Deleted" })]);
 
       await emitDataChanged([table]);
 

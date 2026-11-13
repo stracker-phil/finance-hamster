@@ -145,6 +145,19 @@ pub const MIGRATIONS: &[&str] = &[
         UNIQUE (document_id, transaction_id)
     );
     CREATE INDEX document_links_transaction ON document_links (transaction_id);",
+    // 6: the permanent deletion log: what was deleted from the Archive, when and why.
+    "CREATE TABLE deletions (
+        id TEXT PRIMARY KEY,
+        document_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        original_name TEXT NOT NULL,
+        file TEXT NOT NULL,
+        file_hash TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        excluded_at INTEGER,
+        deleted_at INTEGER NOT NULL,
+        reason TEXT NOT NULL
+    );",
 ];
 
 pub fn version(conn: &Connection) -> AppResult<usize> {
@@ -200,6 +213,7 @@ mod tests {
         [
             "accounts",
             "decisions",
+            "deletions",
             "document_links",
             "documents",
             "journal",
@@ -211,6 +225,22 @@ mod tests {
         ]
         .map(String::from)
         .to_vec()
+    }
+
+    #[test]
+    fn a_file_at_version_five_gains_the_deletion_log_and_keeps_its_documents() {
+        let dir = temp_config_dir();
+        let mut conn = Connection::open(dir.path().join("v5.sqlite")).unwrap();
+        for sql in &MIGRATIONS[..5] {
+            conn.execute_batch(sql).unwrap();
+        }
+        conn.pragma_update(None, "user_version", 5i64).unwrap();
+        assert!(!tables(&conn).contains(&"deletions".to_string()));
+
+        migrate(&mut conn).unwrap();
+
+        assert_eq!(version(&conn).unwrap(), MIGRATIONS.len());
+        assert_eq!(tables(&conn), all_tables());
     }
 
     #[test]

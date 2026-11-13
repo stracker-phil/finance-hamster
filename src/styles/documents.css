@@ -4,7 +4,7 @@
 .add-doc__grid { display: grid; grid-template-columns: 96px minmax(0, 1fr); align-items: center; gap: 10px 12px; margin-top: 14px; font-size: 13px; color: var(--text-secondary); }
 .add-doc__field { display: flex; align-items: center; gap: 8px; }
 .add-doc__field .field { flex: 1; min-width: 0; }
-.add-doc__hint { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+.add-doc__hint { /* the quiet hint text, shared by the document pages */ font-size: 12px; color: var(--text-muted); white-space: nowrap; }
 .add-doc__invoice { display: flex; align-items: center; gap: 8px; color: var(--text); }
 .add-doc__amount { margin-left: auto; font-variant-numeric: tabular-nums; }
 .add-doc__heading { margin: 18px 0 6px; font-size: 12px; font-weight: 600; color: var(--text-secondary); }
@@ -22,7 +22,8 @@
 .doc-page__file { width: 280px; flex: none; display: flex; flex-direction: column; gap: 10px; }
 .doc-page__preview { height: 380px; display: flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
 .doc-page__path { font-size: 11px; color: var(--text-muted); word-break: break-all; }
-.doc-form { flex: 1; min-width: 0; max-width: 520px; margin: 0; padding: 0; border: 0; }
+.doc-form { flex: 1; min-width: 0; max-width: 520px; }
+.doc-form__fields { margin: 0; padding: 0; border: 0; min-width: 0; }
 .doc-form__status { font-size: 12px; color: var(--text-muted); margin-bottom: 18px; }
 .doc-form__heading { margin: 22px 0 10px; font-size: 12px; font-weight: 600; color: var(--text-secondary); }
 .doc-form__heading:first-of-type { margin-top: 0; }
@@ -65,3 +66,27 @@
 .docs-row__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .docs-row__title { font-size: 13.5px; font-weight: 500; }
 .docs-row__anv { width: 92px; text-align: right; font-variant-numeric: tabular-nums; font-size: 13px; }
+.history { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.history__entry { display: flex; gap: 10px; font-size: 13px; }
+.history__dot { width: 8px; height: 8px; margin-top: 5px; flex: none; border-radius: 2px; background: var(--text-muted); }
+.history__dot--added { background: var(--positive); }
+.history__dot--linked { background: var(--accent); }
+.history__dot--finished { background: var(--pill-blue-text); }
+.history__dot--excluded { background: var(--danger); }
+.history__text { display: flex; flex-direction: column; gap: 2px; color: var(--text); }
+.history__doc { font-weight: 600; text-align: left; }
+.history__when { font-size: 12px; color: var(--text-muted); }
+.doc-history { width: 300px; flex: none; align-self: stretch; padding: 0 0 0 16px; border-left: 1px solid var(--hairline); }
+.doc-history__title { margin: 0 0 14px; font-size: 14px; font-weight: 700; }
+.doc-history__note { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--hairline); font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+.doc-banner { display: flex; align-items: center; gap: 10px; margin: 16px 28px 0; padding: 10px 14px; border-radius: 10px; font-size: 13px; border: 1px solid var(--banner-info-border); background: var(--banner-info-bg); color: var(--banner-info-text); }
+.doc-banner--excluded { border-color: var(--border); background: var(--fill-subtle); color: var(--text-secondary); }
+.doc-banner .link-btn { margin-left: auto; }
+.doc-form__top { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+.doc-form__top .doc-form__status { flex: 1; margin: 0; }
+.doc-form__exclude { margin-top: 26px; padding-top: 14px; border-top: 1px solid var(--hairline); }
+.log-page { max-width: 760px; margin: 0 auto; padding: 24px 28px 40px; }
+.archive-page__intro { margin: 0; padding: 14px 24px; font-size: 13px; line-height: 1.5; color: var(--text-muted); border-bottom: 1px solid var(--hairline); }
+.archive-row { display: flex; align-items: center; gap: 12px; min-height: 58px; padding: 0 24px; border-bottom: 1px solid var(--row-hairline); }
+.archive-row__file { font-size: 13px; }
+.docs-group__link { font-size: 12px; font-weight: 500; }

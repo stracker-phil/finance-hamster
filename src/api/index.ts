@@ -1,7 +1,7 @@
 import { getName, getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { Account, AccountEdit, AccountLines, Action, AddInput, AddPreview, DocumentEdit, DocumentGroup, DocumentView, VendorChange, VendorsView, Estimate, LineChoice, Coverage, ReviewQueue, RuleForm, RulesView, Frame, ImportPreview, PdfSource, AppError, AppInfo, CommandInfo, ErrorKind, EventName, EventPayloads, Imported, LaunchEvent, NewAccount, ReloadPreview, RulesFile, Settings, SettingsPatch, TaxYear } from "./types";
+import type { Account, AccountEdit, AccountLines, Action, AddInput, AddPreview, ArchivedDocument, DeletionView, DocumentEdit, DocumentGroup, DocumentStep, DocumentView, HistoryEntry, VendorChange, VendorsView, Estimate, LineChoice, Coverage, ReviewQueue, RuleForm, RulesView, Frame, ImportPreview, PdfSource, AppError, AppInfo, CommandInfo, ErrorKind, EventName, EventPayloads, Imported, LaunchEvent, NewAccount, ReloadPreview, RulesFile, Settings, SettingsPatch, TaxYear } from "./types";
 
 export * from "./types";
 
@@ -61,6 +61,14 @@ export const api = {
   /** Changes one field of a draft; the label of the change, or null when nothing changed. */
   documentEdit: (id: string, change: DocumentEdit) => invoke<string | null>("document_edit", { id, change }),
   documentLineOptions: (id: string, query: string) => invoke<LineChoice[]>("document_line_options", { id, query }),
+  /** Finish, Unlock, Exclude or Restore; the label of the change. */
+  documentStep: (id: string, step: DocumentStep) => invoke<string>("document_step", { id, step }),
+  /** Deletes an excluded document for good; the label of the change. */
+  documentDelete: (id: string, reason: string, understood: boolean) => invoke<string>("document_delete", { id, reason, understood }),
+  documentHistory: (id: string) => invoke<HistoryEntry[]>("document_history", { id }),
+  yearLog: (year: number) => invoke<HistoryEntry[]>("year_log", { year }),
+  archiveList: (year: number) => invoke<ArchivedDocument[]>("archive_list", { year }),
+  deletionLog: () => invoke<DeletionView[]>("deletion_log"),
   documentsList: (query: string) => invoke<DocumentGroup[]>("documents_list", { query }),
   vendorsView: () => invoke<VendorsView>("vendors_view"),
   /** The label of the change. */

@@ -61,6 +61,8 @@ pub struct Settings {
     pub show_original_currency: bool,
     /// Transfers between two of the owner's accounts show as Transfer and never count twice.
     pub hide_own_transfers: bool,
+    /// Days an excluded document stays in the Archive before it can be deleted.
+    pub archive_days: u32,
 }
 
 impl Default for Settings {
@@ -71,6 +73,7 @@ impl Default for Settings {
             number_format: NumberFormat::default(),
             show_original_currency: true,
             hide_own_transfers: true,
+            archive_days: 7,
         }
     }
 }
@@ -85,6 +88,7 @@ pub struct SettingsPatch {
     pub number_format: Option<NumberFormat>,
     pub show_original_currency: Option<bool>,
     pub hide_own_transfers: Option<bool>,
+    pub archive_days: Option<u32>,
 }
 
 impl Settings {
@@ -103,6 +107,9 @@ impl Settings {
         }
         if let Some(hide) = patch.hide_own_transfers {
             self.hide_own_transfers = hide;
+        }
+        if let Some(days) = patch.archive_days {
+            self.archive_days = days.max(1);
         }
     }
 }
@@ -155,9 +162,40 @@ mod tests {
                 "accent": "system",
                 "numberFormat": "dot_decimal",
                 "showOriginalCurrency": true,
-                "hideOwnTransfers": true
+                "hideOwnTransfers": true,
+                "archiveDays": 7
             })
         );
+    }
+
+    #[test]
+    fn archive_days_are_patched_with_a_minimum_of_one_day_and_survive_reopening() {
+        for (days, expected) in [(14, 14), (1, 1), (0, 1)] {
+            let dir = temp_config_dir();
+            let updated = store_in(&dir)
+                .update(SettingsPatch {
+                    archive_days: Some(days),
+                    ..SettingsPatch::default()
+                })
+                .unwrap();
+
+            assert_eq!(updated.archive_days, expected, "{days}");
+            assert_eq!(store_in(&dir).get().archive_days, expected, "{days}");
+        }
+    }
+
+    #[test]
+    fn an_old_settings_file_without_archive_days_loads_seven() {
+        let dir = temp_config_dir();
+        std::fs::write(dir.path().join(FILE_NAME), r#"{"accent":"teal"}"#).unwrap();
+
+        assert_eq!(store_in(&dir).get().archive_days, 7);
+    }
+
+    #[test]
+    fn a_patch_reads_archive_days_in_camel_case() {
+        let patch: SettingsPatch = serde_json::from_value(json!({ "archiveDays": 30 })).unwrap();
+        assert_eq!(patch.archive_days, Some(30));
     }
 
     #[test]

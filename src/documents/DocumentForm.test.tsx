@@ -12,7 +12,8 @@ import { DocumentForm } from "./DocumentForm";
 
 const mocked = vi.mocked(api, true);
 
-const renderForm = (patch: Parameters<typeof documentView>[0] = {}) => renderWithQuery(<DocumentForm doc={documentView(patch)} />);
+const onExclude = vi.fn();
+const renderForm = (patch: Parameters<typeof documentView>[0] = {}) => renderWithQuery(<DocumentForm doc={documentView(patch)} onExclude={onExclude} />);
 const typeInto = async (label: string, text: string) => {
   const field = screen.getByLabelText(label);
   await userEvent.clear(field);
@@ -22,6 +23,7 @@ const unpaid = { paidFromLines: false, paid: null, paidText: null, lines: [] };
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocked.documentStep.mockResolvedValue("Finished Demo Cloud Ltd");
   useStore.setState({ toasts: [], pdfCovers: 0 });
   mocked.documentEdit.mockResolvedValue(null);
   mocked.documentLineOptions.mockResolvedValue([]);
@@ -346,6 +348,59 @@ describe("DocumentForm", () => {
       await userEvent.tab();
 
       expect(mocked.documentEdit).toHaveBeenCalledWith("doc-1", { field: "invoice", amount: "129.00", currency: "USD" });
+    });
+  });
+
+  describe("Mark Finished", () => {
+    it("finishes the draft and toasts the result", async () => {
+      mocked.documentStep.mockResolvedValue("Finished Demo Cloud Ltd");
+      renderForm();
+
+      await userEvent.click(screen.getByRole("button", { name: "Mark Finished" }));
+
+      expect(mocked.documentStep).toHaveBeenCalledWith("doc-1", { kind: "finish" });
+      await waitFor(() => expect(useStore.getState().toasts.map((t) => [t.kind, t.message])).toEqual([["success", "Finished Demo Cloud Ltd"]]));
+    });
+
+    it("is disabled and names the missing facts while some are missing", () => {
+      renderForm({ missing: ["payment date", "vendor"] });
+
+      const button = screen.getByRole("button", { name: "Mark Finished" });
+      expect(button).toBeDisabled();
+      expect(button.getAttribute("title")).toBe("Set the payment date, vendor first");
+    });
+
+    it.each(["finished", "excluded"] as const)("is absent when the document is %s", (state) => {
+      renderForm({ state });
+
+      expect(screen.queryByRole("button", { name: "Mark Finished" })).toBeNull();
+    });
+  });
+
+  describe("Exclude Document…", () => {
+    it("asks to exclude when clicked", async () => {
+      renderForm();
+
+      await userEvent.click(screen.getByRole("button", { name: "Exclude Document…" }));
+
+      expect(onExclude).toHaveBeenCalled();
+    });
+
+    it("stays enabled for a finished document, whose fields are locked", async () => {
+      renderForm({ state: "finished" });
+      const link = screen.getByRole("button", { name: "Exclude Document…" });
+      expect(link).toBeEnabled();
+      expect(screen.getByLabelText("Vendor")).toBeDisabled();
+
+      await userEvent.click(link);
+
+      expect(onExclude).toHaveBeenCalled();
+    });
+
+    it("is absent for an excluded document", () => {
+      renderForm({ state: "excluded" });
+
+      expect(screen.queryByRole("button", { name: "Exclude Document…" })).toBeNull();
     });
   });
 

@@ -1,6 +1,7 @@
 import { api, toAppError } from "../../api";
 import { Icon } from "../../components/icons";
-import { useDataFolder } from "../../queries/settings";
+import { useDeletions } from "../../queries/documents";
+import { useDataFolder, useSettings, useUpdateSettings } from "../../queries/settings";
 import { useStore } from "../../state/store";
 import { Group, Row } from "../controls";
 
@@ -10,6 +11,9 @@ const showDataFolder = () => {
 
 export function PrivacyPage() {
   const { data: folder } = useDataFolder();
+  const { data: settings } = useSettings();
+  const { mutate } = useUpdateSettings();
+  const { data: deletions } = useDeletions();
   return (
     <>
       <Group title="Data folder" anchor="data-folder">
@@ -21,6 +25,27 @@ export function PrivacyPage() {
         <Row label="Documents and statements" description="Original PDFs, copied in once and never changed. docs/<year>/ and docs/inbox/." />
         <Row label="Your decisions" description="hamster.sqlite plus journal.jsonl, an append-only log readable without this app." />
         <Row label="Tax rules" description="rules/rules-<year>.json, plain JSON you can edit." />
+      </Group>
+      <Group title="Archive" anchor="archive">
+        <Row label="Days in Archive before delete" description="An excluded document can be deleted after this many days." htmlFor="archive-days">
+          <input
+            id="archive-days"
+            className="field settings-number"
+            type="number"
+            min={1}
+            value={settings?.archiveDays ?? 7}
+            onChange={(e) => {
+              const days = Number(e.target.value);
+              if (days >= 1) mutate({ archiveDays: days });
+            }}
+          />
+        </Row>
+      </Group>
+      <Group title="Deletion log" anchor="deletion-log">
+        {deletions?.length === 0 && <Row label="Nothing deleted" description="Documents deleted from the Archive are listed here for good." />}
+        {deletions?.map((d, i) => (
+          <Row key={i} label={d.title} description={`${d.file} · ${d.dates} · ${d.reason}`} />
+        ))}
       </Group>
       <Group title="Network" anchor="network">
         <Row label="Internet access" description="Hamster contains no network code. Invoice text is read on this Mac.">

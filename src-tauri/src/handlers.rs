@@ -50,6 +50,12 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static
         crate::documents::commands::documents_list,
         crate::documents::commands::vendors_view,
         crate::documents::commands::vendor_change,
+        crate::documents::commands::document_step,
+        crate::documents::commands::document_delete,
+        crate::documents::commands::document_history,
+        crate::documents::commands::year_log,
+        crate::documents::commands::archive_list,
+        crate::documents::commands::deletion_log,
     ]
 }
 

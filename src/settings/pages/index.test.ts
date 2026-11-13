@@ -30,6 +30,9 @@ describe("SETTINGS_PAGES", () => {
     ["Import a JSON file", "taxrules/import"],
     ["merge", "vendors/vendor-list"],
     ["default item", "vendors/vendor-list"],
+    ["Days in Archive", "privacy/archive"],
+    ["exclude", "privacy/archive"],
+    ["Deletion log", "privacy/deletion-log"],
   ])("finds the row for %s", (query, hit) => {
     expect(found(query)).toContain(hit);
   });
