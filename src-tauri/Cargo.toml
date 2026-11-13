@@ -1,6 +1,6 @@
 [package]
 name = "hamster"
-version = "0.5.0"
+version = "0.6.0"
 description = "Private macOS app that collects ANV documents with the real amount paid, keeps bank statements and tracks subscriptions"
 authors = ["Philipp Stracker <info@philippstracker.com>"]
 edition = "2024"
