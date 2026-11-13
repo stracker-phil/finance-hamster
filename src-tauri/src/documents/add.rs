@@ -13,7 +13,6 @@ use super::guess::{self, Guess};
 use super::payments::{self, days_apart};
 use super::store::{self, DocState, DocumentRow, LinkRow, VendorRow};
 use super::{amounts, files, title_of};
-use crate::accounts;
 use crate::date::{self, DateOrder};
 use crate::db::{Change, Db, Op, Source, Written};
 use crate::error::{AppError, AppResult};
@@ -198,11 +197,7 @@ pub fn preview(
     let vendors = db.read(store::vendors)?;
     let known = g.vendor.as_deref().and_then(|n| find_vendor(&vendors, n));
     let (item_key, item_why) = item_for(db, known)?;
-    let account_names: HashMap<String, String> = db
-        .read(accounts::rows)?
-        .into_iter()
-        .map(|a| (a.id, a.name))
-        .collect();
+    let account_names = payments::account_names(db)?;
     let invoice = [
         g.invoice_number.clone(),
         g.invoice_date.map(|d| date::day_month_year(d, order)),

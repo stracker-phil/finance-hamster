@@ -74,21 +74,31 @@ pub fn ruleset(db: &Db) -> AppResult<Option<Ruleset>> {
     Ok(Some(serde_json::from_str(&year.rules)?))
 }
 
-/// The visible items of the newest open tax year's rules.
-pub fn items(db: &Db) -> AppResult<Vec<ItemOption>> {
-    let Some(ruleset) = ruleset(db)? else {
-        return Ok(Vec::new());
-    };
-    Ok(ruleset
+/// The rules tax year `year` applies; the newest open year's while `year` has none yet.
+pub fn ruleset_for_year(db: &Db, year: i32) -> AppResult<Option<Ruleset>> {
+    match db.read(|c| taxyears::row(c, year))? {
+        Some(row) => Ok(Some(serde_json::from_str(&row.rules)?)),
+        None => ruleset(db),
+    }
+}
+
+/// The visible items of a ruleset, as pickers show them.
+pub fn item_options(ruleset: &Ruleset) -> Vec<ItemOption> {
+    ruleset
         .items
-        .into_iter()
+        .iter()
         .filter(|i| i.visible)
         .map(|i| ItemOption {
             label: format!("KZ {} · {}", i.kz, i.name),
-            key: i.key,
-            kz: i.kz,
+            key: i.key.clone(),
+            kz: i.kz.clone(),
         })
-        .collect())
+        .collect()
+}
+
+/// The visible items of the newest open tax year's rules.
+pub fn items(db: &Db) -> AppResult<Vec<ItemOption>> {
+    Ok(ruleset(db)?.map(|r| item_options(&r)).unwrap_or_default())
 }
 
 /// The amount typed into `field`, without sign; None when nothing was typed.

@@ -1,6 +1,7 @@
 import type { Route } from "../state/route";
 import { AccountPage } from "./AccountPage";
 import { DocumentPage } from "./DocumentPage";
+import { DocumentsPage } from "./DocumentsPage";
 import { EmptyPage } from "./EmptyPage";
 import { ReviewPage } from "./ReviewPage";
 import { StatementsPage } from "./StatementsPage";
@@ -15,7 +16,7 @@ export function PageBody({ route }: { route: Route }) {
     case "statements":
       return <StatementsPage />;
     case "documents":
-      return <EmptyPage title="No documents" text="Drop an invoice PDF onto the sidebar to add it." />;
+      return <DocumentsPage />;
     case "review":
       return <ReviewPage />;
     case "account":

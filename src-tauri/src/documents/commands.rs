@@ -9,7 +9,12 @@ use ts_rs::TS;
 
 use super::add::{self, AddInput, AddPreview};
 use super::amounts::{self, Estimate};
+use super::edit::{self, DocumentEdit};
 use super::files;
+use super::list::{self, DocumentGroup};
+use super::payments::LineChoice;
+use super::vendors::{self, VendorsView};
+use super::view::{self, DocumentView};
 use crate::date::DateOrder;
 use crate::db::Source;
 use crate::db::commands::announce;
@@ -156,4 +161,98 @@ pub fn offer(app: &AppHandle, path: &Path) {
     if let Err(e) = app.emit(ADD_READY_EVENT, payload) {
         log::warn!("Couldn't offer a dropped document: {e}");
     }
+}
+
+#[tauri::command]
+pub fn document_view(state: State<'_, AppState>, id: String) -> AppResult<DocumentView> {
+    view::document(
+        &state.db,
+        &id,
+        state.settings.get().number_format,
+        DateOrder::system(),
+    )
+}
+
+/// Changes one field of a draft; returns the label of the change, or null when nothing changed.
+#[tauri::command]
+pub fn document_edit(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    id: String,
+    change: DocumentEdit,
+) -> AppResult<Option<String>> {
+    let written = edit::edit(
+        &state.db,
+        &id,
+        &change,
+        chrono::Utc::now().timestamp_millis(),
+        Source::Ui,
+    )?;
+    if let Some(written) = &written {
+        announce(&app, written);
+        relocate(&app, &state);
+    }
+    Ok(written.map(|w| w.label))
+}
+
+/// The bank lines the picker offers for a document: likely matches, or lines containing `query`.
+#[tauri::command]
+pub fn document_line_options(
+    state: State<'_, AppState>,
+    id: String,
+    query: String,
+) -> AppResult<Vec<LineChoice>> {
+    view::line_options(
+        &state.db,
+        &id,
+        &query,
+        state.settings.get().number_format,
+        DateOrder::system(),
+    )
+}
+
+#[tauri::command]
+pub fn documents_list(state: State<'_, AppState>, query: String) -> AppResult<Vec<DocumentGroup>> {
+    list::documents(
+        &state.db,
+        &query,
+        state.settings.get().number_format,
+        DateOrder::system(),
+    )
+}
+
+#[tauri::command]
+pub fn vendors_view(state: State<'_, AppState>) -> AppResult<VendorsView> {
+    vendors::view(&state.db)
+}
+
+/// One change to a vendor (Settings → Vendors); returns the label of the change.
+#[derive(serde::Deserialize, Clone, Debug, PartialEq, TS)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+#[ts(export, export_to = "src/api/types.gen.ts")]
+pub enum VendorChange {
+    Rename { name: String },
+    DefaultItem { key: Option<String> },
+    MergeInto { into: String },
+    Delete,
+}
+
+#[tauri::command]
+pub fn vendor_change(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    id: String,
+    change: VendorChange,
+) -> AppResult<String> {
+    let written = match change {
+        VendorChange::Rename { name } => vendors::rename(&state.db, &id, &name, Source::Ui)?,
+        VendorChange::DefaultItem { key } => {
+            vendors::set_default_item(&state.db, &id, key, Source::Ui)?
+        }
+        VendorChange::MergeInto { into } => vendors::merge(&state.db, &id, &into, Source::Ui)?,
+        VendorChange::Delete => vendors::delete(&state.db, &id, Source::Ui)?,
+    };
+    announce(&app, &written);
+    relocate(&app, &state);
+    Ok(written.label)
 }

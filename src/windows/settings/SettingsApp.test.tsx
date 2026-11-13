@@ -60,7 +60,7 @@ describe("SettingsApp", () => {
 
       expect(pageTitle()).toBe("Rules");
       const labels = within(screen.getByRole("group", { name: "Finance" })).getAllByRole("button").map((b) => b.textContent);
-      expect(labels).toEqual(["Rules", "Accounts", "Tax Rules"]);
+      expect(labels).toEqual(["Rules", "Vendors", "Accounts", "Tax Rules"]);
     });
 
     it("asks for confirmation in the Settings window when Re-run… is clicked", async () => {

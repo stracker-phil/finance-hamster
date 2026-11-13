@@ -82,6 +82,5 @@
 .first-run__step { font-size: 12px; font-weight: 600; color: var(--text-muted); }
 .first-run .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
 
-.document-page { position: absolute; inset: 0; display: flex; padding: 16px 20px 20px; }
 .pdf-preview { flex: 1; min-width: 0; position: relative; border-radius: 8px; background: var(--fill-subtle); }
 .pdf-preview__error { position: absolute; inset: 0; display: grid; place-items: center; color: var(--text-muted); font-size: 13px; }

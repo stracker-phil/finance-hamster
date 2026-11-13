@@ -6,10 +6,12 @@ vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await impo
 import { api } from "../api";
 import { account } from "../test/accounts";
 import { renderWithQuery } from "../test/renderWithQuery";
+import { documentGroup, documentRow, documentView, lineChoice, vendorView, vendorsView } from "../test/documents";
 import { ruleView, rulesView } from "../test/lineRules";
 import { reviewLine, reviewQueue } from "../test/review";
 import { accountCoverage, accountLines, coverage, lineView, statementGroup } from "../test/statements";
 import { useAccounts } from "./accounts";
+import { useDocument, useDocumentLineOptions, useDocuments, useVendors } from "./documents";
 import { useLineRules } from "./lineRules";
 import { useReviewQueue } from "./review";
 import { useAccountLines, useCoverage } from "./statements";
@@ -202,6 +204,60 @@ describe("useEvents", () => {
       await emitDataChanged(["documents"]);
 
       expect(screen.getByText("Rules: Bank text contains ALPENMARKT")).toBeTruthy();
+    });
+  });
+
+  describe("documents", () => {
+    function DocumentsProbe() {
+      useEvents();
+      const { data: doc } = useDocument("doc-1");
+      const { data: groups } = useDocuments("");
+      const { data: vendors } = useVendors();
+      const { data: options } = useDocumentLineOptions("doc-1", "", true);
+      return (
+        <>
+          <p>Document: {doc?.title}</p>
+          <p>List: {groups?.flatMap((g) => g.documents.map((d) => d.title)).join(", ")}</p>
+          <p>Vendors: {vendors?.vendors.map((v) => v.name).join(", ")}</p>
+          <p>Options: {options?.map((o) => o.title).join(", ")}</p>
+        </>
+      );
+    }
+
+    const shown = {
+      document: ["Document: Old Invoice", "Document: New Invoice"],
+      list: ["List: Old Invoice", "List: New Invoice"],
+      vendors: ["Vendors: Old Vendor", "Vendors: New Vendor"],
+      options: ["Options: Old Line", "Options: New Line"],
+    } as const;
+
+    beforeEach(() => {
+      mocked.documentView.mockResolvedValue(documentView({ title: "Old Invoice" }));
+      mocked.documentsList.mockResolvedValue([documentGroup({ documents: [documentRow({ title: "Old Invoice" })] })]);
+      mocked.vendorsView.mockResolvedValue(vendorsView({ vendors: [vendorView({ name: "Old Vendor" })] }));
+      mocked.documentLineOptions.mockResolvedValue([lineChoice({ title: "Old Line" })]);
+    });
+
+    it.each([
+      ["documents", ["document", "list", "vendors", "options"]],
+      ["vendors", ["document", "list", "vendors"]],
+      ["document_links", ["document", "list", "options"]],
+      ["tax_years", ["document", "list", "vendors"]],
+      ["transactions", ["options"]],
+    ] as const)("when data_changed names the %s table, refetches %j and keeps the rest", async (table, refreshed) => {
+      renderWithQuery(<DocumentsProbe />);
+      for (const [old] of Object.values(shown)) await screen.findByText(old);
+      mocked.documentView.mockResolvedValue(documentView({ title: "New Invoice" }));
+      mocked.documentsList.mockResolvedValue([documentGroup({ documents: [documentRow({ title: "New Invoice" })] })]);
+      mocked.vendorsView.mockResolvedValue(vendorsView({ vendors: [vendorView({ name: "New Vendor" })] }));
+      mocked.documentLineOptions.mockResolvedValue([lineChoice({ title: "New Line" })]);
+
+      await emitDataChanged([table]);
+
+      for (const key of refreshed) expect(await screen.findByText(shown[key][1])).toBeTruthy();
+      for (const key of Object.keys(shown) as (keyof typeof shown)[]) {
+        if (!(refreshed as readonly string[]).includes(key)) expect(screen.getByText(shown[key][0])).toBeTruthy();
+      }
     });
   });
 

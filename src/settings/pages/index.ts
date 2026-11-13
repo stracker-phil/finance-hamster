@@ -7,6 +7,7 @@ import { RulesPage } from "./RulesPage";
 import { ShortcutsPage } from "./ShortcutsPage";
 import { StatusPage } from "./StatusPage";
 import { TaxRulesPage } from "./TaxRulesPage";
+import { VendorsPage } from "./VendorsPage";
 
 /** Every Settings page in nav order (mockup Settings). */
 export const SETTINGS_PAGES: SettingsPage[] = [
@@ -20,6 +21,18 @@ export const SETTINGS_PAGES: SettingsPage[] = [
     rows: [
       { id: "add-rule", title: "New rule", keywords: ["ignore", "assign", "item", "bank text"] },
       { id: "rerun", title: "Apply rules again", keywords: ["re-run", "rerun"] },
+    ],
+  },
+  {
+    id: "vendors",
+    group: "Finance",
+    label: "Vendors",
+    icon: "vendors",
+    intro: "Vendors are suggested while you type on a document. Typing a new name there adds it here.",
+    Body: VendorsPage,
+    rows: [
+      { id: "vendor-list", title: "Vendors", keywords: ["rename", "merge", "default item"] },
+      { id: "vendor-rules", title: "Rules for vendors", keywords: ["delete"] },
     ],
   },
   {

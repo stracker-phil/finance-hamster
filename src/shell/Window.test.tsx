@@ -10,7 +10,7 @@ import { HOME } from "../state/route";
 import { useStore } from "../state/store";
 import { account } from "../test/accounts";
 import { renderWithQuery as render } from "../test/renderWithQuery";
-import { addPreview } from "../test/documents";
+import { addPreview, documentView } from "../test/documents";
 import { accountLines, importPreview } from "../test/statements";
 import { Window } from "./Window";
 
@@ -243,6 +243,25 @@ describe("account page", () => {
 
     expect(await screen.findByRole("region", { name: "Nr. 010/2026" })).toBeTruthy();
     expect(mocked.accountLines).toHaveBeenCalledWith("acc-2");
+  });
+});
+
+describe("document page", () => {
+  beforeEach(() => {
+    useStore.setState({ route: { page: "document", documentId: "doc-1", year: null } });
+    mocked.documentView.mockResolvedValue(documentView());
+  });
+
+  it("titles the header with the document's title", async () => {
+    render(<Window />);
+
+    await waitFor(() => expect(title()).toBe("Demo Cloud Ltd · DEM-2026-1109"));
+  });
+
+  it("shows the document's form", async () => {
+    render(<Window />);
+
+    expect(await screen.findByText("Every required fact is set")).toBeTruthy();
   });
 });
 

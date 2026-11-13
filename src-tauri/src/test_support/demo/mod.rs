@@ -8,6 +8,7 @@ use crate::accounts::{self, AccountRow};
 use crate::db::{Change, Db, Op, Source};
 use crate::error::AppResult;
 
+mod documents;
 mod statements;
 
 type Seeder = fn() -> AppResult<Option<Op>>;
@@ -89,6 +90,7 @@ pub fn seed_if_empty(db: &Db, config_dir: &Path, today: chrono::NaiveDate) -> Ap
         }
     }
     count += statements::seed(db, config_dir, today)?;
+    count += documents::seed(db, config_dir, today)?;
     Ok(count)
 }
 
@@ -172,11 +174,14 @@ mod tests {
     }
 
     #[test]
-    fn seeding_an_empty_database_writes_the_accounts_op_the_rules_op_and_one_op_per_demo_statement()
-    {
+    fn seeding_writes_the_accounts_the_rules_each_statement_the_tax_year_each_invoice_and_the_file_move()
+     {
         let dir = temp_config_dir();
         let db = Db::open(dir.path()).unwrap();
-        assert_eq!(seed_if_empty(&db, dir.path(), today()).unwrap(), 2 + 24);
+        assert_eq!(
+            seed_if_empty(&db, dir.path(), today()).unwrap(),
+            2 + 24 + 1 + 3 + 1
+        );
 
         let accounts = accounts::list(&db).unwrap();
         let shown: Vec<(&str, &str, bool)> = accounts
@@ -285,6 +290,85 @@ mod tests {
         assert_eq!(newest.to_date, "2026-11-10");
         assert_eq!(newest.file, "statements/2026/private-011.pdf");
         assert!(dir.path().join(&newest.file).exists());
+    }
+
+    #[test]
+    fn the_seed_has_three_invoices_two_linked_and_filed_by_date_and_one_undated_in_the_inbox() {
+        let dir = temp_config_dir();
+        let db = Db::open(dir.path()).unwrap();
+        seed_if_empty(&db, dir.path(), today()).unwrap();
+        let vendors = db.read(crate::documents::store::vendors).unwrap();
+
+        let mut shown: Vec<(String, Option<String>, String, Option<String>)> = db
+            .read(crate::documents::store::documents)
+            .unwrap()
+            .into_iter()
+            .map(|d| {
+                let vendor = vendors
+                    .iter()
+                    .find(|v| Some(&v.id) == d.vendor_id.as_ref())
+                    .map(|v| v.name.clone())
+                    .unwrap_or_default();
+                (vendor, d.pay_date, d.file, d.item_key)
+            })
+            .collect();
+        shown.sort();
+
+        assert_eq!(
+            shown,
+            vec![
+                (
+                    "Buchhandlung Seitenweise".to_string(),
+                    Some("2026-10-14".to_string()),
+                    "docs/2026/2026-10-14-buchhandlung-seitenweise.pdf".to_string(),
+                    Some("literature".to_string()),
+                ),
+                (
+                    "Lumen AI".to_string(),
+                    Some("2026-11-10".to_string()),
+                    "docs/2026/2026-11-10-lumen-ai.pdf".to_string(),
+                    Some("digital-equipment".to_string()),
+                ),
+                (
+                    "Nordbook".to_string(),
+                    None,
+                    "docs/inbox/nordbook-air-14.pdf".to_string(),
+                    None,
+                ),
+            ]
+        );
+        for (_, _, file, _) in &shown {
+            assert!(dir.path().join(file).exists(), "{file}");
+        }
+        assert!(
+            !dir.path()
+                .join("docs/inbox/lumen-invoice-LUM-2026-1110.pdf")
+                .exists()
+        );
+        assert_eq!(db.read(crate::documents::store::links).unwrap().len(), 2);
+    }
+
+    #[test]
+    fn the_seed_installs_the_rules_folder_and_starts_the_current_year_from_it() {
+        let dir = temp_config_dir();
+        let db = Db::open(dir.path()).unwrap();
+        seed_if_empty(&db, dir.path(), today()).unwrap();
+
+        let years: Vec<i32> = crate::taxyears::list(&db)
+            .unwrap()
+            .into_iter()
+            .map(|y| y.year)
+            .collect();
+        let items: Vec<String> = crate::rules::items(&db)
+            .unwrap()
+            .into_iter()
+            .map(|i| i.key)
+            .collect();
+
+        assert!(dir.path().join("rules").is_dir());
+        assert_eq!(years.first(), Some(&2026));
+        assert!(items.contains(&"literature".to_string()));
+        assert!(items.contains(&"digital-equipment".to_string()));
     }
 
     #[test]

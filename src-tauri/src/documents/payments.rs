@@ -114,3 +114,36 @@ pub fn line_choice(
         amount: format_signed(&Money::eur(t.cents), format),
     }
 }
+
+/// Debit lines whose text contains `query`, newest first, leaving out lines already linked to a document.
+pub(super) fn search(db: &Db, query: &str) -> AppResult<Vec<TransactionRow>> {
+    const SHOWN: usize = 20;
+    let linked: Vec<String> = db
+        .read(store::links)?
+        .into_iter()
+        .map(|l| l.transaction_id)
+        .collect();
+    let needle = query.trim().to_uppercase();
+    let mut lines: Vec<TransactionRow> = db
+        .read(statements::all_transactions)?
+        .into_iter()
+        .filter(|t| t.cents < 0 && !linked.contains(&t.id))
+        .filter(|t| {
+            format!("{} {} {}", transaction_title(t), t.text, t.extra)
+                .to_uppercase()
+                .contains(&needle)
+        })
+        .collect();
+    lines.reverse();
+    lines.truncate(SHOWN);
+    Ok(lines)
+}
+
+/// Account names by id, for line details.
+pub fn account_names(db: &Db) -> AppResult<HashMap<String, String>> {
+    Ok(db
+        .read(crate::accounts::rows)?
+        .into_iter()
+        .map(|a| (a.id, a.name))
+        .collect())
+}

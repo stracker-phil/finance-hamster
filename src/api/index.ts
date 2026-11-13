@@ -1,7 +1,7 @@
 import { getName, getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { Account, AccountEdit, AccountLines, Action, AddInput, AddPreview, Estimate, Coverage, ReviewQueue, RuleForm, RulesView, Frame, ImportPreview, PdfSource, AppError, AppInfo, CommandInfo, ErrorKind, EventName, EventPayloads, Imported, LaunchEvent, NewAccount, ReloadPreview, RulesFile, Settings, SettingsPatch, TaxYear } from "./types";
+import type { Account, AccountEdit, AccountLines, Action, AddInput, AddPreview, DocumentEdit, DocumentGroup, DocumentView, VendorChange, VendorsView, Estimate, LineChoice, Coverage, ReviewQueue, RuleForm, RulesView, Frame, ImportPreview, PdfSource, AppError, AppInfo, CommandInfo, ErrorKind, EventName, EventPayloads, Imported, LaunchEvent, NewAccount, ReloadPreview, RulesFile, Settings, SettingsPatch, TaxYear } from "./types";
 
 export * from "./types";
 
@@ -57,6 +57,14 @@ export const api = {
   documentAddCommit: (input: AddInput) => invoke<string>("document_add_commit", { input }),
   documentAddCancel: (token: string) => invoke<void>("document_add_cancel", { token }),
   /** What a bank line counts as with an item; null without a line. */
+  documentView: (id: string) => invoke<DocumentView>("document_view", { id }),
+  /** Changes one field of a draft; the label of the change, or null when nothing changed. */
+  documentEdit: (id: string, change: DocumentEdit) => invoke<string | null>("document_edit", { id, change }),
+  documentLineOptions: (id: string, query: string) => invoke<LineChoice[]>("document_line_options", { id, query }),
+  documentsList: (query: string) => invoke<DocumentGroup[]>("documents_list", { query }),
+  vendorsView: () => invoke<VendorsView>("vendors_view"),
+  /** The label of the change. */
+  vendorChange: (id: string, change: VendorChange) => invoke<string>("vendor_change", { id, change }),
   documentEstimate: (lineId: string | null, itemKey: string | null) => invoke<Estimate | null>("document_estimate", { lineId, itemKey }),
   /** Decides a line by hand; `always` also adds a rule for its key. The label of the change. */
   reviewDecide: (lineId: string, action: Action, itemKey: string | null, always: boolean) => invoke<string>("review_decide", { lineId, action, itemKey, always }),

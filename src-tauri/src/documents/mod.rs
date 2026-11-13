@@ -4,10 +4,14 @@
 pub mod add;
 pub mod amounts;
 pub mod commands;
+pub mod edit;
 pub mod files;
 pub mod guess;
+pub mod list;
 pub mod payments;
 pub mod store;
+pub mod vendors;
+pub mod view;
 
 #[cfg(test)]
 mod tests;

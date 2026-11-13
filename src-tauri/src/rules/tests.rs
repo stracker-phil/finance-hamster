@@ -299,6 +299,44 @@ fn items_list_the_visible_items_of_the_open_year_with_their_kz() {
 }
 
 #[test]
+fn a_year_with_a_row_applies_its_own_rules_and_other_years_the_newest_open_ones() {
+    let (_dir, db) = setup();
+    add_year(&db, 2025, YearState::Closed, "Alt");
+
+    for (year, expected) in [
+        (2025, "Alt"),
+        (2026, "Fachliteratur"),
+        (2024, "Fachliteratur"),
+        (2030, "Fachliteratur"),
+    ] {
+        let rules = super::ruleset_for_year(&db, year).unwrap().unwrap();
+        assert_eq!(rules.items[0].name, expected, "{year}");
+    }
+}
+
+#[test]
+fn there_are_no_rules_for_a_year_while_no_tax_year_exists() {
+    let (_dir, db) = open_with_accounts();
+
+    assert_eq!(super::ruleset_for_year(&db, 2026).unwrap(), None);
+}
+
+#[test]
+fn item_options_leave_out_hidden_items_and_label_by_kz_and_name() {
+    let ruleset: crate::taxrules::model::Ruleset =
+        serde_json::from_value(rules_json(2026, "Fachliteratur")).unwrap();
+
+    assert_eq!(
+        super::item_options(&ruleset),
+        vec![ItemOption {
+            key: "books".into(),
+            label: "KZ 720 · Fachliteratur".into(),
+            kz: "720".into(),
+        }]
+    );
+}
+
+#[test]
 fn there_is_no_ruleset_without_a_tax_year() {
     let (_dir, db) = open_with_accounts();
     assert_eq!(ruleset(&db).unwrap(), None);

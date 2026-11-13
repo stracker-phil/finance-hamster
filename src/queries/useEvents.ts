@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useQueryClient, type QueryClient, type QueryKey } from "@tanstack/react-query";
 import { api, type EventName } from "../api";
 import { ACCOUNTS_KEY } from "./accounts";
+import { DOCUMENT_KEY, DOCUMENT_LINES_KEY, DOCUMENTS_KEY, VENDORS_KEY } from "./documents";
 import { LINE_RULES_KEY } from "./lineRules";
 import { REVIEW_KEY } from "./review";
 import { SETTINGS_KEY } from "./settings";
@@ -17,10 +18,13 @@ export const INVALIDATIONS: Partial<Record<EventName, QueryKey[]>> = {
 export const TABLE_KEYS: Record<string, QueryKey[]> = {
   accounts: [ACCOUNTS_KEY, COVERAGE_KEY, ACCOUNT_LINES_KEY, LINE_RULES_KEY, REVIEW_KEY],
   statements: [COVERAGE_KEY, ACCOUNT_LINES_KEY],
-  transactions: [ACCOUNT_LINES_KEY, LINE_RULES_KEY, COVERAGE_KEY, REVIEW_KEY],
+  transactions: [ACCOUNT_LINES_KEY, LINE_RULES_KEY, COVERAGE_KEY, REVIEW_KEY, DOCUMENT_LINES_KEY],
   rules: [LINE_RULES_KEY],
   decisions: [LINE_RULES_KEY, COVERAGE_KEY, ACCOUNT_LINES_KEY, REVIEW_KEY],
-  tax_years: [TAX_YEARS_KEY, RULES_KEY, LINE_RULES_KEY, REVIEW_KEY, ACCOUNT_LINES_KEY],
+  documents: [DOCUMENT_KEY, DOCUMENT_LINES_KEY, DOCUMENTS_KEY, VENDORS_KEY],
+  vendors: [DOCUMENT_KEY, DOCUMENTS_KEY, VENDORS_KEY],
+  document_links: [DOCUMENT_KEY, DOCUMENT_LINES_KEY, DOCUMENTS_KEY],
+  tax_years: [TAX_YEARS_KEY, RULES_KEY, LINE_RULES_KEY, REVIEW_KEY, ACCOUNT_LINES_KEY, DOCUMENT_KEY, DOCUMENTS_KEY, VENDORS_KEY],
 };
 
 function invalidate(client: QueryClient, keys: QueryKey[]) {

@@ -6,6 +6,7 @@ import { CommandPalette } from "../palette/CommandPalette";
 import { FirstRun } from "../pages/FirstRun";
 import { PageBody } from "../pages/PageBody";
 import { useAccounts } from "../queries/accounts";
+import { useDocument } from "../queries/documents";
 import { useTaxYears } from "../queries/taxYears";
 import { AddDocumentSheet } from "../documents/AddDocumentSheet";
 import { ImportSheet } from "../statements/ImportSheet";
@@ -22,6 +23,8 @@ export function Window() {
   const { data: years = [] } = useTaxYears();
   const importPreview = useStore((s) => s.importPreview);
   const addPreview = useStore((s) => s.addPreview);
+  const { data: openDocument } = useDocument(route.page === "document" ? route.documentId : "", route.page === "document");
+  const documentTitle = route.page === "document" ? openDocument?.title : undefined;
   // Keeps the first run's second step showing once its account exists.
   const [finishingFirstRun, setFinishingFirstRun] = useState(false);
   const importSheet = importPreview && <ImportSheet preview={importPreview} onImported={() => setFinishingFirstRun(false)} />;
@@ -35,7 +38,8 @@ export function Window() {
     );
   }
   const accountName = route.page === "account" ? accounts?.find((a) => a.id === route.accountId)?.name : undefined;
-  const title = accountName ? { ...titleFor(route), title: accountName } : titleFor(route);
+  const pageName = accountName ?? documentTitle;
+  const title = pageName ? { ...titleFor(route), title: pageName } : titleFor(route);
   return (
     <div className="window">
       <Sidebar years={years.map((y) => ({ year: y.year, closed: y.state === "closed" }))} />

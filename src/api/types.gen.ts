@@ -116,6 +116,73 @@ export type DataChanged = { tables: Array<string>, };
 
 export type DocState = "draft" | "finished" | "excluded";
 
+/**
+ * One field of the Document page.
+ */
+export type DocumentEdit = { "field": "payDate", value: string | null, } | { "field": "paid", value: string | null, } | { "field": "vendor", name: string, } | { "field": "item", key: string | null, } | { "field": "workShare", value: number, } | { "field": "note", text: string, } | { "field": "invoice", amount: string | null, currency: string, } | { "field": "link", line: string, } | { "field": "unlink", line: string, };
+
+export type DocumentGroup = { 
+/**
+ * `Tax year 2026` or `Inbox`.
+ */
+title: string, 
+/**
+ * None for the Inbox.
+ */
+year: number | null, 
+/**
+ * `3 documents`.
+ */
+count: string, 
+/**
+ * The sum of the group's ANV amounts.
+ */
+total: string, documents: Array<DocumentRowView>, };
+
+export type DocumentRowView = { id: string, title: string, 
+/**
+ * `10 Nov · KZ 720 Fachliteratur`.
+ */
+sub: string, state: DocState, 
+/**
+ * The ANV amount, empty while unknown.
+ */
+anv: string, };
+
+export type DocumentView = { id: string, title: string, state: DocState, 
+/**
+ * Relative to the data folder.
+ */
+file: string, 
+/**
+ * `YYYY-MM-DD`, for the date field.
+ */
+payDate: string | null, year: number | null, lines: Array<LineChoice>, 
+/**
+ * `€121.23`.
+ */
+paid: string | null, 
+/**
+ * The amount comes from the linked lines and can't be typed.
+ */
+paidFromLines: boolean, 
+/**
+ * The typed amount as the field shows it.
+ */
+paidText: string | null, vendor: string | null, vendors: Array<VendorOption>, 
+/**
+ * The payment year's items; empty until a payment date is set.
+ */
+items: Array<ItemOption>, itemKey: string | null, workShare: number, 
+/**
+ * Present once the amount paid is known.
+ */
+estimate: Estimate | null, note: string, invoiceAmount: string | null, invoiceCurrency: string, 
+/**
+ * The facts still missing before it can be finished, e.g. `payment date`.
+ */
+missing: Array<string>, };
+
 export type ErrorKind = "io" | "invalid_input" | "not_found" | "internal";
 
 export type Estimate = { workShare: number, 
@@ -373,5 +440,31 @@ count: string, lines: Array<LineView>, };
  * What the sidebar lists.
  */
 export type TaxYear = { year: number, state: YearState, ruleset: string, };
+
+/**
+ * One change to a vendor (Settings → Vendors); returns the label of the change.
+ */
+export type VendorChange = { "kind": "rename", name: string, } | { "kind": "defaultItem", key: string | null, } | { "kind": "mergeInto", into: string, } | { "kind": "delete" };
+
+/**
+ * A vendor the combo box suggests.
+ */
+export type VendorOption = { name: string, 
+/**
+ * `2 documents`.
+ */
+detail: string, };
+
+export type VendorView = { id: string, name: string, 
+/**
+ * `2 documents · KZ 169`.
+ */
+detail: string, defaultItemKey: string | null, 
+/**
+ * No document uses it.
+ */
+unused: boolean, };
+
+export type VendorsView = { vendors: Array<VendorView>, items: Array<ItemOption>, };
 
 export type YearState = "open" | "closed";

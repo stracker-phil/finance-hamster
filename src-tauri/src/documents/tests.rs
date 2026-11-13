@@ -8,9 +8,14 @@ use serde_json::json;
 use tempfile::TempDir;
 
 use super::add::{self, AddInput, AddPending, AddPreview};
-use super::payments::LineChoice;
+use super::amounts::Estimate;
+use super::edit::{self, DocumentEdit};
+use super::list::{DocumentGroup, DocumentRowView};
+use super::payments::{self, LineChoice};
 use super::store::{self, DocState, DocumentRow, LinkRow, VendorRow};
-use super::{files, title_of};
+use super::vendors::{self, VendorView, VendorsView};
+use super::view::{self, DocumentView, VendorOption};
+use super::{files, list, title_of};
 use crate::date::DateOrder;
 use crate::db::{Change, Db, Op, Source, Written};
 use crate::error::{AppError, AppResult};
@@ -1108,4 +1113,1549 @@ fn undoing_an_add_removes_its_rows_and_keeps_the_file() {
     assert_eq!(count(&db, store::VENDORS), 0);
     assert_eq!(count(&db, store::LINKS), 0);
     assert!(exists(dir.path(), "docs/inbox/pixelforge-nov.pdf"));
+}
+
+const FORMAT: NumberFormat = NumberFormat::DotDecimal;
+const ORDER: DateOrder = DateOrder::DayFirst;
+
+fn draft(db: &Db, id: &str, patch: impl FnOnce(&mut DocumentRow)) -> DocumentRow {
+    let mut doc = blank_document(id);
+    patch(&mut doc);
+    insert(db, store::DOCUMENTS, &doc);
+    doc
+}
+
+fn link(db: &Db, document_id: &str, line_id: &str) {
+    insert(
+        db,
+        store::LINKS,
+        &LinkRow {
+            id: format!("link-{document_id}-{line_id}"),
+            document_id: document_id.into(),
+            transaction_id: line_id.into(),
+            created_at: 1,
+        },
+    );
+}
+
+fn page(db: &Db, id: &str) -> DocumentView {
+    view::document(db, id, FORMAT, ORDER).unwrap()
+}
+
+fn apply(db: &Db, id: &str, change: DocumentEdit) -> AppResult<Option<Written>> {
+    edit::edit(db, id, &change, NOW, Source::Ui)
+}
+
+fn rejected(result: AppResult<Option<Written>>) -> (String, String) {
+    match result {
+        Err(AppError::InvalidField { field, message }) => (field, message),
+        other => panic!("expected an invalid field, got {other:?}"),
+    }
+}
+
+fn two_october_lines(db: &Db) {
+    add_lines(
+        db,
+        &[
+            debit("l-1", "2026-10-14", -4_690, "Lastschrift SEITENWEISE"),
+            debit("l-2", "2026-10-20", -1_000, "Lastschrift SEITENWEISE"),
+        ],
+    );
+}
+
+fn items_of_setup() -> Vec<ItemOption> {
+    vec![
+        ItemOption {
+            key: "books".into(),
+            label: "KZ 720 · Books".into(),
+            kz: "720".into(),
+        },
+        ItemOption {
+            key: "phone".into(),
+            label: "KZ 721 · Phone".into(),
+            kz: "721".into(),
+        },
+    ]
+}
+
+fn pay_date_edit(value: &str) -> DocumentEdit {
+    DocumentEdit::PayDate {
+        value: Some(value.into()),
+    }
+}
+
+#[test]
+fn a_document_that_does_not_exist_is_not_found_by_page_options_and_edit() {
+    let (_dir, db) = setup();
+
+    assert!(matches!(
+        view::document(&db, "nope", FORMAT, ORDER),
+        Err(AppError::NotFound(_))
+    ));
+    assert!(matches!(
+        view::line_options(&db, "nope", "", FORMAT, ORDER),
+        Err(AppError::NotFound(_))
+    ));
+    assert!(matches!(
+        apply(&db, "nope", DocumentEdit::Note { text: "x".into() }),
+        Err(AppError::NotFound(_))
+    ));
+}
+
+#[test]
+fn the_page_of_a_dated_document_shows_its_lines_amount_vendor_items_and_estimate() {
+    let (_dir, db) = setup();
+    with_pixelforge_vendor(&db);
+    insert(
+        &db,
+        store::VENDORS,
+        &vendor_row("vendor-2", "Nordbook", None),
+    );
+    two_october_lines(&db);
+    draft(&db, "doc-a", |d| {
+        d.vendor_id = Some("vendor-1".into());
+        d.pay_date = Some("2026-10-14".into());
+        d.item_key = Some("phone".into());
+        d.work_share = 60;
+        d.note = "Seminar".into();
+        d.invoice_cents = Some(4_690);
+    });
+    link(&db, "doc-a", "l-2");
+    link(&db, "doc-a", "l-1");
+
+    assert_eq!(
+        page(&db, "doc-a"),
+        DocumentView {
+            id: "doc-a".into(),
+            title: "Pixelforge Ltd. invoice".into(),
+            state: DocState::Draft,
+            file: "docs/inbox/doc-a.pdf".into(),
+            pay_date: Some("2026-10-14".into()),
+            year: Some(2026),
+            lines: vec![
+                LineChoice {
+                    id: "l-1".into(),
+                    title: "Lastschrift SEITENWEISE".into(),
+                    detail: "Private · Wed, 14 Oct".into(),
+                    amount: "\u{2212}€46.90".into(),
+                },
+                LineChoice {
+                    id: "l-2".into(),
+                    title: "Lastschrift SEITENWEISE".into(),
+                    detail: "Private · Tue, 20 Oct".into(),
+                    amount: "\u{2212}€10.00".into(),
+                },
+            ],
+            paid: Some("€56.90".into()),
+            paid_from_lines: true,
+            paid_text: None,
+            vendor: Some("Pixelforge Ltd.".into()),
+            vendors: vec![
+                VendorOption {
+                    name: "Nordbook".into(),
+                    detail: "0 documents".into()
+                },
+                VendorOption {
+                    name: "Pixelforge Ltd.".into(),
+                    detail: "1 document".into()
+                },
+            ],
+            items: items_of_setup(),
+            item_key: Some("phone".into()),
+            work_share: 60,
+            estimate: Some(Estimate {
+                work_share: 60,
+                share_hint: Some("from the item: 40 % private".into()),
+                anv: "€34.14".into(),
+                formula: "€56.90 × 60 %".into(),
+                gwg: Some(
+                    "€34.14 is below the GWG limit (€1,000.00): counts fully in 2026.".into()
+                ),
+            }),
+            note: "Seminar".into(),
+            invoice_amount: Some("46.90".into()),
+            invoice_currency: "EUR".into(),
+            missing: vec![],
+        }
+    );
+}
+
+#[test]
+fn an_empty_document_lists_every_missing_fact_in_order_and_has_no_items_or_estimate() {
+    let (_dir, db) = setup();
+    draft(&db, "doc-b", |_| {});
+
+    let page = page(&db, "doc-b");
+
+    assert_eq!(
+        page.missing,
+        ["payment date", "amount paid", "vendor", "item"]
+    );
+    assert_eq!(page.title, "doc-b");
+    assert_eq!(page.year, None);
+    assert_eq!(page.items, vec![]);
+    assert_eq!(page.estimate, None);
+    assert_eq!(page.paid, None);
+    assert!(!page.paid_from_lines);
+    assert_eq!(page.invoice_amount, None);
+    assert_eq!(page.invoice_currency, "EUR");
+}
+
+#[test]
+fn each_fact_leaves_the_missing_list_once_it_is_set() {
+    let (_dir, db) = setup();
+    with_pixelforge_vendor(&db);
+
+    for (patch, expected) in [
+        (
+            (Some("2026-10-14"), None, None, None),
+            vec!["amount paid", "vendor", "item"],
+        ),
+        (
+            (None, Some(4_690), None, None),
+            vec!["payment date", "vendor", "item"],
+        ),
+        (
+            (None, None, Some("vendor-1"), None),
+            vec!["payment date", "amount paid", "item"],
+        ),
+        (
+            (None, None, None, Some("books")),
+            vec!["payment date", "amount paid", "vendor"],
+        ),
+    ] {
+        let id = format!("doc-{expected:?}");
+        draft(&db, &id, |d| {
+            d.pay_date = patch.0.map(String::from);
+            d.paid_cents = patch.1;
+            d.vendor_id = patch.2.map(String::from);
+            d.item_key = patch.3.map(String::from);
+        });
+
+        assert_eq!(page(&db, &id).missing, expected, "{patch:?}");
+    }
+}
+
+#[test]
+fn a_typed_amount_is_the_paid_amount_without_lines_and_reads_in_the_number_format() {
+    let (_dir, db) = setup();
+    draft(&db, "doc-c", |d| d.paid_cents = Some(4_690));
+
+    let dot = page(&db, "doc-c");
+    let comma = view::document(&db, "doc-c", NumberFormat::CommaDecimal, ORDER).unwrap();
+
+    assert_eq!(dot.paid.as_deref(), Some("€46.90"));
+    assert_eq!(dot.paid_text.as_deref(), Some("46.90"));
+    assert!(!dot.paid_from_lines);
+    assert_eq!(comma.paid.as_deref(), Some("€46,90"));
+    assert_eq!(comma.paid_text.as_deref(), Some("46,90"));
+    assert!(dot.estimate.is_some());
+}
+
+#[test]
+fn linked_lines_override_a_typed_amount_as_the_paid_amount() {
+    let (_dir, db) = setup();
+    two_october_lines(&db);
+    let doc = draft(&db, "doc-d", |d| d.paid_cents = Some(1));
+    link(&db, "doc-d", "l-1");
+    let lines = view::linked_lines(&db, "doc-d").unwrap();
+
+    assert_eq!(view::paid_cents(&doc, &lines), Some(4_690));
+    assert_eq!(view::paid_cents(&doc, &[]), Some(1));
+    assert_eq!(
+        view::paid_cents(
+            &DocumentRow {
+                paid_cents: None,
+                ..doc
+            },
+            &[]
+        ),
+        None
+    );
+}
+
+#[test]
+fn an_invoice_in_a_foreign_currency_shows_its_code_and_plain_amount() {
+    let (_dir, db) = setup();
+    draft(&db, "doc-e", |d| {
+        d.invoice_cents = Some(12_900);
+        d.invoice_currency = Some("USD".into());
+    });
+
+    let page = page(&db, "doc-e");
+
+    assert_eq!(page.invoice_amount.as_deref(), Some("129.00"));
+    assert_eq!(page.invoice_currency, "USD");
+}
+
+#[test]
+fn the_items_come_from_the_payment_years_rules_or_else_the_newest_open_year() {
+    let (_dir, db) = setup();
+    let mut rules = minimal_rules(2025);
+    set(&mut rules, "/items/0/name", json!("Old Books"));
+    insert(
+        &db,
+        taxyears::TABLE,
+        &TaxYearRow::new(2025, "2025 v1".into(), rules_text(&rules), 1),
+    );
+    for (id, date) in [("in-2025", "2025-06-01"), ("in-2024", "2024-06-01")] {
+        draft(&db, id, |d| d.pay_date = Some(date.into()));
+    }
+
+    assert_eq!(
+        page(&db, "in-2025").items,
+        vec![ItemOption {
+            key: "books".into(),
+            label: "KZ 720 · Old Books".into(),
+            kz: "720".into(),
+        }]
+    );
+    assert_eq!(page(&db, "in-2024").items, items_of_setup());
+}
+
+#[test]
+fn the_vendor_choices_count_their_documents() {
+    let (_dir, db) = setup();
+    with_pixelforge_vendor(&db);
+    insert(
+        &db,
+        store::VENDORS,
+        &vendor_row("vendor-2", "Nordbook", None),
+    );
+    for id in ["one", "two"] {
+        draft(&db, id, |d| d.vendor_id = Some("vendor-1".into()));
+    }
+
+    assert_eq!(
+        page(&db, "one").vendors,
+        vec![
+            VendorOption {
+                name: "Nordbook".into(),
+                detail: "0 documents".into()
+            },
+            VendorOption {
+                name: "Pixelforge Ltd.".into(),
+                detail: "2 documents".into()
+            },
+        ]
+    );
+}
+
+#[test]
+fn a_document_page_travels_in_camel_case() {
+    let (_dir, db) = setup();
+    draft(&db, "doc-f", |_| {});
+
+    assert_eq!(
+        serde_json::to_value(page(&db, "doc-f")).unwrap(),
+        json!({
+            "id": "doc-f",
+            "title": "doc-f",
+            "state": "draft",
+            "file": "docs/inbox/doc-f.pdf",
+            "payDate": null,
+            "year": null,
+            "lines": [],
+            "paid": null,
+            "paidFromLines": false,
+            "paidText": null,
+            "vendor": null,
+            "vendors": [],
+            "items": [],
+            "itemKey": null,
+            "workShare": 100,
+            "estimate": null,
+            "note": "",
+            "invoiceAmount": null,
+            "invoiceCurrency": "EUR",
+            "missing": ["payment date", "amount paid", "vendor", "item"]
+        })
+    );
+}
+
+#[test]
+fn without_a_query_the_line_options_match_the_documents_invoice_facts() {
+    let (_dir, db) = setup();
+    with_pixelforge_vendor(&db);
+    add_lines(
+        &db,
+        &[
+            dollar_debit("l-fx", "2026-11-10", -11_871),
+            debit("l-other", "2026-11-10", -500, "Lastschrift OFFICE SUPPLIES"),
+        ],
+    );
+    draft(&db, "doc-a", |d| {
+        d.vendor_id = Some("vendor-1".into());
+        d.invoice_cents = Some(12_900);
+        d.invoice_currency = Some("USD".into());
+        d.invoice_date = Some("2026-11-09".into());
+    });
+
+    let options = view::line_options(&db, "doc-a", "  ", FORMAT, ORDER).unwrap();
+
+    assert_eq!(
+        options,
+        vec![LineChoice {
+            id: "l-fx".into(),
+            title: "PIXELFORGE LTD".into(),
+            detail: "Private · Tue, 10 Nov · USD 129.00".into(),
+            amount: "\u{2212}€118.71".into(),
+        }]
+    );
+}
+
+#[test]
+fn without_an_invoice_the_line_options_use_the_paid_amount_and_payment_date() {
+    let (_dir, db) = setup();
+    add_lines(
+        &db,
+        &[
+            debit("near", "2026-11-12", -12_000, "Lastschrift SHOP A"),
+            debit("far", "2026-11-30", -12_000, "Lastschrift SHOP B"),
+            debit("other", "2026-11-10", -11_000, "Lastschrift SHOP C"),
+        ],
+    );
+    draft(&db, "doc-a", |d| {
+        d.paid_cents = Some(12_000);
+        d.pay_date = Some("2026-11-10".into());
+    });
+
+    let options = view::line_options(&db, "doc-a", "", FORMAT, ORDER).unwrap();
+
+    let ids: Vec<&str> = options.iter().map(|o| o.id.as_str()).collect();
+    assert_eq!(ids, ["near"]);
+}
+
+#[test]
+fn a_query_searches_debit_lines_by_text_newest_first_without_linked_ones() {
+    let (_dir, db) = setup();
+    add_lines(
+        &db,
+        &[
+            debit("old", "2026-11-01", -300, "Lastschrift CAFE ALPEN"),
+            debit("new", "2026-11-05", -400, "Lastschrift CAFE ALPEN"),
+            debit("credit", "2026-11-06", 500, "Gutschrift CAFE ALPEN"),
+            debit("taken", "2026-11-07", -600, "Lastschrift CAFE ALPEN"),
+            debit("miss", "2026-11-08", -700, "Lastschrift SHOP"),
+        ],
+    );
+    draft(&db, "doc-other", |_| {});
+    link(&db, "doc-other", "taken");
+    draft(&db, "doc-a", |_| {});
+
+    let options = view::line_options(&db, "doc-a", " cafe ", FORMAT, ORDER).unwrap();
+
+    let ids: Vec<&str> = options.iter().map(|o| o.id.as_str()).collect();
+    assert_eq!(ids, ["new", "old"]);
+}
+
+#[test]
+fn a_search_shows_at_most_twenty_lines_and_reads_the_detail_lines_too() {
+    let (_dir, db) = setup();
+    let mut lines: Vec<TransactionRow> = (1..=25)
+        .map(|day| {
+            debit(
+                &format!("shop-{day:02}"),
+                &format!("2026-11-{day:02}"),
+                -100,
+                "Lastschrift SHOP",
+            )
+        })
+        .collect();
+    lines.push(TransactionRow {
+        extra: r#"["Ref ABC123"]"#.into(),
+        ..debit("ref", "2026-10-01", -100, "Lastschrift")
+    });
+    add_lines(&db, &lines);
+
+    let shown = payments::search(&db, "shop").unwrap();
+    let by_detail = payments::search(&db, "abc123").unwrap();
+
+    assert_eq!(shown.len(), 20);
+    assert_eq!(shown[0].id, "shop-25");
+    assert_eq!(shown[19].id, "shop-06");
+    assert_eq!(by_detail.len(), 1);
+    assert_eq!(by_detail[0].id, "ref");
+}
+
+#[test]
+fn account_names_are_listed_by_account_id() {
+    let (_dir, db) = setup();
+
+    assert_eq!(
+        payments::account_names(&db).unwrap(),
+        std::collections::HashMap::from([
+            ("account-1".to_string(), "Private".to_string()),
+            ("account-2".to_string(), "Household".to_string()),
+            ("account-3".to_string(), "Business".to_string()),
+        ])
+    );
+}
+
+#[test]
+fn only_a_draft_can_be_edited_and_the_refusal_says_what_to_do() {
+    for (state, message) in [
+        (
+            DocState::Finished,
+            "This document is finished; unlock it to change it",
+        ),
+        (
+            DocState::Excluded,
+            "This document is excluded; restore it to change it",
+        ),
+    ] {
+        let (_dir, db) = setup();
+        draft(&db, "doc-a", |d| d.state = state);
+        let before = count(&db, "journal");
+
+        let result = apply(&db, "doc-a", DocumentEdit::Note { text: "x".into() });
+
+        match result {
+            Err(AppError::InvalidInput(text)) => assert_eq!(text, message),
+            other => panic!("expected a refusal, got {other:?}"),
+        }
+        assert_eq!(count(&db, "journal"), before, "{message}");
+        assert_eq!(document(&db, "doc-a").note, "", "{message}");
+    }
+}
+
+#[test]
+fn the_payment_date_is_stored_as_iso_and_a_blank_clears_it() {
+    for (typed, expected) in [
+        (Some("2026-10-14"), Some("2026-10-14")),
+        (Some("  2026-10-14 "), Some("2026-10-14")),
+        (Some(""), None),
+        (Some("   "), None),
+        (None, None),
+    ] {
+        let (_dir, db) = setup();
+        draft(&db, "doc-a", |d| d.pay_date = Some("2026-01-01".into()));
+
+        apply(
+            &db,
+            "doc-a",
+            DocumentEdit::PayDate {
+                value: typed.map(String::from),
+            },
+        )
+        .unwrap();
+
+        assert_eq!(
+            document(&db, "doc-a").pay_date.as_deref(),
+            expected,
+            "{typed:?}"
+        );
+    }
+}
+
+#[test]
+fn a_payment_date_that_is_no_date_is_refused() {
+    let (_dir, db) = setup();
+    draft(&db, "doc-a", |_| {});
+
+    for typed in ["next tuesday", "2026-13-40"] {
+        assert_eq!(
+            rejected(apply(&db, "doc-a", pay_date_edit(typed))),
+            ("document.payDate".into(), "This isn't a date".into()),
+            "{typed}"
+        );
+    }
+    assert_eq!(document(&db, "doc-a").pay_date, None);
+}
+
+#[test]
+fn the_amount_paid_is_typed_without_sign_and_a_blank_clears_it() {
+    for (typed, expected) in [
+        ("46.90", Some(4_690)),
+        ("-12.50", Some(1_250)),
+        ("€ 12", Some(1_200)),
+        ("", None),
+    ] {
+        let (_dir, db) = setup();
+        draft(&db, "doc-a", |d| d.paid_cents = Some(100));
+
+        apply(
+            &db,
+            "doc-a",
+            DocumentEdit::Paid {
+                value: Some(typed.into()),
+            },
+        )
+        .unwrap();
+
+        assert_eq!(document(&db, "doc-a").paid_cents, expected, "{typed:?}");
+    }
+}
+
+#[test]
+fn the_amount_paid_is_refused_while_lines_are_linked_or_when_it_is_no_amount() {
+    let (_dir, db) = setup();
+    two_october_lines(&db);
+    draft(&db, "linked", |_| {});
+    link(&db, "linked", "l-1");
+    draft(&db, "typed", |_| {});
+
+    assert_eq!(
+        rejected(apply(
+            &db,
+            "linked",
+            DocumentEdit::Paid {
+                value: Some("5".into())
+            }
+        )),
+        (
+            "document.paid".into(),
+            "The linked bank line is the amount paid".into()
+        )
+    );
+    assert_eq!(
+        rejected(apply(
+            &db,
+            "typed",
+            DocumentEdit::Paid {
+                value: Some("abc".into())
+            }
+        )),
+        ("document.paid".into(), "This isn't an amount".into())
+    );
+}
+
+#[test]
+fn a_new_vendor_name_creates_the_vendor_in_the_same_op_and_undo_removes_both() {
+    let (_dir, db) = setup();
+    draft(&db, "doc-a", |_| {});
+
+    let written = apply(
+        &db,
+        "doc-a",
+        DocumentEdit::Vendor {
+            name: "  Nordbook ".into(),
+        },
+    )
+    .unwrap()
+    .unwrap();
+
+    assert_eq!(written.label, "Edit doc-a");
+    let vendors = db.read(store::vendors).unwrap();
+    assert_eq!(
+        vendors,
+        vec![VendorRow {
+            id: vendors[0].id.clone(),
+            name: "Nordbook".into(),
+            default_item_key: None,
+            created_at: NOW,
+        }]
+    );
+    assert_eq!(
+        document(&db, "doc-a").vendor_id.as_deref(),
+        Some(vendors[0].id.as_str())
+    );
+
+    db.undo().unwrap();
+
+    assert_eq!(count(&db, store::VENDORS), 0);
+    assert_eq!(document(&db, "doc-a").vendor_id, None);
+}
+
+#[test]
+fn an_existing_vendor_is_reused_ignoring_case_and_the_edit_is_labelled_by_the_documents_title() {
+    let (_dir, db) = setup();
+    with_pixelforge_vendor(&db);
+    draft(&db, "doc-a", |_| {});
+
+    let first = apply(
+        &db,
+        "doc-a",
+        DocumentEdit::Vendor {
+            name: "PIXELFORGE LTD.".into(),
+        },
+    )
+    .unwrap()
+    .unwrap();
+    let second = apply(
+        &db,
+        "doc-a",
+        DocumentEdit::Vendor {
+            name: "Pixelforge Ltd.".into(),
+        },
+    )
+    .unwrap();
+
+    assert_eq!(first.label, "Edit doc-a");
+    assert_eq!(second, None);
+    assert_eq!(count(&db, store::VENDORS), 1);
+    assert_eq!(
+        document(&db, "doc-a").vendor_id.as_deref(),
+        Some("vendor-1")
+    );
+    let again = apply(&db, "doc-a", DocumentEdit::Note { text: "x".into() })
+        .unwrap()
+        .unwrap();
+    assert_eq!(again.label, "Edit Pixelforge Ltd. invoice");
+}
+
+#[test]
+fn a_blank_vendor_name_is_refused() {
+    let (_dir, db) = setup();
+    draft(&db, "doc-a", |_| {});
+
+    assert_eq!(
+        rejected(apply(
+            &db,
+            "doc-a",
+            DocumentEdit::Vendor { name: "  ".into() }
+        )),
+        ("document.vendor".into(), "Name the vendor".into())
+    );
+}
+
+#[test]
+fn choosing_an_item_sets_its_default_work_share_and_a_blank_clears_the_item() {
+    let (_dir, db) = setup();
+    draft(&db, "doc-a", |d| d.pay_date = Some("2026-10-14".into()));
+    let choose = |key: Option<&str>| DocumentEdit::Item {
+        key: key.map(String::from),
+    };
+
+    apply(&db, "doc-a", choose(Some("phone"))).unwrap();
+    let phone = document(&db, "doc-a");
+    apply(&db, "doc-a", choose(Some("books"))).unwrap();
+    let books = document(&db, "doc-a");
+    apply(&db, "doc-a", choose(Some(""))).unwrap();
+    let cleared = document(&db, "doc-a");
+
+    assert_eq!(
+        (phone.item_key.as_deref(), phone.work_share),
+        (Some("phone"), 60)
+    );
+    assert_eq!(
+        (books.item_key.as_deref(), books.work_share),
+        (Some("books"), 100)
+    );
+    assert_eq!(cleared.item_key, None);
+    assert_eq!(apply(&db, "doc-a", choose(None)).unwrap(), None);
+}
+
+#[test]
+fn an_item_needs_a_payment_date_and_must_be_one_of_the_years_items() {
+    let (_dir, db) = setup();
+    draft(&db, "undated", |_| {});
+    draft(&db, "dated", |d| d.pay_date = Some("2026-10-14".into()));
+    let choose = |key: &str| DocumentEdit::Item {
+        key: Some(key.into()),
+    };
+
+    assert_eq!(
+        rejected(apply(&db, "undated", choose("books"))),
+        ("document.item".into(), "Set the payment date first".into())
+    );
+    assert_eq!(
+        rejected(apply(&db, "dated", choose("nope"))),
+        (
+            "document.item".into(),
+            "Choose one of the year's items".into()
+        )
+    );
+}
+
+#[test]
+fn the_work_share_is_a_percent_between_zero_and_one_hundred() {
+    for (value, ok) in [
+        (0, true),
+        (60, true),
+        (100, true),
+        (-1, false),
+        (101, false),
+    ] {
+        let (_dir, db) = setup();
+        draft(&db, "doc-a", |d| d.work_share = 50);
+
+        let result = apply(&db, "doc-a", DocumentEdit::WorkShare { value });
+
+        if ok {
+            result.unwrap();
+            assert_eq!(document(&db, "doc-a").work_share, value);
+        } else {
+            assert_eq!(
+                rejected(result),
+                (
+                    "document.workShare".into(),
+                    "A share between 0 and 100 %".into()
+                ),
+                "{value}"
+            );
+            assert_eq!(document(&db, "doc-a").work_share, 50);
+        }
+    }
+}
+
+#[test]
+fn the_note_is_stored_as_typed() {
+    let (_dir, db) = setup();
+    draft(&db, "doc-a", |_| {});
+
+    apply(
+        &db,
+        "doc-a",
+        DocumentEdit::Note {
+            text: " Seminar fee\nreceipt ".into(),
+        },
+    )
+    .unwrap();
+
+    assert_eq!(document(&db, "doc-a").note, " Seminar fee\nreceipt ");
+}
+
+#[test]
+fn the_invoice_amount_and_currency_are_stored_together_in_upper_case() {
+    let (_dir, db) = setup();
+    draft(&db, "doc-a", |_| {});
+
+    apply(
+        &db,
+        "doc-a",
+        DocumentEdit::Invoice {
+            amount: Some("-129.00".into()),
+            currency: " usd ".into(),
+        },
+    )
+    .unwrap();
+    let typed = document(&db, "doc-a");
+    apply(
+        &db,
+        "doc-a",
+        DocumentEdit::Invoice {
+            amount: Some(" ".into()),
+            currency: "eur".into(),
+        },
+    )
+    .unwrap();
+    let cleared = document(&db, "doc-a");
+
+    assert_eq!(
+        (typed.invoice_cents, typed.invoice_currency.as_deref()),
+        (Some(12_900), Some("USD"))
+    );
+    assert_eq!(
+        (cleared.invoice_cents, cleared.invoice_currency),
+        (None, None)
+    );
+}
+
+#[test]
+fn an_invoice_needs_a_three_letter_currency_and_a_real_amount() {
+    let (_dir, db) = setup();
+    draft(&db, "doc-a", |_| {});
+
+    for (amount, currency, message) in [
+        ("1", "US", "A three-letter currency code"),
+        ("1", "EURO", "A three-letter currency code"),
+        ("1", "U$D", "A three-letter currency code"),
+        ("1", "12E", "A three-letter currency code"),
+        ("abc", "USD", "This isn't an amount"),
+    ] {
+        assert_eq!(
+            rejected(apply(
+                &db,
+                "doc-a",
+                DocumentEdit::Invoice {
+                    amount: Some(amount.into()),
+                    currency: currency.into()
+                }
+            )),
+            ("document.invoice".into(), message.into()),
+            "{amount} {currency}"
+        );
+    }
+}
+
+#[test]
+fn linking_a_line_adds_the_link_dates_an_undated_document_and_drops_a_typed_amount() {
+    let (_dir, db) = setup();
+    two_october_lines(&db);
+    draft(&db, "doc-a", |d| d.paid_cents = Some(900));
+
+    let written = apply(&db, "doc-a", DocumentEdit::Link { line: "l-1".into() })
+        .unwrap()
+        .unwrap();
+    apply(&db, "doc-a", DocumentEdit::Link { line: "l-2".into() }).unwrap();
+
+    assert_eq!(written.label, "Edit doc-a");
+    let doc = document(&db, "doc-a");
+    assert_eq!(doc.pay_date.as_deref(), Some("2026-10-14"));
+    assert_eq!(doc.paid_cents, None);
+    let mut linked: Vec<String> = db
+        .read(store::links)
+        .unwrap()
+        .into_iter()
+        .map(|l| l.transaction_id)
+        .collect();
+    linked.sort();
+    assert_eq!(linked, ["l-1", "l-2"]);
+    assert_eq!(page(&db, "doc-a").paid.as_deref(), Some("€56.90"));
+}
+
+#[test]
+fn linking_keeps_an_existing_payment_date() {
+    let (_dir, db) = setup();
+    two_october_lines(&db);
+    draft(&db, "doc-a", |d| d.pay_date = Some("2026-11-01".into()));
+
+    apply(&db, "doc-a", DocumentEdit::Link { line: "l-1".into() }).unwrap();
+
+    assert_eq!(
+        document(&db, "doc-a").pay_date.as_deref(),
+        Some("2026-11-01")
+    );
+}
+
+#[test]
+fn a_line_that_is_missing_or_already_linked_cannot_be_linked() {
+    let (_dir, db) = setup();
+    two_october_lines(&db);
+    draft(&db, "doc-a", |_| {});
+    link(&db, "doc-a", "l-1");
+
+    assert!(matches!(
+        apply(
+            &db,
+            "doc-a",
+            DocumentEdit::Link {
+                line: "gone".into()
+            }
+        ),
+        Err(AppError::NotFound(_))
+    ));
+    assert_eq!(
+        rejected(apply(
+            &db,
+            "doc-a",
+            DocumentEdit::Link { line: "l-1".into() }
+        )),
+        (
+            "document.lines".into(),
+            "This line is linked already".into()
+        )
+    );
+    assert_eq!(count(&db, store::LINKS), 1);
+}
+
+#[test]
+fn unlinking_deletes_the_link_and_a_line_that_is_not_linked_is_not_found() {
+    let (_dir, db) = setup();
+    two_october_lines(&db);
+    draft(&db, "doc-a", |d| d.pay_date = Some("2026-10-14".into()));
+    link(&db, "doc-a", "l-1");
+
+    assert!(matches!(
+        apply(&db, "doc-a", DocumentEdit::Unlink { line: "l-2".into() }),
+        Err(AppError::NotFound(_))
+    ));
+    let written = apply(&db, "doc-a", DocumentEdit::Unlink { line: "l-1".into() })
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(written.label, "Edit doc-a");
+    assert_eq!(count(&db, store::LINKS), 0);
+    assert_eq!(
+        document(&db, "doc-a").pay_date.as_deref(),
+        Some("2026-10-14")
+    );
+}
+
+#[test]
+fn an_edit_that_changes_nothing_writes_nothing() {
+    let edits = [
+        pay_date_edit("2026-10-15"),
+        DocumentEdit::Paid {
+            value: Some("46.90".into()),
+        },
+        DocumentEdit::Vendor {
+            name: "Nordbook".into(),
+        },
+        DocumentEdit::Item {
+            key: Some("phone".into()),
+        },
+        DocumentEdit::WorkShare { value: 70 },
+        DocumentEdit::Note {
+            text: "memo".into(),
+        },
+        DocumentEdit::Invoice {
+            amount: Some("12.00".into()),
+            currency: "usd".into(),
+        },
+    ];
+    for change in edits {
+        let (_dir, db) = setup();
+        draft(&db, "doc-a", |d| d.pay_date = Some("2026-10-14".into()));
+        assert!(apply(&db, "doc-a", change.clone()).unwrap().is_some());
+        let before = count(&db, "journal");
+
+        assert_eq!(
+            apply(&db, "doc-a", change.clone()).unwrap(),
+            None,
+            "{change:?}"
+        );
+        assert_eq!(count(&db, "journal"), before, "{change:?}");
+    }
+}
+
+#[test]
+fn undoing_a_link_removes_it_and_restores_the_payment_date() {
+    let (_dir, db) = setup();
+    two_october_lines(&db);
+    draft(&db, "doc-a", |d| d.paid_cents = Some(900));
+    apply(&db, "doc-a", DocumentEdit::Link { line: "l-1".into() }).unwrap();
+
+    db.undo().unwrap();
+
+    assert_eq!(count(&db, store::LINKS), 0);
+    let doc = document(&db, "doc-a");
+    assert_eq!((doc.pay_date, doc.paid_cents), (None, Some(900)));
+}
+
+#[test]
+fn document_edits_are_read_from_the_pages_tagged_json() {
+    for (wire, expected) in [
+        (
+            json!({ "field": "payDate", "value": "2026-10-14" }),
+            pay_date_edit("2026-10-14"),
+        ),
+        (
+            json!({ "field": "paid", "value": null }),
+            DocumentEdit::Paid { value: None },
+        ),
+        (
+            json!({ "field": "vendor", "name": "Nordbook" }),
+            DocumentEdit::Vendor {
+                name: "Nordbook".into(),
+            },
+        ),
+        (
+            json!({ "field": "item", "key": null }),
+            DocumentEdit::Item { key: None },
+        ),
+        (
+            json!({ "field": "workShare", "value": 60 }),
+            DocumentEdit::WorkShare { value: 60 },
+        ),
+        (
+            json!({ "field": "note", "text": "memo" }),
+            DocumentEdit::Note {
+                text: "memo".into(),
+            },
+        ),
+        (
+            json!({ "field": "invoice", "amount": "12.00", "currency": "USD" }),
+            DocumentEdit::Invoice {
+                amount: Some("12.00".into()),
+                currency: "USD".into(),
+            },
+        ),
+        (
+            json!({ "field": "link", "line": "l-1" }),
+            DocumentEdit::Link { line: "l-1".into() },
+        ),
+        (
+            json!({ "field": "unlink", "line": "l-1" }),
+            DocumentEdit::Unlink { line: "l-1".into() },
+        ),
+    ] {
+        assert_eq!(
+            serde_json::from_value::<DocumentEdit>(wire.clone()).unwrap(),
+            expected,
+            "{wire}"
+        );
+    }
+}
+
+fn listed(db: &Db, query: &str) -> Vec<DocumentGroup> {
+    list::documents(db, query, FORMAT, ORDER).unwrap()
+}
+
+fn listed_ids(groups: &[DocumentGroup]) -> Vec<&str> {
+    groups
+        .iter()
+        .flat_map(|g| g.documents.iter().map(|d| d.id.as_str()))
+        .collect()
+}
+
+fn row_view(id: &str, title: &str, sub: &str, state: DocState, anv: &str) -> DocumentRowView {
+    DocumentRowView {
+        id: id.into(),
+        title: title.into(),
+        sub: sub.into(),
+        state,
+        anv: anv.into(),
+    }
+}
+
+fn with_listed_documents(db: &Db) {
+    with_pixelforge_vendor(db);
+    draft(db, "i", |_| {});
+    draft(db, "a", |d| {
+        d.vendor_id = Some("vendor-1".into());
+        d.original_name = "nov-scan.pdf".into();
+        d.pay_date = Some("2026-10-14".into());
+        d.paid_cents = Some(4_690);
+        d.item_key = Some("phone".into());
+        d.work_share = 60;
+        d.note = "Seminar".into();
+    });
+    draft(db, "b", |d| {
+        d.state = DocState::Finished;
+        d.vendor_id = Some("vendor-1".into());
+        d.pay_date = Some("2026-11-10".into());
+        d.paid_cents = Some(1_000);
+        d.item_key = Some("books".into());
+        d.invoice_number = Some("RE-77".into());
+        d.invoice_cents = Some(12_900);
+    });
+    draft(db, "c", |d| {
+        d.original_name = "Beleg-Maerz.pdf".into();
+        d.pay_date = Some("2025-03-01".into());
+        d.item_key = Some("books".into());
+    });
+    draft(db, "x", |d| {
+        d.state = DocState::Excluded;
+        d.pay_date = Some("2026-12-01".into());
+        d.paid_cents = Some(500);
+    });
+}
+
+#[test]
+fn documents_are_grouped_inbox_first_then_years_newest_first_and_newest_payment_first() {
+    let (_dir, db) = setup();
+    with_listed_documents(&db);
+
+    assert_eq!(
+        listed(&db, ""),
+        vec![
+            DocumentGroup {
+                title: "Inbox".into(),
+                year: None,
+                count: "1 document".into(),
+                total: "€0.00".into(),
+                documents: vec![row_view("i", "i", "Not dated", DocState::Draft, "")],
+            },
+            DocumentGroup {
+                title: "Tax year 2026".into(),
+                year: Some(2026),
+                count: "2 documents".into(),
+                total: "€38.14".into(),
+                documents: vec![
+                    row_view(
+                        "b",
+                        "Pixelforge Ltd. invoice",
+                        "10 Nov · KZ 720 Books",
+                        DocState::Finished,
+                        "€10.00"
+                    ),
+                    row_view(
+                        "a",
+                        "Pixelforge Ltd. invoice",
+                        "14 Oct · KZ 721 Phone",
+                        DocState::Draft,
+                        "€28.14"
+                    ),
+                ],
+            },
+            DocumentGroup {
+                title: "Tax year 2025".into(),
+                year: Some(2025),
+                count: "1 document".into(),
+                total: "€0.00".into(),
+                documents: vec![row_view(
+                    "c",
+                    "Beleg-Maerz",
+                    "1 Mar · KZ 720 Books",
+                    DocState::Draft,
+                    ""
+                )],
+            },
+        ]
+    );
+}
+
+#[test]
+fn the_sub_line_reads_the_date_in_the_chosen_order() {
+    let (_dir, db) = setup();
+    with_listed_documents(&db);
+
+    let groups = list::documents(&db, "seminar", FORMAT, DateOrder::MonthFirst).unwrap();
+
+    assert_eq!(groups[0].documents[0].sub, "Oct 14 · KZ 721 Phone");
+}
+
+#[test]
+fn the_query_matches_title_file_name_note_invoice_number_and_amounts_ignoring_case() {
+    let (_dir, db) = setup();
+    with_listed_documents(&db);
+
+    for (query, expected) in [
+        ("PIXELFORGE", vec!["b", "a"]),
+        ("NOV-SCAN", vec!["a"]),
+        ("beleg", vec!["c"]),
+        ("seMinar", vec!["a"]),
+        ("re-77", vec!["b"]),
+        ("129.00", vec!["b"]),
+        ("46.90", vec!["a"]),
+        ("  ", vec!["i", "b", "a", "c"]),
+        ("zzz", vec![]),
+    ] {
+        assert_eq!(listed_ids(&listed(&db, query)), expected, "{query:?}");
+    }
+}
+
+#[test]
+fn nothing_found_gives_no_groups_and_amounts_are_searched_as_shown() {
+    let (_dir, db) = setup();
+    with_listed_documents(&db);
+
+    assert_eq!(listed(&db, "zzz"), vec![]);
+    let comma = list::documents(&db, "46,90", NumberFormat::CommaDecimal, ORDER).unwrap();
+    assert_eq!(listed_ids(&comma), ["a"]);
+    assert_eq!(comma[0].documents[0].anv, "€28,14");
+}
+
+#[test]
+fn a_linked_line_is_the_amount_a_documents_row_counts() {
+    let (_dir, db) = setup();
+    two_october_lines(&db);
+    draft(&db, "doc-a", |d| d.paid_cents = Some(1));
+    link(&db, "doc-a", "l-1");
+
+    let groups = listed(&db, "");
+
+    assert_eq!(groups[0].total, "€46.90");
+    assert_eq!(
+        groups[0].documents,
+        vec![row_view(
+            "doc-a",
+            "doc-a",
+            "Not dated",
+            DocState::Draft,
+            "€46.90"
+        )]
+    );
+}
+
+#[test]
+fn the_document_groups_travel_in_camel_case() {
+    let (_dir, db) = setup();
+    draft(&db, "doc-a", |_| {});
+
+    assert_eq!(
+        serde_json::to_value(listed(&db, "")).unwrap(),
+        json!([{
+            "title": "Inbox",
+            "year": null,
+            "count": "1 document",
+            "total": "€0.00",
+            "documents": [{
+                "id": "doc-a",
+                "title": "doc-a",
+                "sub": "Not dated",
+                "state": "draft",
+                "anv": ""
+            }]
+        }])
+    );
+}
+
+fn with_vendors_and_documents(db: &Db) {
+    for (id, name, default_item) in [
+        ("v-pixel", "Pixelforge Ltd.", None),
+        ("v-nord", "Nordbook", Some("books")),
+        ("v-unused", "Unused Co", None),
+        ("v-zeta", "Zeta", None),
+    ] {
+        insert(db, store::VENDORS, &vendor_row(id, name, default_item));
+    }
+    for (id, vendor, item, created_at) in [
+        ("d1", "v-pixel", Some("phone"), 1),
+        ("d2", "v-pixel", Some("books"), 2),
+        ("d3", "v-pixel", None, 3),
+        ("d4", "v-nord", Some("phone"), 4),
+        ("d5", "v-zeta", Some("legacy"), 5),
+    ] {
+        draft(db, id, |d| {
+            d.vendor_id = Some(vendor.into());
+            d.item_key = item.map(String::from);
+            d.created_at = created_at;
+        });
+    }
+}
+
+fn vendor_names(db: &Db) -> Vec<String> {
+    db.read(store::vendors)
+        .unwrap()
+        .into_iter()
+        .map(|v| v.name)
+        .collect()
+}
+
+#[test]
+fn the_vendor_list_shows_documents_and_the_default_or_last_used_item() {
+    let (_dir, db) = setup();
+    with_vendors_and_documents(&db);
+
+    assert_eq!(
+        vendors::view(&db).unwrap(),
+        VendorsView {
+            vendors: vec![
+                VendorView {
+                    id: "v-nord".into(),
+                    name: "Nordbook".into(),
+                    detail: "1 document · KZ 720".into(),
+                    default_item_key: Some("books".into()),
+                    unused: false,
+                },
+                VendorView {
+                    id: "v-pixel".into(),
+                    name: "Pixelforge Ltd.".into(),
+                    detail: "3 documents · KZ 720".into(),
+                    default_item_key: None,
+                    unused: false,
+                },
+                VendorView {
+                    id: "v-unused".into(),
+                    name: "Unused Co".into(),
+                    detail: "0 documents".into(),
+                    default_item_key: None,
+                    unused: true,
+                },
+                VendorView {
+                    id: "v-zeta".into(),
+                    name: "Zeta".into(),
+                    detail: "1 document · legacy".into(),
+                    default_item_key: None,
+                    unused: false,
+                },
+            ],
+            items: items_of_setup(),
+        }
+    );
+}
+
+#[test]
+fn the_vendor_view_travels_in_camel_case() {
+    let (_dir, db) = setup();
+    insert(
+        &db,
+        store::VENDORS,
+        &vendor_row("v-1", "Nordbook", Some("books")),
+    );
+
+    assert_eq!(
+        serde_json::to_value(vendors::view(&db).unwrap()).unwrap(),
+        json!({
+            "vendors": [{
+                "id": "v-1",
+                "name": "Nordbook",
+                "detail": "0 documents · KZ 720",
+                "defaultItemKey": "books",
+                "unused": true
+            }],
+            "items": [
+                { "key": "books", "label": "KZ 720 · Books", "kz": "720" },
+                { "key": "phone", "label": "KZ 721 · Phone", "kz": "721" }
+            ]
+        })
+    );
+}
+
+#[test]
+fn renaming_a_vendor_trims_the_name_and_is_labelled_by_the_old_name() {
+    let (_dir, db) = setup();
+    with_vendors_and_documents(&db);
+
+    let written = vendors::rename(&db, "v-pixel", "  Pixelforge GmbH ", Source::Ui).unwrap();
+
+    assert_eq!(written.label, "Rename Vendor Pixelforge Ltd.");
+    assert_eq!(
+        vendor_names(&db),
+        ["Nordbook", "Pixelforge GmbH", "Unused Co", "Zeta"]
+    );
+    db.undo().unwrap();
+    assert_eq!(
+        vendor_names(&db),
+        ["Nordbook", "Pixelforge Ltd.", "Unused Co", "Zeta"]
+    );
+}
+
+#[test]
+fn a_vendor_may_change_the_case_of_its_own_name() {
+    let (_dir, db) = setup();
+    with_vendors_and_documents(&db);
+
+    vendors::rename(&db, "v-nord", "NORDBOOK", Source::Ui).unwrap();
+
+    assert!(vendor_names(&db).contains(&"NORDBOOK".to_string()));
+}
+
+#[test]
+fn a_vendor_name_must_not_be_empty_or_taken_by_another_vendor() {
+    let (_dir, db) = setup();
+    with_vendors_and_documents(&db);
+
+    for (name, message) in [
+        ("   ", "The name can't be empty"),
+        (
+            "nordbook",
+            "Another vendor has this name; merge them instead",
+        ),
+    ] {
+        match vendors::rename(&db, "v-pixel", name, Source::Ui) {
+            Err(AppError::InvalidField {
+                field,
+                message: text,
+            }) => {
+                assert_eq!((field.as_str(), text.as_str()), ("vendor.name", message));
+            }
+            other => panic!("expected a refusal for {name:?}, got {other:?}"),
+        }
+    }
+    assert!(matches!(
+        vendors::rename(&db, "gone", "Any", Source::Ui),
+        Err(AppError::NotFound(_))
+    ));
+}
+
+#[test]
+fn a_default_item_is_set_cleared_and_must_be_one_of_the_items() {
+    let (_dir, db) = setup();
+    with_vendors_and_documents(&db);
+    let default_of = |db: &Db, id: &str| {
+        db.read(store::vendors)
+            .unwrap()
+            .into_iter()
+            .find(|v| v.id == id)
+            .unwrap()
+            .default_item_key
+    };
+
+    let written =
+        vendors::set_default_item(&db, "v-unused", Some("phone".into()), Source::Ui).unwrap();
+    assert_eq!(written.label, "Set Default Item of Unused Co");
+    assert_eq!(default_of(&db, "v-unused").as_deref(), Some("phone"));
+
+    vendors::set_default_item(&db, "v-unused", None, Source::Ui).unwrap();
+    assert_eq!(default_of(&db, "v-unused"), None);
+
+    match vendors::set_default_item(&db, "v-unused", Some("nope".into()), Source::Ui) {
+        Err(AppError::InvalidField { field, .. }) => assert_eq!(field, "vendor.item"),
+        other => panic!("expected a refusal, got {other:?}"),
+    }
+    assert_eq!(default_of(&db, "v-unused"), None);
+}
+
+#[test]
+fn merging_moves_the_documents_removes_the_vendor_and_undo_restores_both_in_one_step() {
+    let (_dir, db) = setup();
+    with_vendors_and_documents(&db);
+
+    let written = vendors::merge(&db, "v-pixel", "v-nord", Source::Ui).unwrap();
+
+    assert_eq!(written.label, "Merge Pixelforge Ltd. into Nordbook");
+    assert_eq!(vendor_names(&db), ["Nordbook", "Unused Co", "Zeta"]);
+    for id in ["d1", "d2", "d3", "d4"] {
+        assert_eq!(
+            document(&db, id).vendor_id.as_deref(),
+            Some("v-nord"),
+            "{id}"
+        );
+    }
+    assert_eq!(document(&db, "d5").vendor_id.as_deref(), Some("v-zeta"));
+
+    db.undo().unwrap();
+
+    assert_eq!(
+        vendor_names(&db),
+        ["Nordbook", "Pixelforge Ltd.", "Unused Co", "Zeta"]
+    );
+    for id in ["d1", "d2", "d3"] {
+        assert_eq!(
+            document(&db, id).vendor_id.as_deref(),
+            Some("v-pixel"),
+            "{id}"
+        );
+    }
+}
+
+#[test]
+fn a_vendor_cannot_merge_into_itself_or_with_a_vendor_that_does_not_exist() {
+    let (_dir, db) = setup();
+    with_vendors_and_documents(&db);
+
+    match vendors::merge(&db, "v-pixel", "v-pixel", Source::Ui) {
+        Err(AppError::InvalidInput(text)) => assert_eq!(text, "A vendor can't merge into itself"),
+        other => panic!("expected a refusal, got {other:?}"),
+    }
+    assert!(matches!(
+        vendors::merge(&db, "v-pixel", "gone", Source::Ui),
+        Err(AppError::NotFound(_))
+    ));
+    assert!(matches!(
+        vendors::merge(&db, "gone", "v-pixel", Source::Ui),
+        Err(AppError::NotFound(_))
+    ));
+    assert_eq!(count(&db, store::VENDORS), 4);
+}
+
+#[test]
+fn a_vendor_with_documents_cannot_be_deleted_and_an_unused_one_can() {
+    let (_dir, db) = setup();
+    with_vendors_and_documents(&db);
+
+    match vendors::delete(&db, "v-pixel", Source::Ui) {
+        Err(AppError::InvalidInput(text)) => assert_eq!(
+            text,
+            "Pixelforge Ltd. has documents; merge it into another vendor instead"
+        ),
+        other => panic!("expected a refusal, got {other:?}"),
+    }
+    assert_eq!(count(&db, store::VENDORS), 4);
+
+    let written = vendors::delete(&db, "v-unused", Source::Ui).unwrap();
+
+    assert_eq!(written.label, "Delete Vendor Unused Co");
+    assert_eq!(vendor_names(&db), ["Nordbook", "Pixelforge Ltd.", "Zeta"]);
+    db.undo().unwrap();
+    assert_eq!(count(&db, store::VENDORS), 4);
+}
+
+#[test]
+fn vendor_changes_are_read_from_the_pages_tagged_json() {
+    use super::commands::VendorChange;
+
+    for (wire, expected) in [
+        (
+            json!({ "kind": "rename", "name": "Nordbook" }),
+            VendorChange::Rename {
+                name: "Nordbook".into(),
+            },
+        ),
+        (
+            json!({ "kind": "defaultItem", "key": "books" }),
+            VendorChange::DefaultItem {
+                key: Some("books".into()),
+            },
+        ),
+        (
+            json!({ "kind": "defaultItem", "key": null }),
+            VendorChange::DefaultItem { key: None },
+        ),
+        (
+            json!({ "kind": "mergeInto", "into": "v-2" }),
+            VendorChange::MergeInto { into: "v-2".into() },
+        ),
+        (json!({ "kind": "delete" }), VendorChange::Delete),
+    ] {
+        assert_eq!(
+            serde_json::from_value::<VendorChange>(wire.clone()).unwrap(),
+            expected,
+            "{wire}"
+        );
+    }
 }
