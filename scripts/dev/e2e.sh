@@ -2,7 +2,7 @@
 # Checks that nothing jumps in the running debug app: e2e.sh
 # Clicks every sidebar row twice and opens and closes + New, measuring the panel, the header, the first sidebar
 # row and the clicked control after every step, then checks that every overlay hides the native PDF preview
-# (the debug build's sample document). Exits 1 on any drift of 1px or more or a preview left over an overlay.
+# (the first demo document). Exits 1 on any drift of 1px or more or a preview left over an overlay.
 # Start the app first: bun run build:app && scripts/dev/launch.sh
 set -e
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
@@ -49,8 +49,11 @@ MARK="E2E-$(date +%s)-$$"
   };
   const overlays = async () => {
     const store = window.hamster.getState();
-    store.navigate({ page: 'document', documentId: 'sample', year: null });
-    await expectPdf('sample document', true);
+    const groups = await window.__TAURI_INTERNALS__.invoke('documents_list', { query: '' });
+    const first = groups.flatMap((g) => g.documents)[0];
+    if (!first) return drift.push('no demo document to preview');
+    store.navigate({ page: 'document', documentId: first.id, year: null });
+    await expectPdf('demo document', true);
     document.querySelector('.new-btn').click();
     await expectPdf('+ New open', false);
     document.querySelector('.new-btn').click();

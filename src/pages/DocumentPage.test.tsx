@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
 
 import { api } from "../api";
+import { useStore } from "../state/store";
 import { documentView } from "../test/documents";
 import { renderWithQuery } from "../test/renderWithQuery";
 import { DocumentPage } from "./DocumentPage";
@@ -33,11 +34,15 @@ describe("DocumentPage", () => {
     expect(screen.queryByText("Every required fact is set")).toBeNull();
   });
 
-  it("shows no form when the document is not found", async () => {
+  it("says there is no such document, without a form, preview or error toast, when it is not found", async () => {
     mocked.documentView.mockRejectedValue({ kind: "not_found", message: "Document not found", code: null });
+    useStore.setState({ toasts: [] });
     renderWithQuery(<DocumentPage documentId="doc-missing" />);
 
-    await vi.waitFor(() => expect(mocked.documentView).toHaveBeenCalledWith("doc-missing"));
+    expect(await screen.findByText("No such document")).toBeTruthy();
+    expect(screen.getByText("It may have been deleted, or the link is old.")).toBeTruthy();
     expect(screen.queryByLabelText("Vendor")).toBeNull();
+    expect(screen.queryByText("Text in the PDF can be selected and copied")).toBeNull();
+    expect(useStore.getState().toasts).toEqual([]);
   });
 });

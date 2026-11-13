@@ -1,10 +1,12 @@
 import { PdfPreview } from "../components/PdfPreview";
 import { DocumentForm } from "../documents/DocumentForm";
 import { useDocument } from "../queries/documents";
+import { EmptyPage } from "./EmptyPage";
 
 /** A document: its PDF beside the payment-first form. */
 export function DocumentPage({ documentId }: { documentId: string }) {
-  const { data: doc } = useDocument(documentId);
+  const { data: doc, isError } = useDocument(documentId);
+  if (isError) return <EmptyPage title="No such document" text="It may have been deleted, or the link is old." />;
   return (
     <div className="page-scroll">
       <div className="doc-page">
