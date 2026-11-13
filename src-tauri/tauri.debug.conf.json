@@ -1,0 +1,13 @@
+{
+  "productName": "Hamster (Debug)",
+  "identifier": "com.philippstracker.hamster.debug",
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": [
+          "hamster-debug"
+        ]
+      }
+    }
+  }
+}
