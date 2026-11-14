@@ -153,11 +153,71 @@ mod layout_lines {
     }
 
     #[test]
-    fn baselines_within_half_the_glyph_height_share_a_line() {
-        let near = [glyph('a', 0.0, 100.0), glyph('b', 5.0, 95.0)];
+    fn baselines_within_a_quarter_of_the_glyph_height_share_a_line() {
+        let near = [glyph('a', 0.0, 100.0), glyph('b', 5.0, 97.5)];
         assert_eq!(layout::lines(&near), lines(&["ab"]));
-        let far = [glyph('a', 0.0, 100.0), glyph('b', 5.0, 94.0)];
+        let far = [glyph('a', 0.0, 100.0), glyph('b', 5.0, 97.0)];
         assert_eq!(layout::lines(&far), lines(&["a", " b"]));
+    }
+
+    #[test]
+    fn tall_selection_boxes_do_not_interleave_lines_printed_close_together() {
+        let sized = |c: char, x: f64, y: f64, width: f64| Glyph {
+            c,
+            x,
+            y,
+            width,
+            height: 19.3,
+        };
+        let mut glyphs = Vec::new();
+        for (i, c) in "Kontoauszug".chars().enumerate() {
+            glyphs.push(sized(c, 319.7 + 6.0 * i as f64, 718.7, 6.0));
+        }
+        for (i, c) in "Account Statement".chars().enumerate() {
+            glyphs.push(sized(c, 319.7 + 4.8 * i as f64, 709.7, 4.8));
+        }
+        let trimmed = layout::trim_margin(layout::lines(&glyphs));
+        assert_eq!(trimmed, lines(&["Kontoauszug", "Account Statement"]));
+    }
+
+    #[test]
+    fn wide_adjacent_glyphs_stay_one_word_on_a_page_of_narrow_text() {
+        let sized = |c: char, x: f64, y: f64, width: f64| Glyph {
+            c,
+            x,
+            y,
+            width,
+            height: 10.0,
+        };
+        let mut glyphs = Vec::new();
+        for (i, c) in "768,10".chars().enumerate() {
+            glyphs.push(sized(c, 60.0 + 6.0 * i as f64, 600.0, 6.0));
+        }
+        for (i, c) in "abcdefghij".chars().enumerate() {
+            glyphs.push(sized(c, 4.0 * i as f64, 500.0, 4.0));
+        }
+        let expected = vec![
+            format!("{}768,10", " ".repeat(15)),
+            "abcdefghij".to_string(),
+        ];
+        assert_eq!(layout::lines(&glyphs), expected);
+    }
+
+    #[test]
+    fn words_closer_than_one_column_still_get_a_space() {
+        let glyphs = [glyph('a', 0.0, 100.0), glyph('b', 6.9, 100.0)];
+        assert_eq!(layout::lines(&glyphs), lines(&["a b"]));
+    }
+
+    #[test]
+    fn fixed_width_text_keeps_its_column_alignment() {
+        let glyphs = [
+            glyph('a', 0.0, 100.0),
+            glyph('x', 300.0, 100.0),
+            glyph('y', 305.0, 100.0),
+        ];
+        let expected = vec![format!("a{}xy", " ".repeat(59))];
+        assert_eq!(layout::lines(&glyphs), expected);
     }
 
     #[test]

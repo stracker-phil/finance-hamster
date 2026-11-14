@@ -1,4 +1,4 @@
-//! Rebuilds a page's text with its layout: glyphs that share a baseline form a line, and each glyph sits in the
+//! Rebuilds a page's text with its layout: glyphs that share a baseline form a line, and each word starts in the
 //! column its position gives, so a fixed-width statement reads back with its columns aligned.
 
 /// A visible character and its box in page points (origin bottom left).
@@ -27,7 +27,8 @@ pub fn lines(glyphs: &[Glyph]) -> Vec<String> {
         return Vec::new();
     }
     let advance = median(visible.iter().map(|g| g.width).collect());
-    let tolerance = median(visible.iter().map(|g| g.height).collect()) / 2.0;
+    // Selection boxes are taller than the line pitch, so two printed lines can lie within half a box height.
+    let tolerance = median(visible.iter().map(|g| g.height).collect()) / 4.0;
     rows(visible, tolerance)
         .into_iter()
         .map(|row| render_row(row, advance))
@@ -47,19 +48,30 @@ fn rows(mut glyphs: Vec<&Glyph>, tolerance: f64) -> Vec<Vec<&Glyph>> {
     rows.into_iter().map(|(_, row)| row).collect()
 }
 
-/// The row as text, each glyph in the column `x / advance` gives.
+/// A gap narrower than this share of the typical width joins two glyphs into one word.
+const WORD_GAP: f64 = 0.3;
+
+/// The row as text: a glyph touching the one before continues its word, any other starts in its column, at
+/// least one space after the text before.
 fn render_row(mut row: Vec<&Glyph>, advance: f64) -> String {
     row.sort_by(|a, b| a.x.total_cmp(&b.x));
     let mut line = String::new();
     let mut column = 0usize;
+    let mut end: Option<f64> = None;
     for glyph in row {
-        let at = (glyph.x / advance).round().max(0.0) as usize;
-        while column < at {
-            line.push(' ');
-            column += 1;
+        // The typical width needn't match every font on the page; touching glyphs stay one word regardless.
+        let touching = end.is_some_and(|previous| glyph.x - previous < advance * WORD_GAP);
+        if !touching {
+            let at = (glyph.x / advance).round().max(0.0) as usize;
+            let at = if column > 0 { at.max(column + 1) } else { at };
+            while column < at {
+                line.push(' ');
+                column += 1;
+            }
         }
         line.push(glyph.c);
         column += 1;
+        end = Some(glyph.x + glyph.width);
     }
     line
 }

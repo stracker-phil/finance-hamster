@@ -1,9 +1,10 @@
 //! The Sparkasse/Erste "Kontoauszug" layout: a fixed-width text layer with the header on every page, one line
 //! per booking (text, value date `dd.mm.`, signed amount at the right edge) and indented detail lines below.
 
-use chrono::{Datelike, NaiveDate};
+use chrono::NaiveDate;
 
-use super::model::{Card, CardKind, Fx, ParsedLine, ParsedStatement};
+use super::booking::{date, day_in_period, details, split_last};
+use super::model::{ParsedLine, ParsedStatement};
 use super::{ParseError, amount};
 use crate::accounts::normalize_iban;
 
@@ -16,13 +17,6 @@ pub fn recognizes(pages: &[Vec<String>]) -> bool {
     })
 }
 
-fn date(text: &str) -> Option<NaiveDate> {
-    NaiveDate::parse_from_str(text.trim(), "%d.%m.%Y").ok()
-}
-
-/// Value dates may run a few days past the period's end (bookings dated into the next statement).
-const SLACK_DAYS: u64 = 7;
-
 /// The text after `label` on the first line that has it, across all pages.
 fn field<'a>(pages: &'a [Vec<String>], label: &str) -> Result<&'a str, ParseError> {
     after(pages, label).ok_or_else(|| ParseError::Missing(label.into()))
@@ -34,25 +28,6 @@ fn after<'a>(pages: &'a [Vec<String>], label: &str) -> Option<&'a str> {
         .iter()
         .flatten()
         .find_map(|l| l.split_once(label).map(|(_, rest)| rest.trim()))
-}
-
-/// The last whitespace-separated token of a line and the rest before it.
-fn split_last(line: &str) -> Option<(&str, &str)> {
-    let line = line.trim_end();
-    let at = line.rfind(char::is_whitespace)?;
-    Some((line[..at].trim_end(), &line[at + 1..]))
-}
-
-/// A `dd.mm.` value date in the statement's period; December lines in a January statement belong to the year
-/// before.
-fn day_in_period(text: &str, from: NaiveDate, to: NaiveDate) -> Option<NaiveDate> {
-    let (day, month) = text.strip_suffix('.')?.split_once('.')?;
-    let (day, month): (u32, u32) = (day.parse().ok()?, month.parse().ok()?);
-    let in_year = |year| NaiveDate::from_ymd_opt(year, month, day);
-    match in_year(to.year()) {
-        Some(d) if d <= to + chrono::Days::new(SLACK_DAYS) => Some(d),
-        _ => in_year(from.year()).or_else(|| in_year(to.year() - 1)),
-    }
 }
 
 /// A summary line's amount: `Summe Gutschriften   +2.850,00`.
@@ -184,77 +159,5 @@ fn booking(
         counterparty_iban: None,
         card: None,
         fx: None,
-    })
-}
-
-/// Fills in what the text and the detail lines say: card, FX, counterparty and its IBAN.
-fn details(line: &mut ParsedLine, from: NaiveDate, to: NaiveDate) {
-    line.card = card(&line.text, from, to);
-    line.fx = line.extra.iter().find_map(|e| fx(e));
-    if line.card.is_none() {
-        line.counterparty = line
-            .extra
-            .first()
-            .filter(|e| normalize_iban(e).is_none())
-            .cloned();
-        line.counterparty_iban = line.extra.iter().find_map(|e| normalize_iban(e));
-    }
-}
-
-/// `E-COMM 24,00 USD K1 08.11. LUMEN AI SAN FRANCISCO 840` or `POS 58,30 AT K1 04.11. 17:40 TANKSTELLE ...`.
-fn card(text: &str, from: NaiveDate, to: NaiveDate) -> Option<Card> {
-    let mut words = text.split_whitespace();
-    let kind = match words.next()? {
-        "E-COMM" => CardKind::Online,
-        "POS" => CardKind::Terminal,
-        _ => return None,
-    };
-    let original_amount = amount(words.next()?)?;
-    let currency = words.next()?;
-    words.next().filter(|w| w.starts_with('K'))?;
-    let date = day_in_period(words.next()?, from, to)?;
-    let mut rest: Vec<&str> = words.collect();
-    let time = rest
-        .first()
-        .filter(|w| is_clock_time(w))
-        .map(|w| w.to_string());
-    if time.is_some() {
-        rest.remove(0);
-    }
-    if rest.last().is_some_and(|w| is_country_code(w)) {
-        rest.pop();
-    }
-    let foreign = currency.len() == 3 && currency != "EUR";
-    Some(Card {
-        kind,
-        date,
-        time,
-        merchant: rest.join(" "),
-        original: foreign.then(|| (original_amount, currency.to_string())),
-    })
-}
-
-fn is_clock_time(word: &str) -> bool {
-    word.len() == 5 && word.as_bytes()[2] == b':'
-}
-
-/// The numeric country code card lines end with (040, 840).
-fn is_country_code(word: &str) -> bool {
-    word.len() == 3 && word.chars().all(|c| c.is_ascii_digit())
-}
-
-fn token_after<'a>(text: &'a str, label: &str) -> Option<&'a str> {
-    text.split_once(label)?.1.split_whitespace().next()
-}
-
-/// `SPESEN: 0,49 KURS: 1,0912 VOM: 06.11.2026`.
-fn fx(text: &str) -> Option<Fx> {
-    let fee = token_after(text, "SPESEN:")?;
-    let rate = token_after(text, "KURS:")?;
-    let day = token_after(text, "VOM:")?;
-    Some(Fx {
-        fee: amount(fee)?,
-        rate: rate.to_string(),
-        rate_date: date(day)?,
     })
 }
