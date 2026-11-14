@@ -2,8 +2,11 @@ use std::collections::HashMap;
 
 use tempfile::TempDir;
 
+use chrono::NaiveDate;
+
 use super::{
-    PlanChanged, ReviewLine, ReviewQueue, decide, key_of, queue, title_of, undecided_by_account,
+    PlanChanged, ReviewLine, ReviewQueue, decide, decide_as, key_of, queue, rule_term, title_of,
+    undecided_by_account,
 };
 use crate::date::DateOrder;
 use crate::db::{Db, Source, Written};
@@ -15,7 +18,7 @@ use crate::statements::import_tests::{october, open_with_accounts, open_with_acc
 use crate::statements::store::{self as statements, TransactionRow};
 use crate::subscriptions::store as subscription_store;
 use crate::test_support::demo::seed_if_empty;
-use crate::test_support::statements::{Statement, demo_month};
+use crate::test_support::statements::{Statement, StatementLine, demo_month};
 use crate::test_support::subscriptions::{add as add_subscription, form as subscription_form};
 use crate::test_support::temp_config_dir;
 
@@ -155,6 +158,60 @@ fn row(text: &str, merchant: Option<&str>, counterparty: Option<&str>) -> Transa
         fx_rate: None,
         fx_date: None,
         transfer: false,
+    }
+}
+
+/// The demo month plus two lines whose titles share the first word `ARGUS` and differ in the contract number
+/// on the detail line.
+fn with_contracts(month: u32) -> Statement {
+    let mut statement = demo_month(month, 2026, month, 141_230);
+    let day = |d| NaiveDate::from_ymd_opt(2026, month, d).unwrap();
+    for (text, title, contract, d, cents) in [
+        (
+            "Praemie",
+            "ARGUS VERSICHERUNG",
+            "Vertrag 7788-1234",
+            24,
+            -4_500,
+        ),
+        ("Reise", "ARGUS REISE", "Vertrag 9900-5555", 25, -1_500),
+    ] {
+        statement.lines.push(StatementLine {
+            text: format!("{text} {month:02}/2026"),
+            extra: vec![title.into(), contract.into()],
+            value_date: day(d),
+            cents,
+        });
+    }
+    statement
+}
+
+fn decide_with_term(
+    db: &Db,
+    title: &str,
+    month: u32,
+    action: Action,
+    always: bool,
+    term: Option<&str>,
+) -> Result<Written, AppError> {
+    let subscription_id = (action == Action::Subscription).then(|| hand_linked_subscription(db));
+    decide_as(
+        db,
+        &line_id(db, title, month),
+        action,
+        None,
+        subscription_id,
+        always,
+        term,
+        NOW + 5,
+        Source::Ui,
+    )
+}
+
+fn term_error(result: Result<String, AppError>) -> (String, String) {
+    match result {
+        Err(AppError::InvalidField { field, message }) => (field, message),
+        other => panic!("expected an invalid field, got {other:?}"),
     }
 }
 
@@ -812,6 +869,168 @@ fn a_line_matching_a_subscription_at_another_amount_asks_whether_the_plan_change
         waiting(&queue, "CAFE LINDE DORNBIRN 6850")[0].plan_changed,
         None
     );
+}
+
+#[test]
+fn a_rule_term_is_the_title_key_without_a_selection_and_the_selection_cleaned_up_with_one() {
+    let line = row("E-COMM", Some("STREAMFLIX WIEN 1010"), None);
+
+    for (term, expected) in [
+        (None, "STREAMFLIX"),
+        (Some("wien 1010"), "WIEN 1010"),
+        (Some("  wien \n  1010 "), "WIEN 1010"),
+        (Some("e-comm"), "E-COMM"),
+    ] {
+        assert_eq!(rule_term(&line, term).unwrap(), expected, "{term:?}");
+    }
+}
+
+#[test]
+fn a_rule_term_must_have_three_characters_and_appear_in_the_line() {
+    let line = row("E-COMM", Some("STREAMFLIX WIEN 1010"), None);
+
+    assert_eq!(
+        term_error(rule_term(&line, Some(" ab "))),
+        (
+            "review.term".to_string(),
+            "Select at least 3 characters".to_string()
+        )
+    );
+    assert_eq!(
+        term_error(rule_term(&line, Some("no such"))),
+        (
+            "review.term".to_string(),
+            "“NO SUCH” isn't in this line".to_string()
+        )
+    );
+}
+
+#[test]
+fn always_with_a_term_from_a_detail_line_decides_only_the_lines_containing_it() {
+    let (_dir, db) = imported(&[with_contracts(9), with_contracts(10)]);
+
+    let result = decide_with_term(
+        &db,
+        "ARGUS VERSICHERUNG",
+        10,
+        Action::Ignore,
+        true,
+        Some("7788-1234"),
+    )
+    .unwrap();
+
+    assert_eq!(
+        result,
+        written(
+            "Ignore: ARGUS VERSICHERUNG · rule created",
+            &["decisions", "rules"]
+        )
+    );
+    let rule = rules(&db).pop().unwrap();
+    assert_eq!(rule.tokens(), ["7788-1234".to_string()]);
+    let earlier = decision_of(&db, "ARGUS VERSICHERUNG", 9).unwrap();
+    assert_eq!(
+        (earlier.kind, earlier.rule_id),
+        (Action::Ignore, Some(rule.id))
+    );
+    assert_eq!(decision_of(&db, "ARGUS REISE", 9), None);
+    assert_eq!(decision_of(&db, "ARGUS REISE", 10), None);
+}
+
+#[test]
+fn always_without_a_term_matches_the_first_word_and_decides_the_lines_sharing_it() {
+    let (_dir, db) = imported(&[with_contracts(10)]);
+
+    decide_with_term(&db, "ARGUS VERSICHERUNG", 10, Action::Ignore, true, None).unwrap();
+
+    assert_eq!(rules(&db).pop().unwrap().tokens(), ["ARGUS".to_string()]);
+    assert_eq!(
+        decision_of(&db, "ARGUS REISE", 10).map(|d| d.kind),
+        Some(Action::Ignore)
+    );
+}
+
+#[test]
+fn a_term_is_collapsed_and_upper_cased_before_it_becomes_the_rule() {
+    let (_dir, db) = imported(&[with_contracts(10)]);
+
+    decide_with_term(
+        &db,
+        "ARGUS VERSICHERUNG",
+        10,
+        Action::Ignore,
+        true,
+        Some("  vertrag   7788-1234 "),
+    )
+    .unwrap();
+
+    assert_eq!(
+        rules(&db).pop().unwrap().tokens(),
+        ["VERTRAG 7788-1234".to_string()]
+    );
+}
+
+#[test]
+fn a_too_short_term_or_one_not_in_the_line_is_refused_and_writes_nothing() {
+    let (_dir, db) = imported(&[with_contracts(10)]);
+
+    for term in ["  ab ", "", "9900-5555", "no such text"] {
+        let result = decide_with_term(
+            &db,
+            "ARGUS VERSICHERUNG",
+            10,
+            Action::Ignore,
+            true,
+            Some(term),
+        );
+        assert_eq!(invalid_field(result), "review.term", "{term:?}");
+    }
+
+    assert_eq!(decisions(&db), HashMap::new());
+    assert_eq!(rules(&db), vec![]);
+}
+
+#[test]
+fn a_term_without_always_is_ignored() {
+    let (_dir, db) = imported(&[with_contracts(10)]);
+
+    let result = decide_with_term(
+        &db,
+        "ARGUS VERSICHERUNG",
+        10,
+        Action::Ignore,
+        false,
+        Some("no such text"),
+    )
+    .unwrap();
+
+    assert_eq!(
+        result,
+        written("Ignore: ARGUS VERSICHERUNG", &["decisions"])
+    );
+    assert_eq!(rules(&db), vec![]);
+}
+
+#[test]
+fn a_subscription_decision_with_always_and_a_term_still_makes_no_rule() {
+    let (_dir, db) = imported(&[with_contracts(9), with_contracts(10)]);
+
+    let result = decide_with_term(
+        &db,
+        "ARGUS VERSICHERUNG",
+        10,
+        Action::Subscription,
+        true,
+        Some("7788-1234"),
+    )
+    .unwrap();
+
+    assert_eq!(
+        result,
+        written("Subscription: ARGUS VERSICHERUNG", &["decisions"])
+    );
+    assert_eq!(rules(&db), vec![]);
+    assert_eq!(decision_of(&db, "ARGUS VERSICHERUNG", 9), None);
 }
 
 #[test]

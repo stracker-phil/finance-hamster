@@ -45,6 +45,7 @@ export function ReviewPage() {
   const [items, setItems] = useState<Record<string, string>>({});
   const [always, setAlways] = useState<Record<string, boolean>>({});
   const [subscriptions, setSubscriptions] = useState<Record<string, string>>({});
+  const [terms, setTerms] = useState<Record<string, string>>({});
   const [session, setSession] = useState({ decided: 0, rules: 0 });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -57,6 +58,8 @@ export function ReviewPage() {
 
   const alwaysOn = current ? (always[current.id] ?? false) : false;
   const pickedSubscription = current ? (subscriptions[current.id] ?? NEW_SUBSCRIPTION) : NEW_SUBSCRIPTION;
+  /** The owner's selected text, sent only when it differs from the line's key. */
+  const chosenTerm = current ? (terms[current.id] ?? null) : null;
 
   const sendDecision = (action: Action, subscriptionId: string | null) => {
     if (!current || busy) return;
@@ -65,7 +68,7 @@ export function ReviewPage() {
     setBusy(true);
     setError(null);
     api
-      .reviewDecide(current.id, action, itemOf(current) || null, subscriptionId, alwaysOn)
+      .reviewDecide(current.id, action, itemOf(current) || null, subscriptionId, alwaysOn, chosenTerm)
       .then((label) => {
         setSession((s) => ({ decided: s.decided + 1, rules: s.rules + (rule ? 1 : 0) }));
         useStore.getState().showToast("success", label, { label: "Undo", run: undo });
@@ -80,7 +83,7 @@ export function ReviewPage() {
 
   const decide = (action: Action) => {
     if (!current) return;
-    if (action === "subscription" && pickedSubscription === NEW_SUBSCRIPTION) newSubscriptionFrom(current.id);
+    if (action === "subscription" && pickedSubscription === NEW_SUBSCRIPTION) newSubscriptionFrom(current.id, chosenTerm);
     else sendDecision(action, action === "subscription" ? pickedSubscription : null);
   };
 
@@ -135,12 +138,17 @@ export function ReviewPage() {
           itemChosen={current.id in items}
           subscription={pickedSubscription}
           always={alwaysOn}
+          term={chosenTerm ?? current.key}
           error={error}
           busy={busy}
           itemSelect={itemSelect}
           onItem={(key) => setItems((m) => ({ ...m, [current.id]: key }))}
           onSubscription={(id) => setSubscriptions((m) => ({ ...m, [current.id]: id }))}
           onAlways={(on) => setAlways((m) => ({ ...m, [current.id]: on }))}
+          onTerm={(text) => {
+            setError(null);
+            setTerms(({ [current.id]: _, ...rest }) => (text === null || text.toUpperCase() === current.key ? rest : { ...rest, [current.id]: text.toUpperCase() }));
+          }}
         />
         <div className="review__nav">
           <button className="link-btn" onClick={previous} disabled={index === 0}>

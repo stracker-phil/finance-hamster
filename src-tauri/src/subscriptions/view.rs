@@ -340,14 +340,19 @@ pub fn match_count(
 }
 
 /// The New sheet's starting values for a bank line.
+/// A New Subscription form from a bank line; `term` (text of the line) becomes its match text.
 pub fn prefill(
     conn: &rusqlite::Connection,
     line_id: &str,
+    term: Option<&str>,
     format: &Format,
 ) -> AppResult<SubscriptionForm> {
     let line = statements::transaction_by_id(conn, line_id)?
         .ok_or_else(|| AppError::NotFound(format!("No line {line_id}")))?;
-    Ok(prefill_from(&line, format))
+    Ok(SubscriptionForm {
+        match_text: crate::review::rule_term(&line, term)?,
+        ..prefill_from(&line, format)
+    })
 }
 
 pub fn prefill_from(line: &TransactionRow, format: &Format) -> SubscriptionForm {

@@ -19,6 +19,7 @@ pub fn review_queue(state: State<'_, AppState>) -> AppResult<ReviewQueue> {
 
 /// Decides a line by hand; returns the label of the change.
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub fn review_decide(
     app: AppHandle,
     state: State<'_, AppState>,
@@ -27,14 +28,16 @@ pub fn review_decide(
     item_key: Option<String>,
     subscription_id: Option<String>,
     always: bool,
+    term: Option<String>,
 ) -> AppResult<String> {
-    let written = super::decide(
+    let written = super::decide_as(
         &state.db,
         &line_id,
         action,
         item_key,
         subscription_id,
         always,
+        term.as_deref(),
         chrono::Utc::now().timestamp_millis(),
         Source::Ui,
     )?;

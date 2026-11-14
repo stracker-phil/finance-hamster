@@ -298,8 +298,7 @@ fn checked_item_key(
     Ok(Some(key))
 }
 
-/// Decides a line by hand; with `always`, also adds a rule for its key and applies it to the other lines. A
-/// subscription finds its charges by its own bank text, so a Subscription decision makes no rule.
+/// Decides a line by hand; with `always`, also adds a rule for its key and applies it to the other lines.
 #[allow(clippy::too_many_arguments)]
 pub fn decide(
     db: &Db,
@@ -311,12 +310,68 @@ pub fn decide(
     now: i64,
     source: Source,
 ) -> AppResult<Written> {
+    decide_as(
+        db,
+        line_id,
+        action,
+        item_key,
+        subscription_id,
+        always,
+        None,
+        now,
+        source,
+    )
+}
+
+/// The shortest text a rule may match on; shorter terms match too much by accident.
+const MIN_TERM: usize = 3;
+
+/// The text an "Always" rule matches: the owner's `term`, which must appear in the line, or the title's key.
+pub fn rule_term(line: &TransactionRow, term: Option<&str>) -> AppResult<String> {
+    let Some(term) = term.map(|t| t.split_whitespace().collect::<Vec<_>>().join(" ")) else {
+        return Ok(key_of(&title_of(line)));
+    };
+    let term = term.to_uppercase();
+    if term.chars().count() < MIN_TERM {
+        return Err(AppError::InvalidField {
+            field: "review.term".into(),
+            message: format!("Select at least {MIN_TERM} characters"),
+        });
+    }
+    if !crate::rules::engine::line_text(line).contains(&term) {
+        return Err(AppError::InvalidField {
+            field: "review.term".into(),
+            message: format!("“{term}” isn't in this line"),
+        });
+    }
+    Ok(term)
+}
+
+/// `decide` with the text the rule matches on: `term` (from the line's text), else the title's key. A
+/// subscription finds its charges by its own bank text, so a Subscription decision makes no rule.
+#[allow(clippy::too_many_arguments)]
+pub fn decide_as(
+    db: &Db,
+    line_id: &str,
+    action: Action,
+    item_key: Option<String>,
+    subscription_id: Option<String>,
+    always: bool,
+    term: Option<&str>,
+    now: i64,
+    source: Source,
+) -> AppResult<Written> {
     let line = db
         .read(|c| statements::transaction_by_id(c, line_id))?
         .ok_or_else(|| AppError::NotFound(format!("No line {line_id}")))?;
     let item_key = checked_item_key(db, action, item_key)?;
     let subscription_id = checked_subscription(db, action, subscription_id)?;
     let always = always && action != Action::Subscription;
+    let term = if always {
+        Some(rule_term(&line, term)?)
+    } else {
+        None
+    };
     let decision = DecisionRow {
         id: line.id.clone(),
         kind: action,
@@ -332,9 +387,9 @@ pub fn decide(
         None => Change::insert(rules_store::DECISIONS, &decision)?,
     }];
     let mut label = format!("{}: {title}", verb(action));
-    if always {
+    if let Some(term) = term {
         let mut all = db.read(rules_store::rules)?;
-        let rule = rules::appended(&all, &key_of(&title), action, item_key, now);
+        let rule = rules::appended(&all, &term, action, item_key, now);
         changes.push(Change::insert(rules_store::RULES, &rule)?);
         all.push(rule);
         changes.extend(db.read(|c| rules::apply::changes_except(c, &all, now, Some(&line.id)))?);

@@ -1514,8 +1514,10 @@ fn a_new_sheet_starts_from_a_bank_line() {
     let streaming = line_dated(&db, "2026-10-07", "STREAMFLIX");
     let lumen = line_dated(&db, "2026-10-10", "LUMEN AI");
 
-    let from_streaming = db.read(|c| prefill(c, &streaming.id, &fmt())).unwrap();
-    let from_lumen = db.read(|c| prefill(c, &lumen.id, &fmt())).unwrap();
+    let from_streaming = db
+        .read(|c| prefill(c, &streaming.id, None, &fmt()))
+        .unwrap();
+    let from_lumen = db.read(|c| prefill(c, &lumen.id, None, &fmt())).unwrap();
 
     assert_eq!(
         from_streaming,
@@ -1554,7 +1556,9 @@ fn a_new_sheet_types_amounts_the_way_the_number_format_reads() {
         order: DateOrder::DayFirst,
     };
 
-    let form = db.read(|c| prefill(c, &streaming.id, &comma)).unwrap();
+    let form = db
+        .read(|c| prefill(c, &streaming.id, None, &comma))
+        .unwrap();
 
     assert_eq!(
         (form.amount.as_str(), form.tolerance.as_deref()),
@@ -1566,9 +1570,36 @@ fn a_new_sheet_types_amounts_the_way_the_number_format_reads() {
 fn a_new_sheet_for_an_unknown_line_is_not_found() {
     let (_dir, db) = imported(&[]);
 
-    let result = db.read(|c| prefill(c, "no-such-line", &fmt()));
+    let result = db.read(|c| prefill(c, "no-such-line", None, &fmt()));
 
     assert!(matches!(result, Err(AppError::NotFound(_))), "{result:?}");
+}
+
+#[test]
+fn a_new_sheet_matches_on_the_text_selected_in_the_line() {
+    let (_dir, db) = imported(&[month(10)]);
+    let streaming = line_dated(&db, "2026-10-07", "STREAMFLIX");
+
+    let form = db
+        .read(|c| prefill(c, &streaming.id, Some("  wien   1010 "), &fmt()))
+        .unwrap();
+
+    assert_eq!(form.match_text, "WIEN 1010");
+}
+
+#[test]
+fn a_new_sheet_refuses_a_selection_that_is_not_in_the_line() {
+    let (_dir, db) = imported(&[month(10)]);
+    let streaming = line_dated(&db, "2026-10-07", "STREAMFLIX");
+
+    for term in ["LUMEN", "WI"] {
+        let result = db.read(|c| prefill(c, &streaming.id, Some(term), &fmt()));
+
+        assert!(
+            matches!(&result, Err(AppError::InvalidField { field, .. }) if field == "review.term"),
+            "{term}: {result:?}"
+        );
+    }
 }
 
 // detail

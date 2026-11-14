@@ -121,7 +121,10 @@ pub fn subscription_match_count(
 pub fn subscription_prefill(
     state: State<'_, AppState>,
     line_id: String,
+    term: Option<String>,
 ) -> AppResult<SubscriptionForm> {
     let format = format(&state);
-    state.db.read(|c| view::prefill(c, &line_id, &format))
+    state
+        .db
+        .read(|c| view::prefill(c, &line_id, term.as_deref(), &format))
 }

@@ -9,9 +9,10 @@ export function newSubscription() {
 }
 
 /** Opens the New sheet prefilled from a bank line. */
-export function newSubscriptionFrom(lineId: string) {
+/** Opens New Subscription from a bank line; `term` is the text it should match, else the line's key. */
+export function newSubscriptionFrom(lineId: string, term: string | null = null) {
   api
-    .subscriptionPrefill(lineId)
+    .subscriptionPrefill(lineId, term)
     .then((form) => useStore.getState().setSubscriptionSheet({ kind: "new", form }))
     .catch(showError);
 }

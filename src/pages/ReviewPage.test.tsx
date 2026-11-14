@@ -1,4 +1,4 @@
-import { act, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -113,7 +113,7 @@ describe("ReviewPage", () => {
 
       await userEvent.click(await screen.findByRole("button", { name: "Ignore (I)" }));
 
-      expect(mocked.reviewDecide).toHaveBeenCalledWith("line-1", "ignore", null, null, false);
+      expect(mocked.reviewDecide).toHaveBeenCalledWith("line-1", "ignore", null, null, false, null);
     });
 
     it("sends the chosen item and the always flag", async () => {
@@ -121,10 +121,10 @@ describe("ReviewPage", () => {
       await screen.findByRole("heading", { name: "Example Bookshop" });
 
       await userEvent.selectOptions(itemSelect(), "kz-169");
-      await userEvent.click(screen.getByRole("checkbox", { name: "Always do this for “EXAMPLEBOOKS”" }));
+      await userEvent.click(screen.getByRole("checkbox", { name: "Always do this for lines containing EXAMPLEBOOKS" }));
       await userEvent.click(screen.getByRole("button", { name: "ANV (A)" }));
 
-      expect(mocked.reviewDecide).toHaveBeenCalledWith("line-1", "anv", "kz-169", null, true);
+      expect(mocked.reviewDecide).toHaveBeenCalledWith("line-1", "anv", "kz-169", null, true, null);
     });
 
     it("sends the prefilled item when the owner keeps it", async () => {
@@ -133,7 +133,7 @@ describe("ReviewPage", () => {
 
       await userEvent.click(await screen.findByRole("button", { name: "ANV (A)" }));
 
-      expect(mocked.reviewDecide).toHaveBeenCalledWith("line-1", "anv", "kz-720", null, false);
+      expect(mocked.reviewDecide).toHaveBeenCalledWith("line-1", "anv", "kz-720", null, false, null);
     });
 
     it.each([
@@ -145,7 +145,7 @@ describe("ReviewPage", () => {
 
       await userEvent.keyboard(key);
 
-      expect(mocked.reviewDecide).toHaveBeenCalledWith("line-1", action, null, null, false);
+      expect(mocked.reviewDecide).toHaveBeenCalledWith("line-1", action, null, null, false, null);
     });
 
     it("toasts the returned label with an Undo that undoes the decision", async () => {
@@ -210,7 +210,7 @@ describe("ReviewPage", () => {
       await userEvent.click(await screen.findByRole("button", { name: "Subscription (S)" }));
 
       await waitFor(() => expect(useStore.getState().subscriptionSheet).toEqual({ kind: "new", form: subscriptionForm({ name: "Example Bookshop", matchText: "EXAMPLEBOOKS" }) }));
-      expect(mocked.subscriptionPrefill).toHaveBeenCalledWith("line-1");
+      expect(mocked.subscriptionPrefill).toHaveBeenCalledWith("line-1", null);
       expect(mocked.reviewDecide).not.toHaveBeenCalled();
     });
 
@@ -221,7 +221,7 @@ describe("ReviewPage", () => {
       await userEvent.keyboard("s");
 
       await waitFor(() => expect(useStore.getState().subscriptionSheet?.kind).toBe("new"));
-      expect(mocked.subscriptionPrefill).toHaveBeenCalledWith("line-1");
+      expect(mocked.subscriptionPrefill).toHaveBeenCalledWith("line-1", null);
     });
 
     it("shows an error toast when the line cannot be prefilled", async () => {
@@ -241,7 +241,7 @@ describe("ReviewPage", () => {
       await userEvent.selectOptions(subscriptionPicker(), "sub-1");
       await userEvent.click(screen.getByRole("button", { name: "Subscription (S)" }));
 
-      expect(mocked.reviewDecide).toHaveBeenCalledWith("line-1", "subscription", null, "sub-1", false);
+      expect(mocked.reviewDecide).toHaveBeenCalledWith("line-1", "subscription", null, "sub-1", false, null);
       expect(mocked.subscriptionPrefill).not.toHaveBeenCalled();
     });
 
@@ -253,7 +253,7 @@ describe("ReviewPage", () => {
 
       await userEvent.keyboard("s");
 
-      expect(mocked.reviewDecide).toHaveBeenCalledWith("line-1", "subscription", null, "sub-1", false);
+      expect(mocked.reviewDecide).toHaveBeenCalledWith("line-1", "subscription", null, "sub-1", false, null);
     });
 
     it("counts no new rule for a subscription, even when Always is checked", async () => {
@@ -261,9 +261,9 @@ describe("ReviewPage", () => {
       await screen.findByRole("heading", { name: "Example Bookshop" });
 
       await userEvent.selectOptions(subscriptionPicker(), "sub-1");
-      await userEvent.click(screen.getByRole("checkbox", { name: "Always do this for “EXAMPLEBOOKS”" }));
+      await userEvent.click(screen.getByRole("checkbox", { name: "Always do this for lines containing EXAMPLEBOOKS" }));
       await userEvent.click(screen.getByRole("button", { name: "Subscription (S)" }));
-      await waitFor(() => expect(mocked.reviewDecide).toHaveBeenCalledWith("line-1", "subscription", null, "sub-1", expect.any(Boolean)));
+      await waitFor(() => expect(mocked.reviewDecide).toHaveBeenCalledWith("line-1", "subscription", null, "sub-1", expect.any(Boolean), null));
       mocked.reviewQueue.mockResolvedValue(reviewQueue({ lines: [] }));
 
       await emitDataChanged(["decisions"]);
@@ -279,7 +279,154 @@ describe("ReviewPage", () => {
       await userEvent.selectOptions(itemSelect(), "kz-169");
       await userEvent.click(screen.getByRole("button", { name: "ANV (A)" }));
 
-      expect(mocked.reviewDecide).toHaveBeenCalledWith("line-1", "anv", "kz-169", null, false);
+      expect(mocked.reviewDecide).toHaveBeenCalledWith("line-1", "anv", "kz-169", null, false, null);
+    });
+  });
+
+  describe("the Always term", () => {
+    const HINT = "Select text above, such as a contract number, to match on it instead.";
+    const alwaysBox = (term: string) => screen.getByRole("checkbox", { name: `Always do this for lines containing ${term}` });
+
+    function selectText(node: Node, text: string) {
+      const textNode = node.firstChild!;
+      const start = textNode.textContent!.indexOf(text);
+      const range = document.createRange();
+      range.setStart(textNode, start);
+      range.setEnd(textNode, start + text.length);
+      const selection = window.getSelection()!;
+      selection.removeAllRanges();
+      selection.addRange(range);
+      fireEvent.mouseUp(node);
+    }
+
+    const selectInRaw = (text: string) => selectText(screen.getByText(/Booking text 4711/), text);
+
+    beforeEach(() => {
+      window.getSelection()?.removeAllRanges();
+      mocked.rulePreview.mockImplementation((form) => Promise.resolve({ count: 1, text: `Matches ${form.contains.join(" or ")}.`, examples: [] }));
+      mocked.subscriptionPrefill.mockResolvedValue(subscriptionForm());
+    });
+
+    it("matches the line's key by default and previews what it matches", async () => {
+      render();
+
+      expect(await screen.findByRole("checkbox", { name: "Always do this for lines containing EXAMPLEBOOKS" })).toBeTruthy();
+      expect(await screen.findByText("Matches EXAMPLEBOOKS.")).toBeTruthy();
+      expect(mocked.rulePreview).toHaveBeenCalledWith(expect.objectContaining({ contains: ["EXAMPLEBOOKS"] }));
+      expect(screen.getByText(HINT)).toBeTruthy();
+    });
+
+    it("takes the selected text, upper-cased and on one line, as the term", async () => {
+      render();
+      await screen.findByRole("heading", { name: "Example Bookshop" });
+
+      selectInRaw("Vienna\nBooking text");
+
+      expect(await screen.findByRole("checkbox", { name: "Always do this for lines containing VIENNA BOOKING TEXT" })).toBeTruthy();
+      expect(await screen.findByText("Matches VIENNA BOOKING TEXT.")).toBeTruthy();
+      expect(screen.queryByText(HINT)).toBeNull();
+    });
+
+    it("goes back to the key with the Use button", async () => {
+      render();
+      await screen.findByRole("heading", { name: "Example Bookshop" });
+      selectInRaw("4711");
+
+      await userEvent.click(await screen.findByRole("button", { name: "Use “EXAMPLEBOOKS”" }));
+
+      expect(alwaysBox("EXAMPLEBOOKS")).toBeTruthy();
+      expect(screen.getByText(HINT)).toBeTruthy();
+      expect(screen.queryByRole("button", { name: /^Use “/ })).toBeNull();
+    });
+
+    it("ignores a selection outside the card's text", async () => {
+      render();
+      await screen.findByRole("heading", { name: "Example Bookshop" });
+
+      selectText(screen.getByText("If ANV, counts as"), "counts");
+
+      expect(alwaysBox("EXAMPLEBOOKS")).toBeTruthy();
+      expect(screen.getByText(HINT)).toBeTruthy();
+    });
+
+    it("ignores an empty selection", async () => {
+      render();
+      await screen.findByRole("heading", { name: "Example Bookshop" });
+      selectInRaw("4711");
+      await screen.findByRole("button", { name: "Use “EXAMPLEBOOKS”" });
+
+      window.getSelection()!.removeAllRanges();
+      fireEvent.mouseUp(screen.getByText(/Booking text 4711/));
+
+      expect(alwaysBox("4711")).toBeTruthy();
+    });
+
+    it("keeps the default when the selected text is the key itself", async () => {
+      mocked.reviewQueue.mockResolvedValue(reviewQueue({ lines: [reviewLine({ raw: "examplebooks Vienna" })] }));
+      render();
+      await screen.findByRole("heading", { name: "Example Bookshop" });
+
+      selectText(screen.getByText("examplebooks Vienna"), "examplebooks");
+      await userEvent.click(alwaysBox("EXAMPLEBOOKS"));
+      await userEvent.click(screen.getByRole("button", { name: "Ignore (I)" }));
+
+      expect(screen.getByText(HINT)).toBeTruthy();
+      expect(mocked.reviewDecide).toHaveBeenCalledWith("line-1", "ignore", null, null, true, null);
+    });
+
+    it("sends the selected term with an Always decision", async () => {
+      render();
+      await screen.findByRole("heading", { name: "Example Bookshop" });
+
+      selectInRaw("4711");
+      await userEvent.click(await screen.findByRole("checkbox", { name: "Always do this for lines containing 4711" }));
+      await userEvent.click(screen.getByRole("button", { name: "Ignore (I)" }));
+
+      expect(mocked.reviewDecide).toHaveBeenCalledWith("line-1", "ignore", null, null, true, "4711");
+    });
+
+    it("shows the message of a refused term", async () => {
+      mocked.reviewDecide.mockRejectedValue({ kind: "invalid_input", message: "Invalid input", code: null, field: { path: "review.term", message: "That text is too short to match on." } });
+      render();
+      await screen.findByRole("heading", { name: "Example Bookshop" });
+      selectInRaw("4");
+
+      await userEvent.click(screen.getByRole("button", { name: "Ignore (I)" }));
+
+      expect((await screen.findByRole("alert")).textContent).toBe("That text is too short to match on.");
+    });
+
+    it("prefills a new subscription from the selected term", async () => {
+      render();
+      await screen.findByRole("heading", { name: "Example Bookshop" });
+      selectInRaw("4711");
+
+      await userEvent.click(await screen.findByRole("button", { name: "Subscription (S)" }));
+
+      await waitFor(() => expect(mocked.subscriptionPrefill).toHaveBeenCalledWith("line-1", "4711"));
+    });
+
+    it("prefills a new subscription without a term while the key is used", async () => {
+      render();
+
+      await userEvent.click(await screen.findByRole("button", { name: "Subscription (S)" }));
+
+      await waitFor(() => expect(mocked.subscriptionPrefill).toHaveBeenCalledWith("line-1", null));
+    });
+
+    it("keeps a term per line", async () => {
+      mocked.reviewQueue.mockResolvedValue(reviewQueue({ lines: [reviewLine(), reviewLine({ id: "line-2", title: "Example Cinema", key: "EXAMPLECINEMA" })] }));
+      render();
+      await screen.findByRole("heading", { name: "Example Bookshop" });
+      selectInRaw("4711");
+      await screen.findByRole("button", { name: "Use “EXAMPLEBOOKS”" });
+
+      await userEvent.click(screen.getByRole("button", { name: "Skip →" }));
+      await screen.findByRole("heading", { name: "Example Cinema" });
+      expect(alwaysBox("EXAMPLECINEMA")).toBeTruthy();
+
+      await userEvent.click(screen.getByRole("button", { name: "← Previous" }));
+      expect(await screen.findByRole("checkbox", { name: "Always do this for lines containing 4711" })).toBeTruthy();
     });
   });
 
@@ -321,7 +468,7 @@ describe("ReviewPage", () => {
 
       await userEvent.click(await screen.findByRole("button", { name: "One-off (O)" }));
 
-      expect(mocked.reviewDecide).toHaveBeenCalledWith("line-1", "subscription", null, "sub-1", false);
+      expect(mocked.reviewDecide).toHaveBeenCalledWith("line-1", "subscription", null, "sub-1", false, null);
     });
 
     it("opens Change Plan with the amount, currency and date of the charge with Update Plan", async () => {
@@ -355,7 +502,7 @@ describe("ReviewPage", () => {
       await userEvent.click(await screen.findByRole("button", { name: "New Subscription (N)" }));
 
       await waitFor(() => expect(useStore.getState().subscriptionSheet).toEqual({ kind: "new", form: subscriptionForm() }));
-      expect(mocked.subscriptionPrefill).toHaveBeenCalledWith("line-1");
+      expect(mocked.subscriptionPrefill).toHaveBeenCalledWith("line-1", null);
     });
 
     it("decides a one-off on the O key", async () => {
@@ -364,7 +511,7 @@ describe("ReviewPage", () => {
 
       await userEvent.keyboard("o");
 
-      expect(mocked.reviewDecide).toHaveBeenCalledWith("line-1", "subscription", null, "sub-1", false);
+      expect(mocked.reviewDecide).toHaveBeenCalledWith("line-1", "subscription", null, "sub-1", false, null);
     });
 
     it("opens Change Plan on the U key", async () => {
@@ -435,7 +582,7 @@ describe("ReviewPage", () => {
 
       await userEvent.click(screen.getByRole("button", { name: "Ignore (I)" }));
 
-      expect(mocked.reviewDecide).toHaveBeenCalledWith("line-2", "ignore", null, null, false);
+      expect(mocked.reviewDecide).toHaveBeenCalledWith("line-2", "ignore", null, null, false, null);
     });
 
     it("disables Skip when only one line is left", async () => {
@@ -463,7 +610,7 @@ describe("ReviewPage", () => {
     it("counts the decisions and new rules made in this session", async () => {
       mocked.reviewQueue.mockResolvedValue(reviewQueue());
       render();
-      await userEvent.click(await screen.findByRole("checkbox", { name: "Always do this for “EXAMPLEBOOKS”" }));
+      await userEvent.click(await screen.findByRole("checkbox", { name: "Always do this for lines containing EXAMPLEBOOKS" }));
       await userEvent.click(screen.getByRole("button", { name: "Ignore (I)" }));
       mocked.reviewQueue.mockResolvedValue(reviewQueue({ lines: [] }));
 

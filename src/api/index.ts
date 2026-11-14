@@ -105,10 +105,10 @@ export const api = {
   /** The label of the change. */
   vendorChange: (id: string, change: VendorChange) => invoke<string>("vendor_change", { id, change }),
   documentEstimate: (lineId: string | null, itemKey: string | null) => invoke<Estimate | null>("document_estimate", { lineId, itemKey }),
-  /** Decides a line by hand; `always` also adds a rule for its key. The label of the change. */
-  /** `subscriptionId` links a Subscription decision; the label of the change. */
-  reviewDecide: (lineId: string, action: Action, itemKey: string | null, subscriptionId: string | null, always: boolean) =>
-    invoke<string>("review_decide", { lineId, action, itemKey, subscriptionId, always }),
+  /** Decides a line by hand; `always` also adds a rule matching `term` (text of the line; null: its key). The
+   *  label of the change. `subscriptionId` links a Subscription decision. */
+  reviewDecide: (lineId: string, action: Action, itemKey: string | null, subscriptionId: string | null, always: boolean, term: string | null = null) =>
+    invoke<string>("review_decide", { lineId, action, itemKey, subscriptionId, always, term }),
   todayView: () => invoke<TodayView>("today_view"),
   /** Checks every stored PDF now. */
   filesVerify: () => invoke<FileCheck>("files_verify"),
@@ -130,7 +130,8 @@ export const api = {
   subscriptionDelete: (id: string) => invoke<string>("subscription_delete", { id }),
   subscriptionMatchCount: (form: SubscriptionForm) => invoke<MatchCount>("subscription_match_count", { form }),
   /** A New sheet's form prefilled from a bank line. */
-  subscriptionPrefill: (lineId: string) => invoke<SubscriptionForm>("subscription_prefill", { lineId }),
+  /** A New Subscription form from a line; `term` (text of the line) becomes its match text. */
+  subscriptionPrefill: (lineId: string, term: string | null = null) => invoke<SubscriptionForm>("subscription_prefill", { lineId, term }),
   pdfViewShow: (source: PdfSource, frame: Frame) => invoke<void>("pdf_view_show", { source, frame }),
   pdfViewMove: (frame: Frame) => invoke<void>("pdf_view_move", { frame }),
   pdfViewHide: () => invoke<void>("pdf_view_hide"),
