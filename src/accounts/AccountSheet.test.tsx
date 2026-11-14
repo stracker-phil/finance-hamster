@@ -49,7 +49,7 @@ describe("AccountSheet adding", () => {
     await userEvent.click(screen.getByRole("button", { name: "Add Account" }));
 
     await waitFor(() => expect(messages()).toEqual(["Added Private"]));
-    expect(mocked.addAccount).toHaveBeenCalledWith({ name: "Private", bank: "Example Bank", iban: "AT61 1904 3002 3457 3201", own: false });
+    expect(mocked.addAccount).toHaveBeenCalledWith({ name: "Private", bank: "Example Bank", iban: "AT61 1904 3002 3457 3201", own: false, statementName: null });
     expect(onClose).toHaveBeenCalled();
   });
 
@@ -117,7 +117,7 @@ describe("AccountSheet editing", () => {
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(messages()).toEqual(["Saved Savings"]));
-    expect(mocked.editAccount).toHaveBeenCalledWith("acc-7", { name: "Savings", bank: "Example Bank", own: false });
+    expect(mocked.editAccount).toHaveBeenCalledWith("acc-7", { name: "Savings", bank: "Example Bank", own: false, statementName: null });
     expect(onClose).toHaveBeenCalled();
   });
 

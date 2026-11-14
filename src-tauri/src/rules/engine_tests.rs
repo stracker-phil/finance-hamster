@@ -1,5 +1,5 @@
 use super::builtin_rules;
-use super::engine::{Line, decide, line_text, matches};
+use super::engine::{Line, OwnAccount, decide, line_text, matches, pays_own};
 use super::store::{Action, DecisionRow, RuleRow};
 use super::tests::{HOUSEHOLD_IBAN, NOW, PRIVATE_IBAN, line, own_accounts, rule_row};
 use crate::statements::store::TransactionRow;
@@ -327,6 +327,84 @@ fn the_built_in_bank_fee_rule_ignores_fee_lines_in_any_case() {
         decide(&builtin_rules(NOW), &line(), &own_accounts(), NOW),
         None
     );
+}
+
+#[test]
+fn a_line_pays_an_own_account_by_its_iban_or_by_the_name_statements_print_for_it() {
+    for (counterparty, iban, account, expected) in [
+        (None, Some(HOUSEHOLD_IBAN), "account-1", true),
+        (Some("Haushaltskonto"), None, "account-1", true),
+        (Some("HAUSHALTSKONTO"), None, "account-1", true),
+        (Some("  haushaltskonto \t"), None, "account-1", true),
+        (Some("Alex Beispiel"), None, "account-2", true),
+        (Some("Alex Beispiel"), None, "account-1", false),
+        (Some("Haushaltskonto"), None, "account-2", false),
+        (Some("Haushaltskonto GmbH"), None, "account-1", false),
+        (Some("Zebra GmbH"), None, "account-1", false),
+        (Some("Business"), None, "account-1", false),
+        (None, None, "account-1", false),
+        (
+            Some("Haushaltskonto"),
+            Some("AT091999900000000077"),
+            "account-1",
+            true,
+        ),
+    ] {
+        let t = TransactionRow {
+            account_id: account.into(),
+            counterparty: counterparty.map(Into::into),
+            counterparty_iban: iban.map(Into::into),
+            ..line()
+        };
+        assert_eq!(
+            pays_own(&t, &own_accounts()),
+            expected,
+            "{counterparty:?} {iban:?} on {account}"
+        );
+    }
+}
+
+#[test]
+fn accounts_without_a_statement_name_are_recognized_by_iban_only() {
+    let own = vec![OwnAccount {
+        id: "account-2".into(),
+        iban: HOUSEHOLD_IBAN.into(),
+        statement_name: None,
+    }];
+    let named = TransactionRow {
+        counterparty: Some("Haushaltskonto".into()),
+        ..line()
+    };
+    let by_iban = TransactionRow {
+        counterparty_iban: Some(HOUSEHOLD_IBAN.into()),
+        ..line()
+    };
+
+    assert!(!pays_own(&named, &own));
+    assert!(pays_own(&by_iban, &own));
+}
+
+#[test]
+fn the_built_in_transfer_rule_ignores_lines_whose_counterparty_is_another_own_accounts_statement_name()
+ {
+    for (counterparty, expected) in [
+        (Some("Haushaltskonto"), Some("builtin-transfers")),
+        (Some("Alex Beispiel"), Some("builtin-transfers")),
+        (Some("Zebra GmbH"), None),
+        (None, None),
+    ] {
+        let t = TransactionRow {
+            account_id: "account-3".into(),
+            counterparty: counterparty.map(Into::into),
+            ..line()
+        };
+        let decision = decide(&builtin_rules(NOW), &t, &own_accounts(), NOW);
+        assert_eq!(
+            decision.as_ref().and_then(|d| d.rule_id.as_deref()),
+            expected,
+            "{counterparty:?}"
+        );
+    }
 }
 
 #[test]

@@ -272,15 +272,15 @@ pub fn preview(
     })
 }
 
-/// `own_ibans`: the owner's other accounts; a line paying one of them is a transfer.
+/// `own`: the owner's accounts; a line paying another of them is a transfer.
 fn transaction_row(
     statement: &StatementRow,
     line: &ParsedLine,
-    own_ibans: &[String],
+    own: &[rules::engine::OwnAccount],
 ) -> AppResult<TransactionRow> {
     let card = line.card.as_ref();
     let original = card.and_then(|c| c.original.clone());
-    Ok(TransactionRow {
+    let mut row = TransactionRow {
         id: uuid::Uuid::new_v4().to_string(),
         statement_id: statement.id.clone(),
         account_id: statement.account_id.clone(),
@@ -301,11 +301,10 @@ fn transaction_row(
         fx_fee: line.fx.as_ref().map(|f| f.fee),
         fx_rate: line.fx.as_ref().map(|f| f.rate.clone()),
         fx_date: line.fx.as_ref().map(|f| date::iso(f.rate_date)),
-        transfer: line
-            .counterparty_iban
-            .as_ref()
-            .is_some_and(|iban| own_ibans.contains(iban)),
-    })
+        transfer: false,
+    };
+    row.transfer = rules::engine::pays_own(&row, own);
+    Ok(row)
 }
 
 /// Copies the PDF and stores the statement with its lines as one op; transfers to the owner's other accounts
@@ -326,12 +325,6 @@ pub fn commit(
     if created {
         std::fs::write(&path, &pending.bytes)?;
     }
-    let own: Vec<String> = db
-        .read(accounts::rows)?
-        .into_iter()
-        .filter(|a| a.own && a.id != pending.account.id)
-        .map(|a| a.iban)
-        .collect();
     let statement = StatementRow {
         id: uuid::Uuid::new_v4().to_string(),
         account_id: pending.account.id.clone(),
@@ -354,7 +347,7 @@ pub fn commit(
     let mut changes = vec![Change::insert(store::STATEMENTS, &statement)?];
     let mut decisions = Vec::new();
     for line in &p.lines {
-        let row = transaction_row(&statement, line, &own)?;
+        let row = transaction_row(&statement, line, &own_accounts)?;
         changes.push(Change::insert(store::TRANSACTIONS, &row)?);
         if let Some(decision) = rules::engine::decide(&rules, &row, &own_accounts, now) {
             decisions.push(Change::insert(rules::store::DECISIONS, &decision)?);

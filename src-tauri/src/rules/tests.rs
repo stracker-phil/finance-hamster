@@ -206,11 +206,18 @@ pub(super) fn line() -> TransactionRow {
 }
 
 pub(super) fn own_accounts() -> Vec<OwnAccount> {
-    vec![
-        ("account-1".into(), PRIVATE_IBAN.into()),
-        ("account-2".into(), HOUSEHOLD_IBAN.into()),
-        ("account-3".into(), BUSINESS_IBAN.into()),
+    [
+        ("account-1", PRIVATE_IBAN, Some("Alex Beispiel")),
+        ("account-2", HOUSEHOLD_IBAN, Some("Haushaltskonto")),
+        ("account-3", BUSINESS_IBAN, None),
     ]
+    .into_iter()
+    .map(|(id, iban, name)| OwnAccount {
+        id: id.into(),
+        iban: iban.into(),
+        statement_name: name.map(Into::into),
+    })
+    .collect()
 }
 
 /// A standing order from Private to Household on `day` of October 2026.
@@ -225,6 +232,44 @@ pub(super) fn household_transfer(day: u32) -> StatementLine {
         value_date: chrono::NaiveDate::from_ymd_opt(2026, 10, day).unwrap(),
         cents: -50_000,
     }
+}
+
+/// A standing order from Private to Household on `day` of October 2026, as printed without the IBAN.
+fn named_transfer(day: u32) -> StatementLine {
+    StatementLine {
+        extra: vec!["HOUSEHOLD".into(), "HAUSHALT".into()],
+        ..household_transfer(day)
+    }
+}
+
+/// Edits the account through `accounts::edit`, changing only its statement name.
+fn set_statement_name(db: &Db, id: &str, statement_name: Option<&str>) -> Written {
+    let account = db
+        .read(accounts::rows)
+        .unwrap()
+        .into_iter()
+        .find(|a| a.id == id)
+        .unwrap();
+    accounts::edit(
+        db,
+        id,
+        accounts::AccountEdit {
+            name: account.name,
+            bank: account.bank,
+            own: account.own,
+            statement_name: statement_name.map(Into::into),
+        },
+    )
+    .unwrap()
+}
+
+fn statement_name_of(db: &Db, id: &str) -> Option<String> {
+    db.read(accounts::rows)
+        .unwrap()
+        .into_iter()
+        .find(|a| a.id == id)
+        .unwrap()
+        .statement_name
 }
 
 fn set_own(db: &Db, id: &str, own: bool) {
@@ -1161,6 +1206,116 @@ fn a_transfer_to_another_own_account_is_ignored_by_the_built_in_rule_on_import()
         (Action::Ignore, Some("builtin-transfers".to_string()))
     );
     assert_eq!(decisions_of(&db).len(), 1);
+}
+
+#[test]
+fn a_line_to_another_own_accounts_statement_name_is_stored_as_a_transfer_and_ignored_on_import() {
+    let (dir, db) = setup();
+    ensure_builtins(&db, NOW, Source::App).unwrap();
+    set_statement_name(&db, "account-2", Some("HOUSEHOLD"));
+    let mut statement = october();
+    statement.lines.insert(1, named_transfer(2));
+
+    import_statement(&db, dir.path(), &statement);
+
+    assert!(line_with(&db, "HAUSHALT").transfer);
+    let decision = decision_for(&db, "HAUSHALT").unwrap();
+    assert_eq!(
+        (decision.kind, decision.rule_id),
+        (Action::Ignore, Some("builtin-transfers".to_string()))
+    );
+    assert_eq!(decisions_of(&db).len(), 1);
+}
+
+#[test]
+fn without_a_statement_name_a_line_with_only_a_counterparty_name_stays_undecided() {
+    let (dir, db) = setup();
+    ensure_builtins(&db, NOW, Source::App).unwrap();
+    let mut statement = october();
+    statement.lines.insert(1, named_transfer(2));
+
+    import_statement(&db, dir.path(), &statement);
+
+    assert!(!line_with(&db, "HAUSHALT").transfer);
+    assert_eq!(decision_for(&db, "HAUSHALT"), None);
+}
+
+#[test]
+fn setting_an_accounts_statement_name_decides_its_existing_lines_in_the_same_op_and_undo_reverts_both()
+ {
+    let (dir, db) = setup();
+    ensure_builtins(&db, NOW, Source::App).unwrap();
+    let mut statement = october();
+    statement.lines.insert(1, named_transfer(2));
+    import_statement(&db, dir.path(), &statement);
+    assert_eq!(decision_for(&db, "HAUSHALT"), None);
+
+    let written = set_statement_name(&db, "account-2", Some("  household "));
+
+    assert_eq!(
+        written,
+        Written {
+            label: "Edit Account Household".into(),
+            tables: labels(&["accounts", "decisions"]),
+        }
+    );
+    assert_eq!(
+        statement_name_of(&db, "account-2").as_deref(),
+        Some("household")
+    );
+    let decision = decision_for(&db, "HAUSHALT").unwrap();
+    assert_eq!(
+        (decision.kind, decision.rule_id),
+        (Action::Ignore, Some("builtin-transfers".to_string()))
+    );
+
+    db.undo().unwrap().unwrap();
+
+    assert_eq!(statement_name_of(&db, "account-2"), None);
+    assert_eq!(decision_for(&db, "HAUSHALT"), None);
+}
+
+#[test]
+fn clearing_an_accounts_statement_name_takes_the_decision_back_from_its_lines() {
+    let (dir, db) = setup();
+    ensure_builtins(&db, NOW, Source::App).unwrap();
+    set_statement_name(&db, "account-2", Some("HOUSEHOLD"));
+    let mut statement = october();
+    statement.lines.insert(1, named_transfer(2));
+    import_statement(&db, dir.path(), &statement);
+    assert!(decision_for(&db, "HAUSHALT").is_some());
+
+    let written = set_statement_name(&db, "account-2", None);
+
+    assert_eq!(written.tables, labels(&["accounts", "decisions"]));
+    assert_eq!(statement_name_of(&db, "account-2"), None);
+    assert_eq!(decision_for(&db, "HAUSHALT"), None);
+}
+
+#[test]
+fn editing_only_an_accounts_name_leaves_the_decisions_alone() {
+    let (dir, db) = setup();
+    ensure_builtins(&db, NOW, Source::App).unwrap();
+    set_statement_name(&db, "account-2", Some("HOUSEHOLD"));
+    let mut statement = october();
+    statement.lines.insert(1, named_transfer(2));
+    import_statement(&db, dir.path(), &statement);
+    let before = decision_for(&db, "HAUSHALT").unwrap();
+
+    let written = accounts::edit(
+        &db,
+        "account-2",
+        accounts::AccountEdit {
+            name: "Home".into(),
+            bank: "Example Sparkasse".into(),
+            own: true,
+            statement_name: Some("HOUSEHOLD".into()),
+        },
+    )
+    .unwrap();
+
+    assert_eq!(written.tables, labels(&["accounts"]));
+    assert_eq!(decision_for(&db, "HAUSHALT"), Some(before));
 }
 
 #[test]

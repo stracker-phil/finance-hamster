@@ -12,11 +12,19 @@ use crate::statements::store as statements;
 use crate::subscriptions::matcher::Matchers;
 
 pub fn own_accounts(conn: &Connection) -> AppResult<Vec<OwnAccount>> {
-    Ok(accounts::rows(conn)?
-        .into_iter()
+    Ok(own_of(accounts::rows(conn)?))
+}
+
+/// The own accounts among `rows`.
+pub fn own_of(rows: Vec<accounts::AccountRow>) -> Vec<OwnAccount> {
+    rows.into_iter()
         .filter(|a| a.own)
-        .map(|a| (a.id, a.iban))
-        .collect())
+        .map(|a| OwnAccount {
+            id: a.id,
+            iban: a.iban,
+            statement_name: a.statement_name,
+        })
+        .collect()
 }
 
 /// One change per line whose decision `rules` change; hand decisions stay.
@@ -42,7 +50,30 @@ pub fn changes_with(
     now: i64,
     skipped: Option<&str>,
 ) -> AppResult<Vec<Change>> {
-    let own = own_accounts(conn)?;
+    changes_for(
+        conn,
+        rules,
+        subscriptions,
+        &own_accounts(conn)?,
+        now,
+        skipped,
+    )
+}
+
+/// The rules' changes with the own accounts as they will be after the op that carries them.
+pub fn changes_with_own(conn: &Connection, own: &[OwnAccount], now: i64) -> AppResult<Vec<Change>> {
+    let rules = store::rules(conn)?;
+    changes_for(conn, &rules, &Matchers::load(conn)?, own, now, None)
+}
+
+fn changes_for(
+    conn: &Connection,
+    rules: &[RuleRow],
+    subscriptions: &Matchers,
+    own: &[OwnAccount],
+    now: i64,
+    skipped: Option<&str>,
+) -> AppResult<Vec<Change>> {
     let existing = store::decisions(conn)?;
     let mut changes = Vec::new();
     for line in statements::all_transactions(conn)? {
@@ -51,7 +82,7 @@ pub fn changes_with(
             continue;
         }
         let wanted =
-            engine::decide(rules, &line, &own, now).or_else(|| subscriptions.decide(&line, now));
+            engine::decide(rules, &line, own, now).or_else(|| subscriptions.decide(&line, now));
         if let Some(change) = change_for(current, wanted)? {
             changes.push(change);
         }

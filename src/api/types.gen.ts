@@ -9,7 +9,7 @@ export type Account = { id: string, name: string, bank: string,
 /**
  * `AT•• •••• 0001`.
  */
-ibanMasked: string, own: boolean, };
+ibanMasked: string, own: boolean, statementName: string | null, };
 
 export type AccountCoverage = { id: string, name: string, 
 /**
@@ -32,7 +32,7 @@ note: string | null, };
 /**
  * The fields to change; the IBAN stays, as statements are matched by it.
  */
-export type AccountEdit = { name: string, bank: string, own: boolean, };
+export type AccountEdit = { name: string, bank: string, own: boolean, statementName: string | null, };
 
 export type AccountLines = { id: string, name: string, ibanMasked: string, groups: Array<StatementGroup>, };
 
@@ -491,7 +491,7 @@ export type MonthView = {
  */
 label: string, total: string, rows: Array<YearRow>, };
 
-export type NewAccount = { name: string, bank: string, iban: string, own: boolean, };
+export type NewAccount = { name: string, bank: string, iban: string, own: boolean, statementName: string | null, };
 
 /**
  * Input for `add`, tagged by kind.

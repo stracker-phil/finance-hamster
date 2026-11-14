@@ -62,7 +62,11 @@ fn status(
             (LineStatus::Anv, kz)
         }
         Action::Subscription => (LineStatus::Subscription, None),
-        Action::Ignore if t.transfer => (LineStatus::Transfer, None),
+        Action::Ignore
+            if t.transfer || d.rule_id.as_deref() == Some(crate::rules::TRANSFERS_ID) =>
+        {
+            (LineStatus::Transfer, None)
+        }
         Action::Ignore => {
             let text = if d.by_hand() {
                 "Ignored"

@@ -6,9 +6,10 @@ export interface AccountValues {
   bank: string;
   iban: string;
   own: boolean;
+  statementName: string;
 }
 
-const EMPTY: AccountValues = { name: "", bank: "", iban: "", own: true };
+const EMPTY: AccountValues = { name: "", bank: "", iban: "", own: true, statementName: "" };
 
 interface Props {
   /** The account to edit; absent for a new one. Its IBAN can't change. */
@@ -19,10 +20,13 @@ interface Props {
   onSaved: (name: string) => void;
 }
 
-/** Name, bank, IBAN and the own-account switch; field errors from Rust show under their field. */
+/** Name, bank, IBAN, the own-account switch and the name other statements print; field errors from Rust show
+ *  under their field. */
 export function AccountForm({ account, submitLabel, onCancel, onSaved }: Props) {
   const id = useId();
-  const [values, setValues] = useState<AccountValues>(account ? { name: account.name, bank: account.bank, iban: account.ibanMasked, own: account.own } : EMPTY);
+  const [values, setValues] = useState<AccountValues>(
+    account ? { name: account.name, bank: account.bank, iban: account.ibanMasked, own: account.own, statementName: account.statementName ?? "" } : EMPTY,
+  );
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const set = (patch: Partial<AccountValues>) => setValues((v) => ({ ...v, ...patch }));
@@ -30,7 +34,10 @@ export function AccountForm({ account, submitLabel, onCancel, onSaved }: Props) 
   const submit = (e: FormEvent) => {
     e.preventDefault();
     setBusy(true);
-    const save = account ? api.editAccount(account.id, { name: values.name, bank: values.bank, own: values.own }) : api.addAccount(values);
+    const statementName = values.statementName.trim() || null;
+    const save = account
+      ? api.editAccount(account.id, { name: values.name, bank: values.bank, own: values.own, statementName })
+      : api.addAccount({ name: values.name, bank: values.bank, iban: values.iban, own: values.own, statementName });
     save
       .then(() => onSaved(values.name.trim()))
       .catch((err: unknown) => {
@@ -40,12 +47,23 @@ export function AccountForm({ account, submitLabel, onCancel, onSaved }: Props) 
       .finally(() => setBusy(false));
   };
 
-  const field = (key: "name" | "bank" | "iban", label: string, props: { placeholder?: string; disabled?: boolean; autoFocus?: boolean }) => {
+  const field = (key: "name" | "bank" | "iban" | "statementName", label: string, props: { placeholder?: string; disabled?: boolean; autoFocus?: boolean; hint?: string }) => {
     const error = errors[`account.${key}`];
     return (
       <div className="form-field">
         <label htmlFor={`${id}-${key}`}>{label}</label>
-        <input id={`${id}-${key}`} className="field" value={values[key]} aria-invalid={!!error} aria-describedby={error ? `${id}-${key}-error` : undefined} onChange={(e) => set({ [key]: e.target.value })} {...props} />
+        <input
+          id={`${id}-${key}`}
+          className="field"
+          value={values[key]}
+          aria-invalid={!!error}
+          aria-describedby={error ? `${id}-${key}-error` : undefined}
+          onChange={(e) => set({ [key]: e.target.value })}
+          placeholder={props.placeholder}
+          disabled={props.disabled}
+          autoFocus={props.autoFocus}
+        />
+        {props.hint && !error && <div className="form-check__desc">{props.hint}</div>}
         <div id={`${id}-${key}-error`} className="form-field__error" role={error ? "alert" : undefined}>
           {error ?? ""}
         </div>
@@ -65,6 +83,11 @@ export function AccountForm({ account, submitLabel, onCancel, onSaved }: Props) 
           <span className="form-check__desc">Transfers between your own accounts show as Transfer.</span>
         </span>
       </label>
+      {field("statementName", "Name on other statements", {
+        placeholder: "Haushaltskonto",
+        disabled: !values.own,
+        hint: "How your other accounts' statements name this one. Many bank statements print no IBAN for a transfer, so the name tells it.",
+      })}
       <div className="form-field__error" role={errors.form ? "alert" : undefined}>
         {errors.form ?? ""}
       </div>

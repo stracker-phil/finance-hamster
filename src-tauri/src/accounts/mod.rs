@@ -21,6 +21,9 @@ pub struct AccountRow {
     pub iban: String,
     pub own: bool,
     pub created_at: i64,
+    /// What other accounts' statements print for this one (`Haushaltskonto`); None when not set.
+    #[serde(default)]
+    pub statement_name: Option<String>,
 }
 
 /// An account as the page shows it.
@@ -34,6 +37,7 @@ pub struct Account {
     /// `AT•• •••• 0001`.
     pub iban_masked: String,
     pub own: bool,
+    pub statement_name: Option<String>,
 }
 
 #[derive(Deserialize, Clone, Debug, TS)]
@@ -44,6 +48,8 @@ pub struct NewAccount {
     pub bank: String,
     pub iban: String,
     pub own: bool,
+    #[serde(default)]
+    pub statement_name: Option<String>,
 }
 
 /// The fields to change; the IBAN stays, as statements are matched by it.
@@ -54,6 +60,8 @@ pub struct AccountEdit {
     pub name: String,
     pub bank: String,
     pub own: bool,
+    #[serde(default)]
+    pub statement_name: Option<String>,
 }
 
 /// Upper case without spaces, when it has a valid IBAN check sum.
@@ -97,10 +105,18 @@ fn view(row: AccountRow) -> Account {
         name: row.name,
         bank: row.bank,
         own: row.own,
+        statement_name: row.statement_name,
     }
 }
 
-const COLUMNS: &str = "id, name, bank, iban, own, created_at";
+/// Trimmed, None when empty.
+fn optional(value: Option<String>) -> Option<String> {
+    value
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+}
+
+const COLUMNS: &str = "id, name, bank, iban, own, created_at, statement_name";
 
 fn from_sql(row: &rusqlite::Row) -> rusqlite::Result<AccountRow> {
     Ok(AccountRow {
@@ -110,6 +126,7 @@ fn from_sql(row: &rusqlite::Row) -> rusqlite::Result<AccountRow> {
         iban: row.get(3)?,
         own: row.get(4)?,
         created_at: row.get(5)?,
+        statement_name: row.get(6)?,
     })
 }
 
@@ -166,6 +183,7 @@ pub fn add(db: &Db, input: NewAccount, now: i64) -> AppResult<(Account, Written)
         iban,
         own: input.own,
         created_at: now,
+        statement_name: optional(input.statement_name),
     };
     let op = Op::new(
         format!("Add Account {name}"),
@@ -183,12 +201,22 @@ pub fn edit(db: &Db, id: &str, input: AccountEdit) -> AppResult<Written> {
         name: required_name(&input.name)?,
         bank: input.bank.trim().to_string(),
         own: input.own,
+        statement_name: optional(input.statement_name),
         ..before.clone()
     };
-    let op = Op::new(
-        format!("Edit Account {}", after.name),
-        vec![Change::update(TABLE, &before, &after)?],
-    );
+    let mut changes = vec![Change::update(TABLE, &before, &after)?];
+    // Which lines are transfers between own accounts follows the accounts; the rules decide them again.
+    if (before.own, &before.statement_name) != (after.own, &after.statement_name) {
+        let accounts: Vec<AccountRow> = db
+            .read(rows)?
+            .into_iter()
+            .map(|a| if a.id == after.id { after.clone() } else { a })
+            .collect();
+        let own = crate::rules::apply::own_of(accounts);
+        let now = chrono::Utc::now().timestamp_millis();
+        changes.extend(db.read(|c| crate::rules::apply::changes_with_own(c, &own, now))?);
+    }
+    let op = Op::new(format!("Edit Account {}", after.name), changes);
     db.write(op, Source::Ui)
 }
 
@@ -212,6 +240,7 @@ mod tests {
             bank: "Example Sparkasse".into(),
             iban: iban.into(),
             own: true,
+            statement_name: None,
         }
     }
 
@@ -220,6 +249,14 @@ mod tests {
             name: name.into(),
             bank: bank.into(),
             own,
+            statement_name: None,
+        }
+    }
+
+    fn named(account: &Account, statement_name: Option<&str>) -> AccountEdit {
+        AccountEdit {
+            statement_name: statement_name.map(Into::into),
+            ..edit_to(&account.name, &account.bank, account.own)
         }
     }
 
@@ -278,6 +315,7 @@ mod tests {
             bank: " Example Sparkasse ".into(),
             iban: "at24 1999 9000 0000 0001".into(),
             own: true,
+            statement_name: None,
         };
 
         let (account, written) = add(&db, input, 10).unwrap();
@@ -295,6 +333,7 @@ mod tests {
             bank: "Example Sparkasse".into(),
             iban_masked: "AT•• •••• 0001".into(),
             own: true,
+            statement_name: None,
         };
         assert_eq!(account, expected);
         assert_eq!(list(&db).unwrap(), vec![expected]);
@@ -308,6 +347,7 @@ mod tests {
                 iban: PRIVATE.into(),
                 own: true,
                 created_at: 10,
+                statement_name: None,
             }
         );
     }
@@ -418,6 +458,7 @@ mod tests {
                 bank: "Example Bank".into(),
                 iban_masked: "AT•• •••• 0001".into(),
                 own: false,
+                statement_name: None,
             }]
         );
         let stored = db.read(|c| row(c, &account.id)).unwrap().unwrap();
@@ -462,6 +503,7 @@ mod tests {
             bank: "Example Sparkasse".into(),
             iban_masked: "AT•• •••• 0001".into(),
             own: true,
+            statement_name: Some("Alex Beispiel".into()),
         };
         assert_eq!(
             serde_json::to_value(&account).unwrap(),
@@ -470,8 +512,62 @@ mod tests {
                 "name": "Private",
                 "bank": "Example Sparkasse",
                 "ibanMasked": "AT•• •••• 0001",
-                "own": true
+                "own": true,
+                "statementName": "Alex Beispiel"
             })
         );
+    }
+
+    #[test]
+    fn a_statement_name_is_trimmed_and_an_empty_one_is_none_on_add_and_edit() {
+        let (_dir, db) = open();
+        for (input, expected) in [
+            (Some("  Haushalt  "), Some("Haushalt")),
+            (Some("   "), None),
+            (Some(""), None),
+            (None, None),
+        ] {
+            let (account, _) = add(
+                &db,
+                NewAccount {
+                    statement_name: input.map(Into::into),
+                    ..new_account("Account", PRIVATE)
+                },
+                1,
+            )
+            .unwrap();
+            assert_eq!(account.statement_name.as_deref(), expected, "add {input:?}");
+            assert_eq!(
+                list(&db)
+                    .unwrap()
+                    .iter()
+                    .find(|a| a.id == account.id)
+                    .and_then(|a| a.statement_name.clone())
+                    .as_deref(),
+                expected,
+                "listed {input:?}"
+            );
+            db.undo().unwrap().unwrap();
+        }
+
+        let (account, _) = add(&db, new_account("Private", PRIVATE), 1).unwrap();
+        for (input, expected) in [
+            (Some("  Alex Beispiel "), Some("Alex Beispiel")),
+            (Some("  "), None),
+        ] {
+            edit(&db, &account.id, named(&account, input)).unwrap();
+            let stored = db.read(|c| row(c, &account.id)).unwrap().unwrap();
+            assert_eq!(stored.statement_name.as_deref(), expected, "edit {input:?}");
+        }
+    }
+
+    #[test]
+    fn editing_only_the_name_of_an_account_writes_only_the_accounts_table() {
+        let (_dir, db) = open();
+        let (account, _) = add(&db, new_account("Private", PRIVATE), 1).unwrap();
+
+        let written = edit(&db, &account.id, edit_to("Daily", &account.bank, true)).unwrap();
+
+        assert_eq!(written.tables, vec!["accounts".to_string()]);
     }
 }

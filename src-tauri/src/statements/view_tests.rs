@@ -131,13 +131,13 @@ fn months_are_full_part_or_missing_by_the_days_the_statements_cover() {
     assert_eq!(
         covers(account(&overview, "Household")),
         [
-            Missing, Part, Missing, Full, Full, Full, Full, Full, Full, Full, Full, Part
+            Missing, Part, Missing, Part, Full, Full, Full, Full, Full, Full, Full, Part
         ]
     );
     assert_eq!(
         covers(account(&overview, "Business")),
         [
-            Missing, Missing, Missing, Missing, Missing, Missing, Missing, Missing, Missing, Full,
+            Missing, Missing, Missing, Missing, Missing, Missing, Missing, Missing, Missing, Part,
             Full, Part
         ]
     );
@@ -288,7 +288,7 @@ fn the_seeded_demo_accounts_are_current_but_have_lines_to_review() {
     let (_dir, db) = seeded();
     let overview = overview(&db);
 
-    for (name, waiting) in [("Private", 21), ("Household", 9), ("Business", 2)] {
+    for (name, waiting) in [("Private", 10), ("Business", 3)] {
         let account = account(&overview, name);
         assert_eq!(account.state, AccountState::Review, "{name}");
         assert_eq!(account.to_review, waiting, "{name}");
@@ -298,6 +298,18 @@ fn the_seeded_demo_accounts_are_current_but_have_lines_to_review() {
             "{name}"
         );
     }
+}
+
+#[test]
+fn the_seeded_household_account_has_every_line_decided_and_is_up_to_date() {
+    let (_dir, db) = seeded();
+    let overview = overview(&db);
+
+    let household = account(&overview, "Household");
+
+    assert_eq!(household.to_review, 0);
+    assert_eq!(household.state, AccountState::Ok);
+    assert_eq!(household.state_label, "Up to date");
 }
 
 #[test]
@@ -376,7 +388,7 @@ fn a_skipped_statement_number_is_a_note_naming_the_uncovered_days() {
 
     assert_eq!(
         account(&overview, "Household").note.as_deref(),
-        Some("Statement Nr. 002/2026 was never imported: no lines between 21 Jan and 1 Mar.")
+        Some("Statement Nr. 002/2026 was never imported: no lines between 25 Jan and 2 Mar.")
     );
     assert_eq!(account(&overview, "Private").note, None);
     assert_eq!(account(&overview, "Business").note, None);

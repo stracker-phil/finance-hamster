@@ -1,5 +1,6 @@
-//! The demo subscriptions: a streaming service and an AI tool billed in dollars that counts for ANV, both
-//! found in the demo statements, and one cancelled audiobook service.
+//! The demo subscriptions: a streaming service, an AI tool billed in dollars that counts for ANV and the
+//! household insurance, found by its contract number rather than the insurer's name; one cancelled
+//! audiobook service.
 
 use chrono::{Datelike, NaiveDate};
 
@@ -21,7 +22,7 @@ struct Demo {
     ended: Option<(u32, u32)>,
 }
 
-const DEMOS: [Demo; 3] = [
+const DEMOS: [Demo; 4] = [
     Demo {
         name: "Streamflix",
         tone: 5,
@@ -42,6 +43,17 @@ const DEMOS: [Demo; 3] = [
         match_text: "LUMEN AI",
         item_key: Some("digital-equipment"),
         reminder: Reminder::ThreeDays,
+        ended: None,
+    },
+    Demo {
+        name: "Household insurance",
+        tone: 4,
+        category: "Insurance",
+        amount: "38,90",
+        currency: "EUR",
+        match_text: "4400-1122",
+        item_key: None,
+        reminder: Reminder::Off,
         ended: None,
     },
     Demo {

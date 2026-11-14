@@ -423,7 +423,7 @@ fn a_suggestion_without_an_item_has_no_item_hint() {
 }
 
 #[test]
-fn the_seeded_demo_keeps_only_the_cafe_and_household_lines_in_the_queue() {
+fn the_seeded_demo_keeps_only_the_cafe_and_clouddesk_lines_in_the_queue() {
     let dir = temp_config_dir();
     let db = Db::open(dir.path()).unwrap();
     seed_if_empty(
@@ -438,14 +438,14 @@ fn the_seeded_demo_keeps_only_the_cafe_and_household_lines_in_the_queue() {
     let mut distinct: Vec<&str> = titles(&queue);
     distinct.sort_unstable();
     distinct.dedup();
-    assert_eq!(distinct, ["CAFE LINDE DORNBIRN 6850", "HOUSEHOLD"]);
+    assert_eq!(distinct, ["CAFE LINDE DORNBIRN 6850", "CLOUDDESK DUBLIN"]);
     assert_eq!(
         queue
             .subscriptions
             .iter()
             .map(|s| s.name.as_str())
             .collect::<Vec<_>>(),
-        ["Lumen AI", "Streamflix"]
+        ["Household insurance", "Lumen AI", "Streamflix"]
     );
 }
 

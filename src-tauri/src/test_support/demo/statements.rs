@@ -1,5 +1,7 @@
 //! The demo statements: a year of made-up months for each demo account, imported through the real pipeline.
-//! Household misses February, so the Statements page shows a gap.
+//! Each account has its own bookings: Private the salary and card payments, Household the shared costs paid
+//! from Private's standing order, Business client income and its costs. Household misses February, so the
+//! Statements page shows a gap.
 
 use std::path::Path;
 
@@ -10,7 +12,12 @@ use crate::error::AppResult;
 use crate::statements::import;
 use crate::test_support::statements::{Statement, StatementLine, demo_month};
 
-const HOUSEHOLD_IBAN: &str = "AT94 1999 9000 0000 0002";
+#[derive(Clone, Copy, PartialEq)]
+enum Bookings {
+    Private,
+    Household,
+    Business,
+}
 
 struct DemoAccount {
     holder: &'static str,
@@ -18,9 +25,11 @@ struct DemoAccount {
     iban: &'static str,
     first_month: u32,
     never_imported: &'static [u32],
-    /// A monthly standing order to the household account.
-    pays_household: bool,
+    bookings: Bookings,
 }
+
+/// The standing order from Private to Household, on both statements.
+const HOUSEHOLD_SHARE: i64 = 50_000;
 
 const ACCOUNTS: [DemoAccount; 3] = [
     DemoAccount {
@@ -28,21 +37,21 @@ const ACCOUNTS: [DemoAccount; 3] = [
         iban: "AT24 1999 9000 0000 0001",
         first_month: 1,
         never_imported: &[],
-        pays_household: true,
+        bookings: Bookings::Private,
     },
     DemoAccount {
         holder: "Household",
-        iban: HOUSEHOLD_IBAN,
+        iban: "AT94 1999 9000 0000 0002",
         first_month: 1,
         never_imported: &[2],
-        pays_household: false,
+        bookings: Bookings::Household,
     },
     DemoAccount {
         holder: "Business",
         iban: "AT67 1999 9000 0000 0003",
         first_month: 9,
         never_imported: &[],
-        pays_household: false,
+        bookings: Bookings::Business,
     },
 ];
 
@@ -57,6 +66,89 @@ fn month_end(first: NaiveDate) -> NaiveDate {
         .map_or(first, |next| next - Days::new(1))
 }
 
+fn line(text: &str, extra: &[&str], value_date: NaiveDate, cents: i64) -> StatementLine {
+    StatementLine {
+        text: text.into(),
+        extra: extra.iter().map(|e| (*e).to_string()).collect(),
+        value_date,
+        cents,
+    }
+}
+
+/// `POS 85,40 AT K1 06.10. 18:05` with the merchant on the line below, as the bank prints a card payment.
+fn card(
+    kind: &str,
+    cents: i64,
+    day: NaiveDate,
+    time: &str,
+    merchant: &str,
+    booked: u64,
+) -> StatementLine {
+    let paid = format!("{},{:02}", cents / 100, cents % 100);
+    let text = format!(
+        "{kind:<6} {paid:>8} AT  K1   {}. {time}",
+        day.format("%d.%m")
+    );
+    line(&text, &[merchant], day + Days::new(booked), -cents)
+}
+
+/// Shared costs, paid from Private's standing order.
+fn household_lines(first: NaiveDate) -> Vec<StatementLine> {
+    let d = |day: u64| first + Days::new(day - 1);
+    let month = first.format("%m/%Y");
+    vec![
+        line("Haushalt", &["Alex Beispiel"], d(2), HOUSEHOLD_SHARE),
+        card(
+            "POS",
+            8_540,
+            d(6),
+            "18:05",
+            "SPAR MARKT DORNBIRN 6850 040",
+            1,
+        ),
+        line(
+            &format!("Strom {month}"),
+            &[
+                "STADTWERKE MUSTER",
+                "MDID:000412345",
+                &format!("Strom {month}"),
+            ],
+            d(15),
+            -6_400,
+        ),
+        card(
+            "POS",
+            6_215,
+            d(20),
+            "11:30",
+            "SPAR MARKT DORNBIRN 6850 040",
+            1,
+        ),
+        line(
+            "Polizze Nr. 4400-1122",
+            &["MUSTER VERSICHERUNG AG", "Polizze Nr. 4400-1122"],
+            d(25),
+            -3_890,
+        ),
+    ]
+}
+
+/// Client income and the business's own costs.
+fn business_lines(first: NaiveDate) -> Vec<StatementLine> {
+    let d = |day: u64| first + Days::new(day - 1);
+    let month = first.month();
+    vec![
+        line(
+            &format!("RE 2026-{month:03}"),
+            &["KUNDE BEISPIEL GMBH", &format!("RE 2026-{month:03}")],
+            d(4),
+            240_000,
+        ),
+        card("E-COMM", 2_900, d(9), "00:00", "CLOUDDESK DUBLIN 372", 1),
+        line("Kontoführung", &[], d(28), -990),
+    ]
+}
+
 /// The month's statement for the account, cut off at `until`.
 fn statement(
     account: &DemoAccount,
@@ -69,16 +161,20 @@ fn statement(
     s.holder = format!("Alex Beispiel ({})", account.holder);
     s.iban = account.iban.to_string();
     s.to = month_end(first).min(until);
-    if account.pays_household {
-        // The bank prints the receiving account's name, not its IBAN.
-        s.lines.push(StatementLine {
-            text: "Haushalt".into(),
-            extra: vec!["HOUSEHOLD".into()],
-            value_date: first + Days::new(1),
-            cents: -50_000,
-        });
-        s.lines.sort_by_key(|l| l.value_date);
+    match account.bookings {
+        Bookings::Private => {
+            // The bank prints the receiving account's name, not its IBAN.
+            s.lines.push(line(
+                "Haushalt",
+                &["HOUSEHOLD"],
+                first + Days::new(1),
+                -HOUSEHOLD_SHARE,
+            ));
+        }
+        Bookings::Household => s.lines = household_lines(first),
+        Bookings::Business => s.lines = business_lines(first),
     }
+    s.lines.sort_by_key(|l| l.value_date);
     s.lines.retain(|l| l.value_date <= s.to);
     s
 }
@@ -100,6 +196,10 @@ pub fn seed(db: &Db, config_dir: &Path, today: NaiveDate) -> AppResult<usize> {
                 continue;
             }
             let s = statement(account, month, first, until, balance);
+            // A statement prints its period from its bookings, so a month with none yet has no statement.
+            if s.lines.is_empty() {
+                continue;
+            }
             balance = s.new_balance();
             if account.never_imported.contains(&month) {
                 continue;

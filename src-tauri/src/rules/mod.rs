@@ -51,7 +51,7 @@ pub struct ItemOption {
     pub kz: String,
 }
 
-const TRANSFERS_ID: &str = "builtin-transfers";
+pub const TRANSFERS_ID: &str = "builtin-transfers";
 const BANK_FEES_ID: &str = "builtin-bank-fees";
 const BANK_FEE_TOKENS: [&str; 2] = ["Kontoführung", "Debitkarte"];
 

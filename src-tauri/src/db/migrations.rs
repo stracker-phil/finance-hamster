@@ -226,6 +226,8 @@ pub const MIGRATIONS: &[&str] = &[
         year INTEGER NOT NULL UNIQUE,
         completed_at INTEGER NOT NULL
     );",
+    // 13: the name other statements print for an account, to tell transfers when they print no IBAN.
+    "ALTER TABLE accounts ADD COLUMN statement_name TEXT;",
 ];
 
 pub fn version(conn: &Connection) -> AppResult<usize> {
@@ -299,6 +301,34 @@ mod tests {
         ]
         .map(String::from)
         .to_vec()
+    }
+
+    #[test]
+    fn a_file_at_version_twelve_gains_the_statement_name_and_keeps_its_accounts() {
+        let dir = temp_config_dir();
+        let mut conn = Connection::open(dir.path().join("v12.sqlite")).unwrap();
+        for sql in &MIGRATIONS[..12] {
+            conn.execute_batch(sql).unwrap();
+        }
+        conn.pragma_update(None, "user_version", 12i64).unwrap();
+        conn.execute(
+            "INSERT INTO accounts (id, name, bank, iban, own, created_at) \
+             VALUES ('account-1', 'Private', 'Example Sparkasse', 'AT241999900000000001', 1, 1)",
+            [],
+        )
+        .unwrap();
+
+        migrate(&mut conn).unwrap();
+
+        assert_eq!(version(&conn).unwrap(), MIGRATIONS.len());
+        let (name, statement_name): (String, Option<String>) = conn
+            .query_row(
+                "SELECT name, statement_name FROM accounts WHERE id = 'account-1'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!((name.as_str(), statement_name), ("Private", None));
     }
 
     #[test]

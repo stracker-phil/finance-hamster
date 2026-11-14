@@ -12,8 +12,25 @@ pub struct Line<'a> {
     counterparty_own: bool,
 }
 
-/// An own account's id and IBAN, to tell transfers between own accounts.
-pub type OwnAccount = (String, String);
+/// One of the owner's accounts, to tell transfers between own accounts: by the IBAN, or by the name other
+/// statements print for it (real statements often print no counterparty IBAN).
+#[derive(Clone, Debug, PartialEq)]
+pub struct OwnAccount {
+    pub id: String,
+    pub iban: String,
+    pub statement_name: Option<String>,
+}
+
+/// Whether the line pays or is paid by another of the owner's accounts.
+pub fn pays_own(t: &TransactionRow, own: &[OwnAccount]) -> bool {
+    let name = t.counterparty.as_deref().map(|c| c.trim().to_uppercase());
+    own.iter().filter(|a| a.id != t.account_id).any(|a| {
+        t.counterparty_iban.as_ref() == Some(&a.iban)
+            || a.statement_name
+                .as_deref()
+                .is_some_and(|n| name.as_deref() == Some(n.trim().to_uppercase().as_str()))
+    })
+}
 
 /// The text conditions search: booking text, detail lines, merchant and counterparty, upper case.
 pub fn line_text(t: &TransactionRow) -> String {
@@ -31,10 +48,7 @@ impl<'a> Line<'a> {
             text: line_text(t),
             abs_cents: t.cents.abs(),
             account_id: &t.account_id,
-            counterparty_own: t.counterparty_iban.as_ref().is_some_and(|iban| {
-                own.iter()
-                    .any(|(id, own_iban)| own_iban == iban && id != &t.account_id)
-            }),
+            counterparty_own: pays_own(t, own),
         }
     }
 }

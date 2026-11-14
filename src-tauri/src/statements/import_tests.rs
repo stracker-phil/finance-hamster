@@ -31,6 +31,7 @@ pub(crate) fn open_with_accounts() -> (tempfile::TempDir, Db) {
                     iban: (*iban).into(),
                     own: true,
                     created_at: i as i64,
+                    statement_name: None,
                 },
             )
         })
@@ -455,6 +456,7 @@ fn a_line_to_an_account_that_is_not_the_owners_is_no_transfer() {
                         iban: "AT091999900000000077".into(),
                         own: false,
                         created_at: 10,
+                        statement_name: None,
                     },
                 )
                 .unwrap(),

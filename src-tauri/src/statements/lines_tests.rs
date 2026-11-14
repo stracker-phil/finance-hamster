@@ -165,7 +165,7 @@ fn lines_show_their_day_title_foreign_amount_signed_amount_and_flags() {
                 true,
                 false
             ),
-            ("2 Oct", "HOUSEHOLD", None, "−€500.00", false, false),
+            ("2 Oct", "HOUSEHOLD", None, "−€500.00", false, true),
             (
                 "3 Oct",
                 "HAUSVERWALTUNG MUSTER",
@@ -361,6 +361,44 @@ fn an_ignored_transfer_between_own_accounts_is_a_transfer_without_a_note() {
     let page = lines_of(&db, "account-1");
 
     assert_eq!(status_of(&page, "HOUSEHOLD"), (LineStatus::Transfer, None));
+}
+
+#[test]
+fn a_line_the_built_in_transfer_rule_ignored_shows_as_a_transfer_whatever_its_stored_flag() {
+    let (dir, db) = open_with_accounts_and_year();
+    ensure_builtins(&db, NOW, Source::App).unwrap();
+    let mut statement = october();
+    statement.lines.insert(
+        1,
+        StatementLine {
+            text: "Dauerauftrag".into(),
+            extra: vec!["HOUSEHOLD".into(), "HAUSHALT".into()],
+            value_date: day(2026, 10, 2),
+            cents: -50_000,
+        },
+    );
+    import_statement(&db, dir.path(), &statement);
+    assert_eq!(
+        status_of(&lines_of(&db, "account-1"), "HOUSEHOLD").0,
+        LineStatus::Review
+    );
+
+    crate::accounts::edit(
+        &db,
+        "account-2",
+        crate::accounts::AccountEdit {
+            name: "Household".into(),
+            bank: "Example Sparkasse".into(),
+            own: true,
+            statement_name: Some("HOUSEHOLD".into()),
+        },
+    )
+    .unwrap();
+
+    assert_eq!(
+        status_of(&lines_of(&db, "account-1"), "HOUSEHOLD"),
+        (LineStatus::Transfer, None)
+    );
 }
 
 #[test]

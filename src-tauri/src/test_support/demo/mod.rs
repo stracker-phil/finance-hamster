@@ -25,6 +25,15 @@ pub const DEMO_ACCOUNTS: [(&str, &str); 3] = [
     ("Business", "AT671999900000000003"),
 ];
 
+/// What the other demo statements print for an account, so the transfers between them are recognized.
+fn statement_name(account: &str) -> Option<&'static str> {
+    match account {
+        "Private" => Some("Alex Beispiel"),
+        "Household" => Some("HOUSEHOLD"),
+        _ => None,
+    }
+}
+
 fn demo_accounts() -> AppResult<Option<Op>> {
     let demo = DEMO_ACCOUNTS;
     let changes = demo
@@ -38,6 +47,7 @@ fn demo_accounts() -> AppResult<Option<Op>> {
                 iban: (*iban).into(),
                 own: true,
                 created_at: i as i64,
+                statement_name: statement_name(name).map(Into::into),
             };
             Change::insert(accounts::TABLE, &row)
         })
@@ -69,6 +79,9 @@ fn demo_rules() -> AppResult<Option<Op>> {
         rule(2, "HAUSVERWALTUNG", Action::Ignore, None),
         rule(3, "TANKSTELLE", Action::Ignore, None),
         rule(4, "SEITENWEISE", Action::Anv, Some("literature")),
+        rule(5, "SPAR MARKT", Action::Ignore, None),
+        rule(6, "STADTWERKE", Action::Ignore, None),
+        rule(7, "KUNDE BEISPIEL", Action::Ignore, None),
     ]);
     let changes = rows
         .iter()
@@ -188,7 +201,7 @@ mod tests {
         let db = Db::open(dir.path()).unwrap();
         assert_eq!(
             seed_if_empty(&db, dir.path(), today()).unwrap(),
-            2 + 24 + 1 + 4 + 2 + 1 + 3 + 3
+            2 + 24 + 1 + 4 + 2 + 1 + 3 + 4
         );
         let kinds: Vec<_> = crate::year::entries::entries(&db, 2026)
             .unwrap()
@@ -221,7 +234,7 @@ mod tests {
     }
 
     #[test]
-    fn the_seed_has_the_built_in_rules_and_four_demo_rules_in_running_order() {
+    fn the_seed_has_the_built_in_rules_and_seven_demo_rules_in_running_order() {
         let dir = temp_config_dir();
         let db = Db::open(dir.path()).unwrap();
         seed_if_empty(&db, dir.path(), today()).unwrap();
@@ -241,7 +254,32 @@ mod tests {
                 "demo-rule-1",
                 "demo-rule-2",
                 "demo-rule-3",
-                "demo-rule-4"
+                "demo-rule-4",
+                "demo-rule-5",
+                "demo-rule-6",
+                "demo-rule-7"
+            ]
+        );
+    }
+
+    #[test]
+    fn the_demo_accounts_carry_the_names_other_statements_print_for_them() {
+        let dir = temp_config_dir();
+        let db = Db::open(dir.path()).unwrap();
+        seed_if_empty(&db, dir.path(), today()).unwrap();
+
+        let names: Vec<(String, Option<String>)> = accounts::list(&db)
+            .unwrap()
+            .into_iter()
+            .map(|a| (a.name, a.statement_name))
+            .collect();
+
+        assert_eq!(
+            names,
+            [
+                ("Private".to_string(), Some("Alex Beispiel".to_string())),
+                ("Household".to_string(), Some("HOUSEHOLD".to_string())),
+                ("Business".to_string(), None),
             ]
         );
     }
@@ -262,13 +300,25 @@ mod tests {
             Some("literature"),
             "demo-rule-4",
         );
-        for outcome in outcomes_of_lines_containing(&db, "CAFE") {
-            assert_eq!(outcome, None);
+        all_decided_as(&db, "SPAR MARKT", Action::Ignore, None, "demo-rule-5");
+        all_decided_as(&db, "STADTWERKE", Action::Ignore, None, "demo-rule-6");
+        all_decided_as(&db, "KUNDE BEISPIEL", Action::Ignore, None, "demo-rule-7");
+        all_decided_as(
+            &db,
+            "Kontoführung",
+            Action::Ignore,
+            None,
+            "builtin-bank-fees",
+        );
+        for needle in ["CAFE", "CLOUDDESK"] {
+            for outcome in outcomes_of_lines_containing(&db, needle) {
+                assert_eq!(outcome, None, "{needle}");
+            }
         }
     }
 
     #[test]
-    fn the_seed_has_three_subscriptions_and_links_the_lines_they_match() {
+    fn the_seed_has_four_subscriptions_and_links_the_lines_they_match() {
         let dir = temp_config_dir();
         let db = Db::open(dir.path()).unwrap();
         seed_if_empty(&db, dir.path(), today()).unwrap();
@@ -287,6 +337,7 @@ mod tests {
         assert_eq!(
             shown,
             [
+                ("Household insurance", None, None),
                 ("Lumen AI", Some("digital-equipment"), None),
                 ("Streamflix", None, None),
                 ("Tonfeld Audiobooks", None, Some("2026-06-30")),
@@ -319,15 +370,35 @@ mod tests {
     }
 
     #[test]
-    fn seeded_transfers_to_household_stay_undecided_because_statements_print_no_counterparty_iban()
-    {
+    fn the_household_insurance_lines_are_linked_to_its_subscription_by_the_contract_number() {
+        let dir = temp_config_dir();
+        let db = Db::open(dir.path()).unwrap();
+        seed_if_empty(&db, dir.path(), today()).unwrap();
+        let id = db
+            .read(crate::subscriptions::store::subscriptions)
+            .unwrap()
+            .into_iter()
+            .find(|s| s.name == "Household insurance")
+            .map(|s| s.id);
+
+        let outcomes = outcomes_of_lines_containing(&db, "4400-1122");
+
+        assert_eq!(outcomes, vec![Some((Action::Subscription, None, id)); 9]);
+    }
+
+    #[test]
+    fn seeded_transfers_between_private_and_household_are_decided_by_the_built_in_rule_through_statement_names()
+     {
         let dir = temp_config_dir();
         let db = Db::open(dir.path()).unwrap();
         seed_if_empty(&db, dir.path(), today()).unwrap();
 
-        let outcomes = outcomes_of_lines_containing(&db, "HOUSEHOLD");
+        let to_household = outcomes_of_lines_containing(&db, "HOUSEHOLD");
+        let from_private = outcomes_of_lines_containing(&db, "Alex Beispiel");
 
-        assert_eq!(outcomes, vec![None; 11]);
+        let decided = Some((Action::Ignore, None, Some("builtin-transfers".to_string())));
+        assert_eq!(to_household, vec![decided.clone(); 11]);
+        assert_eq!(from_private, vec![decided; 10]);
     }
 
     #[test]
