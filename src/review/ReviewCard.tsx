@@ -123,12 +123,12 @@ export function ReviewCard(props: Props) {
         <div className="review-card__plan">
           <Info size={15} />
           <div>
-            <b>Plan changed?</b> {plan.text}
+            <b>Another amount.</b> {plan.text}
           </div>
         </div>
       )}
       <div className="review-card__question" id="review-question">
-        What is this line?
+        {plan ? `Is this ${plan.name}?` : "What is this line?"}
       </div>
       <div className="review-card__choices" role="radiogroup" aria-labelledby="review-question">
         {choices.map((c) => {

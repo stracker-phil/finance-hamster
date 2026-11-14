@@ -31,14 +31,13 @@ const EMPTY_FORM: SubscriptionForm = {
   reminder: "three_days",
   itemKey: null,
   matchText: "",
-  tolerancePercent: 0,
+  exactOnly: false,
 };
 
 function renderSheet({ id = null, initial = null, onClose = vi.fn() }: { id?: string | null; initial?: SubscriptionForm | null; onClose?: () => void } = {}) {
   return renderWithQuery(<SubscriptionSheet id={id} initial={initial} onClose={onClose} />);
 }
 
-const toleranceSelect = () => screen.getByRole<HTMLSelectElement>("combobox", { name: /Amount may differ by/ });
 const submit = () => userEvent.click(screen.getByRole("button", { name: "Add Subscription" }));
 
 beforeEach(() => {
@@ -224,41 +223,37 @@ describe("SubscriptionSheet", () => {
     });
   });
 
-  describe("the amount tolerance", () => {
-    it.each([
-      ["Exact amount", 0],
-      ["± 1 %", 1],
-      ["± 2 %", 2],
-      ["± 5 %", 5],
-      ["± 10 %", 10],
-      ["Any amount", null],
-    ])("sends %s as %j", async (label, tolerancePercent) => {
-      renderSheet({ initial: subscriptionForm({ tolerancePercent: tolerancePercent === 0 ? 5 : 0 }) });
+  describe("another amount", () => {
+    const ASK_HINT = "A charge at another amount waits in Review: a new plan, a one-off, or not this subscription.";
+    const EXACT_HINT = "Only charges of exactly this amount are this subscription; others are reviewed like any line.";
 
-      await userEvent.selectOptions(toleranceSelect(), label);
-      await submit();
+    it("starts on Ask me with its hint", () => {
+      renderSheet({ initial: subscriptionForm() });
 
-      expect(mocked.subscriptionSave).toHaveBeenCalledWith(null, expect.objectContaining({ tolerancePercent }));
+      expect(screen.getByRole("button", { name: "Ask me" }).getAttribute("aria-pressed")).toBe("true");
+      expect(screen.getByRole("button", { name: "Exact amount only" }).getAttribute("aria-pressed")).toBe("false");
+      expect(screen.getByText(ASK_HINT)).toBeTruthy();
     });
 
-    it.each([
-      [0, "Exact amount"],
-      [5, "± 5 %"],
-      [null, "Any amount"],
-      [3, "± 3 %"],
-    ])("shows a stored tolerance of %j as %s", (stored, label) => {
-      renderSheet({ initial: subscriptionForm({ tolerancePercent: stored }) });
+    it("sends exactOnly true and shows the other hint after Exact amount only is chosen", async () => {
+      renderSheet({ initial: subscriptionForm() });
 
-      expect(toleranceSelect().selectedOptions[0].textContent).toBe(label);
-    });
-
-    it("keeps a stored value outside the list selectable and sends it unchanged", async () => {
-      renderSheet({ initial: subscriptionForm({ tolerancePercent: 3 }) });
-
+      await userEvent.click(screen.getByRole("button", { name: "Exact amount only" }));
       await submit();
 
-      expect(screen.getByRole("option", { name: "± 3 %" })).toBeTruthy();
-      expect(mocked.subscriptionSave).toHaveBeenCalledWith(null, expect.objectContaining({ tolerancePercent: 3 }));
+      expect(screen.getByText(EXACT_HINT)).toBeTruthy();
+      expect(screen.queryByText(ASK_HINT)).toBeNull();
+      expect(mocked.subscriptionSave).toHaveBeenCalledWith(null, expect.objectContaining({ exactOnly: true }));
+    });
+
+    it("shows a stored exact-only subscription on Exact amount only and sends Ask me when switched back", async () => {
+      renderSheet({ initial: subscriptionForm({ exactOnly: true }) });
+      expect(screen.getByRole("button", { name: "Exact amount only" }).getAttribute("aria-pressed")).toBe("true");
+
+      await userEvent.click(screen.getByRole("button", { name: "Ask me" }));
+      await submit();
+
+      expect(mocked.subscriptionSave).toHaveBeenCalledWith(null, expect.objectContaining({ exactOnly: false }));
     });
   });
 

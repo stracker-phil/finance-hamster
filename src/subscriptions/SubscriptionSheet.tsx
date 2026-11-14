@@ -26,7 +26,7 @@ const empty = (): SubscriptionForm => ({
   reminder: "off",
   itemKey: null,
   matchText: "",
-  tolerancePercent: 0,
+  exactOnly: false,
 });
 
 export const INTERVALS: { value: Interval; label: string }[] = [
@@ -47,24 +47,10 @@ const REMINDERS: { value: Reminder; label: string }[] = [
   { value: "one_week", label: "1 week before" },
 ];
 
-/** How far a charge may differ from the plan, in percent; the select spells "any amount" (null) as `any`. */
-const ANY = "any";
-const TOLERANCES = [
-  { value: "0", label: "Exact amount" },
-  { value: "1", label: "± 1 %" },
-  { value: "2", label: "± 2 %" },
-  { value: "5", label: "± 5 %" },
-  { value: "10", label: "± 10 %" },
+const OTHER_AMOUNTS = [
+  { value: "ask" as const, label: "Ask me" },
+  { value: "exact" as const, label: "Exact amount only" },
 ];
-const toChoice = (percent: number | null) => (percent === null ? ANY : String(percent));
-const fromChoice = (value: string) => (value === ANY ? null : Number(value));
-
-/** The choices, plus a stored value none of them offers. */
-function toleranceOptions(percent: number | null) {
-  const offered = percent === null || TOLERANCES.some((t) => t.value === String(percent));
-  const own = offered ? [] : [{ value: String(percent), label: `± ${percent} %` }];
-  return [...TOLERANCES, ...own, { value: ANY, label: "Any amount" }];
-}
 
 const letterOf = (name: string) => name.match(/[\p{L}\p{N}]/u)?.[0]?.toUpperCase() ?? "?";
 
@@ -219,25 +205,18 @@ export function SubscriptionSheet({ id, initial, source, onClose }: { id: string
               <input id={field("match")} className="field mono sub-sheet__match" value={form.matchText} placeholder="LUMEN AI" aria-invalid={!!message("match")} onChange={(e) => set({ matchText: e.target.value })} />
             </div>
             <div className="sub-group__row">
-              <label htmlFor={field("tolerance")} className="sub-group__text">
-                Amount may differ by
-                <span className="add-doc__hint">From the plan in effect on the charge&apos;s date. A charge beyond it asks “Plan changed?” in Review.</span>
-              </label>
-              <select
-                id={field("tolerance")}
-                className="field"
-                value={toChoice(form.tolerancePercent)}
-                onChange={(e) => set({ tolerancePercent: fromChoice(e.target.value) })}
-              >
-                {toleranceOptions(form.tolerancePercent).map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
+              <span className="sub-group__text">
+                Another amount
+                <span className="add-doc__hint">
+                  {form.exactOnly
+                    ? "Only charges of exactly this amount are this subscription; others are reviewed like any line."
+                    : "A charge at another amount waits in Review: a new plan, a one-off, or not this subscription."}
+                </span>
+              </span>
+              <Segmented label="Another amount" options={OTHER_AMOUNTS} value={form.exactOnly ? "exact" : "ask"} onChange={(v) => set({ exactOnly: v === "exact" })} />
             </div>
           </div>
-          {fieldError("match", "tolerance")}
+          {fieldError("match")}
           <p className="add-doc__hint sub-sheet__count" aria-live="polite">
             {count?.text ?? " "}
           </p>

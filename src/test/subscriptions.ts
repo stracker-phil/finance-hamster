@@ -16,7 +16,7 @@ export function subscriptionForm(patch: Partial<SubscriptionForm> = {}): Subscri
     reminder: "off",
     itemKey: null,
     matchText: "LUMEN AI",
-    tolerancePercent: 0,
+    exactOnly: false,
     ...patch,
   };
 }

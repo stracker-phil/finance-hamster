@@ -240,6 +240,9 @@ pub const MIGRATIONS: &[&str] = &[
              ORDER BY p.start DESC LIMIT 1),
             0)
     END;",
+    // 15: a subscription asks about another amount unless it takes only its exact amount; the tolerance
+    // columns stay for the journal's older ops.
+    "ALTER TABLE subscriptions ADD COLUMN exact_only INTEGER NOT NULL DEFAULT 0;",
 ];
 
 pub fn version(conn: &Connection) -> AppResult<usize> {
@@ -313,6 +316,48 @@ mod tests {
         ]
         .map(String::from)
         .to_vec()
+    }
+
+    #[test]
+    fn a_file_at_version_fourteen_gains_exact_only_off_for_every_subscription() {
+        let dir = temp_config_dir();
+        let mut conn = Connection::open(dir.path().join("v14.sqlite")).unwrap();
+        for sql in &MIGRATIONS[..14] {
+            conn.execute_batch(sql).unwrap();
+        }
+        conn.pragma_update(None, "user_version", 14i64).unwrap();
+        for (id, tolerance) in [
+            ("sub-exact", Some(0)),
+            ("sub-any", None),
+            ("sub-wide", Some(15)),
+        ] {
+            conn.execute(
+                "INSERT INTO subscriptions (id, name, tone, category, reminder, match_text, tolerance_percent, created_at) \
+                 VALUES (?1, ?1, 1, 'Media', 'off', 'TEXT', ?2, 1)",
+                rusqlite::params![id, tolerance],
+            )
+            .unwrap();
+        }
+
+        migrate(&mut conn).unwrap();
+
+        assert_eq!(version(&conn).unwrap(), MIGRATIONS.len());
+        let mut query = conn
+            .prepare("SELECT id, exact_only FROM subscriptions ORDER BY id")
+            .unwrap();
+        let flags: Vec<(String, i64)> = query
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect();
+        assert_eq!(
+            flags,
+            [
+                ("sub-any".to_string(), 0),
+                ("sub-exact".to_string(), 0),
+                ("sub-wide".to_string(), 0),
+            ]
+        );
     }
 
     #[test]

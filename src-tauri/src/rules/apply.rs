@@ -8,8 +8,8 @@ use super::store::{self, DecisionRow, RuleRow};
 use crate::accounts;
 use crate::db::Change;
 use crate::error::AppResult;
-use crate::statements::store as statements;
-use crate::subscriptions::matcher::Matchers;
+use crate::statements::store::{self as statements, TransactionRow};
+use crate::subscriptions::matcher::{self, Matchers};
 
 pub fn own_accounts(conn: &Connection) -> AppResult<Vec<OwnAccount>> {
     Ok(own_of(accounts::rows(conn)?))
@@ -75,14 +75,21 @@ fn changes_for(
     skipped: Option<&str>,
 ) -> AppResult<Vec<Change>> {
     let existing = store::decisions(conn)?;
+    let lines = statements::all_transactions(conn)?;
+    let recomputed = |line: &TransactionRow| {
+        !existing.get(&line.id).is_some_and(DecisionRow::by_hand)
+            && skipped != Some(line.id.as_str())
+    };
+    let charges = subscriptions.assign(&lines, &matcher::taken(&existing, true), |line| {
+        recomputed(line) && engine::decide(rules, line, own, now).is_none()
+    });
     let mut changes = Vec::new();
-    for line in statements::all_transactions(conn)? {
-        let current = existing.get(&line.id);
-        if current.is_some_and(DecisionRow::by_hand) || skipped == Some(line.id.as_str()) {
+    for line in &lines {
+        if !recomputed(line) {
             continue;
         }
-        let wanted =
-            engine::decide(rules, &line, own, now).or_else(|| subscriptions.decide(&line, now));
+        let current = existing.get(&line.id);
+        let wanted = engine::decide(rules, line, own, now).or_else(|| charges.decide(line, now));
         if let Some(change) = change_for(current, wanted)? {
             changes.push(change);
         }

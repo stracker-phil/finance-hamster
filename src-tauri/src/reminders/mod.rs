@@ -14,7 +14,7 @@ use crate::settings::Settings;
 use crate::statements::store as statements;
 use crate::statements::view as statement_view;
 use crate::subscriptions::Book;
-use crate::subscriptions::matcher::Matchers;
+use crate::subscriptions::matcher::{self, Matchers};
 use crate::subscriptions::store::Reminder;
 use crate::subscriptions::view::Format;
 use crate::taxyears::{self, YearState};
@@ -73,16 +73,18 @@ fn renewals(db: &Db, today: NaiveDate, format: &Format) -> AppResult<Vec<Due>> {
 fn price_changes(db: &Db) -> AppResult<Vec<Due>> {
     let matchers = db.read(Matchers::load)?;
     let decided = db.read(decisions::decisions)?;
-    Ok(db
-        .read(statements::all_transactions)?
+    let lines = db.read(statements::all_transactions)?;
+    let asked = matchers.assign(&lines, &matcher::taken(&decided, false), |t| {
+        !decided.contains_key(&t.id)
+    });
+    Ok(lines
         .iter()
-        .filter(|t| !decided.contains_key(&t.id))
         .filter_map(|t| {
-            let (sub, _) = matchers.plan_changed(t)?;
+            let (sub, _) = asked.asks_about(&t.id)?;
             Some(due(
                 format!("plan:{}", t.id),
                 format!("{} charged a different amount", sub.name),
-                "Review the line to update its plan or keep it as a one-off.".into(),
+                "Review the line: a new price, a one-off, or not this subscription.".into(),
             ))
         })
         .collect())
@@ -405,7 +407,7 @@ mod tests {
                 key: format!("plan:{}", line.id),
                 notification: notification(
                     "Lumen AI charged a different amount",
-                    "Review the line to update its plan or keep it as a one-off."
+                    "Review the line: a new price, a one-off, or not this subscription."
                 ),
             }]
         );

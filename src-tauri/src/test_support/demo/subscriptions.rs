@@ -86,7 +86,7 @@ pub fn seed(db: &Db, today: NaiveDate, now: i64) -> AppResult<usize> {
             reminder: demo.reminder,
             item_key: demo.item_key.map(Into::into),
             match_text: demo.match_text.into(),
-            tolerance_percent: Some(0),
+            exact_only: false,
         };
         edit::create(db, &form, today, now, Source::Seed)?;
     }

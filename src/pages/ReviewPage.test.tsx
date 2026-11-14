@@ -567,30 +567,48 @@ describe("ReviewPage", () => {
       mocked.subscriptionPrefill.mockResolvedValue(subscriptionForm());
     });
 
-    it("explains the change and offers Update Plan, One-off and New Subscription instead of ANV, Subscription and Ignore", async () => {
+    const waitForPlan = () => screen.findByText("Another amount.");
+
+    it("asks whether the line is the subscription and offers Yes new price, Yes this once and No instead of ANV, Subscription and Ignore", async () => {
       render();
 
-      expect(await screen.findByText("Plan changed?")).toBeTruthy();
+      expect(await waitForPlan()).toBeTruthy();
+      expect(screen.getByRole("radiogroup", { name: "Is this Lumen AI?" })).toBeTruthy();
       expect(screen.getByText(/Lumen AI charged €25.00 instead of €20.00\./)).toBeTruthy();
-      for (const name of ["Update Plan (U)", "One-off (O)", "New Subscription (N)"]) expect(radio(name)).toBeTruthy();
+      for (const name of ["Yes, new price (U)", "Yes, this once (O)", "No (N)"]) expect(radio(name)).toBeTruthy();
       for (const name of ["ANV (A)", "Subscription (S)", "Ignore (I)"]) expect(screen.queryByRole("radio", { name })).toBeNull();
     });
 
-    it("starts with Update Plan picked as suggested and says what it will do", async () => {
+    it("starts with nothing picked and Decide disabled", async () => {
       render();
 
-      await screen.findByText("Plan changed?");
-      expect(radio("Update Plan (U)").getAttribute("aria-checked")).toBe("true");
-      expect(radio("Update Plan (U)").textContent).toContain("Suggested, as before");
-      expect(radio("One-off (O)").getAttribute("aria-checked")).toBe("false");
+      await waitForPlan();
+      for (const name of ["Yes, new price (U)", "Yes, this once (O)", "No (N)"]) expect(radio(name).getAttribute("aria-checked")).toBe("false");
+      expect(radio("Yes, new price (U)").textContent).not.toContain("Suggested, as before");
+      expect(confirmButton("Decide").disabled).toBe(true);
+    });
+
+    it("says what Yes, new price will do once picked", async () => {
+      render();
+      await waitForPlan();
+
+      await choose("Yes, new price (U)");
+
       expect(confirmButton("Update Plan…").disabled).toBe(false);
-      expect(screen.getByText("Opens Change Plan for Lumen AI at 25.00 EUR, to check before saving.")).toBeTruthy();
+      expect(screen.getByText(/^Opens Change Plan for Lumen AI at 25.00 EUR from this charge/)).toBeTruthy();
+    });
+
+    it("hints that No means not this subscription", async () => {
+      render();
+      await waitForPlan();
+
+      expect(radio("No (N)").textContent).toContain("Not Lumen AI");
     });
 
     it("hides the item and subscription pickers and the Always checkbox", async () => {
       render();
 
-      await screen.findByText("Plan changed?");
+      await waitForPlan();
       expect(screen.queryByLabelText("Counts as")).toBeNull();
       expect(screen.queryByRole("combobox")).toBeNull();
       expect(screen.queryByRole("checkbox")).toBeNull();
@@ -598,9 +616,9 @@ describe("ReviewPage", () => {
 
     it("links the line to the subscription as a one-off only on confirm", async () => {
       render();
-      await screen.findByText("Plan changed?");
+      await waitForPlan();
 
-      await choose("One-off (O)");
+      await choose("Yes, this once (O)");
       expect(mocked.reviewDecide).not.toHaveBeenCalled();
       await confirm("Link as One-off");
 
@@ -609,7 +627,8 @@ describe("ReviewPage", () => {
 
     it("opens Change Plan with the amount, currency and date of the charge, and the line as its source", async () => {
       render();
-      await screen.findByText("Plan changed?");
+      await waitForPlan();
+      await choose("Yes, new price (U)");
 
       await confirm("Update Plan…");
 
@@ -628,27 +647,37 @@ describe("ReviewPage", () => {
     it("shows the error when the subscription cannot be loaded for Update Plan", async () => {
       mocked.subscriptionDetail.mockRejectedValue({ kind: "not_found", message: "Subscription not found", code: null });
       render();
-      await screen.findByText("Plan changed?");
+      await waitForPlan();
+      await choose("Yes, new price (U)");
 
       await confirm("Update Plan…");
 
       expect((await screen.findByRole("alert")).textContent).toBe("Subscription not found");
     });
 
-    it("opens the New sheet from the line with New Subscription", async () => {
+    it("opens Change Plan on U then Return", async () => {
       render();
-      await screen.findByText("Plan changed?");
+      await waitForPlan();
 
-      await choose("New Subscription (N)");
-      await confirm("Set Up Subscription…");
+      await userEvent.keyboard("u");
+      await userEvent.keyboard("{Enter}");
 
-      await waitFor(() => expect(useStore.getState().subscriptionSheet).toEqual({ kind: "new", form: subscriptionForm(), source: line() }));
-      expect(mocked.subscriptionPrefill).toHaveBeenCalledWith("line-1", null);
+      await waitFor(() => expect(useStore.getState().subscriptionSheet?.kind).toBe("plan"));
+    });
+
+    it("does nothing on Return while nothing is picked", async () => {
+      render();
+      await waitForPlan();
+
+      await userEvent.keyboard("{Enter}");
+
+      expect(mocked.reviewDecide).not.toHaveBeenCalled();
+      expect(useStore.getState().subscriptionSheet).toBeNull();
     });
 
     it("decides a one-off on O then Return", async () => {
       render();
-      await screen.findByText("Plan changed?");
+      await waitForPlan();
 
       await userEvent.keyboard("o");
       expect(mocked.reviewDecide).not.toHaveBeenCalled();
@@ -657,34 +686,64 @@ describe("ReviewPage", () => {
       expect(mocked.reviewDecide).toHaveBeenCalledWith("line-1", "subscription", null, "sub-1", false, null);
     });
 
-    it("opens Change Plan on Return with the suggested Update Plan", async () => {
-      render();
-      await screen.findByText("Plan changed?");
-
-      await userEvent.keyboard("{Enter}");
-
-      await waitFor(() => expect(useStore.getState().subscriptionSheet?.kind).toBe("plan"));
-    });
-
-    it("opens the New sheet on N then Return", async () => {
-      render();
-      await screen.findByText("Plan changed?");
-
-      await userEvent.keyboard("n");
-      await userEvent.keyboard("{Enter}");
-
-      await waitFor(() => expect(useStore.getState().subscriptionSheet?.kind).toBe("new"));
-    });
-
     it("ignores the A, S and I keys", async () => {
       render();
-      await screen.findByText("Plan changed?");
+      await waitForPlan();
 
       await userEvent.keyboard("asi");
 
-      expect(radio("Update Plan (U)").getAttribute("aria-checked")).toBe("true");
+      for (const name of ["Yes, new price (U)", "Yes, this once (O)", "No (N)"]) expect(radio(name).getAttribute("aria-checked")).toBe("false");
       expect(mocked.reviewDecide).not.toHaveBeenCalled();
       expect(mocked.subscriptionPrefill).not.toHaveBeenCalled();
+    });
+
+    describe("answered No", () => {
+      beforeEach(() => {
+        mocked.reviewQueue.mockResolvedValue(
+          reviewQueue({ lines: [reviewLine({ planChanged: planChanged(), suggestion: "anv" })], subscriptions: [{ id: "sub-1", name: "Lumen AI", letter: "L", tone: 1 }] }),
+        );
+      });
+
+      it("sends nothing and asks What is this line? with ANV, Subscription and Ignore", async () => {
+        render();
+        await waitForPlan();
+
+        await choose("No (N)");
+        await confirm("Not This Subscription");
+
+        expect(await screen.findByRole("radiogroup", { name: "What is this line?" })).toBeTruthy();
+        for (const name of ["ANV (A)", "Subscription (S)", "Ignore (I)"]) expect(radio(name)).toBeTruthy();
+        expect(screen.queryByRole("radio", { name: "No (N)" })).toBeNull();
+        expect(mocked.reviewDecide).not.toHaveBeenCalled();
+        expect(mocked.subscriptionPrefill).not.toHaveBeenCalled();
+      });
+
+      it("picks nothing but the line's suggestion and shows the details of the ordinary line", async () => {
+        render();
+        await waitForPlan();
+
+        await userEvent.keyboard("n");
+        await userEvent.keyboard("{Enter}");
+
+        await screen.findByRole("radiogroup", { name: "What is this line?" });
+        expect(radio("ANV (A)").getAttribute("aria-checked")).toBe("true");
+        expect(radio("Subscription (S)").getAttribute("aria-checked")).toBe("false");
+        expect(radio("Ignore (I)").getAttribute("aria-checked")).toBe("false");
+        expect(itemSelect()).toBeTruthy();
+      });
+
+      it("opens the New sheet from the line with Subscription", async () => {
+        render();
+        await waitForPlan();
+        await choose("No (N)");
+        await confirm("Not This Subscription");
+
+        await choose("Subscription (S)");
+        await confirm("Set Up Subscription…");
+
+        await waitFor(() => expect(useStore.getState().subscriptionSheet?.kind).toBe("new"));
+        expect(mocked.subscriptionPrefill).toHaveBeenCalledWith("line-1", null);
+      });
     });
   });
 

@@ -89,8 +89,8 @@ pub struct SubscriptionRow {
     pub item_key: Option<String>,
     /// Bank text a charge contains, case-insensitive.
     pub match_text: String,
-    /// How far a charge may differ from its plan's amount, in percent of it; None matches any amount.
-    pub tolerance_percent: Option<i64>,
+    /// Only the plan's exact amount is this subscription; otherwise another amount asks in Review.
+    pub exact_only: bool,
     pub created_at: i64,
 }
 
@@ -118,7 +118,7 @@ impl PlanRow {
 
 pub fn subscriptions(conn: &Connection) -> AppResult<Vec<SubscriptionRow>> {
     let mut query = conn.prepare(&format!(
-        "SELECT id, name, tone, category, ended_on, reminder, item_key, match_text, tolerance_percent, created_at \
+        "SELECT id, name, tone, category, ended_on, reminder, item_key, match_text, exact_only, created_at \
          FROM {SUBSCRIPTIONS} ORDER BY name COLLATE NOCASE, id"
     ))?;
     let rows = query.query_map([], |row| {
@@ -132,7 +132,7 @@ pub fn subscriptions(conn: &Connection) -> AppResult<Vec<SubscriptionRow>> {
             reminder: Reminder::parse(&reminder),
             item_key: row.get(6)?,
             match_text: row.get(7)?,
-            tolerance_percent: row.get(8)?,
+            exact_only: row.get(8)?,
             created_at: row.get(9)?,
         })
     })?;

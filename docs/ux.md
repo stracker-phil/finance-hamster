@@ -28,7 +28,7 @@ on Documents it and the big search field are one search)
 | Page | Shows |
 |---|---|
 | Today | one headline next step with one primary button (review → attach invoices → import overdue statement → finish drafts), other open items as quiet rows, the next 5 charges, the current tax year's total and progress, one line on statements; the hamster with "You're up to date" when nothing is open |
-| Review | one undecided line at a time: "What is this line?" ANV (A) · Subscription (S) · Ignore (I) picks (the suggestion starts picked), only the pick's detail, "Also decide every line containing TERM this way", one sentence of what will happen beside the confirm button (↩); Skip (J), Previous, progress bar; the Plan changed? card; a done state with counts |
+| Review | one undecided line at a time: "What is this line?" ANV (A) · Subscription (S) · Ignore (I) picks (the suggestion starts picked), only the pick's detail, "Also decide every line containing TERM this way", one sentence of what will happen beside the confirm button (↩); Skip (J), Previous, progress bar; "Is this <subscription>?" for another amount (Yes, new price · Yes, this once · No); a done state with counts |
 | Subscriptions | grouped by next charge (next 7 days · next 30 days · later, Ended collapsed); header: active count and cost per month; a detail panel with a 12-month plan timeline |
 | Statements | one coverage bar per account over 12 months (imported, partly, missing, before the first statement) and a status tag per account (Up to date, N to review, Statement missing, N days behind) |
 | Account | the account's lines grouped by statement, with a note where a statement is missing between two groups |

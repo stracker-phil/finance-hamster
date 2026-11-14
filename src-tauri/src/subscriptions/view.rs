@@ -297,7 +297,7 @@ pub fn match_count(
         reminder: Reminder::Off,
         item_key: None,
         match_text: form.match_text.clone(),
-        tolerance_percent: form.tolerance_percent.map(i64::from),
+        exact_only: form.exact_only,
         created_at: 0,
     };
     let plan = PlanRow {
@@ -306,15 +306,16 @@ pub fn match_count(
         name: String::new(),
         cents: crate::money::parse_cents(&form.amount).map_or(0, i64::abs),
         currency: form.currency.trim().to_uppercase(),
-        interval: Interval::Monthly,
+        interval: form.interval,
         start: "0000-01-01".into(),
         end: None,
         created_at: 0,
     };
     let matchers = Matchers::new(vec![sub], vec![plan]);
+    let assignment = matchers.assign(lines, &[], |_| true);
     let matched: Vec<&TransactionRow> = lines
         .iter()
-        .filter(|l| matchers.matched(l).is_some())
+        .filter(|l| assignment.charge_of(&l.id).is_some())
         .collect();
     let count = matched.len() as u32;
     let last = matched
@@ -382,6 +383,6 @@ pub fn prefill_from(line: &TransactionRow, format: &Format) -> SubscriptionForm 
         reminder: Reminder::Off,
         item_key: None,
         match_text: key_of(&title),
-        tolerance_percent: Some(0),
+        exact_only: false,
     }
 }

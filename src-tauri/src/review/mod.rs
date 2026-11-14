@@ -23,7 +23,7 @@ use crate::settings::NumberFormat;
 use crate::statements::store::{self as statements, TransactionRow};
 use crate::subscriptions::{
     self,
-    matcher::{Matchers, charged_in},
+    matcher::{self, Assignment, Matchers, charged_in},
 };
 
 /// A line waiting for a decision, as the Review card shows it.
@@ -144,6 +144,9 @@ pub fn queue(db: &Db, format: NumberFormat, order: DateOrder) -> AppResult<Revie
     let decisions = db.read(rules_store::decisions)?;
     let accounts = db.read(accounts::rows)?;
     let matchers = db.read(Matchers::load)?;
+    let asked = matchers.assign(&lines, &matcher::taken(&decisions, false), |t| {
+        !decisions.contains_key(&t.id)
+    });
     let mut earlier: HashMap<String, Earlier> = HashMap::new();
     for line in &lines {
         if let Some(d) = decisions.get(&line.id).filter(|d| d.by_hand()) {
@@ -185,7 +188,7 @@ pub fn queue(db: &Db, format: NumberFormat, order: DateOrder) -> AppResult<Revie
                 item_why: before
                     .filter(|b| b.item_key.is_some())
                     .map(|b| format!("last used for {}", b.title)),
-                plan_changed: plan_changed(&matchers, t, format),
+                plan_changed: plan_changed(&asked, t, format),
                 title,
                 key,
             }
@@ -200,11 +203,11 @@ pub fn queue(db: &Db, format: NumberFormat, order: DateOrder) -> AppResult<Revie
 }
 
 fn plan_changed(
-    matchers: &Matchers,
+    asked: &Assignment,
     t: &TransactionRow,
     format: NumberFormat,
 ) -> Option<PlanChanged> {
-    let (sub, plan) = matchers.plan_changed(t)?;
+    let (sub, plan) = asked.asks_about(&t.id)?;
     let money = |cents| {
         format_money(
             &Money {

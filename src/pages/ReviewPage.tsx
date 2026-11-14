@@ -48,13 +48,16 @@ export function ReviewPage() {
   const [always, setAlways] = useState<Record<string, boolean>>({});
   const [subscriptions, setSubscriptions] = useState<Record<string, string>>({});
   const [terms, setTerms] = useState<Record<string, string>>({});
+  /** Lines answered "No, not this subscription": asked like any other. */
+  const [notThis, setNotThis] = useState<Record<string, true>>({});
   const [session, setSession] = useState({ decided: 0, rules: 0 });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const itemSelect = useRef<HTMLSelectElement>(null);
   const lines = data?.lines ?? [];
   const index = Math.min(position, Math.max(lines.length - 1, 0));
-  const current: ReviewLine | undefined = lines[index];
+  const line = lines[index] as ReviewLine | undefined;
+  const current: ReviewLine | undefined = line && notThis[line.id] ? { ...line, planChanged: null } : line;
 
   const itemOf = (line: ReviewLine) => items[line.id] ?? line.itemKey ?? "";
 
@@ -94,7 +97,15 @@ export function ReviewPage() {
   };
 
   const choices = (line: ReviewLine): Choice[] => {
-    const runs = { decide: sendDecision, updatePlan: () => updatePlan(line), setUp: () => newSubscriptionFrom(line, chosenTerm) };
+    const runs = {
+      decide: sendDecision,
+      updatePlan: () => updatePlan(line),
+      setUp: () => newSubscriptionFrom(line, chosenTerm),
+      notThis: () => {
+        setNotThis((m) => ({ ...m, [line.id]: true }));
+        setPicks(({ [line.id]: _, ...rest }) => rest);
+      },
+    };
     if (line.planChanged) return planChoices(line.planChanged, runs);
     return lineChoices(
       line,

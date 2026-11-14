@@ -872,6 +872,53 @@ fn a_line_matching_a_subscription_at_another_amount_asks_whether_the_plan_change
 }
 
 #[test]
+fn an_exact_only_subscription_does_not_ask_about_another_amount() {
+    let (_dir, db) = imported(&[october()]);
+    let mut form = subscription_form("Lumen AI", "LUMEN AI", "20.00");
+    form.currency = "USD".into();
+    form.exact_only = true;
+    add_subscription(&db, &form);
+
+    let queue = queue_of(&db);
+
+    assert_eq!(
+        waiting(&queue, "LUMEN AI SAN FRANCISCO")[0].plan_changed,
+        None
+    );
+}
+
+#[test]
+fn a_line_a_month_after_a_hand_linked_one_off_still_asks_about_the_plan() {
+    let (_dir, db) = imported(&[september(), october()]);
+    let mut form = subscription_form("Lumen AI", "LUMEN AI", "20.00");
+    form.currency = "USD".into();
+    let id = add_subscription(&db, &form);
+    decide(
+        &db,
+        &line_id(&db, "LUMEN AI SAN FRANCISCO", 9),
+        Action::Subscription,
+        None,
+        Some(id.clone()),
+        false,
+        NOW + 5,
+        Source::Ui,
+    )
+    .unwrap();
+
+    let queue = queue_of(&db);
+
+    let asked = &waiting(&queue, "LUMEN AI SAN FRANCISCO");
+    assert_eq!(asked.len(), 1);
+    assert_eq!(
+        asked[0]
+            .plan_changed
+            .as_ref()
+            .map(|p| p.subscription_id.as_str()),
+        Some(id.as_str())
+    );
+}
+
+#[test]
 fn a_rule_term_is_the_title_key_without_a_selection_and_the_selection_cleaned_up_with_one() {
     let line = row("E-COMM", Some("STREAMFLIX WIEN 1010"), None);
 

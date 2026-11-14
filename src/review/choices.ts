@@ -27,30 +27,39 @@ export interface Runs {
   decide: (action: Action, subscriptionId: string | null) => void;
   setUp: () => void;
   updatePlan: () => void;
+  /** "No, not this subscription": the line is asked like any other. */
+  notThis: () => void;
 }
 
 const SET_UP = { confirm: "Set Up Subscription…", outcome: "Opens New Subscription with this line, to check before saving." };
 
+/** "Is this <subscription>?" for a charge at another amount than its plan. */
 export function planChoices(plan: PlanChanged, runs: Runs): Choice[] {
   return [
     {
       key: "U",
-      label: "Update Plan",
+      label: "Yes, new price",
       hint: "A new plan from this charge",
-      suggested: true,
       confirm: "Update Plan…",
-      outcome: `Opens Change Plan for ${plan.name} at ${plan.amount} ${plan.currency}, to check before saving.`,
+      outcome: `Opens Change Plan for ${plan.name} at ${plan.amount} ${plan.currency} from this charge, to check before saving. Later charges at that amount are booked.`,
       run: runs.updatePlan,
     },
     {
       key: "O",
-      label: "One-off",
+      label: "Yes, this once",
       hint: "Keep the plan",
       confirm: "Link as One-off",
-      outcome: `Keeps the plan and links this charge to ${plan.name}.`,
+      outcome: `It becomes a charge of ${plan.name}; the plan stays as it is.`,
       run: () => runs.decide("subscription", plan.subscriptionId),
     },
-    { key: "N", label: "New Subscription", hint: "A different service", ...SET_UP, run: runs.setUp },
+    {
+      key: "N",
+      label: "No",
+      hint: `Not ${plan.name}`,
+      confirm: "Not This Subscription",
+      outcome: "Then it's asked like any other line: ANV, another subscription or Ignore.",
+      run: runs.notThis,
+    },
   ];
 }
 

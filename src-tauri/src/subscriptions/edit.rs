@@ -32,8 +32,8 @@ pub struct SubscriptionForm {
     pub reminder: Reminder,
     pub item_key: Option<String>,
     pub match_text: String,
-    /// How far a charge may differ from the plan's amount, in percent; None matches any amount.
-    pub tolerance_percent: Option<u32>,
+    /// Only the plan's exact amount is this subscription; otherwise another amount asks in Review.
+    pub exact_only: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, TS)]
@@ -74,14 +74,6 @@ fn day(field: &str, text: &str) -> AppResult<NaiveDate> {
     date::parse(text).ok_or_else(|| invalid(field, "This isn't a date"))
 }
 
-/// 100 % or more would match a charge of nothing; Any amount says that plainly.
-fn tolerance(percent: Option<u32>) -> AppResult<Option<i64>> {
-    if percent.is_some_and(|p| p >= 100) {
-        return Err(invalid("tolerance", "Choose less than 100 %"));
-    }
-    Ok(percent.map(i64::from))
-}
-
 /// The subscription row a form describes, keeping `id` and `created_at`.
 fn row_of(
     db: &Db,
@@ -119,7 +111,7 @@ fn row_of(
         reminder: form.reminder,
         item_key: form.item_key.clone(),
         match_text: form.match_text.trim().to_string(),
-        tolerance_percent: tolerance(form.tolerance_percent)?,
+        exact_only: form.exact_only,
         created_at,
     })
 }

@@ -148,7 +148,7 @@ fn form_of(sub: &SubscriptionRow, plan: Option<&PlanRow>, format: &Format) -> Su
         reminder: sub.reminder,
         item_key: sub.item_key.clone(),
         match_text: sub.match_text.clone(),
-        tolerance_percent: sub.tolerance_percent.and_then(|p| u32::try_from(p).ok()),
+        exact_only: sub.exact_only,
     }
 }
 
@@ -187,10 +187,10 @@ pub fn detail(
             .map_or_else(|| format!("Yes · {key}"), |i| format!("Yes · {}", i.label)),
         None => "No".into(),
     };
-    let tolerance = match sub.tolerance_percent {
-        None => "any amount".to_string(),
-        Some(0) => "exact amount".to_string(),
-        Some(p) => format!("± {p} %"),
+    let amount_rule = if sub.exact_only {
+        "exact amount only"
+    } else {
+        "another amount asks"
     };
     let charges = running
         .charges
@@ -238,7 +238,7 @@ pub fn detail(
         anv,
         reminder: sub.reminder.label().into(),
         rule: format!(
-            "text contains {} · {tolerance}",
+            "text contains {} · {amount_rule}",
             sub.match_text.to_uppercase()
         ),
         charges,

@@ -816,9 +816,9 @@ endedOn: string | null, amount: string, currency: string, interval: Interval,
  */
 start: string, reminder: Reminder, itemKey: string | null, matchText: string, 
 /**
- * How far a charge may differ from the plan's amount, in percent; None matches any amount.
+ * Only the plan's exact amount is this subscription; otherwise another amount asks in Review.
  */
-tolerancePercent: number | null, };
+exactOnly: boolean, };
 
 export type SubscriptionGroup = { label: string, total: string, rows: Array<SubscriptionRowView>, };
 

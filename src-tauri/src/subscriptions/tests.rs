@@ -87,7 +87,54 @@ fn matchers(sub: SubscriptionRow, plans: Vec<PlanRow>) -> Matchers {
 }
 
 fn decision_of(matchers: &Matchers, t: &TransactionRow) -> Option<DecisionRow> {
-    matchers.decide(t, 7)
+    matchers
+        .assign(std::slice::from_ref(t), &[], |_| true)
+        .decide(t, 7)
+}
+
+#[derive(Debug, PartialEq)]
+enum Verdict {
+    Booked,
+    Asked,
+    Nothing,
+}
+
+fn verdicts(matchers: &Matchers, lines: &[TransactionRow], taken: &[(&str, &str)]) -> Vec<Verdict> {
+    let taken: Vec<(String, String)> = taken
+        .iter()
+        .map(|(sub, line)| (sub.to_string(), line.to_string()))
+        .collect();
+    let assignment = matchers.assign(lines, &taken, |_| true);
+    lines
+        .iter()
+        .map(|l| {
+            if assignment.charge_of(&l.id).is_some() {
+                Verdict::Booked
+            } else if assignment.asks_about(&l.id).is_some() {
+                Verdict::Asked
+            } else {
+                Verdict::Nothing
+            }
+        })
+        .collect()
+}
+
+fn plan_interval(interval: Interval) -> PlanRow {
+    plan_with(
+        plan_row("p", "sub-1", 1_000, "2026-01-01", None),
+        interval,
+        "EUR",
+    )
+}
+
+fn streamflix_matchers(exact_only: bool, plan: PlanRow) -> Matchers {
+    matchers(
+        SubscriptionRow {
+            exact_only,
+            ..subscription_row("sub-1", "Streamflix", "STREAMFLIX")
+        },
+        vec![plan],
+    )
 }
 
 fn all_lines(db: &Db) -> Vec<TransactionRow> {
@@ -294,31 +341,131 @@ fn a_subscription_charges_up_to_and_including_its_last_day() {
 }
 
 #[test]
-fn the_tolerance_is_how_far_the_amount_may_differ_from_the_plan_in_percent_in_either_direction() {
-    for (tolerance, cents, expected) in [
-        (Some(0), 1_000, true),
-        (Some(0), 1_001, false),
-        (Some(5), 1_040, true),
-        (Some(5), 1_050, true),
-        (Some(5), 1_051, false),
-        (Some(5), 1_060, false),
-        (Some(5), 960, true),
-        (Some(5), 950, true),
-        (Some(5), 949, false),
-        (Some(5), 940, false),
-        (None, 99_999, true),
-        (None, 1, true),
+fn only_the_plans_exact_amount_is_booked_and_any_other_amount_asks() {
+    let m = streamflix_matchers(false, plan_interval(Interval::Monthly));
+
+    for (cents, expected) in [
+        (1_000, Verdict::Booked),
+        (1_001, Verdict::Asked),
+        (999, Verdict::Asked),
+        (99_999, Verdict::Asked),
     ] {
-        let sub = SubscriptionRow {
-            tolerance_percent: tolerance,
-            ..subscription_row("sub-1", "Streamflix", "STREAMFLIX")
-        };
-        let m = matchers(sub, vec![plan_row("p", "sub-1", 1_000, "2026-01-01", None)]);
-
-        let found = decision_of(&m, &line("l1", "2026-10-07", -cents, "STREAMFLIX")).is_some();
-
-        assert_eq!(found, expected, "{tolerance:?} {cents}");
+        let lines = [line("l1", "2026-10-07", -cents, "STREAMFLIX")];
+        assert_eq!(verdicts(&m, &lines, &[]), [expected], "{cents}");
     }
+}
+
+#[test]
+fn an_exact_only_subscription_neither_books_nor_asks_about_another_amount() {
+    let m = streamflix_matchers(true, plan_interval(Interval::Monthly));
+
+    for (cents, expected) in [(1_000, Verdict::Booked), (1_001, Verdict::Nothing)] {
+        let lines = [line("l1", "2026-10-07", -cents, "STREAMFLIX")];
+        assert_eq!(verdicts(&m, &lines, &[]), [expected], "{cents}");
+    }
+}
+
+#[test]
+fn a_second_exact_charge_one_day_after_a_booked_one_is_neither_booked_nor_asked() {
+    let m = streamflix_matchers(false, plan_interval(Interval::Monthly));
+    let lines = [
+        line("l1", "2026-10-07", -1_000, "STREAMFLIX"),
+        line("l2", "2026-10-08", -1_000, "STREAMFLIX"),
+    ];
+
+    assert_eq!(
+        verdicts(&m, &lines, &[]),
+        [Verdict::Booked, Verdict::Nothing]
+    );
+}
+
+#[test]
+fn a_line_one_day_after_a_hand_linked_charge_is_not_asked_about() {
+    let m = streamflix_matchers(false, plan_interval(Interval::Monthly));
+    let lines = [
+        line("l1", "2026-10-07", -777, "STREAMFLIX"),
+        line("l2", "2026-10-08", -1_599, "STREAMFLIX"),
+    ];
+
+    let result = {
+        let taken = [("sub-1".to_string(), "l1".to_string())];
+        let assignment = m.assign(&lines, &taken, |t| t.id != "l1");
+        (
+            assignment.charge_of("l2").is_some(),
+            assignment.asks_about("l2").is_some(),
+        )
+    };
+
+    assert_eq!(result, (false, false));
+}
+
+#[test]
+fn only_candidate_lines_are_assigned() {
+    let m = streamflix_matchers(false, plan_interval(Interval::Monthly));
+    let lines = [
+        line("l1", "2026-09-07", -1_000, "STREAMFLIX"),
+        line("l2", "2026-10-07", -1_000, "STREAMFLIX"),
+    ];
+
+    let assignment = m.assign(&lines, &[], |t| t.id == "l2");
+
+    assert!(assignment.charge_of("l1").is_none());
+    assert_eq!(
+        assignment.charge_of("l2").map(|s| s.id.as_str()),
+        Some("sub-1")
+    );
+}
+
+#[test]
+fn monthly_charges_twenty_eight_days_apart_are_both_booked() {
+    let m = streamflix_matchers(false, plan_interval(Interval::Monthly));
+    let lines = [
+        line("l1", "2026-02-01", -1_000, "STREAMFLIX"),
+        line("l2", "2026-03-01", -1_000, "STREAMFLIX"),
+    ];
+
+    assert_eq!(
+        verdicts(&m, &lines, &[]),
+        [Verdict::Booked, Verdict::Booked]
+    );
+}
+
+#[test]
+fn the_gap_between_two_charges_of_a_plan_is_twenty_days_monthly_sixty_quarterly_and_240_yearly() {
+    for (interval, days, expected) in [
+        (Interval::Monthly, 19, Verdict::Nothing),
+        (Interval::Monthly, 20, Verdict::Booked),
+        (Interval::Quarterly, 59, Verdict::Nothing),
+        (Interval::Quarterly, 60, Verdict::Booked),
+        (Interval::Yearly, 239, Verdict::Nothing),
+        (Interval::Yearly, 240, Verdict::Booked),
+    ] {
+        let m = streamflix_matchers(false, plan_interval(interval));
+        let first = day(2026, 1, 1);
+        let second = (first + chrono::Days::new(days)).to_string();
+        let lines = [
+            line("l1", "2026-01-01", -1_000, "STREAMFLIX"),
+            line("l2", &second, -1_000, "STREAMFLIX"),
+        ];
+
+        let result = verdicts(&m, &lines, &[]);
+
+        assert_eq!(result[1], expected, "{interval:?} {days}");
+    }
+}
+
+#[test]
+fn an_odd_amount_the_day_before_an_exact_charge_does_not_take_its_slot() {
+    let m = streamflix_matchers(false, plan_interval(Interval::Monthly));
+    let lines = [
+        line("l1", "2026-10-06", -1_599, "STREAMFLIX"),
+        line("l2", "2026-10-07", -1_000, "STREAMFLIX"),
+    ];
+
+    assert_eq!(
+        verdicts(&m, &lines, &[]),
+        [Verdict::Nothing, Verdict::Booked]
+    );
 }
 
 #[test]
@@ -427,15 +574,16 @@ fn the_charged_amount_has_no_sign_and_is_in_the_plans_currency_or_nothing() {
 }
 
 #[test]
-fn a_line_with_the_text_at_another_amount_is_a_possible_plan_change() {
+fn a_line_with_the_text_at_another_amount_asks_about_the_subscription_and_its_plan() {
     let sub = subscription_row("sub-1", "Streamflix", "STREAMFLIX");
     let plan = plan_row("p", "sub-1", 1_299, "2026-01-01", None);
     let m = matchers(sub.clone(), vec![plan.clone()]);
+    let asked = line("l1", "2026-10-07", -1_599, "STREAMFLIX");
 
-    assert_eq!(
-        m.plan_changed(&line("l1", "2026-10-07", -1_599, "STREAMFLIX")),
-        Some((&sub, &plan))
-    );
+    let assignment = m.assign(std::slice::from_ref(&asked), &[], |_| true);
+
+    assert_eq!(assignment.asks_about("l1"), Some((&sub, &plan)));
+    assert_eq!(assignment.charge_of("l1"), None);
     for (t, why) in [
         (
             line("l2", "2026-10-07", -1_299, "STREAMFLIX"),
@@ -444,26 +592,9 @@ fn a_line_with_the_text_at_another_amount_is_a_possible_plan_change() {
         (line("l3", "2026-10-07", -1_599, "NETFLIX"), "text differs"),
         (line("l4", "2026-10-07", 1_599, "STREAMFLIX"), "incoming"),
     ] {
-        assert_eq!(m.plan_changed(&t), None, "{why}");
+        let assignment = m.assign(std::slice::from_ref(&t), &[], |_| true);
+        assert_eq!(assignment.asks_about(&t.id), None, "{why}");
     }
-}
-
-#[test]
-fn a_five_percent_tolerance_matches_a_charge_four_percent_off_and_asks_about_one_six_percent_off() {
-    let sub = SubscriptionRow {
-        tolerance_percent: Some(5),
-        ..subscription_row("sub-1", "Streamflix", "STREAMFLIX")
-    };
-    let plan = plan_row("p", "sub-1", 1_000, "2026-01-01", None);
-    let m = matchers(sub.clone(), vec![plan.clone()]);
-
-    let four_percent_off = line("l1", "2026-10-07", -1_040, "STREAMFLIX");
-    let six_percent_off = line("l2", "2026-10-07", -1_060, "STREAMFLIX");
-
-    assert!(decision_of(&m, &four_percent_off).is_some());
-    assert_eq!(m.plan_changed(&four_percent_off), None);
-    assert!(decision_of(&m, &six_percent_off).is_none());
-    assert_eq!(m.plan_changed(&six_percent_off), Some((&sub, &plan)));
 }
 
 #[test]
@@ -476,9 +607,7 @@ fn a_line_is_linked_to_the_first_subscription_it_matches() {
     ];
     let m = Matchers::new(vec![a, b], plans);
 
-    let decision = m
-        .decide(&line("l1", "2026-10-07", -1_299, "STREAMFLIX"), 0)
-        .unwrap();
+    let decision = decision_of(&m, &line("l1", "2026-10-07", -1_299, "STREAMFLIX")).unwrap();
 
     assert_eq!(decision.subscription_id.as_deref(), Some("sub-a"));
 }
@@ -655,7 +784,7 @@ fn creating_a_subscription_stores_it_with_its_first_plan_and_names_the_change() 
     new.category = " Media ".into();
     new.currency = "usd".into();
     new.match_text = " STREAMFLIX ".into();
-    new.tolerance_percent = Some(15);
+    new.exact_only = true;
     new.active = false;
     new.ended_on = None;
 
@@ -675,7 +804,7 @@ fn creating_a_subscription_stores_it_with_its_first_plan_and_names_the_change() 
             reminder: Reminder::Off,
             item_key: None,
             match_text: "STREAMFLIX".into(),
-            tolerance_percent: Some(15),
+            exact_only: true,
             created_at: NOW,
         }]
     );
@@ -696,27 +825,15 @@ fn creating_a_subscription_stores_it_with_its_first_plan_and_names_the_change() 
 }
 
 #[test]
-fn a_negative_tone_wraps_into_the_six_tones_and_a_zero_tolerance_means_exact() {
+fn a_negative_tone_wraps_into_the_six_tones() {
     let (_dir, db) = imported(&[]);
     let mut new = streamflix();
     new.tone = -1;
-    new.tolerance_percent = Some(0);
 
     edit::create(&db, &new, today(), NOW, Source::Ui).unwrap();
 
     let sub = rows(&db).0.remove(0);
-    assert_eq!((sub.tone, sub.tolerance_percent), (5, Some(0)));
-}
-
-#[test]
-fn a_form_without_a_tolerance_matches_any_amount() {
-    let (_dir, db) = imported(&[]);
-    let mut new = streamflix();
-    new.tolerance_percent = None;
-
-    edit::create(&db, &new, today(), NOW, Source::Ui).unwrap();
-
-    assert_eq!(rows(&db).0[0].tolerance_percent, None);
+    assert_eq!((sub.tone, sub.exact_only), (5, false));
 }
 
 #[test]
@@ -799,20 +916,6 @@ fn an_invalid_form_names_the_field_and_writes_nothing() {
                 ..base.clone()
             },
         ),
-        (
-            "subscription.tolerance",
-            SubscriptionForm {
-                tolerance_percent: Some(100),
-                ..base.clone()
-            },
-        ),
-        (
-            "subscription.tolerance",
-            SubscriptionForm {
-                tolerance_percent: Some(250),
-                ..base.clone()
-            },
-        ),
     ];
 
     for (field, invalid) in cases {
@@ -857,23 +960,22 @@ fn a_foreign_plan_links_charges_by_their_original_amount() {
 }
 
 #[test]
-fn lines_at_another_amount_stay_unlinked_unless_any_amount_is_allowed() {
+fn a_line_at_another_amount_is_never_linked_by_creating_a_subscription() {
     let (_dir, db) = imported(&[month(10)]);
-    let exact = add(&db, &form("Exact", "STREAMFLIX", "13.00"));
-    let mut any = form("Any", "STREAMFLIX", "13.00");
-    any.tolerance_percent = None;
+    let mut exact_only = form("Exact", "STREAMFLIX", "13.00");
+    exact_only.exact_only = true;
 
-    assert_eq!(linked_dates(&db, &exact), Vec::<String>::new());
-    let any_id = add(&db, &any);
+    let asking = add(&db, &form("Asking", "STREAMFLIX", "13.00"));
+    let strict = add(&db, &exact_only);
 
-    assert_eq!(linked_dates(&db, &any_id), ["2026-10-07"]);
+    assert_eq!(linked_dates(&db, &asking), Vec::<String>::new());
+    assert_eq!(linked_dates(&db, &strict), Vec::<String>::new());
 }
 
 #[test]
 fn a_subscription_never_links_a_credit() {
     let (_dir, db) = imported(&[month(10)]);
-    let mut salary = form("Salary", "NORDWIND", "2850.00");
-    salary.tolerance_percent = None;
+    let salary = form("Salary", "NORDWIND", "2850.00");
 
     let id = add(&db, &salary);
 
@@ -1491,14 +1593,13 @@ fn the_sheet_counts_the_charges_a_form_would_match() {
     let lines = all_lines(&db);
     let mut lumen = form("Lumen AI", "LUMEN AI", "24.00");
     lumen.currency = "USD".into();
-    let mut any = streamflix();
-    any.amount = "99.00".into();
-    any.tolerance_percent = None;
+    let mut quarterly = streamflix();
+    quarterly.interval = Interval::Quarterly;
 
     for (draft, count, text) in [
         (streamflix(), 3, "Matches 3 charges, the last on 7 Nov 2026"),
         (lumen, 3, "Matches 3 charges, the last on 10 Nov 2026"),
-        (any, 3, "Matches 3 charges, the last on 7 Nov 2026"),
+        (quarterly, 2, "Matches 2 charges, the last on 7 Nov 2026"),
         (
             form("Streamflix", "STREAMFLIX", "13.00"),
             0,
@@ -1563,7 +1664,7 @@ fn a_new_sheet_starts_from_a_bank_line() {
             reminder: Reminder::Off,
             item_key: None,
             match_text: "STREAMFLIX".into(),
-            tolerance_percent: Some(0),
+            exact_only: false,
         }
     );
     assert_eq!(
@@ -1629,10 +1730,7 @@ fn a_new_sheet_types_the_amount_the_way_the_number_format_reads() {
         .read(|c| prefill(c, &streaming.id, None, &comma))
         .unwrap();
 
-    assert_eq!(
-        (form.amount.as_str(), form.tolerance_percent),
-        ("12,99", Some(0))
-    );
+    assert_eq!((form.amount.as_str(), form.exact_only), ("12,99", false));
 }
 
 #[test]
@@ -1750,7 +1848,7 @@ fn the_detail_shows_amount_next_charge_timeline_plans_rule_charges_and_the_edit_
             detail.reminder.as_str(),
             detail.rule.as_str()
         ),
-        ("No", "Off", "text contains STREAMFLIX · exact amount")
+        ("No", "Off", "text contains STREAMFLIX · another amount asks")
     );
     let charge = |id: String, date: &str| ChargeView {
         id,
@@ -1785,7 +1883,7 @@ fn the_detail_shows_amount_next_charge_timeline_plans_rule_charges_and_the_edit_
             "reminder": "off",
             "itemKey": null,
             "matchText": "STREAMFLIX",
-            "tolerancePercent": 0,
+            "exactOnly": false,
         })
     );
 }
@@ -1829,13 +1927,12 @@ fn the_detail_travels_with_camel_case_names() {
 }
 
 #[test]
-fn a_subscription_for_anv_in_dollars_shows_the_item_euro_cost_reminder_and_tolerance() {
+fn a_subscription_for_anv_in_dollars_shows_the_item_euro_cost_reminder_and_rule() {
     let (_dir, db) = imported(&[month(10)]);
     let mut lumen = form("Lumen AI", "LUMEN AI", "24.00");
     lumen.currency = "USD".into();
     lumen.item_key = Some("books".into());
     lumen.reminder = Reminder::ThreeDays;
-    lumen.tolerance_percent = Some(5);
     let id = add(&db, &lumen);
     let item = rules::items(&db).unwrap().remove(0);
 
@@ -1856,27 +1953,28 @@ fn a_subscription_for_anv_in_dollars_shows_the_item_euro_cost_reminder_and_toler
             Some("Tue, 10 Nov · 3 days ago"),
             format!("Yes · {}", item.label).as_str(),
             "3 days before",
-            "text contains LUMEN AI · ± 5 %",
+            "text contains LUMEN AI · another amount asks",
         )
     );
     assert_eq!(detail.plans[0].price, "USD 24.00 monthly");
 }
 
 #[test]
-fn the_rule_text_names_the_tolerance() {
+fn the_rule_text_says_whether_another_amount_asks_or_only_the_exact_amount_counts() {
     let (_dir, db) = imported(&[]);
-    for (tolerance, expected) in [
-        (None, "text contains STREAMFLIX · any amount"),
-        (Some(0), "text contains STREAMFLIX · exact amount"),
-        (Some(5), "text contains STREAMFLIX · ± 5 %"),
-        (Some(99), "text contains STREAMFLIX · ± 99 %"),
+    for (exact_only, expected) in [
+        (false, "text contains STREAMFLIX · another amount asks"),
+        (true, "text contains STREAMFLIX · exact amount only"),
     ] {
         let mut new = streamflix();
-        new.name = format!("Streamflix {tolerance:?}");
-        new.tolerance_percent = tolerance;
+        new.name = format!("Streamflix {exact_only}");
+        new.exact_only = exact_only;
         let id = add(&db, &new);
 
-        assert_eq!(detail_of(&db, &id).rule, expected, "{tolerance:?}");
+        let detail = detail_of(&db, &id);
+
+        assert_eq!(detail.rule, expected, "{exact_only}");
+        assert_eq!(detail.form.exact_only, exact_only);
     }
 }
 
