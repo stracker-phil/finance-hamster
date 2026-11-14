@@ -55,6 +55,9 @@ appearance light
 go '{ page: "year", year: Number(new Date().getFullYear()) }'
 shot year-light
 go '{ page: "review" }'
+sleep 1
+# A picked choice shows what confirming would do.
+"$HERE/js.sh" '(() => { document.querySelector("[aria-label=\"Ignore (I)\"]")?.click(); setTimeout(() => document.querySelector(".review-card__always input")?.click(), 200); })()'
 shot review-light
 go '{ page: "documents" }'
 shot documents-light

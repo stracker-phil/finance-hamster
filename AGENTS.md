@@ -30,7 +30,7 @@ cd hamster
 bun install
 scripts/create-signing-cert.sh   # once per Mac without an Apple Development certificate (ADR 0019)
 bun run build:app                # debug bundle: src-tauri/target/debug/bundle/macos/Hamster (Debug).app
-bun run release                  # release bundle, installed to ~/Applications and ~/.local/bin
+bun run tauri build && scripts/install.sh   # release bundle, installed to ~/Applications and ~/.local/bin
 ```
 
 Debug builds are never installed; call them by path or start them with `scripts/dev/launch.sh`. They keep
@@ -44,7 +44,7 @@ build's, and start with made-up demo data. Hamster makes no network requests.
 | `bun run test` | Vitest and Rust unit tests pass |
 | `bun run lint` | exits 0: types drift check, `tsc`, ESLint, `clippy -D warnings` |
 | `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | no differences |
-| `bun run release` | `Hamster.app` in `src-tauri/target/release/bundle/` |
+| `bun run tauri build` | `Hamster.app` in `src-tauri/target/release/bundle/macos/` |
 
 ## Adapt
 
