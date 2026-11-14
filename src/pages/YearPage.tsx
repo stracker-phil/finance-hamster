@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Car, Copy, Euro, FileText, Landmark, ListChecks, Trash2 } from "lucide-react";
-import { api, type AttentionView, type KennzahlView, type MonthView, type QuestionView, type YearRow } from "../api";
-import { startAddDocument } from "../documents/addFlow";
+import { api, type AttentionKind, type AttentionView, type KennzahlView, type MonthView, type QuestionView, type YearRow } from "../api";
+import { attachInvoiceTo, startAddDocument } from "../documents/addFlow";
 import { copyText } from "../lib/clipboard";
 import { showError } from "../lib/undoToast";
 import { useYearPage } from "../queries/year";
@@ -118,14 +118,37 @@ function Kennzahl({ item, year, open }: { item: KennzahlView; year: number; open
 /** Rows shown before "Show all": a long list hides the sections below it. */
 const ATTENTION_SHOWN = 5;
 
-function AttentionList({ year, items }: { year: number; items: AttentionView[] }) {
+const KIND_HEADING: Record<AttentionKind, string> = { missing_invoice: "Invoices to attach", draft: "Drafts to finish", undated: "Documents without a date" };
+
+/** A missing invoice's Attach PDF…: for its bank line when it has one, else any new document. */
+const attachMissing = (item: AttentionView) => (item.lineId ? void attachInvoiceTo(item.lineId) : startAddDocument());
+
+/** What needs attention; with `focus` only that kind, all of it, scrolled into view. */
+function AttentionList({ year, items, focus }: { year: number; items: AttentionView[]; focus?: AttentionKind }) {
   const navigate = useStore((s) => s.navigate);
   const [all, setAll] = useState(false);
+  const [only, setOnly] = useState(focus);
+  const section = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (focus) section.current?.scrollIntoView({ block: "start" });
+  }, [focus]);
   if (items.length === 0) return null;
-  const shown = all ? items : items.slice(0, ATTENTION_SHOWN);
+  const kept = only ? items.filter((i) => i.kind === only) : items;
+  const shown = all || only ? kept : kept.slice(0, ATTENTION_SHOWN);
+  const showEverything = () => {
+    setOnly(undefined);
+    setAll(true);
+  };
   return (
-    <section aria-label="Needs attention">
-      <h3 className="year-heading">Needs attention</h3>
+    <section ref={section} className="year-attention" aria-label="Needs attention">
+      <div className="year-heading-row">
+        <h3 className="year-heading">{only ? KIND_HEADING[only] : "Needs attention"}</h3>
+        {only && kept.length < items.length && (
+          <button className="link-btn year-heading__more" onClick={showEverything}>
+            Show all {items.length} that need attention
+          </button>
+        )}
+      </div>
       {shown.map((item, i) => {
         const { documentId, entryId } = item;
         return (
@@ -142,14 +165,14 @@ function AttentionList({ year, items }: { year: number; items: AttentionView[] }
             ) : entryId ? (
               <AttachButton year={year} entryId={entryId} />
             ) : (
-              <button className="btn btn--small" onClick={startAddDocument}>
+              <button className="btn btn--small" onClick={() => attachMissing(item)}>
                 Attach PDF…
               </button>
             )}
           </div>
         );
       })}
-      {items.length > ATTENTION_SHOWN && (
+      {!only && items.length > ATTENTION_SHOWN && (
         <button className="link-btn year-more" onClick={() => setAll((open) => !open)}>
           {all ? "Show fewer" : `Show all ${items.length}`}
         </button>
@@ -193,7 +216,7 @@ function CheckLine({ year }: { year: number }) {
   );
 }
 
-export function YearPage({ year }: { year: number }) {
+export function YearPage({ year, attention }: { year: number; attention?: AttentionKind }) {
   const filter = useStore((s) => s.filter);
   const [view, setView] = useState<"kennzahl" | "month">("kennzahl");
   const { data, isError } = useYearPage(year, filter);
@@ -232,7 +255,7 @@ export function YearPage({ year }: { year: number }) {
           </section>
         )}
 
-        <AttentionList year={data.year} items={data.attention} />
+        <AttentionList key={attention ?? "all"} year={data.year} items={data.attention} focus={attention} />
 
         <div className="year-switch" role="group" aria-label="Show">
           <button className="seg-btn" aria-pressed={view === "kennzahl"} onClick={() => setView("kennzahl")}>

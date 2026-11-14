@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
 
-import { api } from "../api";
+import { api, type AttentionView } from "../api";
 import { HOME } from "../state/route";
 import { useStore } from "../state/store";
 import { addPreview } from "../test/documents";
@@ -170,6 +170,68 @@ describe("YearPage", () => {
       await userEvent.click(screen.getByRole("button", { name: "Attach PDF…" }));
 
       expect(mocked.documentAddChoose).toHaveBeenCalled();
+      expect(mocked.documentLineChoice).not.toHaveBeenCalled();
+    });
+
+    it("starts the add flow on the bank line of a missing invoice that names one", async () => {
+      mocked.documentAddChoose.mockResolvedValue(addPreview());
+      await show({ attention: [attentionView({ kind: "missing_invoice", title: "Example Hosting", documentId: null, lineId: "line-9" })] });
+
+      await userEvent.click(screen.getByRole("button", { name: "Attach PDF…" }));
+
+      await vi.waitFor(() => expect(mocked.documentLineChoice).toHaveBeenCalledWith("line-9"));
+    });
+
+    describe("focused on one kind", () => {
+      const mixed = () => [
+        ...Array.from({ length: 6 }, (_, i) => attentionView({ kind: "missing_invoice", title: `Example Invoice ${i + 1}`, documentId: null })),
+        attentionView({ kind: "draft", title: "Example Draft", documentId: "doc-2" }),
+        attentionView({ kind: "undated", title: "Example Undated", documentId: "doc-3" }),
+      ];
+      const showFocused = async (attention: AttentionView[], kind: "missing_invoice" | "draft" | "undated") => {
+        Element.prototype.scrollIntoView = vi.fn();
+        mocked.yearPage.mockResolvedValue(yearPage({ attention }));
+        renderWithQuery(<YearPage year={2026} attention={kind} />);
+        await screen.findByText("Total to enter for 2026 · ruleset 2026 v1");
+      };
+
+      it.each([
+        ["missing_invoice", "Invoices to attach"],
+        ["draft", "Drafts to finish"],
+        ["undated", "Documents without a date"],
+      ] as const)("headlines the %s kind as %s", async (kind, heading) => {
+        await showFocused(mixed(), kind);
+
+        expect(screen.getByRole("heading", { name: new RegExp(`^${heading}`) })).toBeTruthy();
+      });
+
+      it("shows every item of that kind, past five, and none of the others", async () => {
+        await showFocused(mixed(), "missing_invoice");
+
+        const section = within(screen.getByRole("region", { name: "Needs attention" }));
+        expect(section.getByText(/Example Invoice 6/)).toBeTruthy();
+        expect(section.queryByText(/Example Draft/)).toBeNull();
+        expect(section.queryByText(/Example Undated/)).toBeNull();
+        expect(section.queryByRole("button", { name: /^Show all \d+$/ })).toBeNull();
+      });
+
+      it("shows every item again from the Show all link, which then disappears", async () => {
+        await showFocused(mixed(), "draft");
+
+        await userEvent.click(screen.getByRole("button", { name: "Show all 8 that need attention" }));
+
+        const section = within(screen.getByRole("region", { name: "Needs attention" }));
+        expect(section.getByText(/Example Draft/)).toBeTruthy();
+        expect(section.getByText(/Example Undated/)).toBeTruthy();
+        expect(section.getByRole("heading", { name: "Needs attention" })).toBeTruthy();
+        expect(section.queryByRole("button", { name: /that need attention/ })).toBeNull();
+      });
+
+      it("offers no Show all link when every item is of that kind", async () => {
+        await showFocused([attentionView({ kind: "draft", documentId: "doc-2" })], "draft");
+
+        expect(screen.queryByRole("button", { name: /that need attention/ })).toBeNull();
+      });
     });
   });
 

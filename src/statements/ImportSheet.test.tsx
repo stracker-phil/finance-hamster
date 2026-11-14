@@ -36,7 +36,7 @@ describe("ImportSheet", () => {
     expect(screen.getByText("statement-010-2026.pdf")).toBeTruthy();
     expect(screen.getByText("Kontoauszug Nr. 010/2026 · 4 pages · 1 Nov – 10 Nov 2026")).toBeTruthy();
     expect(screen.getByText("Private")).toBeTruthy();
-    expect(screen.getByText("Read 42 transactions")).toBeTruthy();
+    expect(screen.getByText("Read 42 lines")).toBeTruthy();
     expect(screen.getByText(/1,412.30 \+ 2,250.00 − 1,986.44 = 1,675.86/)).toBeTruthy();
     expect(screen.getByText("Follows statement Nr. 009/2026")).toBeTruthy();
     expect(screen.getByText("Opening balance matches the previous closing balance.")).toBeTruthy();

@@ -293,6 +293,7 @@ mod tests {
                     detail: String::new(),
                     document_id: None,
                     entry_id: None,
+                    line_id: None,
                 })
                 .collect(),
             kennzahlen: Vec::new(),

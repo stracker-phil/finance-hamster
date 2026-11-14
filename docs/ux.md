@@ -20,17 +20,18 @@ the selected row is an accent wash with accent text.
 ### Header (58px, same on every page)
 Title (19px bold) · one page-specific control (for example the By Kennzahl / By month switch) · the filter
 field (200px, ⌘F, Esc clears; filters the current list as you type; when the text also matches elsewhere a
-small menu lists those matches plus Search everywhere ⌘↩; on pages without a list it reads Search everywhere)
+small menu lists those matches plus Search everywhere ⌘↩; on pages without a list it reads Search everywhere;
+on Documents it and the big search field are one search)
 · the **+ New** menu: Import Statement… ⌘I, Add Invoice PDF… ⌘O, New Subscription ⌘N.
 
 ### Pages
 | Page | Shows |
 |---|---|
 | Today | one headline next step with one primary button (review → attach invoices → import overdue statement → finish drafts), other open items as quiet rows, the next 5 charges, the current tax year's total and progress, one line on statements; the hamster with "You're up to date" when nothing is open |
-| Review | one undecided line at a time: ANV (A) · Subscription (S) · Ignore (I), suggestion highlighted, Skip (J), Previous, progress bar, "Always do this for KEY"; the Plan changed? card; a done state with counts |
+| Review | one undecided line at a time: "What is this line?" ANV (A) · Subscription (S) · Ignore (I) picks (the suggestion starts picked), only the pick's detail, "Also decide every line containing TERM this way", one sentence of what will happen beside the confirm button (↩); Skip (J), Previous, progress bar; the Plan changed? card; a done state with counts |
 | Subscriptions | grouped by next charge (next 7 days · next 30 days · later, Ended collapsed); header: active count and cost per month; a detail panel with a 12-month plan timeline |
-| Statements | one coverage bar per account over 12 months (imported, partly, missing) and a status tag per account |
-| Account | the account's lines grouped by statement |
+| Statements | one coverage bar per account over 12 months (imported, partly, missing, before the first statement) and a status tag per account (Up to date, N to review, Statement missing, N days behind) |
+| Account | the account's lines grouped by statement, with a note where a statement is missing between two groups |
 | Tax year | hero with the copy total, ruleset version and progress; **Questions for <year>** (number fields from the rules file; empty = unanswered); Needs attention (missing invoices, drafts, undated scans); By Kennzahl: one copy value per Kennzahl with a copy button, its rows below (documents, amounts, trips, slices with a "From 2025" pill; row amounts only when a Kennzahl has several rows), one note line from estimate rules, "+ Add" (Document, Amount or Trip) in an open year, trips added inline (date, destination and purpose, km); By month: Every month, Whole year (amounts and earlier slices), then months with trips in theirs; … menu: Log, Archive, Export Summary PDF, Open Ruleset JSON; Close Year… / Open Snapshot PDF |
 | Document | the edit form (Payment → Classification with the item picker and work share → Result → Notes → More), a GWG line or the Depreciation block (cost, useful life, slices per year, frozen ones marked), PDF preview, History column; breadcrumb "Documents /" or the tax year it was opened from |
 | Documents | sidebar entry; a large "Is it already here?" field, documents by tax year plus Inbox |

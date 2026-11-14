@@ -55,6 +55,7 @@ export function createApiMock(overrides: Partial<Api> = {}): Api {
     documentAddChoose: vi.fn().mockResolvedValue(null),
     documentAddCommit: vi.fn().mockResolvedValue("Add Document Demo Vendor"),
     documentAddCancel: vi.fn().mockResolvedValue(undefined),
+    documentLineChoice: vi.fn().mockResolvedValue(null),
     documentEstimate: vi.fn().mockResolvedValue(null),
     documentView: vi.fn().mockRejectedValue({ kind: "not_found", message: "Document not found", code: null }),
     documentEdit: vi.fn().mockResolvedValue(null),

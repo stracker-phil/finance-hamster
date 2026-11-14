@@ -766,6 +766,7 @@ mod tests {
                 detail: "KZ 727 needs evidence before it counts".into(),
                 document_id: None,
                 entry_id: Some(id.clone()),
+                line_id: None,
             }]
         );
         assert_eq!(waiting.progress, "1 invoice and 2 answers missing");

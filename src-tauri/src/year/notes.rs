@@ -7,11 +7,13 @@ use crate::money::{Money, format_money};
 use crate::settings::NumberFormat;
 use crate::taxrules::model::{EstimateRule, Item, Question, QuestionType};
 
-pub const ANSWER_FIRST: &str = "Answer the question above.";
-
 /// `Telearbeitstage` from `Telearbeitstage (Homeoffice days)`: the label before any explanation.
 fn short(label: &str) -> &str {
     label.split(" (").next().unwrap_or(label).trim()
+}
+
+fn answer_first(question: &str) -> String {
+    format!("Answer {question} under Questions first.")
 }
 
 fn amount(cents: i64, format: NumberFormat) -> String {
@@ -40,7 +42,7 @@ pub fn note(
     for rule in rules {
         match rule {
             EstimateRule::Requires { question, min } => match answers.get(question) {
-                None => return Some(ANSWER_FIRST.into()),
+                None => return Some(answer_first(&label(question))),
                 Some(value) if (*value as f64) < *min => {
                     return Some(format!(
                         "Fewer than {min} {}: the tax office won't accept this.",
@@ -54,7 +56,7 @@ pub fn note(
                     .iter()
                     .any(|q| &q.id == question && q.kind == QuestionType::Amount);
                 return Some(match answers.get(question) {
-                    None => ANSWER_FIRST.into(),
+                    None => answer_first(&label(question)),
                     Some(cents) if is_amount => format!(
                         "The tax office subtracts the {} {} you received.",
                         amount(*cents, format),
@@ -135,7 +137,7 @@ mod tests {
     fn an_unanswered_requirement_asks_for_the_answer() {
         assert_eq!(
             note_of(json!([requires()]), &[]),
-            Some("Answer the question above.".into())
+            Some("Answer Telearbeitstage under Questions first.".into())
         );
     }
 
@@ -163,7 +165,7 @@ mod tests {
     fn a_reduction_asks_for_its_answer_or_names_the_amount_received() {
         assert_eq!(
             note_of(json!([reduce_by()]), &[]),
-            Some("Answer the question above.".into())
+            Some("Answer Telearbeitspauschale under Questions first.".into())
         );
         assert_eq!(
             note_of(json!([reduce_by()]), &[("pauschale", 12_000)]),
@@ -212,7 +214,7 @@ mod tests {
         for estimate in orders {
             assert_eq!(
                 note_of(estimate.clone(), &[]),
-                Some("Answer the question above.".into()),
+                Some("Answer Telearbeitstage under Questions first.".into()),
                 "{estimate}"
             );
             assert_eq!(

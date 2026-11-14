@@ -28,7 +28,7 @@ export function questionView(patch: Partial<QuestionView> = {}): QuestionView {
 
 /** A demo attention entry, with `patch` applied. */
 export function attentionView(patch: Partial<AttentionView> = {}): AttentionView {
-  return { kind: "draft", title: "Example Market", detail: "Still a draft", documentId: "doc-2", entryId: null, ...patch };
+  return { kind: "draft", title: "Example Market", detail: "Still a draft", documentId: "doc-2", entryId: null, lineId: null, ...patch };
 }
 
 /** A demo month section, with `patch` applied. */

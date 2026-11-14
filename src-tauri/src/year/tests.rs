@@ -688,7 +688,7 @@ fn a_kennzahl_has_a_note_only_when_it_has_rows() {
         [
             Some("Enter the full amount. The tax office counts up to €300.00 per year."),
             None,
-            Some("Answer the question above."),
+            Some("Answer Telearbeitstage under Questions first."),
             None,
             Some("Reported by others; shown for reference, never counted here")
         ]
@@ -884,6 +884,7 @@ fn drafts_are_listed_under_attention_and_marked_in_their_rows() {
         detail: "Finish it to lock its values for the tax year".into(),
         document_id: Some(id.into()),
         entry_id: None,
+        line_id: None,
     };
     assert_eq!(attention, [&expected("doc-d1"), &expected("doc-d2")]);
     assert_eq!(
@@ -922,6 +923,7 @@ fn a_document_without_a_payment_date_is_listed_as_undated_and_counts_nowhere() {
             detail: "Set its payment date to place it in a tax year".into(),
             document_id: Some("doc-u".into()),
             entry_id: None,
+            line_id: None,
         }]
     );
     assert_eq!(page.total, "€0.00");
@@ -965,6 +967,7 @@ fn an_anv_line_on_an_item_that_needs_an_invoice_is_missing_its_invoice_and_does_
             detail: "5 Oct · KZ 720 needs the invoice before it counts".into(),
             document_id: None,
             entry_id: None,
+            line_id: Some("l-m".into()),
         }]
     );
     assert_eq!(amounts(rows_of(&page, "720")), ["€10.00"]);
@@ -1337,6 +1340,7 @@ fn a_draft_needs_attention_only_in_the_purchase_year_but_its_slices_stay_marked_
             detail: "Finish it to lock its values for the tax year".into(),
             document_id: Some("pc".into()),
             entry_id: None,
+            line_id: None,
         }]
     );
     assert!(later.attention.is_empty());

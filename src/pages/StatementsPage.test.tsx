@@ -56,6 +56,17 @@ describe("StatementsPage", () => {
     expect(screen.getByText("Nr. 008 is missing between Nr. 007 and Nr. 009")).toBeTruthy();
   });
 
+  it.each([
+    ["behind", "13 days behind"],
+    ["gap", "Gap before Nr. 009"],
+  ] as const)("warns with the chip of an account in state %s", async (state, stateLabel) => {
+    mocked.statementsCoverage.mockResolvedValue(coverage({ accounts: [accountCoverage({ state, stateLabel })] }));
+
+    render(<StatementsPage />);
+
+    expect((await screen.findByText(stateLabel)).className).toContain("state-chip--warn");
+  });
+
   it("shows no note for an account without a gap", async () => {
     render(<StatementsPage />);
 

@@ -140,6 +140,19 @@ pub(super) fn search(db: &Db, query: &str) -> AppResult<Vec<TransactionRow>> {
 }
 
 /// Account names by id, for line details.
+/// The line as the picker shows it; None when no line has the id.
+pub fn choice_of(
+    db: &Db,
+    id: &str,
+    format: NumberFormat,
+    order: DateOrder,
+) -> AppResult<Option<LineChoice>> {
+    let names = account_names(db)?;
+    Ok(db
+        .read(|c| crate::statements::store::transaction_by_id(c, id))?
+        .map(|t| line_choice(&t, &names, format, order)))
+}
+
 pub fn account_names(db: &Db) -> AppResult<HashMap<String, String>> {
     Ok(db
         .read(crate::accounts::rows)?

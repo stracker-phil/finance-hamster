@@ -87,6 +87,7 @@ export const api = {
   /** The label of the change. */
   documentAddCommit: (input: AddInput) => invoke<string>("document_add_commit", { input }),
   documentAddCancel: (token: string) => invoke<void>("document_add_cancel", { token }),
+  documentLineChoice: (id: string) => invoke<LineChoice | null>("document_line_choice", { id }),
   /** What a bank line counts as with an item; null without a line. */
   documentView: (id: string) => invoke<DocumentView>("document_view", { id }),
   /** Changes one field of a draft; the label of the change, or null when nothing changed. */

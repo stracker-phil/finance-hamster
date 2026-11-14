@@ -5,8 +5,8 @@ vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await impo
 
 import { api, type AddReady } from "../api";
 import { useStore } from "../state/store";
-import { addPreview } from "../test/documents";
-import { startAddDocument, useDroppedDocuments } from "./addFlow";
+import { addPreview, lineChoice } from "../test/documents";
+import { attachInvoiceTo, startAddDocument, useDroppedDocuments } from "./addFlow";
 
 const mocked = vi.mocked(api, true);
 
@@ -44,6 +44,48 @@ describe("startAddDocument", () => {
 
     await waitFor(() => expect(useStore.getState().toasts.map((t) => [t.kind, t.message])).toEqual([["error", "Not a text PDF"]]));
     expect(useStore.getState().addPreview).toBeNull();
+  });
+});
+
+describe("attachInvoiceTo", () => {
+  it("opens the sheet with the bank line first and without a second copy of it", async () => {
+    const preview = addPreview();
+    const chosen = lineChoice({ id: "line-2", title: "Example Market" });
+    mocked.documentAddChoose.mockResolvedValue(preview);
+    mocked.documentLineChoice.mockResolvedValue(chosen);
+
+    await attachInvoiceTo("line-2");
+
+    expect(mocked.documentLineChoice).toHaveBeenCalledWith("line-2");
+    const ids = useStore.getState().addPreview?.lines.map((l) => l.id);
+    expect(ids).toEqual(["line-2", "line-1"]);
+  });
+
+  it("keeps the lines of the invoice when the line is not offered", async () => {
+    const preview = addPreview();
+    mocked.documentAddChoose.mockResolvedValue(preview);
+    mocked.documentLineChoice.mockResolvedValue(null);
+
+    await attachInvoiceTo("line-9");
+
+    expect(useStore.getState().addPreview).toEqual(preview);
+  });
+
+  it("opens nothing and asks for no line when the file dialog is cancelled", async () => {
+    mocked.documentAddChoose.mockResolvedValue(null);
+
+    await attachInvoiceTo("line-2");
+
+    expect(useStore.getState().addPreview).toBeNull();
+    expect(mocked.documentLineChoice).not.toHaveBeenCalled();
+  });
+
+  it("shows an error toast when the invoice cannot be read", async () => {
+    mocked.documentAddChoose.mockRejectedValue({ kind: "invalid_input", message: "Not a text PDF", code: null });
+
+    await attachInvoiceTo("line-2");
+
+    expect(useStore.getState().toasts.map((t) => [t.kind, t.message])).toEqual([["error", "Not a text PDF"]]);
   });
 });
 

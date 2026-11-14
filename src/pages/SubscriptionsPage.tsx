@@ -8,10 +8,10 @@ import { SubscriptionPanel } from "../subscriptions/SubscriptionPanel";
 import { EmptyPage } from "./EmptyPage";
 
 /** Every subscription by next charge, the ended ones folded away at the bottom, and the selected one's panel. */
-export function SubscriptionsPage() {
+export function SubscriptionsPage({ open = null }: { open?: string | null }) {
   const filter = useStore((s) => s.filter);
   const { data } = useSubscriptions(filter);
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(open);
   const [endedOpen, setEndedOpen] = useState(false);
   useEffect(() => {
     if (!selected) return;

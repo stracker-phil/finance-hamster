@@ -8,7 +8,7 @@ use crate::review;
 use crate::rules::store::Action;
 use crate::rules::{RuleForm, ensure_builtins, save};
 use crate::settings::NumberFormat;
-use crate::test_support::statements::StatementLine;
+use crate::test_support::statements::{StatementLine, demo_month};
 use crate::test_support::subscriptions::{add as add_subscription, form as subscription_form};
 
 const NOW: i64 = 1_700_000_000;
@@ -145,6 +145,67 @@ fn a_household_without_february_has_no_group_for_it() {
     assert!(!labels.contains(&"Nr. 002/2026"));
     assert_eq!(labels[0], "Nr. 011/2026");
     assert_eq!(labels[9], "Nr. 001/2026");
+}
+
+#[test]
+fn a_group_whose_older_statement_is_not_its_predecessor_says_what_was_never_imported() {
+    let (_dir, db) = seeded();
+
+    let household = lines_of(&db, "demo-account-2");
+    let private = lines_of(&db, "demo-account-1");
+
+    let missing: Vec<(&str, Option<&str>)> = household
+        .groups
+        .iter()
+        .filter(|g| g.missing_before.is_some())
+        .map(|g| (g.label.as_str(), g.missing_before.as_deref()))
+        .collect();
+    assert_eq!(
+        missing,
+        [("Nr. 003/2026", Some("Nr. 002/2026 was never imported"))]
+    );
+    assert!(private.groups.iter().all(|g| g.missing_before.is_none()));
+}
+
+#[test]
+fn several_missing_statements_are_named_by_the_two_that_surround_them() {
+    for (older, newer, expected) in [
+        (
+            demo_month(1, 2026, 1, 141_230),
+            demo_month(4, 2026, 4, 141_230),
+            "Statements between Nr. 001/2026 and Nr. 004/2026 were never imported",
+        ),
+        (
+            demo_month(12, 2025, 12, 141_230),
+            demo_month(2, 2026, 2, 141_230),
+            "Statements between Nr. 012/2025 and Nr. 002/2026 were never imported",
+        ),
+    ] {
+        let (dir, db) = open_with_accounts();
+        import_statement(&db, dir.path(), &older);
+        import_statement(&db, dir.path(), &newer);
+
+        let page = lines_of(&db, "account-1");
+
+        assert_eq!(page.groups[0].missing_before.as_deref(), Some(expected));
+        assert_eq!(page.groups[1].missing_before, None, "{expected}");
+    }
+}
+
+#[test]
+fn consecutive_statements_across_a_year_boundary_miss_nothing() {
+    let (dir, db) = open_with_accounts();
+    let december = demo_month(12, 2025, 12, 141_230);
+    import_statement(&db, dir.path(), &december);
+    import_statement(
+        &db,
+        dir.path(),
+        &demo_month(1, 2026, 1, december.new_balance()),
+    );
+
+    let page = lines_of(&db, "account-1");
+
+    assert_eq!(page.groups[0].missing_before, None);
 }
 
 #[test]

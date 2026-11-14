@@ -109,6 +109,15 @@ describe("SubscriptionsPage", () => {
       expect(mocked.subscriptionDetail).toHaveBeenCalledWith("sub-1");
     });
 
+    it("shows the panel of the subscription it is opened on, with its row pressed", async () => {
+      renderWithQuery(<SubscriptionsPage open="sub-1" />);
+
+      const panel = within(await screen.findByRole("complementary", { name: "Subscription" }));
+      expect(await panel.findByText("Next charge 15 Dec")).toBeTruthy();
+      expect(mocked.subscriptionDetail).toHaveBeenCalledWith("sub-1");
+      expect((await rowButton(/Lumen AI/)).getAttribute("aria-pressed")).toBe("true");
+    });
+
     it("closes the panel on Escape", async () => {
       renderWithQuery(<SubscriptionsPage />);
       await userEvent.click(await rowButton(/Lumen AI/));

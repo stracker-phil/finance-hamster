@@ -40,6 +40,7 @@
 .cov { flex: 1; height: 8px; border-radius: 4px; display: block; background: var(--acct, var(--accent)); opacity: 0.85; }
 .cov--part { opacity: 1; background: linear-gradient(90deg, var(--acct, var(--accent)) 0 33%, color-mix(in srgb, var(--acct, var(--accent)) 18%, transparent) 33% 100%); }
 .cov--missing { opacity: 1; background: transparent; box-shadow: inset 0 0 0 1.5px var(--warning); }
+.cov--before { opacity: 1; background: transparent; box-shadow: inset 0 0 0 1px var(--hairline); }
 
 .state-chip { padding: 3px 9px; border-radius: 11px; font-size: 12px; font-weight: 600; white-space: nowrap; }
 .state-chip--ok { color: var(--pill-green-text); background: var(--pill-green-bg); }
@@ -75,3 +76,6 @@
 .import-check__dot { width: 18px; height: 18px; flex: none; display: grid; place-items: center; border-radius: 9px; background: var(--positive); color: var(--text-on-accent); }
 .import-check__dot--warn { background: var(--warning); }
 .import-check__detail { font-size: 12px; color: var(--text-muted); }
+
+/* Between two statement groups of an account page, where the chain breaks. */
+.line-gap { display: flex; align-items: center; gap: 8px; margin: 14px 0 0; padding: 8px 12px; border-radius: 8px; background: var(--fill-subtle); font-size: 12px; color: var(--text-secondary); }

@@ -45,20 +45,44 @@ describe("DocumentForm", () => {
   });
 
   describe("payment date", () => {
-    it("saves a changed date", () => {
+    it("saves a changed date when the field is left", () => {
       renderForm();
+      const field = screen.getByLabelText("Date");
 
-      fireEvent.change(screen.getByLabelText("Date"), { target: { value: "2026-11-12" } });
+      fireEvent.change(field, { target: { value: "2026-11-12" } });
+      expect(mocked.documentEdit).not.toHaveBeenCalled();
+      fireEvent.blur(field);
 
       expect(mocked.documentEdit).toHaveBeenCalledWith("doc-1", { field: "payDate", value: "2026-11-12" });
     });
 
-    it("saves null when the date is cleared", () => {
+    it("saves a changed date on Enter", () => {
       renderForm();
+      const field = screen.getByLabelText("Date");
+      field.focus();
 
-      fireEvent.change(screen.getByLabelText("Date"), { target: { value: "" } });
+      fireEvent.change(field, { target: { value: "2026-11-12" } });
+      fireEvent.keyDown(field, { key: "Enter" });
+
+      expect(mocked.documentEdit).toHaveBeenCalledWith("doc-1", { field: "payDate", value: "2026-11-12" });
+    });
+
+    it("saves null when the date is cleared and the field is left", () => {
+      renderForm();
+      const field = screen.getByLabelText("Date");
+
+      fireEvent.change(field, { target: { value: "" } });
+      fireEvent.blur(field);
 
       expect(mocked.documentEdit).toHaveBeenCalledWith("doc-1", { field: "payDate", value: null });
+    });
+
+    it("saves nothing when the field is left unchanged", () => {
+      renderForm();
+
+      fireEvent.blur(screen.getByLabelText("Date"));
+
+      expect(mocked.documentEdit).not.toHaveBeenCalled();
     });
 
     it("names the tax year of the date", () => {

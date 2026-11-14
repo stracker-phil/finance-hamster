@@ -92,6 +92,21 @@ describe("YearCheckPage", () => {
       expect(mocked.yearCheckComplete).not.toHaveBeenCalled();
     });
 
+    it("shows the Y and N key hints while the focused question has Yes and No", async () => {
+      await show(items(1));
+
+      expect(screen.getByText("Y").style.visibility).toBe("");
+      expect(screen.getByText("N").style.visibility).toBe("");
+    });
+
+    it("hides the Y and N key hints, keeping their room, while the focused question is a number question", async () => {
+      await show([commute(), ...items(1)]);
+
+      expect(screen.getByText("Y").style.visibility).toBe("hidden");
+      expect(screen.getByText("N").style.visibility).toBe("hidden");
+      expect(screen.getByText("L").style.visibility).toBe("");
+    });
+
     it("starts with every question open after leaving and coming back", async () => {
       const first = await show(items(3));
       await press("No", "Question 1");

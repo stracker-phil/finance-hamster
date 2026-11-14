@@ -17,7 +17,7 @@ export function PageBody({ route }: { route: Route }) {
     case "today":
       return <TodayPage />;
     case "subscriptions":
-      return <SubscriptionsPage />;
+      return <SubscriptionsPage key={route.subscriptionId ?? ""} open={route.subscriptionId} />;
     case "statements":
       return <StatementsPage />;
     case "documents":
@@ -27,7 +27,7 @@ export function PageBody({ route }: { route: Route }) {
     case "account":
       return <AccountPage accountId={route.accountId} />;
     case "year":
-      return <YearPage year={route.year} />;
+      return <YearPage year={route.year} attention={route.attention} />;
     case "document":
       return <DocumentPage documentId={route.documentId} />;
     case "log":

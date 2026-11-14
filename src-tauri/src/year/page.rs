@@ -48,6 +48,8 @@ pub struct AttentionView {
     pub document_id: Option<String>,
     /// The amount that waits for its evidence PDF.
     pub entry_id: Option<String>,
+    /// The bank line that waits for its invoice.
+    pub line_id: Option<String>,
 }
 
 #[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq, TS)]

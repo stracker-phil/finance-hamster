@@ -39,6 +39,7 @@ pub(super) fn entry_rows(
                         format!("{} · {}", entry.text, eur(cents, format)),
                         format!("KZ {} needs evidence before it counts", item.kz),
                         Some(entry.id.clone()),
+                        None,
                     );
                     (
                         RowKind::Amount,
@@ -139,6 +140,7 @@ pub(super) fn decided_lines(
                 format!("{title} · {}", eur(line.cents.abs(), format)),
                 format!("{day} · KZ {} needs the invoice before it counts", item.kz),
                 None,
+                Some(line.id.clone()),
             );
             continue;
         }

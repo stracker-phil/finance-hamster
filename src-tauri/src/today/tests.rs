@@ -18,9 +18,21 @@ const NOW: i64 = 1_700_000_000;
 const HOME_DAYS: &str = "Telearbeitstage (Homeoffice days)";
 const PAUSCHALE: &str = "Telearbeitspauschale (from the employer)";
 const ACCOUNTS: [&str; 3] = ["account-1", "account-2", "account-3"];
+const BEHIND_AFTER_DAYS: u32 = 7;
 
 fn view_in(db: &Db, number: NumberFormat, order: DateOrder) -> TodayView {
-    today_view(db, today(), number, order).unwrap()
+    today_view(db, today(), number, order, BEHIND_AFTER_DAYS).unwrap()
+}
+
+fn view_behind_after(db: &Db, days: u32) -> TodayView {
+    today_view(
+        db,
+        today(),
+        NumberFormat::DotDecimal,
+        DateOrder::DayFirst,
+        days,
+    )
+    .unwrap()
 }
 
 fn view(db: &Db) -> TodayView {
@@ -53,6 +65,31 @@ fn statement_ending(db: &Db, account_id: &str, to: &str) {
             layout: "sparkasse".into(),
             file_hash: format!("hash-{account_id}"),
             file: format!("statements/2026/{account_id}.pdf"),
+            pages: 1,
+            imported_at: 1,
+        },
+    );
+}
+
+/// A second statement of `account_id`, Nr. 9, which leaves Nr. 10 missing before its Nr. 11.
+fn earlier_statement(db: &Db, account_id: &str) {
+    insert(
+        db,
+        STATEMENTS,
+        &StatementRow {
+            id: format!("statement-{account_id}-earlier"),
+            account_id: account_id.into(),
+            number: 9,
+            year: 2026,
+            from_date: "2025-12-01".into(),
+            to_date: "2025-12-31".into(),
+            old_balance: 0,
+            credits: 0,
+            debits: 0,
+            new_balance: 0,
+            layout: "sparkasse".into(),
+            file_hash: format!("hash-{account_id}-earlier"),
+            file: format!("statements/2026/{account_id}-earlier.pdf"),
             pages: 1,
             imported_at: 1,
         },
@@ -176,7 +213,7 @@ fn the_headline_moves_on_to_the_next_open_step_once_review_is_done() {
 }
 
 #[test]
-fn a_single_new_transaction_asks_for_one_minute_of_review() {
+fn a_single_line_asks_for_one_minute_of_review() {
     let (_dir, db) = quiet();
     add_line(&db, 1, "account-1", "2026-11-09", "Lastschrift A");
 
@@ -186,7 +223,7 @@ fn a_single_new_transaction_asks_for_one_minute_of_review() {
         step,
         Step {
             key: "review".into(),
-            title: "1 new transaction to review".into(),
+            title: "1 line to review".into(),
             detail: "about 1 minute".into(),
             line: "From Private. Rules decided the rest.".into(),
             button: "Start Review".into(),
@@ -198,10 +235,10 @@ fn a_single_new_transaction_asks_for_one_minute_of_review() {
 #[test]
 fn review_time_is_the_waiting_count_over_six_rounded_up() {
     for (count, title, detail) in [
-        (6, "6 new transactions to review", "about 1 minute"),
-        (7, "7 new transactions to review", "about 2 minutes"),
-        (12, "12 new transactions to review", "about 2 minutes"),
-        (13, "13 new transactions to review", "about 3 minutes"),
+        (6, "6 lines to review", "about 1 minute"),
+        (7, "7 lines to review", "about 2 minutes"),
+        (12, "12 lines to review", "about 2 minutes"),
+        (13, "13 lines to review", "about 3 minutes"),
     ] {
         let (_dir, db) = quiet();
         for n in 1..=count {
@@ -228,7 +265,7 @@ fn review_names_only_the_accounts_with_waiting_lines_and_counts_undecided_ones()
 
     let step = view(&db).next.unwrap();
 
-    assert_eq!(step.title, "2 new transactions to review");
+    assert_eq!(step.title, "2 lines to review");
     assert_eq!(
         step.line,
         "From Private and Business. Rules decided the rest."
@@ -253,7 +290,10 @@ fn attach_counts_the_missing_invoices_and_names_the_first_two_by_title() {
             detail: "Lastschrift A and Lastschrift B".into(),
             line: "They count once their PDF is attached.".into(),
             button: "Show in Tax Year 2026".into(),
-            target: StepTarget::Year { year: 2026 },
+            target: StepTarget::Year {
+                year: 2026,
+                attention: Some(AttentionKind::MissingInvoice),
+            },
         }
     );
 }
@@ -337,7 +377,10 @@ fn questions_lists_the_unanswered_ones_of_the_newest_open_year() {
             line: "Numbers from your year, such as the Lohnzettel. They decide what the tax office accepts."
                 .into(),
             button: "Answer in Tax Year 2026".into(),
-            target: StepTarget::Year { year: 2026 },
+            target: StepTarget::Year {
+                year: 2026,
+                attention: None,
+            },
         }
     );
 }
@@ -440,6 +483,7 @@ fn the_questions_step_returns_once_the_year_check_ran_in_november_or_before_it_i
         day(2026, 10, 31),
         NumberFormat::DotDecimal,
         DateOrder::DayFirst,
+        BEHIND_AFTER_DAYS,
     )
     .unwrap();
 
@@ -457,6 +501,7 @@ fn after_the_year_the_check_is_offered_again_until_it_ran_after_31_dec() {
             day(2027, 1, 9),
             NumberFormat::DotDecimal,
             DateOrder::DayFirst,
+            BEHIND_AFTER_DAYS,
         )
         .unwrap()
     };
@@ -509,7 +554,7 @@ fn a_draft_opens_its_document_in_the_year() {
 }
 
 #[test]
-fn several_drafts_are_counted_and_the_first_one_opens() {
+fn several_drafts_are_counted_and_shown_together_in_the_year() {
     let (_dir, db) = quiet();
     for id in ["doc-d1", "doc-d2"] {
         add_document(&db, id, |d| {
@@ -522,10 +567,71 @@ fn several_drafts_are_counted_and_the_first_one_opens() {
     let step = view(&db).next.unwrap();
 
     assert_eq!(step.title, "2 drafts to finish");
-    assert!(
-        matches!(step.target, StepTarget::Document { ref id, year: 2026 } if id.starts_with("doc-d")),
-        "{:?}",
-        step.target
+    assert_eq!(
+        step.line,
+        "Finish them to lock their values for the tax year."
+    );
+    assert_eq!(step.button, "Show Drafts");
+    assert_eq!(
+        step.target,
+        StepTarget::Year {
+            year: 2026,
+            attention: Some(AttentionKind::Draft)
+        }
+    );
+}
+
+#[test]
+fn a_gap_in_the_chain_asks_to_import_the_missing_statement_when_nothing_is_behind() {
+    let (_dir, db) = quiet();
+    earlier_statement(&db, "account-1");
+
+    let step = view(&db).next.unwrap();
+
+    assert_eq!(
+        step,
+        Step {
+            key: "gap".into(),
+            title: "A Private statement is missing".into(),
+            detail: "import it to close the gap".into(),
+            line: "Statement Nr. 010/2026 was never imported: no lines between 31 Dec and 1 Jan."
+                .into(),
+            button: "Import Statement…".into(),
+            target: StepTarget::Import,
+        }
+    );
+}
+
+#[test]
+fn an_account_behind_comes_before_a_gap_in_the_import_step() {
+    let (_dir, db) = quiet_ending(["2026-11-10", "2026-11-10", "2026-10-20"]);
+    earlier_statement(&db, "account-1");
+
+    let step = view(&db).next.unwrap();
+
+    assert_eq!(step.key, "import");
+    assert_eq!(step.title, "Business statement is 24 days behind");
+}
+
+#[test]
+fn a_gap_in_the_chain_is_not_a_step_once_the_reminder_days_have_passed() {
+    let (_dir, db) = quiet();
+    earlier_statement(&db, "account-1");
+
+    let step = view_behind_after(&db, 2).next.unwrap();
+
+    assert_eq!(step.key, "import");
+    assert_eq!(step.title, "Private statement is 3 days behind");
+}
+
+#[test]
+fn an_account_is_behind_only_after_the_given_reminder_days() {
+    let (_dir, db) = quiet_ending(["2026-10-20", "2026-11-10", "2026-11-10"]);
+
+    assert_eq!(view_behind_after(&db, 30).next, None);
+    assert_eq!(
+        view_behind_after(&db, 23).next.map(|s| s.title),
+        Some("Private statement is 24 days behind".to_string())
     );
 }
 
@@ -559,7 +665,10 @@ fn year_steps_belong_to_the_newest_open_year_not_a_newer_closed_one() {
 
     assert_eq!(
         view.next.map(|s| s.target),
-        Some(StepTarget::Year { year: 2026 })
+        Some(StepTarget::Year {
+            year: 2026,
+            attention: Some(AttentionKind::MissingInvoice)
+        })
     );
     assert_eq!(view.year.map(|y| y.year), Some(2026));
 }
@@ -831,6 +940,7 @@ fn another_day_changes_the_date_and_what_is_behind() {
         day(2026, 11, 20),
         NumberFormat::DotDecimal,
         DateOrder::DayFirst,
+        BEHIND_AFTER_DAYS,
     )
     .unwrap();
 
@@ -858,7 +968,11 @@ fn the_view_serializes_with_camel_case_fields_and_tagged_targets() {
     assert_eq!(value["next"]["target"], json!({ "kind": "review" }));
     assert_eq!(
         value["also"][0]["target"],
-        json!({ "kind": "year", "year": 2026 })
+        json!({ "kind": "year", "year": 2026, "attention": "missing_invoice" })
+    );
+    assert_eq!(
+        value["also"][2]["target"],
+        json!({ "kind": "year", "year": 2026, "attention": null })
     );
     assert_eq!(value["also"][1]["target"], json!({ "kind": "import" }));
     assert_eq!(

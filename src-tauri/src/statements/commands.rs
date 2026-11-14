@@ -96,7 +96,13 @@ pub fn statement_import_cancel(state: State<'_, AppState>, token: String) {
 
 #[tauri::command]
 pub fn statements_coverage(state: State<'_, AppState>, query: String) -> AppResult<Coverage> {
-    view::coverage(&state.db, today(), &query, DateOrder::system())
+    view::coverage(
+        &state.db,
+        today(),
+        &query,
+        DateOrder::system(),
+        state.settings.get().import_after_days,
+    )
 }
 
 #[tauri::command]

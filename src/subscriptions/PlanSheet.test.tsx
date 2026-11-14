@@ -78,7 +78,7 @@ describe("PlanSheet", () => {
   it("explains when the current plan ends once a start date is set", () => {
     renderSheet();
 
-    expect(screen.getByText(/The current plan ends on .*2026/)).toBeTruthy();
+    expect(screen.getByText(/The current plan ends on 9 Nov 2026\./)).toBeTruthy();
   });
 
   it("asks for a start date when it is cleared", () => {

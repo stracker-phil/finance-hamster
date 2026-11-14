@@ -39,8 +39,9 @@ pub struct DocumentGroup {
     pub year: Option<i32>,
     /// `3 documents`.
     pub count: String,
-    /// The sum of the group's ANV amounts.
-    pub total: String,
+    /// `€1,540.00 paid`: what the year's documents cost, not what counts (the tax year page has that); None
+    /// for the Inbox.
+    pub total: Option<String>,
     pub documents: Vec<DocumentRowView>,
 }
 
@@ -95,10 +96,10 @@ fn group_of(listed: &[Listed], format: NumberFormat) -> DocumentGroup {
         title: year.map_or_else(|| "Inbox".into(), |y| format!("Tax year {y}")),
         year,
         count: format!("{n} {}", if n == 1 { "document" } else { "documents" }),
-        total: format_money(
-            &Money::eur(listed.iter().map(|l| l.anv_cents).sum()),
-            format,
-        ),
+        total: year.map(|_| {
+            let paid = listed.iter().map(|l| l.anv_cents).sum();
+            format!("{} paid", format_money(&Money::eur(paid), format))
+        }),
         documents: listed.iter().map(|l| l.row.clone()).collect(),
     }
 }

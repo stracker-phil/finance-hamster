@@ -1,12 +1,16 @@
+import type { AttentionKind } from "../api";
+
 /** Every page of the main window and what it needs to show. */
 export type Route =
   | { page: "today" }
-  | { page: "subscriptions" }
+  /** `subscriptionId` opens its panel. */
+  | { page: "subscriptions"; subscriptionId?: string }
   | { page: "statements" }
   | { page: "documents" }
   | { page: "review" }
   | { page: "account"; accountId: string }
-  | { page: "year"; year: number }
+  /** `attention` shows only what needs attention of that kind. */
+  | { page: "year"; year: number; attention?: AttentionKind }
   /** `year` is the tax year it was opened from; null when opened from Documents. */
   | { page: "document"; documentId: string; year: number | null }
   | { page: "log"; year: number }

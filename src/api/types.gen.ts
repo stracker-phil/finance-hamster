@@ -36,7 +36,7 @@ export type AccountEdit = { name: string, bank: string, own: boolean, statementN
 
 export type AccountLines = { id: string, name: string, ibanMasked: string, groups: Array<StatementGroup>, };
 
-export type AccountState = "ok" | "behind" | "review";
+export type AccountState = "ok" | "behind" | "gap" | "review";
 
 /**
  * What a rule or a hand decision does with a line.
@@ -122,7 +122,11 @@ documentId: string | null,
 /**
  * The amount that waits for its evidence PDF.
  */
-entryId: string | null, };
+entryId: string | null, 
+/**
+ * The bank line that waits for its invoice.
+ */
+lineId: string | null, };
 
 export type ChainKind = "first" | "continues" | "gap";
 
@@ -173,7 +177,7 @@ shortcut: string | null,
  */
 custom: boolean, };
 
-export type Cover = "full" | "part" | "missing";
+export type Cover = "full" | "part" | "missing" | "before";
 
 export type Coverage = { months: Array<MonthHead>, accounts: Array<AccountCoverage>, };
 
@@ -230,9 +234,10 @@ year: number | null,
  */
 count: string, 
 /**
- * The sum of the group's ANV amounts.
+ * `€1,540.00 paid`: what the year's documents cost, not what counts (the tax year page has that); None
+ * for the Inbox.
  */
-total: string, documents: Array<DocumentRowView>, };
+total: string | null, documents: Array<DocumentRowView>, };
 
 export type DocumentRowView = { id: string, title: string, 
 /**
@@ -729,7 +734,11 @@ range: string,
 /**
  * `62 lines`.
  */
-count: string, lines: Array<LineView>, };
+count: string, lines: Array<LineView>, 
+/**
+ * The statements missing between this one and the next older one, in words.
+ */
+missingBefore: string | null, };
 
 /**
  * One part of the statements line: `Private and Business until 10 Nov`.
@@ -746,11 +755,11 @@ value: string, ok: boolean, };
 
 export type Step = { 
 /**
- * `review`, `attach`, `import`, `check`, `questions`, `draft`: also the dot's colour.
+ * `review`, `attach`, `import`, `gap`, `check`, `questions`, `draft`: also the dot's colour.
  */
 key: string, 
 /**
- * `12 new transactions to review`.
+ * `12 lines to review`.
  */
 title: string, 
 /**
@@ -765,7 +774,7 @@ line: string, button: string, target: StepTarget, };
 /**
  * Where a step's button leads.
  */
-export type StepTarget = { "kind": "review" } | { "kind": "year", year: number, } | { "kind": "import" } | { "kind": "document", id: string, year: number, } | { "kind": "yearCheck", year: number, };
+export type StepTarget = { "kind": "review" } | { "kind": "year", year: number, attention: AttentionKind | null, } | { "kind": "import" } | { "kind": "document", id: string, year: number, } | { "kind": "yearCheck", year: number, };
 
 export type SubscriptionDetail = { id: string, name: string, letter: string, tone: number, interval: string, 
 /**

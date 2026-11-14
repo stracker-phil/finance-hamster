@@ -1591,6 +1591,26 @@ fn a_search_shows_at_most_twenty_lines_and_reads_the_detail_lines_too() {
 }
 
 #[test]
+fn a_line_is_shown_as_the_picker_shows_it_and_an_unknown_id_is_none() {
+    let (_dir, db) = setup();
+    two_october_lines(&db);
+
+    assert_eq!(
+        payments::choice_of(&db, "l-1", FORMAT, ORDER).unwrap(),
+        Some(LineChoice {
+            id: "l-1".into(),
+            title: "Lastschrift SEITENWEISE".into(),
+            detail: "Private · Wed, 14 Oct".into(),
+            amount: "\u{2212}€46.90".into(),
+        })
+    );
+    assert_eq!(
+        payments::choice_of(&db, "nope", FORMAT, ORDER).unwrap(),
+        None
+    );
+}
+
+#[test]
 fn account_names_are_listed_by_account_id() {
     let (_dir, db) = setup();
 
@@ -2256,14 +2276,14 @@ fn documents_are_grouped_inbox_first_then_years_newest_first_and_newest_payment_
                 title: "Inbox".into(),
                 year: None,
                 count: "1 document".into(),
-                total: "€0.00".into(),
+                total: None,
                 documents: vec![row_view("i", "i", "Not dated", DocState::Draft, "")],
             },
             DocumentGroup {
                 title: "Tax year 2026".into(),
                 year: Some(2026),
                 count: "2 documents".into(),
-                total: "€38.14".into(),
+                total: Some("€38.14 paid".into()),
                 documents: vec![
                     row_view(
                         "b",
@@ -2285,7 +2305,7 @@ fn documents_are_grouped_inbox_first_then_years_newest_first_and_newest_payment_
                 title: "Tax year 2025".into(),
                 year: Some(2025),
                 count: "1 document".into(),
-                total: "€0.00".into(),
+                total: Some("€0.00 paid".into()),
                 documents: vec![row_view(
                     "c",
                     "Beleg-Maerz",
@@ -2348,7 +2368,7 @@ fn a_linked_line_is_the_amount_a_documents_row_counts() {
 
     let groups = listed(&db, "");
 
-    assert_eq!(groups[0].total, "€46.90");
+    assert_eq!(groups[0].total, None);
     assert_eq!(
         groups[0].documents,
         vec![row_view(
@@ -2372,7 +2392,7 @@ fn the_document_groups_travel_in_camel_case() {
             "title": "Inbox",
             "year": null,
             "count": "1 document",
-            "total": "€0.00",
+            "total": null,
             "documents": [{
                 "id": "doc-a",
                 "title": "doc-a",

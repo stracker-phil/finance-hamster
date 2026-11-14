@@ -10,7 +10,7 @@ button.sub-row:hover { background: var(--fill-hover); }
 .sub-row--selected, button.sub-row--selected:hover { background: var(--selection-bg); }
 .sub-row__name { font-weight: 500; }
 .sub-row__anv { margin-left: 8px; }
-.sub-row__next { margin-left: auto; white-space: nowrap; }
+.sub-row__next { flex: none; min-width: 96px; margin-left: auto; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .sub-row__amount { width: 84px; text-align: right; }
 .sub-row--ended { color: var(--text-muted); }
 .sub-row__open { position: absolute; inset: 0; border: 0; background: transparent; }
@@ -27,6 +27,7 @@ button.sub-row:hover { background: var(--fill-hover); }
 .sub-panel__amount { margin-top: 10px; font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .sub-panel__actions { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
 .sub-panel__spacer { flex: 1; }
+.sub-panel__note { white-space: normal; }
 
 .plan-timeline { display: flex; gap: 3px; margin-top: 4px; }
 .plan-timeline--labels span { flex: 1; text-align: center; font-size: 10px; color: var(--text-muted); }

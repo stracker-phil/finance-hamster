@@ -12,7 +12,7 @@ function go(target: StepTarget) {
     case "review":
       return navigate({ page: "review" });
     case "year":
-      return navigate({ page: "year", year: target.year });
+      return navigate({ page: "year", year: target.year, ...(target.attention && { attention: target.attention }) });
     case "import":
       return startImport();
     case "document":
@@ -66,7 +66,7 @@ function UpcomingCharges({ charges }: { charges: UpcomingCharge[] }) {
       </h3>
       {charges.length === 0 && <p className="add-doc__hint">No subscription charges ahead.</p>}
       {charges.map((charge) => (
-        <div key={charge.id} className="sub-line">
+        <button key={charge.id} className="sub-line today__charge" onClick={() => useStore.getState().navigate({ page: "subscriptions", subscriptionId: charge.id })}>
           <span className={`tile tile--small ${accountTone(charge.tone)}`}>{charge.letter}</span>
           <span className="sub-line__main today__name">
             {charge.name}
@@ -74,7 +74,7 @@ function UpcomingCharges({ charges }: { charges: UpcomingCharge[] }) {
           </span>
           <span className={charge.soon ? "today__when today__when--soon" : "today__when"}>{charge.when}</span>
           <span className="year-row__amount today__amount">{charge.amount}</span>
-        </div>
+        </button>
       ))}
     </section>
   );
@@ -88,7 +88,7 @@ function YearColumn({ year, statements }: { year: YearSummary | null; statements
           <h3 className="sub-sheet__heading today__heading">
             Tax year {year.year}
             <button className="link-btn today__more" onClick={() => useStore.getState().navigate({ page: "year", year: year.year })}>
-              Open
+              Show Tax Year
             </button>
           </h3>
           <div className="today__total">{year.total}</div>

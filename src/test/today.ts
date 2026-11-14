@@ -4,7 +4,7 @@ import type { Step, TodayView, UpcomingCharge, YearSummary } from "../api";
 export function step(patch: Partial<Step> = {}): Step {
   return {
     key: "review",
-    title: "12 new transactions to review",
+    title: "12 lines to review",
     detail: "about 2 minutes",
     line: "Decide what each one is: ANV, subscription or ignore.",
     button: "Start review",

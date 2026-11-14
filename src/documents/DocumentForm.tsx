@@ -99,7 +99,7 @@ export function DocumentForm({ doc, onExclude }: { doc: DocumentView; onExclude:
           </label>
           <div>
             <div className="doc-form__row">
-              <input id={`${id}-date`} type="date" className="field doc-form__date" value={doc.payDate ?? ""} onChange={(e) => save({ field: "payDate", value: e.target.value || null })} />
+              <SavedInput id={`${id}-date`} type="date" className="doc-form__date" value={doc.payDate ?? ""} onSave={(text) => save({ field: "payDate", value: text || null })} />
               {doc.year && <span className="add-doc__hint">Tax year {doc.year}</span>}
             </div>
             <FieldError message={errors["document.payDate"]} />

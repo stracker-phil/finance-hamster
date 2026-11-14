@@ -30,3 +30,5 @@
 .today__statements { margin: 26px 0 0; font-size: 12px; line-height: 1.6; color: var(--text-muted); }
 .today__behind { color: var(--warning-text); }
 @media (max-width: 760px) { .today__columns { flex-direction: column; } }
+.today__charge { width: 100%; padding: 0 6px; border: 0; border-bottom: 1px solid var(--row-hairline); border-radius: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: default; }
+.today__charge:hover { background: var(--fill-hover); }

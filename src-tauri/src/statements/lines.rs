@@ -3,7 +3,7 @@
 use serde::Serialize;
 use ts_rs::TS;
 
-use super::store::{self, TransactionRow};
+use super::store::{self, StatementRow, TransactionRow};
 use crate::accounts;
 use crate::date::{self, DateOrder};
 use crate::db::Db;
@@ -90,6 +90,29 @@ pub struct StatementGroup {
     /// `62 lines`.
     pub count: String,
     pub lines: Vec<LineView>,
+    /// The statements missing between this one and the next older one, in words.
+    pub missing_before: Option<String>,
+}
+
+/// `Nr. 002/2026 was never imported` when `older` isn't the statement just before `newer`.
+fn missing_between(older: &StatementRow, newer: &StatementRow) -> Option<String> {
+    if super::view::follows(older, newer) {
+        return None;
+    }
+    Some(
+        if newer.year == older.year && newer.number == older.number + 2 {
+            format!(
+                "Nr. {:03}/{} was never imported",
+                older.number + 1,
+                older.year
+            )
+        } else {
+            format!(
+                "Statements between Nr. {:03}/{} and Nr. {:03}/{} were never imported",
+                older.number, older.year, newer.number, newer.year
+            )
+        },
+    )
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
@@ -153,7 +176,17 @@ pub fn account_lines(
     let items = rules::items(db)?;
     let mut groups = Vec::new();
     let needle = query.trim().to_lowercase();
-    for s in db.read(|c| store::statements_of(c, account_id))? {
+    // Newest first.
+    let statements = db.read(|c| store::statements_of(c, account_id))?;
+    let olders: Vec<Option<StatementRow>> = statements
+        .iter()
+        .skip(1)
+        .cloned()
+        .map(Some)
+        .chain([None])
+        .collect();
+    for (s, older) in statements.into_iter().zip(olders) {
+        let missing_before = older.as_ref().and_then(|o| missing_between(o, &s));
         let lines: Vec<TransactionRow> = db
             .read(|c| store::transactions_of(c, &s.id))?
             .into_iter()
@@ -192,6 +225,7 @@ pub fn account_lines(
                     line_view(t, decision, &items, format, order)
                 })
                 .collect(),
+            missing_before,
             id: s.id,
         });
     }

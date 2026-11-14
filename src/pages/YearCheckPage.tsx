@@ -110,7 +110,13 @@ export function YearCheckPage({ year }: { year: number }) {
             <div className="check__sub">Things you might forget to claim. Say No to what doesn’t apply. Later moves a question to the end.</div>
           </div>
           <span className="review__keys">
-            <span className="kbd">Y</span> <span className="kbd">N</span> <span className="kbd">L</span>
+            <span className="kbd" style={canAdd ? undefined : { visibility: "hidden" }}>
+              Y
+            </span>{" "}
+            <span className="kbd" style={canAdd ? undefined : { visibility: "hidden" }}>
+              N
+            </span>{" "}
+            <span className="kbd">L</span>
           </span>
         </div>
         <div className="check__stack">

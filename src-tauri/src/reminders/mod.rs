@@ -103,7 +103,9 @@ fn statements_due(
     order: DateOrder,
 ) -> AppResult<Vec<Due>> {
     let mut out = Vec::new();
-    for account in statement_view::coverage(db, today, "", order)?.accounts {
+    for account in
+        statement_view::coverage(db, today, "", order, settings.import_after_days)?.accounts
+    {
         if let Some(end) = last_statement_end(db, &account.id)?
             && end + Days::new(u64::from(settings.import_after_days)) <= today
         {

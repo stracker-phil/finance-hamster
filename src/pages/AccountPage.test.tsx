@@ -55,6 +55,22 @@ describe("AccountPage", () => {
     expect(screen.getAllByRole("region").map((r) => r.getAttribute("aria-label"))).toEqual(["Nr. 010/2026", "Nr. 009/2026"]);
   });
 
+  it("notes a gap before a statement after its lines", async () => {
+    mocked.accountLines.mockResolvedValue(accountLines({ groups: [statementGroup({ missingBefore: "No statement for 11–31 Oct" })] }));
+
+    render(<AccountPage accountId="acc-1" />);
+
+    const group = await screen.findByRole("region", { name: "Nr. 010/2026" });
+    expect(within(group).getByRole("note").textContent).toBe("No statement for 11–31 Oct");
+  });
+
+  it("shows no note when nothing is missing before a statement", async () => {
+    render(<AccountPage accountId="acc-1" />);
+
+    await screen.findByRole("region", { name: "Nr. 010/2026" });
+    expect(screen.queryByRole("note")).toBeNull();
+  });
+
   it("shows a line's date, title and amount", async () => {
     render(<AccountPage accountId="acc-1" />);
 

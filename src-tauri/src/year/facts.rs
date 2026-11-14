@@ -69,6 +69,7 @@ impl Facts {
         title: String,
         detail: String,
         entry_id: Option<String>,
+        line_id: Option<String>,
     ) {
         self.missing_invoices += 1;
         self.attention.push(AttentionView {
@@ -77,6 +78,7 @@ impl Facts {
             detail,
             document_id: None,
             entry_id,
+            line_id,
         });
     }
 }
@@ -128,6 +130,7 @@ fn document_rows(
                 title,
                 document_id: Some(doc.id.clone()),
                 entry_id: None,
+                line_id: None,
             });
             continue;
         };
@@ -192,6 +195,7 @@ fn count_state(doc: &DocumentRow, title: &str, facts: &mut Facts) {
             title: title.to_string(),
             document_id: Some(doc.id.clone()),
             entry_id: None,
+            line_id: None,
         });
     } else {
         facts.finished += 1;

@@ -25,7 +25,7 @@ describe("TodayPage", () => {
 
       renderWithQuery(<TodayPage />);
 
-      expect(await screen.findByRole("heading", { name: "12 new transactions to review" })).toBeTruthy();
+      expect(await screen.findByRole("heading", { name: "12 lines to review" })).toBeTruthy();
       expect(screen.getByText("Friday, 13 November")).toBeTruthy();
       expect(screen.getByText("Decide what each one is: ANV, subscription or ignore.")).toBeTruthy();
       expect(screen.getByRole("button", { name: "Start review" })).toBeTruthy();
@@ -33,7 +33,8 @@ describe("TodayPage", () => {
 
     it.each([
       ["review", step({ button: "Start review", target: { kind: "review" } }), { page: "review" }],
-      ["the tax year", step({ button: "Open tax year", target: { kind: "year", year: 2026 } }), { page: "year", year: 2026 }],
+      ["the tax year", step({ button: "Open tax year", target: { kind: "year", year: 2026, attention: null } }), { page: "year", year: 2026 }],
+      ["the missing invoices of the tax year", step({ button: "Attach invoices", target: { kind: "year", year: 2026, attention: "missing_invoice" } }), { page: "year", year: 2026, attention: "missing_invoice" }],
       ["a document", step({ button: "Attach PDF", target: { kind: "document", id: "doc-7", year: 2026 } }), { page: "document", documentId: "doc-7", year: 2026 }],
       ["the year check", step({ button: "Start year check", target: { kind: "yearCheck", year: 2026 } }), { page: "yearCheck", year: 2026 }],
     ])("sends the button to %s", async (_name, next, route) => {
@@ -121,6 +122,15 @@ describe("TodayPage", () => {
       expect(screen.getByText("Pixelforge Cloud").textContent).toContain("ANV");
     });
 
+    it("opens the subscription of a charge that is clicked", async () => {
+      mocked.todayView.mockResolvedValue(todayView({ upcoming: [upcomingCharge({ id: "sub-2", name: "Pixelforge Cloud" })] }));
+      renderWithQuery(<TodayPage />);
+
+      await userEvent.click(await screen.findByRole("button", { name: /Pixelforge Cloud/ }));
+
+      expect(useStore.getState().route).toEqual({ page: "subscriptions", subscriptionId: "sub-2" });
+    });
+
     it("says no charges are ahead when there are none", async () => {
       renderWithQuery(<TodayPage />);
 
@@ -149,11 +159,11 @@ describe("TodayPage", () => {
       expect(screen.getByText("4 of 6 items answered")).toBeTruthy();
     });
 
-    it("opens the year page from Open", async () => {
+    it("opens the year page from Show Tax Year", async () => {
       mocked.todayView.mockResolvedValue(todayView({ year: yearSummary({ year: 2026 }) }));
       renderWithQuery(<TodayPage />);
 
-      await userEvent.click(await screen.findByRole("button", { name: "Open" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Show Tax Year" }));
 
       expect(useStore.getState().route).toEqual({ page: "year", year: 2026 });
     });
@@ -190,7 +200,7 @@ describe("TodayPage", () => {
       await screen.findByText("No subscription charges ahead.");
       expect(screen.queryByText(/Tax year/)).toBeNull();
       expect(screen.queryByText("Werbungskosten so far")).toBeNull();
-      expect(screen.queryByRole("button", { name: "Open" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Show Tax Year" })).toBeNull();
     });
 
     it("still shows the statements line in a Statements section when there is no year", async () => {

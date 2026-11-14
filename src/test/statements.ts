@@ -56,7 +56,7 @@ export function lineView(patch: Partial<LineView> = {}): LineView {
 
 /** A demo statement group, with `patch` applied. */
 export function statementGroup(patch: Partial<StatementGroup> = {}): StatementGroup {
-  return { id: "st-1", label: "Nr. 010/2026", range: "1 Nov – 10 Nov", count: "1 line", lines: [lineView()], ...patch };
+  return { id: "st-1", label: "Nr. 010/2026", range: "1 Nov – 10 Nov", count: "1 line", missingBefore: null, lines: [lineView()], ...patch };
 }
 
 /** A demo account's lines, with `patch` applied. */

@@ -14,6 +14,19 @@ export function startAddDocument() {
     .catch(showError);
 }
 
+/** Asks for the invoice of one bank line; the sheet starts on that line instead of its own best guess. */
+export async function attachInvoiceTo(lineId: string) {
+  try {
+    const preview = await api.documentAddChoose();
+    if (!preview) return;
+    const line = await api.documentLineChoice(lineId);
+    const lines = line ? [line, ...preview.lines.filter((l) => l.id !== line.id)] : preview.lines;
+    useStore.getState().setAddPreview({ ...preview, lines });
+  } catch (e) {
+    showError(e);
+  }
+}
+
 /** Invoices dropped on the window arrive read by Rust: the sheet opens, or a toast says why not. */
 export function useDroppedDocuments() {
   useEffect(() => {

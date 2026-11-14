@@ -95,6 +95,20 @@ pub fn document_add_commit(
     Ok(written.label)
 }
 
+/// A bank line as the Add document sheet's picker shows it, for an invoice added from that line.
+#[tauri::command]
+pub fn document_line_choice(
+    state: State<'_, AppState>,
+    id: String,
+) -> AppResult<Option<LineChoice>> {
+    super::payments::choice_of(
+        &state.db,
+        &id,
+        state.settings.get().number_format,
+        DateOrder::system(),
+    )
+}
+
 #[tauri::command]
 pub fn document_add_cancel(state: State<'_, AppState>, token: String) {
     state.adds.take(&token);

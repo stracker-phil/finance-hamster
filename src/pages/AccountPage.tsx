@@ -34,6 +34,12 @@ export function AccountPage({ accountId }: { accountId: string }) {
               <span className={line.credit ? "line-row__amount line-row__amount--in" : "line-row__amount"}>{line.amount}</span>
             </div>
           ))}
+          {group.missingBefore && (
+            <div className="line-gap" role="note">
+              <span className="cov-row__dot" />
+              {group.missingBefore}
+            </div>
+          )}
         </section>
       ))}
     </div>

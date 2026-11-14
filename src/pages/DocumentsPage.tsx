@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { FileText, Search } from "lucide-react";
 import type { DocState } from "../api";
 import { useDocuments } from "../queries/documents";
@@ -11,11 +10,12 @@ const STATE_PILL: Record<DocState, { label: string; className: string }> = {
   excluded: { label: "Excluded", className: "pill" },
 };
 
-/** Documents: "Is it already here?", then every document by tax year, the undated ones in the Inbox. */
+/** Documents: "Is it already here?", then every document by tax year, the undated ones in the Inbox. The big field
+ *  and the header's filter are one search. */
 export function DocumentsPage() {
-  const [query, setQuery] = useState("");
-  const filter = useStore((s) => s.filter);
-  const { data: groups } = useDocuments(query || filter);
+  const query = useStore((s) => s.filter);
+  const setQuery = useStore((s) => s.setFilter);
+  const { data: groups } = useDocuments(query);
   const navigate = useStore((s) => s.navigate);
   return (
     <div className="page-scroll">
@@ -51,7 +51,11 @@ export function DocumentsPage() {
                   </button>
                 </>
               )}
-              <span className="docs-group__total">{group.total}</span>
+              {group.total && (
+                <span className="docs-group__total" title="What these documents cost; the tax year page shows what counts">
+                  {group.total}
+                </span>
+              )}
             </div>
             {group.documents.map((doc) => (
               <button key={doc.id} className="docs-row" onClick={() => navigate({ page: "document", documentId: doc.id, year: null })}>

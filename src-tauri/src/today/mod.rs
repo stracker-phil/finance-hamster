@@ -2,6 +2,7 @@
 //! tax year and how far the statements reach. Every fact comes from the page that owns it.
 
 pub mod commands;
+mod steps;
 #[cfg(test)]
 mod tests;
 
@@ -9,17 +10,19 @@ use chrono::NaiveDate;
 use serde::Serialize;
 use ts_rs::TS;
 
-use crate::accounts;
 use crate::date::{self, DateOrder};
 use crate::db::Db;
 use crate::error::AppResult;
 use crate::settings::NumberFormat;
 use crate::statements::store as statements;
-use crate::statements::view::{self as coverage, AccountState};
+use crate::statements::view::{self as coverage, AccountState, Coverage};
 use crate::subscriptions::Book;
 use crate::subscriptions::view::{Format, letter};
 use crate::taxyears::{self, YearState};
 use crate::year::page::{self as year_page, AttentionKind, YearPage};
+use steps::{
+    attach_step, draft_step, import_step, joined, questions_step, review_step, year_check_step,
+};
 
 /// Where a step's button leads.
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
@@ -27,19 +30,28 @@ use crate::year::page::{self as year_page, AttentionKind, YearPage};
 #[ts(export, export_to = "src/api/types.gen.ts")]
 pub enum StepTarget {
     Review,
-    Year { year: i32 },
+    /// With `attention`, the tax year shows only what needs attention of that kind.
+    Year {
+        year: i32,
+        attention: Option<AttentionKind>,
+    },
     Import,
-    Document { id: String, year: i32 },
-    YearCheck { year: i32 },
+    Document {
+        id: String,
+        year: i32,
+    },
+    YearCheck {
+        year: i32,
+    },
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "src/api/types.gen.ts")]
 pub struct Step {
-    /// `review`, `attach`, `import`, `check`, `questions`, `draft`: also the dot's colour.
+    /// `review`, `attach`, `import`, `gap`, `check`, `questions`, `draft`: also the dot's colour.
     pub key: String,
-    /// `12 new transactions to review`.
+    /// `12 lines to review`.
     pub title: String,
     /// The quiet row's right side: `about 2 minutes`.
     pub detail: String,
@@ -102,190 +114,7 @@ pub struct TodayView {
 const UPCOMING: usize = 5;
 const SOON_DAYS: i64 = 3;
 
-fn plural(n: usize, one: &str, many: &str) -> String {
-    format!("{n} {}", if n == 1 { one } else { many })
-}
-
-/// `A`, `A and B`, `A, B and C`.
-fn joined(names: &[String]) -> String {
-    match names {
-        [] => String::new(),
-        [one] => one.clone(),
-        [rest @ .., last] => format!("{} and {last}", rest.join(", ")),
-    }
-}
-
-fn review_step(db: &Db) -> AppResult<Option<Step>> {
-    let waiting = db.read(crate::review::undecided_by_account)?;
-    let count: u32 = waiting.values().sum();
-    if count == 0 {
-        return Ok(None);
-    }
-    let names: Vec<String> = db
-        .read(accounts::rows)?
-        .into_iter()
-        .filter(|a| waiting.get(&a.id).is_some_and(|n| *n > 0))
-        .map(|a| a.name)
-        .collect();
-    let minutes = (count as usize).div_ceil(6).max(1);
-    Ok(Some(Step {
-        key: "review".into(),
-        title: plural(
-            count as usize,
-            "new transaction to review",
-            "new transactions to review",
-        ),
-        detail: format!("about {}", plural(minutes, "minute", "minutes")),
-        line: format!("From {}. Rules decided the rest.", joined(&names)),
-        button: "Start Review".into(),
-        target: StepTarget::Review,
-    }))
-}
-
-fn import_step(db: &Db, today: NaiveDate, order: DateOrder) -> AppResult<Option<Step>> {
-    let view = coverage::coverage(db, today, "", order)?;
-    let Some(behind) = view
-        .accounts
-        .iter()
-        .find(|a| a.state == AccountState::Behind)
-    else {
-        return Ok(None);
-    };
-    let (title, detail, line) = match last_statement_end(db, &behind.id)? {
-        Some(end) => {
-            let ends = date::day_month(end, order);
-            (
-                format!(
-                    "{} statement is {}",
-                    behind.name,
-                    behind.state_label.to_lowercase()
-                ),
-                format!("last one ends {ends}"),
-                format!("Its last statement ends on {ends}."),
-            )
-        }
-        None => (
-            format!("{} has no statement yet", behind.name),
-            "import its first one".to_string(),
-            "Import its first statement to see its lines.".to_string(),
-        ),
-    };
-    Ok(Some(Step {
-        key: "import".into(),
-        title,
-        detail,
-        line,
-        button: "Import Statement…".into(),
-        target: StepTarget::Import,
-    }))
-}
-
-/// The first two distinct names, in order.
-fn first_names(names: impl Iterator<Item = String>) -> String {
-    let mut distinct: Vec<String> = Vec::new();
-    for name in names {
-        if !distinct.contains(&name) {
-            distinct.push(name);
-        }
-        if distinct.len() == 2 {
-            break;
-        }
-    }
-    joined(&distinct)
-}
-
-fn attach_step(page: &YearPage) -> Option<Step> {
-    let year = page.year;
-    let missing: Vec<_> = page
-        .attention
-        .iter()
-        .filter(|a| a.kind == AttentionKind::MissingInvoice)
-        .collect();
-    (!missing.is_empty()).then(|| Step {
-        key: "attach".into(),
-        title: plural(missing.len(), "invoice to attach", "invoices to attach"),
-        // An attention title reads `<payee> · <amount>`.
-        detail: first_names(
-            missing
-                .iter()
-                .map(|a| a.title.split(" · ").next().unwrap_or(&a.title).to_string()),
-        ),
-        line: "They count once their PDF is attached.".into(),
-        button: format!("Show in Tax Year {year}"),
-        target: StepTarget::Year { year },
-    })
-}
-
-fn questions_step(page: &YearPage) -> Option<Step> {
-    let year = page.year;
-    let open: Vec<&str> = page
-        .questions
-        .iter()
-        .filter(|q| !q.answered)
-        .map(|q| q.label.as_str())
-        .collect();
-    (!open.is_empty()).then(|| Step {
-        key: "questions".into(),
-        title: format!("{} for Tax year {year}", plural(open.len(), "question", "questions")),
-        detail: open.join(" · "),
-        line: "Numbers from your year, such as the Lohnzettel. They decide what the tax office accepts.".into(),
-        button: format!("Answer in Tax Year {year}"),
-        target: StepTarget::Year { year },
-    })
-}
-
-fn year_check_step(
-    db: &Db,
-    today: NaiveDate,
-    number: NumberFormat,
-    order: DateOrder,
-) -> AppResult<Option<Step>> {
-    let Some(&year) = crate::yearcheck::due_years(db, today)?.first() else {
-        return Ok(None);
-    };
-    let view = crate::yearcheck::view(db, year, today, number, order)?;
-    let count = view.questions.len();
-    let run = view
-        .last_run
-        .map_or("Not run yet".to_string(), |d| format!("Last run {d}"));
-    Ok(Some(Step {
-        key: "check".into(),
-        title: format!("Year check for {year}"),
-        detail: format!(
-            "{run} · {}",
-            plural(count, "quick question", "quick questions")
-        ),
-        line: "Things you might forget to claim. Most are a quick No.".into(),
-        button: "Start Year Check".into(),
-        target: StepTarget::YearCheck { year },
-    }))
-}
-
-fn draft_step(page: &YearPage) -> Option<Step> {
-    let year = page.year;
-    let drafts: Vec<_> = page
-        .attention
-        .iter()
-        .filter(|a| a.kind == AttentionKind::Draft)
-        .collect();
-    let first = drafts.first()?;
-    Some(Step {
-        key: "draft".into(),
-        title: plural(drafts.len(), "draft to finish", "drafts to finish"),
-        detail: first_names(drafts.iter().map(|d| d.title.clone())),
-        line: "Finish it to lock its values for the tax year.".into(),
-        button: "Open Draft".into(),
-        target: first
-            .document_id
-            .clone()
-            .map_or(StepTarget::Year { year }, |id| StepTarget::Document {
-                id,
-                year,
-            }),
-    })
-}
-
-fn last_statement_end(db: &Db, account_id: &str) -> AppResult<Option<NaiveDate>> {
+pub(super) fn last_statement_end(db: &Db, account_id: &str) -> AppResult<Option<NaiveDate>> {
     Ok(db
         .read(|c| statements::statements_of(c, account_id))?
         .iter()
@@ -294,8 +123,7 @@ fn last_statement_end(db: &Db, account_id: &str) -> AppResult<Option<NaiveDate>>
 }
 
 /// Accounts grouped by how far their statements reach; the ones behind come last.
-fn reach(db: &Db, today: NaiveDate, order: DateOrder) -> AppResult<Vec<StatementReach>> {
-    let view = coverage::coverage(db, today, "", order)?;
+fn reach(db: &Db, view: &Coverage, order: DateOrder) -> AppResult<Vec<StatementReach>> {
     let mut groups: Vec<(Option<NaiveDate>, bool, Vec<String>)> = Vec::new();
     for account in &view.accounts {
         let end = last_statement_end(db, &account.id)?;
@@ -361,8 +189,10 @@ pub fn today_view(
     today: NaiveDate,
     number: NumberFormat,
     order: DateOrder,
+    import_after_days: u32,
 ) -> AppResult<TodayView> {
     let format = Format { number, order };
+    let statements_view = coverage::coverage(db, today, "", order, import_after_days)?;
     let newest_open = db
         .read(taxyears::rows)?
         .into_iter()
@@ -382,7 +212,7 @@ pub fn today_view(
     let mut steps = [
         review_step(db)?,
         from_year(attach_step),
-        import_step(db, today, order)?,
+        import_step(db, &statements_view, order)?,
         check,
         questions,
         from_year(draft_step),
@@ -400,6 +230,6 @@ pub fn today_view(
             progress: p.progress,
             progress_percent: p.progress_percent,
         }),
-        statements: reach(db, today, order)?,
+        statements: reach(db, &statements_view, order)?,
     })
 }

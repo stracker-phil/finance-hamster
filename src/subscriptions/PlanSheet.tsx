@@ -1,6 +1,7 @@
 import { useId, useState, type FormEvent } from "react";
 import { api, toAppError, type PlanForm, type ReviewLine } from "../api";
 import { Modal } from "../components/Modal";
+import { dayMonthYear } from "../lib/date";
 import { undoToast } from "../lib/undoToast";
 import { Segmented } from "../settings/controls";
 import { useStore } from "../state/store";
@@ -11,7 +12,7 @@ const dayBefore = (iso: string) => {
   const day = new Date(`${iso}T12:00:00`);
   if (Number.isNaN(day.getTime())) return "";
   day.setDate(day.getDate() - 1);
-  return day.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+  return dayMonthYear(day);
 };
 
 /** Change Plan: the current plan ends the day before the new one starts; its charges stay with it. */

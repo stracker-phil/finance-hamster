@@ -65,8 +65,14 @@ fn ending_on_a_booking(number: u32, month: u32, to: NaiveDate, old_balance: i64)
     statement
 }
 
+const BEHIND_AFTER_DAYS: u32 = 30;
+
 fn overview(db: &Db) -> Coverage {
-    coverage(db, today(), "", DateOrder::DayFirst).unwrap()
+    coverage(db, today(), "", DateOrder::DayFirst, BEHIND_AFTER_DAYS).unwrap()
+}
+
+fn overview_behind_after(db: &Db, days: u32) -> Coverage {
+    coverage(db, today(), "", DateOrder::DayFirst, days).unwrap()
 }
 
 fn account<'a>(coverage: &'a Coverage, name: &str) -> &'a AccountCoverage {
@@ -117,30 +123,59 @@ fn every_account_has_a_cover_for_every_month_shown() {
 }
 
 #[test]
-fn months_are_full_part_or_missing_by_the_days_the_statements_cover() {
+fn months_are_before_full_part_or_missing_by_the_days_the_statements_cover() {
     let (_dir, db) = seeded();
     let overview = overview(&db);
-    use Cover::{Full, Missing, Part};
+    use Cover::{Before, Full, Missing, Part};
 
     assert_eq!(
         covers(account(&overview, "Private")),
         [
-            Missing, Full, Full, Full, Full, Full, Full, Full, Full, Full, Full, Part
+            Before, Full, Full, Full, Full, Full, Full, Full, Full, Full, Full, Part
         ]
     );
     assert_eq!(
         covers(account(&overview, "Household")),
         [
-            Missing, Part, Missing, Part, Full, Full, Full, Full, Full, Full, Full, Part
+            Before, Part, Missing, Part, Full, Full, Full, Full, Full, Full, Full, Part
         ]
     );
     assert_eq!(
         covers(account(&overview, "Business")),
         [
-            Missing, Missing, Missing, Missing, Missing, Missing, Missing, Missing, Missing, Part,
-            Full, Part
+            Before, Before, Before, Before, Before, Before, Before, Before, Before, Part, Full,
+            Part
         ]
     );
+}
+
+#[test]
+fn months_before_the_first_statement_say_so_in_their_tip() {
+    let (dir, db) = open_with_accounts();
+    import_statement(&db, dir.path(), &october());
+
+    let overview = overview(&db);
+    let private = account(&overview, "Private");
+
+    assert_eq!(private.months[9].cover, Cover::Before);
+    assert_eq!(
+        private.months[9].tip,
+        "September 2026 · before the first statement"
+    );
+    assert_eq!(private.months[0].cover, Cover::Before);
+    assert_eq!(private.months[10].cover, Cover::Part);
+}
+
+#[test]
+fn cover_kinds_travel_as_snake_case_words() {
+    for (cover, word) in [
+        (Cover::Full, "full"),
+        (Cover::Part, "part"),
+        (Cover::Missing, "missing"),
+        (Cover::Before, "before"),
+    ] {
+        assert_eq!(serde_json::to_value(cover).unwrap(), word, "{word}");
+    }
 }
 
 #[test]
@@ -157,7 +192,7 @@ fn month_tips_name_the_statements_that_cover_them() {
     assert_eq!(
         tips(private, &[0, 1, 10, 11]),
         [
-            "December 2025 · no statement",
+            "December 2025 · before the first statement",
             "January 2026 · Nr. 001/2026, Nr. 002/2026",
             "October 2026 · Nr. 010/2026, Nr. 011/2026",
             "November 2026 · partly, Nr. 011/2026",
@@ -259,12 +294,14 @@ fn the_last_statement_is_named_with_its_number_and_end_day() {
 }
 
 #[test]
-fn an_account_is_up_to_date_within_seven_days_of_its_last_statements_end() {
-    for (days_ago, state, label) in [
-        (0, AccountState::Ok, "Up to date"),
-        (7, AccountState::Ok, "Up to date"),
-        (8, AccountState::Behind, "8 days behind"),
-        (30, AccountState::Behind, "30 days behind"),
+fn an_account_is_behind_only_after_the_reminder_days_since_its_last_statements_end() {
+    for (behind_after, days_ago, state, label) in [
+        (30, 0, AccountState::Ok, "Up to date"),
+        (30, 30, AccountState::Ok, "Up to date"),
+        (30, 31, AccountState::Behind, "31 days behind"),
+        (7, 7, AccountState::Ok, "Up to date"),
+        (7, 8, AccountState::Behind, "8 days behind"),
+        (0, 1, AccountState::Behind, "1 days behind"),
     ] {
         let (dir, db) = open_with_accounts();
         ignore_everything_of_private(&db);
@@ -275,11 +312,14 @@ fn an_account_is_up_to_date_within_seven_days_of_its_last_statements_end() {
             &ending_on_a_booking(10, end.month(), end, 141_230),
         );
 
-        let overview = overview(&db);
+        let overview = overview_behind_after(&db, behind_after);
         let private = account(&overview, "Private");
 
-        assert_eq!(private.state, state, "{days_ago} days");
-        assert_eq!(private.state_label, label, "{days_ago} days");
+        assert_eq!(private.state, state, "{behind_after}: {days_ago} days");
+        assert_eq!(
+            private.state_label, label,
+            "{behind_after}: {days_ago} days"
+        );
     }
 }
 
@@ -301,15 +341,50 @@ fn the_seeded_demo_accounts_are_current_but_have_lines_to_review() {
 }
 
 #[test]
-fn the_seeded_household_account_has_every_line_decided_and_is_up_to_date() {
+fn the_seeded_household_account_has_every_line_decided_but_a_missing_statement() {
     let (_dir, db) = seeded();
     let overview = overview(&db);
 
     let household = account(&overview, "Household");
 
     assert_eq!(household.to_review, 0);
-    assert_eq!(household.state, AccountState::Ok);
-    assert_eq!(household.state_label, "Up to date");
+    assert_eq!(household.state, AccountState::Gap);
+    assert_eq!(household.state_label, "Statement missing");
+}
+
+#[test]
+fn a_gap_in_the_chain_wins_over_lines_to_review() {
+    let (dir, db) = open_with_accounts();
+    import_statement(&db, dir.path(), &demo_month(9, 2026, 9, 141_230));
+    import_statement(&db, dir.path(), &ending(11, 11, today(), 100_000));
+
+    let overview = overview(&db);
+    let private = account(&overview, "Private");
+
+    assert!(private.to_review > 0);
+    assert_eq!(private.state, AccountState::Gap);
+    assert_eq!(private.state_label, "Statement missing");
+}
+
+#[test]
+fn being_behind_wins_over_a_gap_in_the_chain() {
+    let (_dir, db) = seeded();
+
+    let overview = overview_behind_after(&db, 2);
+    let household = account(&overview, "Household");
+
+    assert_eq!(household.state, AccountState::Behind);
+    let end = db
+        .read(|c| super::store::statements_of(c, &household.id))
+        .unwrap()
+        .iter()
+        .filter_map(|s| crate::date::parse(&s.to_date))
+        .max()
+        .unwrap();
+    assert_eq!(
+        household.state_label,
+        format!("{} days behind", (today() - end).num_days())
+    );
 }
 
 #[test]
@@ -328,15 +403,19 @@ fn an_up_to_date_account_with_undecided_lines_is_in_review() {
 #[test]
 fn being_behind_wins_over_lines_to_review() {
     let (dir, db) = open_with_accounts();
-    let end = today() - chrono::Days::new(30);
-    import_statement(&db, dir.path(), &ending(10, end.month(), end, 141_230));
+    let end = today() - chrono::Days::new(31);
+    import_statement(
+        &db,
+        dir.path(),
+        &ending_on_a_booking(10, end.month(), end, 141_230),
+    );
 
     let overview = overview(&db);
     let private = account(&overview, "Private");
 
     assert!(private.to_review > 0);
     assert_eq!(private.state, AccountState::Behind);
-    assert_eq!(private.state_label, "30 days behind");
+    assert_eq!(private.state_label, "31 days behind");
 }
 
 #[test]
@@ -353,6 +432,7 @@ fn account_states_travel_as_snake_case_words() {
     for (state, word) in [
         (AccountState::Ok, "ok"),
         (AccountState::Behind, "behind"),
+        (AccountState::Gap, "gap"),
         (AccountState::Review, "review"),
     ] {
         assert_eq!(serde_json::to_value(state).unwrap(), word, "{word}");
@@ -360,7 +440,7 @@ fn account_states_travel_as_snake_case_words() {
 }
 
 #[test]
-fn an_account_without_statements_is_behind_with_every_month_missing() {
+fn an_account_without_statements_is_behind_with_every_month_before_the_first_statement() {
     let (_dir, db) = open_with_accounts();
 
     let overview = overview(&db);
@@ -371,13 +451,11 @@ fn an_account_without_statements_is_behind_with_every_month_missing() {
         assert_eq!(account.state, AccountState::Behind, "{}", account.name);
         assert_eq!(account.state_label, "No statements", "{}", account.name);
         assert_eq!(account.note, None, "{}", account.name);
+        assert_eq!(covers(account), vec![Cover::Before; 12], "{}", account.name);
         assert_eq!(
-            covers(account),
-            vec![Cover::Missing; 12],
-            "{}",
-            account.name
+            account.months[11].tip,
+            "November 2026 · before the first statement"
         );
-        assert_eq!(account.months[11].tip, "November 2026 · no statement");
     }
 }
 
@@ -412,7 +490,14 @@ fn balances_that_do_not_connect_are_a_note() {
 fn the_month_heads_cross_the_year_boundary_for_an_early_date() {
     let (_dir, db) = open_with_accounts();
 
-    let early = coverage(&db, day(2026, 2, 3), "", DateOrder::DayFirst).unwrap();
+    let early = coverage(
+        &db,
+        day(2026, 2, 3),
+        "",
+        DateOrder::DayFirst,
+        BEHIND_AFTER_DAYS,
+    )
+    .unwrap();
 
     let labels: Vec<&str> = early.months.iter().map(|m| m.label.as_str()).collect();
     assert_eq!(
@@ -441,7 +526,8 @@ fn a_query_keeps_the_accounts_whose_name_contains_it_ignoring_case() {
         ("  i", vec!["Private", "Business"]),
         ("savings", vec![]),
     ] {
-        let filtered = coverage(&db, today(), query, DateOrder::DayFirst).unwrap();
+        let filtered =
+            coverage(&db, today(), query, DateOrder::DayFirst, BEHIND_AFTER_DAYS).unwrap();
 
         let names: Vec<&str> = filtered.accounts.iter().map(|a| a.name.as_str()).collect();
         assert_eq!(names, expected, "{query:?}");
@@ -453,7 +539,7 @@ fn a_query_keeps_the_accounts_whose_name_contains_it_ignoring_case() {
 fn the_last_day_follows_the_date_order() {
     let (_dir, db) = seeded();
 
-    let month_first = coverage(&db, today(), "", DateOrder::MonthFirst).unwrap();
+    let month_first = coverage(&db, today(), "", DateOrder::MonthFirst, BEHIND_AFTER_DAYS).unwrap();
 
     assert_eq!(
         account(&month_first, "Private").last,

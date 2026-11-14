@@ -47,6 +47,7 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static
         crate::documents::commands::document_add_choose,
         crate::documents::commands::document_add_commit,
         crate::documents::commands::document_add_cancel,
+        crate::documents::commands::document_line_choice,
         crate::documents::commands::document_estimate,
         crate::documents::commands::document_view,
         crate::documents::commands::document_edit,

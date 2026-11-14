@@ -97,7 +97,7 @@ export function SubscriptionPanel({ id, onClose }: { id: string; onClose: () => 
               </button>
             )}
           </div>
-          <p className="add-doc__hint">Change Plan keeps the history: the old plan ends, the new one starts. Edit only fixes mistakes.</p>
+          <p className="add-doc__hint sub-panel__note">Change Plan keeps the history: the old plan ends, the new one starts. Edit only fixes mistakes.</p>
         </div>
       )}
     </aside>

@@ -79,7 +79,8 @@ fn statement_row(db: &Db, account: &AccountCoverage, order: DateOrder) -> AppRes
 }
 
 fn statement_rows(db: &Db, today: NaiveDate, order: DateOrder) -> AppResult<Vec<StatusRow>> {
-    statement_view::coverage(db, today, "", order)?
+    // The rows show the chain only, never how far behind an account is.
+    statement_view::coverage(db, today, "", order, u32::MAX)?
         .accounts
         .iter()
         .map(|account| statement_row(db, account, order))

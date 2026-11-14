@@ -50,7 +50,7 @@ export function ImportSheet({ preview, onImported }: { preview: ImportPreview; o
         <span className="import-file__account">{preview.accountName}</span>
       </div>
       <div className="import-checks">
-        <CheckRow ok title={`Read ${preview.lines} transactions`} detail="Account recognized from the IBAN on page 1." />
+        <CheckRow ok title={`Read ${preview.lines} ${preview.lines === 1 ? "line" : "lines"}`} detail="Account recognized from the IBAN on page 1." />
         <CheckRow ok title="Balance adds up" detail={`${preview.balance} · matches the printed new balance`} mono />
         <CheckRow ok={preview.chain !== "gap"} title={preview.chainTitle} detail={preview.chainDetail} />
       </div>

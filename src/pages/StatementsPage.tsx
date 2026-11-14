@@ -6,7 +6,7 @@ import { useStore } from "../state/store";
 import { accountTone } from "../lib/accountTone";
 import { EmptyPage } from "./EmptyPage";
 
-const STATE_CHIP: Record<AccountCoverage["state"], string> = { ok: "state-chip--ok", behind: "state-chip--warn", review: "state-chip--info" };
+const STATE_CHIP: Record<AccountCoverage["state"], string> = { ok: "state-chip--ok", behind: "state-chip--warn", gap: "state-chip--warn", review: "state-chip--info" };
 
 function AccountRow({ account, index }: { account: AccountCoverage; index: number }) {
   const navigate = useStore((s) => s.navigate);
@@ -91,6 +91,10 @@ export function StatementsPage() {
           <span>
             <span className="cov cov--missing" />
             Missing
+          </span>
+          <span>
+            <span className="cov cov--before" />
+            Before the first statement
           </span>
           <span className="cov-legend__note">Checked by printed balances · statements must follow each other</span>
         </div>

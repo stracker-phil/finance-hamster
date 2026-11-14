@@ -14,7 +14,7 @@ import { DocumentsPage } from "./DocumentsPage";
 const mocked = vi.mocked(api, true);
 
 const inbox = () =>
-  documentGroup({ title: "Inbox", year: null, count: "1 document", total: "", documents: [documentRow({ id: "doc-2", title: "Example Market", sub: "no payment date yet", state: "draft", anv: "" })] });
+  documentGroup({ title: "Inbox", year: null, count: "1 document", total: null, documents: [documentRow({ id: "doc-2", title: "Example Market", sub: "no payment date yet", state: "draft", anv: "" })] });
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -35,6 +35,16 @@ describe("DocumentsPage", () => {
       expect(within(year).getByText("2 documents")).toBeTruthy();
       expect(within(year).getByText("€121.23", { selector: ".docs-group__total" })).toBeTruthy();
       expect(within(screen.getByRole("region", { name: "Inbox" })).getByText("1 document")).toBeTruthy();
+    });
+
+    it("shows no total for a group without one", async () => {
+      mocked.documentsList.mockResolvedValue([documentGroup({ total: null })]);
+      renderWithQuery(<DocumentsPage />);
+
+      const year = await screen.findByRole("region", { name: "Tax year 2026" });
+
+      expect(within(year).getByText("1 document")).toBeTruthy();
+      expect(year.querySelector(".docs-group__total")).toBeNull();
     });
 
     it("shows each row with its title, sub line, state and ANV amount", async () => {
@@ -101,14 +111,22 @@ describe("DocumentsPage", () => {
       expect(screen.queryByRole("button", { name: /Demo Cloud Ltd/ })).toBeNull();
     });
 
-    it("lists the documents matching the header filter, and prefers the typed search over it", async () => {
+    it("shares the header filter: it fills the big field and is the query", async () => {
       useStore.setState({ filter: "cloud" });
       renderWithQuery(<DocumentsPage />);
-      await screen.findByText("No documents");
+      await screen.findByText(/Nothing matches “cloud”/);
+
       expect(mocked.documentsList).toHaveBeenLastCalledWith("cloud");
+      expect(screen.getByRole<HTMLInputElement>("textbox", { name: "Search documents" }).value).toBe("cloud");
+    });
+
+    it("sets the shared filter when typing in the big field", async () => {
+      renderWithQuery(<DocumentsPage />);
+      await screen.findByText("No documents");
 
       await userEvent.type(screen.getByRole("textbox", { name: "Search documents" }), "books");
 
+      expect(useStore.getState().filter).toBe("books");
       expect(mocked.documentsList).toHaveBeenLastCalledWith("books");
     });
 

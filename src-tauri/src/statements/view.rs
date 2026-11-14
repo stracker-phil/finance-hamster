@@ -10,8 +10,6 @@ use crate::date::{self, DateOrder};
 use crate::db::Db;
 use crate::error::AppResult;
 
-/// Days after its last statement's end an account still counts as up to date.
-const UP_TO_DATE_DAYS: i64 = 7;
 const MONTHS_SHOWN: u32 = 12;
 
 #[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq, TS)]
@@ -21,6 +19,8 @@ pub enum Cover {
     Full,
     Part,
     Missing,
+    /// Before the account's first statement, so nothing is missing.
+    Before,
 }
 
 #[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq, TS)]
@@ -29,6 +29,8 @@ pub enum Cover {
 pub enum AccountState {
     Ok,
     Behind,
+    /// A statement in the chain was never imported.
+    Gap,
     /// Up to date, with lines waiting in Review.
     Review,
 }
@@ -85,7 +87,7 @@ fn months(today: NaiveDate) -> Vec<NaiveDate> {
         .collect()
 }
 
-fn follows(previous: &StatementRow, s: &StatementRow) -> bool {
+pub(crate) fn follows(previous: &StatementRow, s: &StatementRow) -> bool {
     (s.year == previous.year && s.number == previous.number + 1)
         || (s.year == previous.year + 1 && s.number == 1)
 }
@@ -126,6 +128,13 @@ fn month_cover(first: NaiveDate, today: NaiveDate, statements: &[StatementRow]) 
         .map(|(_, _, label)| label.as_str())
         .collect();
     let heading = date::month_year(first);
+    let first_statement = ranges.iter().map(|(from, _, _)| *from).min();
+    if first_statement.is_none_or(|start| last < start) {
+        return MonthCover {
+            cover: Cover::Before,
+            tip: format!("{heading} · before the first statement"),
+        };
+    }
     let (cover, tip) = match covered {
         0 => (Cover::Missing, format!("{heading} · no statement")),
         n if n == days => (Cover::Full, format!("{heading} · {}", names.join(", "))),
@@ -174,7 +183,9 @@ fn account_coverage(
     to_review: u32,
     today: NaiveDate,
     order: DateOrder,
+    import_after_days: u32,
 ) -> AccountCoverage {
+    let note = chain_note(statements, order);
     let newest = statements.iter().max_by_key(|s| (s.year, s.number));
     let (last, state, state_label) =
         match newest.and_then(|s| date::parse(&s.to_date).map(|end| (s, end))) {
@@ -190,8 +201,10 @@ fn account_coverage(
                     s.number,
                     date::day_month(end, order)
                 );
-                if behind > UP_TO_DATE_DAYS {
+                if behind > i64::from(import_after_days) {
                     (last, AccountState::Behind, format!("{behind} days behind"))
+                } else if note.is_some() {
+                    (last, AccountState::Gap, "Statement missing".to_string())
                 } else if to_review > 0 {
                     (last, AccountState::Review, format!("{to_review} to review"))
                 } else {
@@ -210,12 +223,19 @@ fn account_coverage(
             .into_iter()
             .map(|m| month_cover(m, today, statements))
             .collect(),
-        note: chain_note(statements, order),
+        note,
     }
 }
 
-/// `query` keeps only the accounts whose name contains it.
-pub fn coverage(db: &Db, today: NaiveDate, query: &str, order: DateOrder) -> AppResult<Coverage> {
+/// `query` keeps only the accounts whose name contains it; an account is behind `import_after_days` after its
+/// last statement ends.
+pub fn coverage(
+    db: &Db,
+    today: NaiveDate,
+    query: &str,
+    order: DateOrder,
+    import_after_days: u32,
+) -> AppResult<Coverage> {
     let needle = query.trim().to_lowercase();
     let mut accounts = Vec::new();
     let waiting = db.read(crate::review::undecided_by_account)?;
@@ -232,6 +252,7 @@ pub fn coverage(db: &Db, today: NaiveDate, query: &str, order: DateOrder) -> App
             to_review,
             today,
             order,
+            import_after_days,
         ));
     }
     Ok(Coverage {
