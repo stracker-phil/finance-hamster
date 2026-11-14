@@ -294,22 +294,26 @@ fn a_subscription_charges_up_to_and_including_its_last_day() {
 }
 
 #[test]
-fn the_tolerance_is_how_far_the_amount_may_differ_from_the_plan_in_either_direction() {
+fn the_tolerance_is_how_far_the_amount_may_differ_from_the_plan_in_percent_in_either_direction() {
     for (tolerance, cents, expected) in [
-        (Some(0), 1_299, true),
-        (Some(0), 1_300, false),
-        (Some(100), 1_399, true),
-        (Some(100), 1_400, false),
-        (Some(100), 1_199, true),
-        (Some(100), 1_198, false),
+        (Some(0), 1_000, true),
+        (Some(0), 1_001, false),
+        (Some(5), 1_040, true),
+        (Some(5), 1_050, true),
+        (Some(5), 1_051, false),
+        (Some(5), 1_060, false),
+        (Some(5), 960, true),
+        (Some(5), 950, true),
+        (Some(5), 949, false),
+        (Some(5), 940, false),
         (None, 99_999, true),
         (None, 1, true),
     ] {
         let sub = SubscriptionRow {
-            tolerance_cents: tolerance,
+            tolerance_percent: tolerance,
             ..subscription_row("sub-1", "Streamflix", "STREAMFLIX")
         };
-        let m = matchers(sub, vec![plan_row("p", "sub-1", 1_299, "2026-01-01", None)]);
+        let m = matchers(sub, vec![plan_row("p", "sub-1", 1_000, "2026-01-01", None)]);
 
         let found = decision_of(&m, &line("l1", "2026-10-07", -cents, "STREAMFLIX")).is_some();
 
@@ -442,6 +446,24 @@ fn a_line_with_the_text_at_another_amount_is_a_possible_plan_change() {
     ] {
         assert_eq!(m.plan_changed(&t), None, "{why}");
     }
+}
+
+#[test]
+fn a_five_percent_tolerance_matches_a_charge_four_percent_off_and_asks_about_one_six_percent_off() {
+    let sub = SubscriptionRow {
+        tolerance_percent: Some(5),
+        ..subscription_row("sub-1", "Streamflix", "STREAMFLIX")
+    };
+    let plan = plan_row("p", "sub-1", 1_000, "2026-01-01", None);
+    let m = matchers(sub.clone(), vec![plan.clone()]);
+
+    let four_percent_off = line("l1", "2026-10-07", -1_040, "STREAMFLIX");
+    let six_percent_off = line("l2", "2026-10-07", -1_060, "STREAMFLIX");
+
+    assert!(decision_of(&m, &four_percent_off).is_some());
+    assert_eq!(m.plan_changed(&four_percent_off), None);
+    assert!(decision_of(&m, &six_percent_off).is_none());
+    assert_eq!(m.plan_changed(&six_percent_off), Some((&sub, &plan)));
 }
 
 #[test]
@@ -633,7 +655,7 @@ fn creating_a_subscription_stores_it_with_its_first_plan_and_names_the_change() 
     new.category = " Media ".into();
     new.currency = "usd".into();
     new.match_text = " STREAMFLIX ".into();
-    new.tolerance = Some("1,50".into());
+    new.tolerance_percent = Some(15);
     new.active = false;
     new.ended_on = None;
 
@@ -653,7 +675,7 @@ fn creating_a_subscription_stores_it_with_its_first_plan_and_names_the_change() 
             reminder: Reminder::Off,
             item_key: None,
             match_text: "STREAMFLIX".into(),
-            tolerance_cents: Some(150),
+            tolerance_percent: Some(15),
             created_at: NOW,
         }]
     );
@@ -674,27 +696,27 @@ fn creating_a_subscription_stores_it_with_its_first_plan_and_names_the_change() 
 }
 
 #[test]
-fn a_negative_tone_wraps_into_the_six_tones_and_an_empty_tolerance_means_exact() {
+fn a_negative_tone_wraps_into_the_six_tones_and_a_zero_tolerance_means_exact() {
     let (_dir, db) = imported(&[]);
     let mut new = streamflix();
     new.tone = -1;
-    new.tolerance = Some("  ".into());
+    new.tolerance_percent = Some(0);
 
     edit::create(&db, &new, today(), NOW, Source::Ui).unwrap();
 
     let sub = rows(&db).0.remove(0);
-    assert_eq!((sub.tone, sub.tolerance_cents), (5, Some(0)));
+    assert_eq!((sub.tone, sub.tolerance_percent), (5, Some(0)));
 }
 
 #[test]
 fn a_form_without_a_tolerance_matches_any_amount() {
     let (_dir, db) = imported(&[]);
     let mut new = streamflix();
-    new.tolerance = None;
+    new.tolerance_percent = None;
 
     edit::create(&db, &new, today(), NOW, Source::Ui).unwrap();
 
-    assert_eq!(rows(&db).0[0].tolerance_cents, None);
+    assert_eq!(rows(&db).0[0].tolerance_percent, None);
 }
 
 #[test]
@@ -780,7 +802,14 @@ fn an_invalid_form_names_the_field_and_writes_nothing() {
         (
             "subscription.tolerance",
             SubscriptionForm {
-                tolerance: Some("lots".into()),
+                tolerance_percent: Some(100),
+                ..base.clone()
+            },
+        ),
+        (
+            "subscription.tolerance",
+            SubscriptionForm {
+                tolerance_percent: Some(250),
                 ..base.clone()
             },
         ),
@@ -832,7 +861,7 @@ fn lines_at_another_amount_stay_unlinked_unless_any_amount_is_allowed() {
     let (_dir, db) = imported(&[month(10)]);
     let exact = add(&db, &form("Exact", "STREAMFLIX", "13.00"));
     let mut any = form("Any", "STREAMFLIX", "13.00");
-    any.tolerance = None;
+    any.tolerance_percent = None;
 
     assert_eq!(linked_dates(&db, &exact), Vec::<String>::new());
     let any_id = add(&db, &any);
@@ -844,7 +873,7 @@ fn lines_at_another_amount_stay_unlinked_unless_any_amount_is_allowed() {
 fn a_subscription_never_links_a_credit() {
     let (_dir, db) = imported(&[month(10)]);
     let mut salary = form("Salary", "NORDWIND", "2850.00");
-    salary.tolerance = None;
+    salary.tolerance_percent = None;
 
     let id = add(&db, &salary);
 
@@ -1464,7 +1493,7 @@ fn the_sheet_counts_the_charges_a_form_would_match() {
     lumen.currency = "USD".into();
     let mut any = streamflix();
     any.amount = "99.00".into();
-    any.tolerance = None;
+    any.tolerance_percent = None;
 
     for (draft, count, text) in [
         (streamflix(), 3, "Matches 3 charges, the last on 7 Nov 2026"),
@@ -1534,7 +1563,7 @@ fn a_new_sheet_starts_from_a_bank_line() {
             reminder: Reminder::Off,
             item_key: None,
             match_text: "STREAMFLIX".into(),
-            tolerance: Some("0.00".into()),
+            tolerance_percent: Some(0),
         }
     );
     assert_eq!(
@@ -1552,9 +1581,7 @@ fn a_new_sheet_starts_at_the_oldest_line_of_the_account_with_the_match_text() {
     let (_dir, db) = imported(&[month(8), month(9), month(10)]);
     let october = line_dated(&db, "2026-10-07", "STREAMFLIX");
 
-    let form = db
-        .read(|c| prefill(c, &october.id, None, &fmt()))
-        .unwrap();
+    let form = db.read(|c| prefill(c, &october.id, None, &fmt())).unwrap();
 
     assert_eq!(form.start, "2026-08-07");
 }
@@ -1568,9 +1595,7 @@ fn a_new_sheet_ignores_matching_lines_of_another_account() {
     let in_other_account = line_dated(&db, "2026-07-07", "STREAMFLIX");
     assert_ne!(in_other_account.account_id, october.account_id);
 
-    let form = db
-        .read(|c| prefill(c, &october.id, None, &fmt()))
-        .unwrap();
+    let form = db.read(|c| prefill(c, &october.id, None, &fmt())).unwrap();
 
     assert_eq!(form.start, "2026-09-07");
 }
@@ -1580,9 +1605,7 @@ fn a_selected_term_narrows_which_lines_set_the_start() {
     let (_dir, db) = imported(&[month(9), month(10)]);
     let october = line_dated(&db, "2026-10-07", "STREAMFLIX");
 
-    let whole = db
-        .read(|c| prefill(c, &october.id, None, &fmt()))
-        .unwrap();
+    let whole = db.read(|c| prefill(c, &october.id, None, &fmt())).unwrap();
     let narrowed = db
         .read(|c| prefill(c, &october.id, Some("06.10."), &fmt()))
         .unwrap();
@@ -1594,7 +1617,7 @@ fn a_selected_term_narrows_which_lines_set_the_start() {
 }
 
 #[test]
-fn a_new_sheet_types_amounts_the_way_the_number_format_reads() {
+fn a_new_sheet_types_the_amount_the_way_the_number_format_reads() {
     let (_dir, db) = imported(&[month(10)]);
     let streaming = line_dated(&db, "2026-10-07", "STREAMFLIX");
     let comma = Format {
@@ -1607,8 +1630,8 @@ fn a_new_sheet_types_amounts_the_way_the_number_format_reads() {
         .unwrap();
 
     assert_eq!(
-        (form.amount.as_str(), form.tolerance.as_deref()),
-        ("12,99", Some("0,00"))
+        (form.amount.as_str(), form.tolerance_percent),
+        ("12,99", Some(0))
     );
 }
 
@@ -1762,7 +1785,7 @@ fn the_detail_shows_amount_next_charge_timeline_plans_rule_charges_and_the_edit_
             "reminder": "off",
             "itemKey": null,
             "matchText": "STREAMFLIX",
-            "tolerance": "0.00",
+            "tolerancePercent": 0,
         })
     );
 }
@@ -1812,7 +1835,7 @@ fn a_subscription_for_anv_in_dollars_shows_the_item_euro_cost_reminder_and_toler
     lumen.currency = "USD".into();
     lumen.item_key = Some("books".into());
     lumen.reminder = Reminder::ThreeDays;
-    lumen.tolerance = Some("1.00".into());
+    lumen.tolerance_percent = Some(5);
     let id = add(&db, &lumen);
     let item = rules::items(&db).unwrap().remove(0);
 
@@ -1833,7 +1856,7 @@ fn a_subscription_for_anv_in_dollars_shows_the_item_euro_cost_reminder_and_toler
             Some("Tue, 10 Nov · 3 days ago"),
             format!("Yes · {}", item.label).as_str(),
             "3 days before",
-            "text contains LUMEN AI · ± USD 1.00",
+            "text contains LUMEN AI · ± 5 %",
         )
     );
     assert_eq!(detail.plans[0].price, "USD 24.00 monthly");
@@ -1844,12 +1867,13 @@ fn the_rule_text_names_the_tolerance() {
     let (_dir, db) = imported(&[]);
     for (tolerance, expected) in [
         (None, "text contains STREAMFLIX · any amount"),
-        (Some("0"), "text contains STREAMFLIX · exact amount"),
-        (Some("1.50"), "text contains STREAMFLIX · ± €1.50"),
+        (Some(0), "text contains STREAMFLIX · exact amount"),
+        (Some(5), "text contains STREAMFLIX · ± 5 %"),
+        (Some(99), "text contains STREAMFLIX · ± 99 %"),
     ] {
         let mut new = streamflix();
         new.name = format!("Streamflix {tolerance:?}");
-        new.tolerance = tolerance.map(Into::into);
+        new.tolerance_percent = tolerance;
         let id = add(&db, &new);
 
         assert_eq!(detail_of(&db, &id).rule, expected, "{tolerance:?}");

@@ -1,9 +1,10 @@
 import { useId, useState, type FormEvent } from "react";
-import { api, toAppError, type PlanForm } from "../api";
+import { api, toAppError, type PlanForm, type ReviewLine } from "../api";
 import { Modal } from "../components/Modal";
 import { undoToast } from "../lib/undoToast";
 import { Segmented } from "../settings/controls";
 import { useStore } from "../state/store";
+import { SourceLine } from "./SourceLine";
 import { INTERVALS } from "./SubscriptionSheet";
 
 const dayBefore = (iso: string) => {
@@ -14,7 +15,7 @@ const dayBefore = (iso: string) => {
 };
 
 /** Change Plan: the current plan ends the day before the new one starts; its charges stay with it. */
-export function PlanSheet({ id, name, currentPlan, initial, onClose }: { id: string; name: string; currentPlan: string; initial: PlanForm; onClose: () => void }) {
+export function PlanSheet({ id, name, currentPlan, initial, source, onClose }: { id: string; name: string; currentPlan: string; initial: PlanForm; source?: ReviewLine; onClose: () => void }) {
   const titleId = useId();
   const field = (key: string) => `${titleId}-${key}`;
   const [form, setForm] = useState(initial);
@@ -53,6 +54,7 @@ export function PlanSheet({ id, name, currentPlan, initial, onClose }: { id: str
           <h2 id={titleId}>Change plan · {name}</h2>
           <span className="add-doc__hint">Current: {currentPlan}</span>
         </div>
+        {source && <SourceLine line={source} />}
         <div className="sub-grid">
           <label htmlFor={field("name")}>New plan</label>
           <div>
@@ -99,5 +101,5 @@ export function PlanSheet({ id, name, currentPlan, initial, onClose }: { id: str
 export function PlanSheetHost() {
   const sheet = useStore((s) => s.subscriptionSheet);
   if (sheet?.kind !== "plan") return null;
-  return <PlanSheet key={sheet.id} id={sheet.id} name={sheet.name} currentPlan={sheet.currentPlan} initial={sheet.form} onClose={() => useStore.getState().setSubscriptionSheet(null)} />;
+  return <PlanSheet key={sheet.id} id={sheet.id} name={sheet.name} currentPlan={sheet.currentPlan} initial={sheet.form} source={sheet.source} onClose={() => useStore.getState().setSubscriptionSheet(null)} />;
 }

@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -7,6 +7,7 @@ vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await impo
 import { api, type PlanForm } from "../api";
 import { useStore } from "../state/store";
 import { renderWithQuery } from "../test/renderWithQuery";
+import { reviewLine } from "../test/review";
 import { PlanSheet, PlanSheetHost } from "./PlanSheet";
 
 const mocked = vi.mocked(api, true);
@@ -57,6 +58,21 @@ describe("PlanSheet", () => {
     expect(mocked.subscriptionChangePlan).toHaveBeenCalledWith("sub-1", { name: "Pro", amount: "29.00", currency: "EUR", interval: "yearly", start: "2026-12-01" });
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(useStore.getState().toasts.at(-1)).toMatchObject({ kind: "success", message: "Change plan Lumen AI", action: { label: "Undo" } });
+  });
+
+  it("shows the bank line it was opened from", () => {
+    renderWithQuery(<PlanSheet id="sub-1" name="Lumen AI" currentPlan="Plus · €20.00 monthly" initial={FORM} source={reviewLine()} onClose={vi.fn()} />);
+
+    const line = within(screen.getByLabelText("Bank line"));
+    expect(line.getByText("Example Bookshop")).toBeTruthy();
+    expect(line.getByText("−€34.90")).toBeTruthy();
+    expect(line.getByText(/Booking text 4711/)).toBeTruthy();
+  });
+
+  it("shows no bank line without a source", () => {
+    renderSheet();
+
+    expect(screen.queryByLabelText("Bank line")).toBeNull();
   });
 
   it("explains when the current plan ends once a start date is set", () => {

@@ -11,25 +11,28 @@
 .review-card__title { flex: 1; min-width: 0; margin: 0; font-size: 28px; font-weight: 750; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .review-card__amount { font-size: 28px; font-weight: 750; font-variant-numeric: tabular-nums; }
 .review-card__text { user-select: text; -webkit-user-select: text; cursor: text; }
-.review-card__raw { margin: 0 0 20px; font: 11.5px/1.5 var(--font-mono, ui-monospace, monospace); color: var(--text-muted); white-space: pre-wrap; }
+.review-card__raw { margin: 0 0 18px; font: 11.5px/1.5 var(--font-mono, ui-monospace, monospace); color: var(--text-muted); white-space: pre-wrap; }
+.review-card__question { margin-bottom: 8px; font-size: 13px; font-weight: 600; color: var(--text-secondary); }
 .review-card__choices { display: flex; gap: 10px; }
 .tbig {
   flex: 1; height: 76px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
   border: 1px solid var(--border); border-radius: 10px; background: var(--panel-bg); color: var(--text); font-size: 14px; cursor: default;
 }
 .tbig:hover:not(:disabled) { background: var(--fill-hover); }
-.tbig--suggested { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.tbig--on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); background: var(--selection-bg); }
+.tbig--on:hover:not(:disabled) { background: var(--selection-bg); }
 .tbig__label { font-weight: 600; }
 .tbig__hint { font-size: 11px; color: var(--text-muted); }
-.review-card__item { display: flex; align-items: center; gap: 10px; margin-top: 16px; font-size: 13px; color: var(--text-secondary); }
+/* One height for every pick, so the confirm row never moves. */
+.review-card__details { margin-top: 14px; min-height: 92px; }
+.review-card__item { display: flex; align-items: center; gap: 10px; min-height: 32px; font-size: 13px; color: var(--text-secondary); }
+.review-card__placeholder { color: var(--text-muted); }
 .review-card__item .field { width: auto; min-width: 220px; }
 .review-card__why { font-size: 12px; color: var(--accent-text); }
-.review-card__error { text-align: center; }
-.review-card__suggestion { font-size: 12px; color: var(--accent-text); text-align: center; }
-.review-card__rule { margin-top: 12px; text-align: center; }
-.review-card__always { display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-size: 13px; color: var(--text-secondary); }
+.review-card__rule { margin-top: 10px; }
+.review-card__always { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-secondary); }
 .review-card__term { padding: 1px 6px; border-radius: 5px; background: var(--selection-bg); color: var(--selection-text); font: 12px var(--font-mono, ui-monospace, monospace); }
-.review-card__term-hint { display: flex; justify-content: center; gap: 10px; margin-top: 4px; min-height: 18px; font-size: 12px; color: var(--text-muted); }
+.review-card__term-hint { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 4px; min-height: 18px; font-size: 12px; color: var(--text-muted); }
 .review__nav { display: flex; align-items: center; justify-content: space-between; margin: 14px 6px 0; }
 .review__keys { font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 3px; }
 .review-done__tile { width: 44px; height: 44px; border-radius: 12px; background: var(--positive); color: var(--tile-text); display: flex; align-items: center; justify-content: center; }
@@ -46,3 +49,9 @@
 }
 .review-card__plan { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 14px; padding: 10px 12px; border-radius: 10px; background: var(--selection-bg); color: var(--text-secondary); font-size: 13px; line-height: 1.5; }
 .review-card__plan svg { flex: none; margin-top: 3px; color: var(--accent-text); }
+/* What confirming does, beside the one button that does it. */
+.review-card__confirm { display: flex; align-items: center; gap: 16px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--hairline); }
+.review-card__outcome { flex: 1; min-width: 0; min-height: 36px; display: flex; align-items: center; font-size: 13px; line-height: 1.4; color: var(--text-secondary); }
+.review-card__outcome .form-field__error { min-height: 0; font-size: 13px; }
+.review-card__go { flex: none; display: inline-flex; align-items: center; gap: 8px; }
+.kbd--on-accent { background: transparent; border-color: currentColor; color: inherit; opacity: 0.8; }

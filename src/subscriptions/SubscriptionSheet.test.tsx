@@ -1,5 +1,5 @@
 import { QueryClientProvider } from "@tanstack/react-query";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -10,6 +10,7 @@ import { createQueryClient } from "../queries/queryClient";
 import { SETTINGS_KEY } from "../queries/settings";
 import { useStore } from "../state/store";
 import { renderWithQuery } from "../test/renderWithQuery";
+import { reviewLine } from "../test/review";
 import { settings } from "../test/settings";
 import { subscriptionForm, subscriptionsView } from "../test/subscriptions";
 import { SubscriptionSheet, SubscriptionSheetHost } from "./SubscriptionSheet";
@@ -30,14 +31,14 @@ const EMPTY_FORM: SubscriptionForm = {
   reminder: "three_days",
   itemKey: null,
   matchText: "",
-  tolerance: "0",
+  tolerancePercent: 0,
 };
 
 function renderSheet({ id = null, initial = null, onClose = vi.fn() }: { id?: string | null; initial?: SubscriptionForm | null; onClose?: () => void } = {}) {
   return renderWithQuery(<SubscriptionSheet id={id} initial={initial} onClose={onClose} />);
 }
 
-const toleranceSelect = () => screen.getByRole<HTMLSelectElement>("combobox", { name: /Compared with the plan/ });
+const toleranceSelect = () => screen.getByRole<HTMLSelectElement>("combobox", { name: /Amount may differ by/ });
 const submit = () => userEvent.click(screen.getByRole("button", { name: "Add Subscription" }));
 
 beforeEach(() => {
@@ -72,7 +73,8 @@ describe("SubscriptionSheet", () => {
 
       await submit();
 
-      expect(mocked.subscriptionSave).toHaveBeenCalledWith(null, { ...EMPTY_FORM, name: "Lumen AI", amount: "20.00" });      await waitFor(() => expect(onClose).toHaveBeenCalled());
+      expect(mocked.subscriptionSave).toHaveBeenCalledWith(null, { ...EMPTY_FORM, name: "Lumen AI", amount: "20.00" });
+      await waitFor(() => expect(onClose).toHaveBeenCalled());
       expect(useStore.getState().toasts.at(-1)).toMatchObject({ kind: "success", message: "Add Lumen AI", action: { label: "Undo" } });
     });
 
@@ -224,30 +226,98 @@ describe("SubscriptionSheet", () => {
 
   describe("the amount tolerance", () => {
     it.each([
-      ["Exact amount", "0"],
-      ["± 0.50", "0.50"],
-      ["± 1.00", "1.00"],
-      ["± 2.00", "2.00"],
-      ["± 5.00", "5.00"],
+      ["Exact amount", 0],
+      ["± 1 %", 1],
+      ["± 2 %", 2],
+      ["± 5 %", 5],
+      ["± 10 %", 10],
       ["Any amount", null],
-    ])("sends %s as %j", async (label, tolerance) => {
-      renderSheet({ initial: subscriptionForm({ tolerance: tolerance === "0" ? "1.00" : "0" }) });
+    ])("sends %s as %j", async (label, tolerancePercent) => {
+      renderSheet({ initial: subscriptionForm({ tolerancePercent: tolerancePercent === 0 ? 5 : 0 }) });
 
       await userEvent.selectOptions(toleranceSelect(), label);
       await submit();
 
-      expect(mocked.subscriptionSave).toHaveBeenCalledWith(null, expect.objectContaining({ tolerance }));
+      expect(mocked.subscriptionSave).toHaveBeenCalledWith(null, expect.objectContaining({ tolerancePercent }));
     });
 
     it.each([
-      ["1,00", "± 1.00"],
-      ["0.5", "± 0.50"],
+      [0, "Exact amount"],
+      [5, "± 5 %"],
       [null, "Any amount"],
-      ["0", "Exact amount"],
+      [3, "± 3 %"],
     ])("shows a stored tolerance of %j as %s", (stored, label) => {
-      renderSheet({ initial: subscriptionForm({ tolerance: stored }) });
+      renderSheet({ initial: subscriptionForm({ tolerancePercent: stored }) });
 
       expect(toleranceSelect().selectedOptions[0].textContent).toBe(label);
+    });
+
+    it("keeps a stored value outside the list selectable and sends it unchanged", async () => {
+      renderSheet({ initial: subscriptionForm({ tolerancePercent: 3 }) });
+
+      await submit();
+
+      expect(screen.getByRole("option", { name: "± 3 %" })).toBeTruthy();
+      expect(mocked.subscriptionSave).toHaveBeenCalledWith(null, expect.objectContaining({ tolerancePercent: 3 }));
+    });
+  });
+
+  describe("the bank line it was opened from", () => {
+    const source = reviewLine();
+
+    function renderWithSource() {
+      return renderWithQuery(<SubscriptionSheet id={null} initial={subscriptionForm({ matchText: "EXAMPLEBOOKS" })} source={source} onClose={vi.fn()} />);
+    }
+
+    function selectInRaw(text: string) {
+      const node = screen.getByText(/Booking text 4711/);
+      const textNode = node.firstChild!;
+      const start = textNode.textContent!.indexOf(text);
+      const range = document.createRange();
+      range.setStart(textNode, start);
+      range.setEnd(textNode, start + text.length);
+      const selection = window.getSelection()!;
+      selection.removeAllRanges();
+      selection.addRange(range);
+      fireEvent.mouseUp(node);
+    }
+
+    beforeEach(() => {
+      window.getSelection()?.removeAllRanges();
+    });
+
+    it("shows the line's title, amount, account, date and raw text", () => {
+      renderWithSource();
+
+      const line = within(screen.getByLabelText("Bank line"));
+      expect(line.getByText("Example Bookshop")).toBeTruthy();
+      expect(line.getByText("−€34.90")).toBeTruthy();
+      expect(line.getByText("Private · Tue, 10 Nov")).toBeTruthy();
+      expect(line.getByText(/Booking text 4711/)).toBeTruthy();
+    });
+
+    it("shows no bank line without a source", () => {
+      renderSheet({ initial: subscriptionForm() });
+
+      expect(screen.queryByLabelText("Bank line")).toBeNull();
+    });
+
+    it("sets the bank text to the selected text, upper-cased, and sends it", async () => {
+      renderWithSource();
+
+      selectInRaw("Booking text 4711");
+      await submit();
+
+      expect(screen.getByLabelText<HTMLInputElement>(/^Bank text contains/).value).toBe("BOOKING TEXT 4711");
+      expect(mocked.subscriptionSave).toHaveBeenCalledWith(null, expect.objectContaining({ matchText: "BOOKING TEXT 4711" }));
+    });
+
+    it("keeps the bank text when nothing is selected", () => {
+      renderWithSource();
+
+      fireEvent.mouseUp(screen.getByText(/Booking text 4711/));
+
+      expect(screen.getByLabelText<HTMLInputElement>(/^Bank text contains/).value).toBe("EXAMPLEBOOKS");
     });
   });
 
@@ -420,6 +490,14 @@ describe("SubscriptionSheetHost", () => {
 
     expect(screen.getByRole("dialog", { name: "New Subscription" })).toBeTruthy();
     expect(screen.getByLabelText<HTMLInputElement>("Name").value).toBe("");
+  });
+
+  it("shows the source line of a New sheet opened from Review", () => {
+    useStore.setState({ subscriptionSheet: { kind: "new", form: subscriptionForm(), source: reviewLine() } });
+
+    renderWithQuery(<SubscriptionSheetHost />);
+
+    expect(within(screen.getByLabelText("Bank line")).getByText("Example Bookshop")).toBeTruthy();
   });
 
   it("shows the New sheet prefilled with the form from the store", () => {

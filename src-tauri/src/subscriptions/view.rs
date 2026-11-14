@@ -288,10 +288,6 @@ pub fn match_count(
     form: &SubscriptionForm,
     format: &Format,
 ) -> MatchCount {
-    let tolerance = form
-        .tolerance
-        .as_deref()
-        .map(|t| crate::money::parse_cents(t.trim()).map_or(0, i64::abs));
     let sub = SubscriptionRow {
         id: "draft".into(),
         name: form.name.clone(),
@@ -301,7 +297,7 @@ pub fn match_count(
         reminder: Reminder::Off,
         item_key: None,
         match_text: form.match_text.clone(),
-        tolerance_cents: tolerance,
+        tolerance_percent: form.tolerance_percent.map(i64::from),
         created_at: 0,
     };
     let plan = PlanRow {
@@ -386,6 +382,6 @@ pub fn prefill_from(line: &TransactionRow, format: &Format) -> SubscriptionForm 
         reminder: Reminder::Off,
         item_key: None,
         match_text: key_of(&title),
-        tolerance: Some(format_plain(0, format.number)),
+        tolerance_percent: Some(0),
     }
 }

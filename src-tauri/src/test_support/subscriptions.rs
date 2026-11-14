@@ -46,7 +46,7 @@ pub fn form(name: &str, match_text: &str, amount: &str) -> SubscriptionForm {
         reminder: Reminder::Off,
         item_key: None,
         match_text: match_text.into(),
-        tolerance: Some("0".into()),
+        tolerance_percent: Some(0),
     }
 }
 
@@ -71,7 +71,7 @@ pub fn subscription_row(id: &str, name: &str, match_text: &str) -> SubscriptionR
         reminder: Reminder::Off,
         item_key: None,
         match_text: match_text.into(),
-        tolerance_cents: Some(0),
+        tolerance_percent: Some(0),
         created_at: 1,
     }
 }

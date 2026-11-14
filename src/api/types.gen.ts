@@ -807,9 +807,9 @@ endedOn: string | null, amount: string, currency: string, interval: Interval,
  */
 start: string, reminder: Reminder, itemKey: string | null, matchText: string, 
 /**
- * The amount a charge may differ by; None matches any amount.
+ * How far a charge may differ from the plan's amount, in percent; None matches any amount.
  */
-tolerance: string | null, };
+tolerancePercent: number | null, };
 
 export type SubscriptionGroup = { label: string, total: string, rows: Array<SubscriptionRowView>, };
 

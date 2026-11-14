@@ -76,12 +76,12 @@ impl Matchers {
     }
 
     fn amount_fits(&self, sub: &SubscriptionRow, t: &TransactionRow) -> bool {
-        let Some(tolerance) = sub.tolerance_cents else {
+        let Some(percent) = sub.tolerance_percent else {
             return true;
         };
         plan_on(&self.plans_of(&sub.id), &t.value_date)
-            .and_then(|plan| charged_in(t, &plan.currency).map(|c| (c - plan.cents).abs()))
-            .is_some_and(|difference| difference <= tolerance)
+            .and_then(|plan| charged_in(t, &plan.currency).map(|c| (plan, (c - plan.cents).abs())))
+            .is_some_and(|(plan, difference)| difference * 100 <= percent * plan.cents)
     }
 
     /// The first subscription the line is a charge of.

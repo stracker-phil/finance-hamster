@@ -117,7 +117,11 @@ binding.
 ## Overlays inside a window
 Toasts bottom right, self-dismissing (success 2.5s, info 4s, error 8s, with an action such as Undo 10s);
 errors read "Something went wrong" with Details. Sheets over `--scrim` (Import, Add document, Edit/New
-subscription, Change Plan, confirms) take Esc first, trap Tab and return focus. Anything that loses the
+subscription, Change Plan, confirms) take Esc first, trap Tab and return focus. A click beside a sheet
+does nothing (only the palette closes on it), and the scrim over the toolbar still drags the window. A sheet
+grows to the window's height; a long one keeps its head and buttons and scrolls only its body. A sheet opened
+from a bank line shows that line at its top. Review never decides on one click: A, S, I or a click picks, the
+confirm button (or Return) beside one sentence of what will happen decides, and Undo follows. Anything that loses the
 owner's data asks first in a `ConfirmSheet` that names what goes and what stays; deleting a document also
 needs a typed reason and an "I understand this can't be undone" checkbox. The content never blanks. Empty
 states say why in few words.

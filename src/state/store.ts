@@ -1,4 +1,4 @@
-import type { AddPreview, ImportPreview, PlanForm, SubscriptionForm } from "../api";
+import type { AddPreview, ImportPreview, PlanForm, ReviewLine, SubscriptionForm } from "../api";
 import { create } from "zustand";
 import { HOME, sameRoute, type Route } from "./route";
 
@@ -6,9 +6,9 @@ export type ToastKind = "success" | "info" | "error";
 
 /** New starts empty or from a bank line; Edit and Change Plan start from the subscription. */
 export type SubscriptionSheet =
-  | { kind: "new"; form: SubscriptionForm | null }
+  | { kind: "new"; form: SubscriptionForm | null; source?: ReviewLine }
   | { kind: "edit"; id: string; form: SubscriptionForm }
-  | { kind: "plan"; id: string; name: string; currentPlan: string; form: PlanForm };
+  | { kind: "plan"; id: string; name: string; currentPlan: string; form: PlanForm; source?: ReviewLine };
 
 export interface Toast {
   id: number;

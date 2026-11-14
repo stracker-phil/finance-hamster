@@ -228,6 +228,18 @@ pub const MIGRATIONS: &[&str] = &[
     );",
     // 13: the name other statements print for an account, to tell transfers when they print no IBAN.
     "ALTER TABLE accounts ADD COLUMN statement_name TEXT;",
+    // 14: a subscription's tolerance in percent of its plan, rounded up from the old one in cents against the
+    // latest plan; tolerance_cents stays for the journal's older ops.
+    "ALTER TABLE subscriptions ADD COLUMN tolerance_percent INTEGER;
+    UPDATE subscriptions SET tolerance_percent = CASE
+        WHEN tolerance_cents IS NULL THEN NULL
+        WHEN tolerance_cents = 0 THEN 0
+        ELSE COALESCE(
+            (SELECT MIN(99, (ABS(subscriptions.tolerance_cents) * 100 + p.cents - 1) / p.cents)
+             FROM plans p WHERE p.subscription_id = subscriptions.id AND p.cents > 0
+             ORDER BY p.start DESC LIMIT 1),
+            0)
+    END;",
 ];
 
 pub fn version(conn: &Connection) -> AppResult<usize> {
@@ -301,6 +313,60 @@ mod tests {
         ]
         .map(String::from)
         .to_vec()
+    }
+
+    #[test]
+    fn a_file_at_version_thirteen_converts_subscription_tolerances_to_percent_of_the_plan() {
+        let dir = temp_config_dir();
+        let mut conn = Connection::open(dir.path().join("v13.sqlite")).unwrap();
+        for sql in &MIGRATIONS[..13] {
+            conn.execute_batch(sql).unwrap();
+        }
+        conn.pragma_update(None, "user_version", 13i64).unwrap();
+        for (id, tolerance) in [
+            ("sub-tolerant", Some(150)),
+            ("sub-any", None),
+            ("sub-exact", Some(0)),
+            ("sub-huge", Some(5_000)),
+            ("sub-no-plan", Some(150)),
+        ] {
+            conn.execute(
+                "INSERT INTO subscriptions (id, name, tone, category, reminder, match_text, tolerance_cents, created_at) \
+                 VALUES (?1, ?1, 1, 'Media', 'off', 'TEXT', ?2, 1)",
+                rusqlite::params![id, tolerance],
+            )
+            .unwrap();
+            if id != "sub-no-plan" {
+                conn.execute(
+                    "INSERT INTO plans (id, subscription_id, name, cents, currency, interval, start, created_at) \
+                     VALUES (?1, ?2, 'Standard', 1000, 'EUR', 'monthly', '2026-01-01', 1)",
+                    rusqlite::params![format!("plan-{id}"), id],
+                )
+                .unwrap();
+            }
+        }
+
+        migrate(&mut conn).unwrap();
+
+        assert_eq!(version(&conn).unwrap(), MIGRATIONS.len());
+        let mut query = conn
+            .prepare("SELECT id, tolerance_percent FROM subscriptions ORDER BY id")
+            .unwrap();
+        let converted: Vec<(String, Option<i64>)> = query
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect();
+        assert_eq!(
+            converted,
+            [
+                ("sub-any".to_string(), None),
+                ("sub-exact".to_string(), Some(0)),
+                ("sub-huge".to_string(), Some(99)),
+                ("sub-no-plan".to_string(), Some(0)),
+                ("sub-tolerant".to_string(), Some(15)),
+            ]
+        );
     }
 
     #[test]

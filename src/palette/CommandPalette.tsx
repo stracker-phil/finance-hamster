@@ -55,7 +55,7 @@ function Palette() {
     }
   };
   return (
-    <Modal className="palette" labelledBy="palette-input" onClose={close}>
+    <Modal className="palette" labelledBy="palette-input" dismissOnScrim onClose={close}>
       <label className="palette__search">
         <Search size={16} />
         <input

@@ -1,5 +1,5 @@
 import { useId, useState, type FormEvent } from "react";
-import { api, toAppError, type Interval, type Reminder, type SubscriptionForm } from "../api";
+import { api, toAppError, type Interval, type Reminder, type ReviewLine, type SubscriptionForm } from "../api";
 import { Modal } from "../components/Modal";
 import { undoToast } from "../lib/undoToast";
 import { useSettings } from "../queries/settings";
@@ -9,6 +9,7 @@ import { useStore } from "../state/store";
 import { accountTone } from "../lib/accountTone";
 import { deleteSubscription } from "./flow";
 import { today } from "../lib/today";
+import { SourceLine } from "./SourceLine";
 
 const TONES = 6;
 
@@ -25,7 +26,7 @@ const empty = (): SubscriptionForm => ({
   reminder: "off",
   itemKey: null,
   matchText: "",
-  tolerance: "0",
+  tolerancePercent: 0,
 });
 
 export const INTERVALS: { value: Interval; label: string }[] = [
@@ -46,27 +47,29 @@ const REMINDERS: { value: Reminder; label: string }[] = [
   { value: "one_week", label: "1 week before" },
 ];
 
-/** The tolerance choices; `null` matches any amount. */
-const TOLERANCES: { value: string | null; label: string }[] = [
+/** How far a charge may differ from the plan, in percent; the select spells "any amount" (null) as `any`. */
+const ANY = "any";
+const TOLERANCES = [
   { value: "0", label: "Exact amount" },
-  { value: "0.50", label: "± 0.50" },
-  { value: "1.00", label: "± 1.00" },
-  { value: "2.00", label: "± 2.00" },
-  { value: "5.00", label: "± 5.00" },
-  { value: null, label: "Any amount" },
+  { value: "1", label: "± 1 %" },
+  { value: "2", label: "± 2 %" },
+  { value: "5", label: "± 5 %" },
+  { value: "10", label: "± 10 %" },
 ];
+const toChoice = (percent: number | null) => (percent === null ? ANY : String(percent));
+const fromChoice = (value: string) => (value === ANY ? null : Number(value));
+
+/** The choices, plus a stored value none of them offers. */
+function toleranceOptions(percent: number | null) {
+  const offered = percent === null || TOLERANCES.some((t) => t.value === String(percent));
+  const own = offered ? [] : [{ value: String(percent), label: `± ${percent} %` }];
+  return [...TOLERANCES, ...own, { value: ANY, label: "Any amount" }];
+}
 
 const letterOf = (name: string) => name.match(/[\p{L}\p{N}]/u)?.[0]?.toUpperCase() ?? "?";
 
-/** The tolerance choice for a stored value, which may be written `1,00` or `1.00`. */
-function toleranceChoice(value: string | null) {
-  if (value === null) return "any";
-  const number = Number(value.replace(",", "."));
-  return TOLERANCES.find((t) => t.value !== null && Number(t.value) === number)?.value ?? "0";
-}
-
 /** New and Edit share this sheet; Edit fixes mistakes in place, without plan history. */
-export function SubscriptionSheet({ id, initial, onClose }: { id: string | null; initial: SubscriptionForm | null; onClose: () => void }) {
+export function SubscriptionSheet({ id, initial, source, onClose }: { id: string | null; initial: SubscriptionForm | null; source?: ReviewLine; onClose: () => void }) {
   const titleId = useId();
   const field = (name: string) => `${titleId}-${name}`;
   const { data: settings } = useSettings();
@@ -123,6 +126,7 @@ export function SubscriptionSheet({ id, initial, onClose }: { id: string | null;
           <Segmented label="State" options={STATES} value={form.active ? "active" : "cancelled"} onChange={(state) => set({ active: state === "active", endedOn: state === "active" ? null : (form.endedOn ?? today()) })} />
         </div>
         <div className="sub-sheet__body">
+          {source && <SourceLine line={source} onSelect={(matchText) => set({ matchText })} />}
           <div className="sub-grid">
             <label htmlFor={field("name")}>Name</label>
             <div>
@@ -210,17 +214,23 @@ export function SubscriptionSheet({ id, initial, onClose }: { id: string | null;
             <div className="sub-group__row">
               <label htmlFor={field("match")} className="sub-group__text">
                 Bank text contains
+                {source && <span className="add-doc__hint">Or select text in the line above, such as a contract number.</span>}
               </label>
               <input id={field("match")} className="field mono sub-sheet__match" value={form.matchText} placeholder="LUMEN AI" aria-invalid={!!message("match")} onChange={(e) => set({ matchText: e.target.value })} />
             </div>
             <div className="sub-group__row">
               <label htmlFor={field("tolerance")} className="sub-group__text">
-                Amount
-                <span className="add-doc__hint">Compared with the plan in effect on the charge&apos;s date, in {form.currency || "its currency"}.</span>
+                Amount may differ by
+                <span className="add-doc__hint">From the plan in effect on the charge&apos;s date. A charge beyond it asks “Plan changed?” in Review.</span>
               </label>
-              <select id={field("tolerance")} className="field" value={toleranceChoice(form.tolerance)} onChange={(e) => set({ tolerance: e.target.value === "any" ? null : e.target.value })}>
-                {TOLERANCES.map((t) => (
-                  <option key={t.label} value={t.value ?? "any"}>
+              <select
+                id={field("tolerance")}
+                className="field"
+                value={toChoice(form.tolerancePercent)}
+                onChange={(e) => set({ tolerancePercent: fromChoice(e.target.value) })}
+              >
+                {toleranceOptions(form.tolerancePercent).map((t) => (
+                  <option key={t.value} value={t.value}>
                     {t.label}
                   </option>
                 ))}
@@ -256,5 +266,13 @@ export function SubscriptionSheetHost() {
   const sheet = useStore((s) => s.subscriptionSheet);
   const close = () => useStore.getState().setSubscriptionSheet(null);
   if (!sheet || sheet.kind === "plan") return null;
-  return <SubscriptionSheet key={sheet.kind === "edit" ? sheet.id : "new"} id={sheet.kind === "edit" ? sheet.id : null} initial={sheet.form} onClose={close} />;
+  return (
+    <SubscriptionSheet
+      key={sheet.kind === "edit" ? sheet.id : "new"}
+      id={sheet.kind === "edit" ? sheet.id : null}
+      initial={sheet.form}
+      source={sheet.kind === "new" ? sheet.source : undefined}
+      onClose={close}
+    />
+  );
 }

@@ -148,7 +148,7 @@ fn form_of(sub: &SubscriptionRow, plan: Option<&PlanRow>, format: &Format) -> Su
         reminder: sub.reminder,
         item_key: sub.item_key.clone(),
         match_text: sub.match_text.clone(),
-        tolerance: sub.tolerance_cents.map(|c| format_plain(c, format.number)),
+        tolerance_percent: sub.tolerance_percent.and_then(|p| u32::try_from(p).ok()),
     }
 }
 
@@ -187,13 +187,10 @@ pub fn detail(
             .map_or_else(|| format!("Yes · {key}"), |i| format!("Yes · {}", i.label)),
         None => "No".into(),
     };
-    let tolerance = match sub.tolerance_cents {
+    let tolerance = match sub.tolerance_percent {
         None => "any amount".to_string(),
         Some(0) => "exact amount".to_string(),
-        Some(c) => format!(
-            "± {}",
-            format.money(c, current.map_or("EUR", |p| &p.currency))
-        ),
+        Some(p) => format!("± {p} %"),
     };
     let charges = running
         .charges

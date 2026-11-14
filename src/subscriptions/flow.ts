@@ -1,4 +1,4 @@
-import { api, type SubscriptionDetail } from "../api";
+import { api, type ReviewLine, type SubscriptionDetail } from "../api";
 import { showError, undoToast } from "../lib/undoToast";
 import { useStore } from "../state/store";
 import { today } from "../lib/today";
@@ -8,12 +8,12 @@ export function newSubscription() {
   useStore.getState().setSubscriptionSheet({ kind: "new", form: null });
 }
 
-/** Opens the New sheet prefilled from a bank line. */
-/** Opens New Subscription from a bank line; `term` is the text it should match, else the line's key. */
-export function newSubscriptionFrom(lineId: string, term: string | null = null) {
+/** Opens New Subscription from a bank line, which the sheet shows; `term` is the text it should match, else the
+ *  line's key. */
+export function newSubscriptionFrom(line: ReviewLine, term: string | null = null) {
   api
-    .subscriptionPrefill(lineId, term)
-    .then((form) => useStore.getState().setSubscriptionSheet({ kind: "new", form }))
+    .subscriptionPrefill(line.id, term)
+    .then((form) => useStore.getState().setSubscriptionSheet({ kind: "new", form, source: line }))
     .catch(showError);
 }
 
@@ -21,13 +21,15 @@ export function editSubscription(detail: SubscriptionDetail) {
   useStore.getState().setSubscriptionSheet({ kind: "edit", id: detail.id, form: detail.form });
 }
 
-/** Opens Change Plan, starting today with the current plan's values unless `from` gives the new amount. */
-export function changePlan(detail: SubscriptionDetail, from?: { amount: string; currency: string; date: string }) {
+/** Opens Change Plan, starting today with the current plan's values unless `from` gives the new amount; `source`
+ *  is the bank line it was opened from. */
+export function changePlan(detail: SubscriptionDetail, from?: { amount: string; currency: string; date: string }, source?: ReviewLine) {
   useStore.getState().setSubscriptionSheet({
     kind: "plan",
     id: detail.id,
     name: detail.name,
     currentPlan: detail.currentPlan,
+    source,
     form: {
       name: "",
       amount: from?.amount ?? detail.form.amount,

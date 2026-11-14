@@ -3,7 +3,8 @@ import { Check } from "lucide-react";
 import { api, toAppError, type Action, type ReviewLine } from "../api";
 import { usePageKeys } from "../commands/pageKeys";
 import { useReviewQueue } from "../queries/review";
-import { CHOICES, NEW_SUBSCRIPTION, ReviewCard, type Choice } from "../review/ReviewCard";
+import { lineChoices, planChoices, type Choice } from "../review/choices";
+import { NEW_SUBSCRIPTION, ReviewCard } from "../review/ReviewCard";
 import { useStore } from "../state/store";
 import { changePlan, newSubscriptionFrom } from "../subscriptions/flow";
 
@@ -42,6 +43,7 @@ function AllReviewed({ decided, rules }: { decided: number; rules: number }) {
 export function ReviewPage() {
   const { data } = useReviewQueue();
   const [position, setPosition] = useState(0);
+  const [picks, setPicks] = useState<Record<string, string>>({});
   const [items, setItems] = useState<Record<string, string>>({});
   const [always, setAlways] = useState<Record<string, boolean>>({});
   const [subscriptions, setSubscriptions] = useState<Record<string, string>>({});
@@ -60,15 +62,16 @@ export function ReviewPage() {
   const pickedSubscription = current ? (subscriptions[current.id] ?? NEW_SUBSCRIPTION) : NEW_SUBSCRIPTION;
   /** The owner's selected text, sent only when it differs from the line's key. */
   const chosenTerm = current ? (terms[current.id] ?? null) : null;
+  const term = current ? (chosenTerm ?? current.key) : "";
 
   const sendDecision = (action: Action, subscriptionId: string | null) => {
     if (!current || busy) return;
-    // Rust makes no rule for a Subscription decision; the done count follows it.
+    // Rust makes no rule for a Subscription decision.
     const rule = alwaysOn && action !== "subscription";
     setBusy(true);
     setError(null);
     api
-      .reviewDecide(current.id, action, itemOf(current) || null, subscriptionId, alwaysOn, chosenTerm)
+      .reviewDecide(current.id, action, itemOf(current) || null, subscriptionId, rule, chosenTerm)
       .then((label) => {
         setSession((s) => ({ decided: s.decided + 1, rules: s.rules + (rule ? 1 : 0) }));
         useStore.getState().showToast("success", label, { label: "Undo", run: undo });
@@ -81,33 +84,40 @@ export function ReviewPage() {
       .finally(() => setBusy(false));
   };
 
-  const decide = (action: Action) => {
-    if (!current) return;
-    if (action === "subscription" && pickedSubscription === NEW_SUBSCRIPTION) newSubscriptionFrom(current.id, chosenTerm);
-    else sendDecision(action, action === "subscription" ? pickedSubscription : null);
-  };
-
-  const updatePlan = () => {
-    const plan = current?.planChanged;
+  const updatePlan = (line: ReviewLine) => {
+    const plan = line.planChanged;
     if (!plan) return;
     api
       .subscriptionDetail(plan.subscriptionId)
-      .then((detail) => changePlan(detail, plan))
+      .then((detail) => changePlan(detail, plan, line))
       .catch((e: unknown) => setError(toAppError(e).message));
   };
 
   const choices = (line: ReviewLine): Choice[] => {
-    const plan = line.planChanged;
-    if (plan)
-      return [
-        { key: "U", label: "Update Plan", hint: "A new plan from this charge", suggested: true, run: updatePlan },
-        { key: "O", label: "One-off", hint: `Keep the plan; link it to ${plan.name}`, run: () => sendDecision("subscription", plan.subscriptionId) },
-        { key: "N", label: "New Subscription", hint: "A different service", run: () => newSubscriptionFrom(line.id) },
-      ];
-    return CHOICES.map((c) => ({ key: c.key, label: c.label, hint: c.hint, suggested: c.action === line.suggestion, run: () => decide(c.action) }));
+    const runs = { decide: sendDecision, updatePlan: () => updatePlan(line), setUp: () => newSubscriptionFrom(line, chosenTerm) };
+    if (line.planChanged) return planChoices(line.planChanged, runs);
+    return lineChoices(
+      line,
+      {
+        itemLabel: data?.items.find((i) => i.key === itemOf(line))?.label,
+        linked: data?.subscriptions.find((s) => s.id === pickedSubscription),
+        ruleTerm: alwaysOn ? term : null,
+      },
+      runs,
+    );
   };
   const shown = current ? choices(current) : [];
+  const picked = current ? (picks[current.id] ?? shown.find((c) => c.suggested)?.key ?? null) : null;
+  const chosen = shown.find((c) => c.key === picked);
 
+  const pick = (key: string) => {
+    if (!current) return;
+    setError(null);
+    setPicks((m) => ({ ...m, [current.id]: key }));
+  };
+  const confirm = () => {
+    if (chosen && !chosen.blocked && !busy) chosen.run();
+  };
   const skip = () => {
     if (lines.length > 0) setPosition((index + 1) % lines.length);
   };
@@ -115,7 +125,7 @@ export function ReviewPage() {
     if (index > 0) setPosition(index - 1);
   };
 
-  usePageKeys({ ...Object.fromEntries(shown.map((c) => [c.key.toLowerCase(), c.run])), [SKIP_KEY.toLowerCase()]: skip });
+  usePageKeys({ ...Object.fromEntries(shown.map((c) => [c.key.toLowerCase(), () => pick(c.key)])), enter: confirm, [SKIP_KEY.toLowerCase()]: skip });
 
   if (!data) return null;
   if (!current) return <AllReviewed decided={session.decided} rules={session.rules} />;
@@ -132,16 +142,19 @@ export function ReviewPage() {
         <ReviewCard
           line={current}
           choices={shown}
+          picked={picked}
           items={data.items}
           subscriptions={data.subscriptions}
           item={itemOf(current)}
           itemChosen={current.id in items}
           subscription={pickedSubscription}
           always={alwaysOn}
-          term={chosenTerm ?? current.key}
+          term={term}
           error={error}
           busy={busy}
           itemSelect={itemSelect}
+          onPick={pick}
+          onConfirm={confirm}
           onItem={(key) => setItems((m) => ({ ...m, [current.id]: key }))}
           onSubscription={(id) => setSubscriptions((m) => ({ ...m, [current.id]: id }))}
           onAlways={(on) => setAlways((m) => ({ ...m, [current.id]: on }))}
@@ -160,7 +173,7 @@ export function ReviewPage() {
                 {c.key}
               </span>
             ))}{" "}
-            decide · <span className="kbd">{SKIP_KEY}</span> skip
+            pick · <span className="kbd">↩</span> confirm · <span className="kbd">{SKIP_KEY}</span> skip
           </span>
           <button className="link-btn" onClick={skip} disabled={lines.length < 2}>
             Skip →

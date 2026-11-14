@@ -10,6 +10,8 @@ interface Props {
   describedBy?: string;
   /** Added to the sheet, for a sheet of its own size. */
   className?: string;
+  /** A click beside the sheet closes it; only for sheets that hold no input worth keeping. */
+  dismissOnScrim?: boolean;
   children: ReactNode;
 }
 
@@ -19,9 +21,9 @@ function focusables(root: HTMLElement): HTMLElement[] {
   return [...root.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => !el.hidden);
 }
 
-/** A sheet over a scrim: Escape and a click on the scrim close it, Tab stays inside, and focus returns
- *  to the element that opened it. */
-export function Modal({ onClose, role = "dialog", labelledBy, describedBy, className, children }: Props) {
+/** A sheet over a scrim: Escape closes it, Tab stays inside, and focus returns to the element that opened it.
+ *  The scrim over the toolbar still drags the window. */
+export function Modal({ onClose, role = "dialog", labelledBy, describedBy, className, dismissOnScrim = false, children }: Props) {
   useCoversPdf();
   const sheetRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
@@ -72,7 +74,8 @@ export function Modal({ onClose, role = "dialog", labelledBy, describedBy, class
   };
 
   return createPortal(
-    <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="overlay" onMouseDown={(e) => dismissOnScrim && e.target === e.currentTarget && onClose()}>
+      <div className="overlay__drag" data-tauri-drag-region />
       <div
         ref={sheetRef}
         className={className ? `dialog sheet ${className}` : "dialog sheet"}
