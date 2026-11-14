@@ -162,8 +162,8 @@ fn row(text: &str, merchant: Option<&str>, counterparty: Option<&str>) -> Transa
 fn a_title_is_the_merchant_then_the_counterparty_then_the_booking_text() {
     for (line, expected) in [
         (
-            row("E-COMM", Some("STREAMFLIX WIEN"), Some("Other")),
-            "STREAMFLIX WIEN",
+            row("E-COMM", Some("STREAMFLIX WIEN 1010"), Some("Other")),
+            "STREAMFLIX WIEN 1010",
         ),
         (
             row("Gehalt", None, Some("NORDWIND SOFTWARE GMBH")),
@@ -178,7 +178,7 @@ fn a_title_is_the_merchant_then_the_counterparty_then_the_booking_text() {
 #[test]
 fn a_key_is_the_first_word_with_letters_in_upper_case_or_two_words_when_the_first_is_short() {
     for (title, expected) in [
-        ("TANKSTELLE RHEIN LUSTENAU", "TANKSTELLE"),
+        ("TANKSTELLE RHEIN LUSTENAU 6890", "TANKSTELLE"),
         ("DM DROGERIE MARKT", "DM DROGERIE"),
         ("cafe linde dornbirn", "CAFE"),
         ("12 Bakery Muster", "BAKERY"),
@@ -199,7 +199,7 @@ fn lines_without_a_decision_are_counted_per_account() {
     );
 
     import_all(&db, &dir, &[september()]);
-    decide_line(&db, "STREAMFLIX WIEN", 10, Action::Ignore, None, false);
+    decide_line(&db, "STREAMFLIX WIEN 1010", 10, Action::Ignore, None, false);
 
     assert_eq!(
         db.read(undecided_by_account).unwrap(),
@@ -222,11 +222,11 @@ fn the_queue_lists_undecided_lines_newest_first() {
     assert_eq!(
         titles(&queue),
         [
-            "CAFE LINDE DORNBIRN",
+            "CAFE LINDE DORNBIRN 6850",
             "BUCHHANDLUNG SEITENWEISE",
             "LUMEN AI SAN FRANCISCO",
-            "STREAMFLIX WIEN",
-            "TANKSTELLE RHEIN LUSTENAU",
+            "STREAMFLIX WIEN 1010",
+            "TANKSTELLE RHEIN LUSTENAU 6890",
             "HAUSVERWALTUNG MUSTER",
             "NORDWIND SOFTWARE GMBH",
         ]
@@ -248,7 +248,7 @@ fn a_queued_line_shows_its_account_date_amount_raw_text_and_key() {
             date: "Thu, 1 Oct".into(),
             title: "NORDWIND SOFTWARE GMBH".into(),
             amount: "+€2,850.00".into(),
-            raw: "Gehalt\nNORDWIND SOFTWARE GMBH\nAT94 1999 9000 0000 0099\nREF: LOHN".into(),
+            raw: "GEHALT 10/2026\nNORDWIND SOFTWARE GMBH\n260101000000001\nGEHALT 10/2026".into(),
             key: "NORDWIND".into(),
             suggestion: None,
             item_key: None,
@@ -256,13 +256,13 @@ fn a_queued_line_shows_its_account_date_amount_raw_text_and_key() {
             plan_changed: None,
         }]
     );
-    let card = &waiting(&queue, "STREAMFLIX WIEN")[0];
+    let card = &waiting(&queue, "STREAMFLIX WIEN 1010")[0];
     assert_eq!(
         (card.date.as_str(), card.amount.as_str(), card.raw.as_str()),
         (
             "Wed, 7 Oct",
             "−€12.99",
-            "E-COMM 12,99 AT K1 06.10. STREAMFLIX WIEN 040"
+            "E-COMM 12,99 AT K1 06.10. 00:00\nSTREAMFLIX WIEN 1010 040"
         )
     );
 }
@@ -301,11 +301,11 @@ fn without_a_tax_year_the_queue_has_no_items() {
 fn lines_with_a_decision_leave_the_queue() {
     let (_dir, db) = imported(&[october()]);
 
-    decide_line(&db, "STREAMFLIX WIEN", 10, Action::Ignore, None, false);
+    decide_line(&db, "STREAMFLIX WIEN 1010", 10, Action::Ignore, None, false);
 
     let queue = queue_of(&db);
     assert_eq!(queue.lines.len(), 6);
-    assert!(waiting(&queue, "STREAMFLIX WIEN").is_empty());
+    assert!(waiting(&queue, "STREAMFLIX WIEN 1010").is_empty());
 }
 
 #[test]
@@ -343,11 +343,18 @@ fn a_line_suggests_the_action_and_item_of_the_newest_hand_decision_for_its_key()
 #[test]
 fn a_suggestion_without_an_item_has_no_item_hint() {
     let (_dir, db) = imported(&[september(), october()]);
-    decide_line(&db, "CAFE LINDE DORNBIRN", 9, Action::Ignore, None, false);
+    decide_line(
+        &db,
+        "CAFE LINDE DORNBIRN 6850",
+        9,
+        Action::Ignore,
+        None,
+        false,
+    );
 
     let queue = queue_of(&db);
 
-    let line = &waiting(&queue, "CAFE LINDE DORNBIRN")[0];
+    let line = &waiting(&queue, "CAFE LINDE DORNBIRN 6850")[0];
     assert_eq!(
         (
             line.suggestion,
@@ -359,7 +366,7 @@ fn a_suggestion_without_an_item_has_no_item_hint() {
 }
 
 #[test]
-fn the_seeded_demo_keeps_only_the_cafe_lines_in_the_queue() {
+fn the_seeded_demo_keeps_only_the_cafe_and_household_lines_in_the_queue() {
     let dir = temp_config_dir();
     let db = Db::open(dir.path()).unwrap();
     seed_if_empty(
@@ -374,7 +381,7 @@ fn the_seeded_demo_keeps_only_the_cafe_lines_in_the_queue() {
     let mut distinct: Vec<&str> = titles(&queue);
     distinct.sort_unstable();
     distinct.dedup();
-    assert_eq!(distinct, ["CAFE LINDE DORNBIRN"]);
+    assert_eq!(distinct, ["CAFE LINDE DORNBIRN 6850", "HOUSEHOLD"]);
     assert_eq!(
         queue
             .subscriptions
@@ -389,13 +396,16 @@ fn the_seeded_demo_keeps_only_the_cafe_lines_in_the_queue() {
 fn deciding_a_line_by_hand_stores_a_decision_without_a_rule() {
     let (_dir, db) = imported(&[october()]);
 
-    let result = decide_line(&db, "STREAMFLIX WIEN", 10, Action::Ignore, None, false);
+    let result = decide_line(&db, "STREAMFLIX WIEN 1010", 10, Action::Ignore, None, false);
 
-    assert_eq!(result, written("Ignore: STREAMFLIX WIEN", &["decisions"]));
     assert_eq!(
-        decision_of(&db, "STREAMFLIX WIEN", 10),
+        result,
+        written("Ignore: STREAMFLIX WIEN 1010", &["decisions"])
+    );
+    assert_eq!(
+        decision_of(&db, "STREAMFLIX WIEN 1010", 10),
         Some(DecisionRow {
-            id: line_id(&db, "STREAMFLIX WIEN", 10),
+            id: line_id(&db, "STREAMFLIX WIEN 1010", 10),
             kind: Action::Ignore,
             item_key: None,
             subscription_id: None,
@@ -419,16 +429,16 @@ fn the_label_names_the_action_and_the_line() {
             "ANV: BUCHHANDLUNG SEITENWEISE",
         ),
         (
-            "STREAMFLIX WIEN",
+            "STREAMFLIX WIEN 1010",
             Action::Subscription,
             None,
-            "Subscription: STREAMFLIX WIEN",
+            "Subscription: STREAMFLIX WIEN 1010",
         ),
         (
-            "CAFE LINDE DORNBIRN",
+            "CAFE LINDE DORNBIRN 6850",
             Action::Ignore,
             None,
-            "Ignore: CAFE LINDE DORNBIRN",
+            "Ignore: CAFE LINDE DORNBIRN 6850",
         ),
     ] {
         let result = decide_line(&db, title, 10, action, item, false);
@@ -450,7 +460,7 @@ fn an_item_decision_keeps_its_item_and_any_other_action_drops_it() {
     );
     decide_line(
         &db,
-        "CAFE LINDE DORNBIRN",
+        "CAFE LINDE DORNBIRN 6850",
         10,
         Action::Ignore,
         Some("books"),
@@ -458,7 +468,7 @@ fn an_item_decision_keeps_its_item_and_any_other_action_drops_it() {
     );
     decide_line(
         &db,
-        "STREAMFLIX WIEN",
+        "STREAMFLIX WIEN 1010",
         10,
         Action::Subscription,
         Some("books"),
@@ -467,8 +477,8 @@ fn an_item_decision_keeps_its_item_and_any_other_action_drops_it() {
 
     let item = |title: &str| decision_of(&db, title, 10).and_then(|d| d.item_key);
     assert_eq!(item("BUCHHANDLUNG SEITENWEISE").as_deref(), Some("books"));
-    assert_eq!(item("CAFE LINDE DORNBIRN"), None);
-    assert_eq!(item("STREAMFLIX WIEN"), None);
+    assert_eq!(item("CAFE LINDE DORNBIRN 6850"), None);
+    assert_eq!(item("STREAMFLIX WIEN 1010"), None);
 }
 
 #[test]
@@ -515,14 +525,21 @@ fn deciding_an_unknown_line_is_not_found() {
 #[test]
 fn a_hand_decision_replaces_the_decision_a_rule_made_and_undo_brings_it_back() {
     let (dir, db) = imported(&[september()]);
-    decide_line(&db, "CAFE LINDE DORNBIRN", 9, Action::Ignore, None, true);
+    decide_line(
+        &db,
+        "CAFE LINDE DORNBIRN 6850",
+        9,
+        Action::Ignore,
+        None,
+        true,
+    );
     import_all(&db, &dir, &[october()]);
-    let by_rule = decision_of(&db, "CAFE LINDE DORNBIRN", 10).unwrap();
+    let by_rule = decision_of(&db, "CAFE LINDE DORNBIRN 6850", 10).unwrap();
     assert!(!by_rule.by_hand());
 
     let result = decide_line(
         &db,
-        "CAFE LINDE DORNBIRN",
+        "CAFE LINDE DORNBIRN 6850",
         10,
         Action::Subscription,
         None,
@@ -530,24 +547,27 @@ fn a_hand_decision_replaces_the_decision_a_rule_made_and_undo_brings_it_back() {
     );
 
     assert_eq!(result.tables, ["decisions"]);
-    let now = decision_of(&db, "CAFE LINDE DORNBIRN", 10).unwrap();
+    let now = decision_of(&db, "CAFE LINDE DORNBIRN 6850", 10).unwrap();
     assert_eq!((now.kind, now.rule_id), (Action::Subscription, None));
 
     db.undo().unwrap().unwrap();
 
-    assert_eq!(decision_of(&db, "CAFE LINDE DORNBIRN", 10), Some(by_rule));
+    assert_eq!(
+        decision_of(&db, "CAFE LINDE DORNBIRN 6850", 10),
+        Some(by_rule)
+    );
 }
 
 #[test]
 fn always_adds_a_rule_for_the_key_and_applies_it_to_the_other_undecided_lines() {
     let (_dir, db) = imported(&[september(), october()]);
 
-    let result = decide_line(&db, "STREAMFLIX WIEN", 10, Action::Ignore, None, true);
+    let result = decide_line(&db, "STREAMFLIX WIEN 1010", 10, Action::Ignore, None, true);
 
     assert_eq!(
         result,
         written(
-            "Ignore: STREAMFLIX WIEN · rule created",
+            "Ignore: STREAMFLIX WIEN 1010 · rule created",
             &["decisions", "rules"]
         )
     );
@@ -568,12 +588,12 @@ fn always_adds_a_rule_for_the_key_and_applies_it_to_the_other_undecided_lines() 
             NOW + 5
         )
     );
-    let earlier = decision_of(&db, "STREAMFLIX WIEN", 9).unwrap();
+    let earlier = decision_of(&db, "STREAMFLIX WIEN 1010", 9).unwrap();
     assert_eq!(
         (earlier.kind, earlier.rule_id, earlier.decided_at),
         (Action::Ignore, Some(rule.id.clone()), NOW + 5)
     );
-    let decided = decision_of(&db, "STREAMFLIX WIEN", 10).unwrap();
+    let decided = decision_of(&db, "STREAMFLIX WIEN 1010", 10).unwrap();
     assert_eq!((decided.kind, decided.rule_id), (Action::Ignore, None));
     assert_eq!(decision_of(&db, "LUMEN AI SAN FRANCISCO", 9), None);
 }
@@ -603,20 +623,34 @@ fn an_item_rule_carries_its_item_to_the_lines_it_decides() {
 #[test]
 fn always_leaves_the_hand_decisions_of_other_lines_alone() {
     let (_dir, db) = imported(&[september(), october()]);
-    decide_line(&db, "STREAMFLIX WIEN", 9, Action::Subscription, None, false);
-    let before = decision_of(&db, "STREAMFLIX WIEN", 9);
+    decide_line(
+        &db,
+        "STREAMFLIX WIEN 1010",
+        9,
+        Action::Subscription,
+        None,
+        false,
+    );
+    let before = decision_of(&db, "STREAMFLIX WIEN 1010", 9);
 
-    decide_line(&db, "STREAMFLIX WIEN", 10, Action::Ignore, None, true);
+    decide_line(&db, "STREAMFLIX WIEN 1010", 10, Action::Ignore, None, true);
 
-    assert_eq!(decision_of(&db, "STREAMFLIX WIEN", 9), before);
+    assert_eq!(decision_of(&db, "STREAMFLIX WIEN 1010", 9), before);
 }
 
 #[test]
 fn a_new_rule_runs_after_the_existing_ones() {
     let (_dir, db) = imported(&[october()]);
-    decide_line(&db, "STREAMFLIX WIEN", 10, Action::Ignore, None, true);
+    decide_line(&db, "STREAMFLIX WIEN 1010", 10, Action::Ignore, None, true);
 
-    decide_line(&db, "CAFE LINDE DORNBIRN", 10, Action::Ignore, None, true);
+    decide_line(
+        &db,
+        "CAFE LINDE DORNBIRN 6850",
+        10,
+        Action::Ignore,
+        None,
+        true,
+    );
 
     let positions: Vec<(i64, Vec<String>)> = rules(&db)
         .iter()
@@ -635,10 +669,10 @@ fn a_new_rule_runs_after_the_existing_ones() {
 fn undoing_a_decision_with_a_rule_reverts_the_decision_the_rule_and_its_lines_in_one_step() {
     let (_dir, db) = imported(&[september(), october()]);
 
-    decide_line(&db, "STREAMFLIX WIEN", 10, Action::Ignore, None, true);
+    decide_line(&db, "STREAMFLIX WIEN 1010", 10, Action::Ignore, None, true);
     let undone = db.undo().unwrap().unwrap();
 
-    assert_eq!(undone.label, "Ignore: STREAMFLIX WIEN · rule created");
+    assert_eq!(undone.label, "Ignore: STREAMFLIX WIEN 1010 · rule created");
     assert_eq!(rules(&db), vec![]);
     assert_eq!(decisions(&db), HashMap::new());
     assert_eq!(queue_of(&db).lines.len(), 14);
@@ -647,7 +681,7 @@ fn undoing_a_decision_with_a_rule_reverts_the_decision_the_rule_and_its_lines_in
 #[test]
 fn a_subscription_decision_needs_an_existing_subscription() {
     let (_dir, db) = imported(&[october()]);
-    let id = line_id(&db, "STREAMFLIX WIEN", 10);
+    let id = line_id(&db, "STREAMFLIX WIEN 1010", 10);
 
     for subscription in [
         None,
@@ -681,7 +715,7 @@ fn a_subscription_decision_links_the_line_and_never_creates_a_rule() {
 
     let result = decide(
         &db,
-        &line_id(&db, "STREAMFLIX WIEN", 10),
+        &line_id(&db, "STREAMFLIX WIEN 1010", 10),
         Action::Subscription,
         None,
         Some(subscription_id.clone()),
@@ -693,12 +727,12 @@ fn a_subscription_decision_links_the_line_and_never_creates_a_rule() {
 
     assert_eq!(
         result,
-        written("Subscription: STREAMFLIX WIEN", &["decisions"])
+        written("Subscription: STREAMFLIX WIEN 1010", &["decisions"])
     );
     assert_eq!(
-        decision_of(&db, "STREAMFLIX WIEN", 10),
+        decision_of(&db, "STREAMFLIX WIEN 1010", 10),
         Some(DecisionRow {
-            id: line_id(&db, "STREAMFLIX WIEN", 10),
+            id: line_id(&db, "STREAMFLIX WIEN 1010", 10),
             kind: Action::Subscription,
             item_key: None,
             subscription_id: Some(subscription_id),
@@ -708,7 +742,7 @@ fn a_subscription_decision_links_the_line_and_never_creates_a_rule() {
         })
     );
     assert_eq!(rules(&db), vec![]);
-    assert_eq!(decision_of(&db, "STREAMFLIX WIEN", 9), None);
+    assert_eq!(decision_of(&db, "STREAMFLIX WIEN 1010", 9), None);
 }
 
 #[test]
@@ -718,7 +752,7 @@ fn a_decision_other_than_subscription_links_no_subscription() {
 
     decide(
         &db,
-        &line_id(&db, "CAFE LINDE DORNBIRN", 10),
+        &line_id(&db, "CAFE LINDE DORNBIRN 6850", 10),
         Action::Ignore,
         None,
         Some(subscription_id),
@@ -728,7 +762,7 @@ fn a_decision_other_than_subscription_links_no_subscription() {
     )
     .unwrap();
 
-    let decision = decision_of(&db, "CAFE LINDE DORNBIRN", 10).unwrap();
+    let decision = decision_of(&db, "CAFE LINDE DORNBIRN 6850", 10).unwrap();
     assert_eq!(decision.subscription_id, None);
 }
 
@@ -774,7 +808,10 @@ fn a_line_matching_a_subscription_at_another_amount_asks_whether_the_plan_change
             date: "2026-10-10".into(),
         })
     );
-    assert_eq!(waiting(&queue, "CAFE LINDE DORNBIRN")[0].plan_changed, None);
+    assert_eq!(
+        waiting(&queue, "CAFE LINDE DORNBIRN 6850")[0].plan_changed,
+        None
+    );
 }
 
 #[test]
@@ -782,11 +819,11 @@ fn a_line_at_the_planned_amount_is_decided_and_leaves_the_queue() {
     let (_dir, db) = imported(&[october()]);
     let id = add_subscription(&db, &subscription_form("Streamflix", "STREAMFLIX", "12.99"));
 
-    let decision = decision_of(&db, "STREAMFLIX WIEN", 10).unwrap();
+    let decision = decision_of(&db, "STREAMFLIX WIEN 1010", 10).unwrap();
 
     assert_eq!(
         (decision.kind, decision.subscription_id, decision.rule_id),
         (Action::Subscription, Some(id.clone()), Some(id))
     );
-    assert!(waiting(&queue_of(&db), "STREAMFLIX WIEN").is_empty());
+    assert!(waiting(&queue_of(&db), "STREAMFLIX WIEN 1010").is_empty());
 }

@@ -124,7 +124,7 @@ fn linked_dates(db: &Db, id: &str) -> Vec<String> {
 fn line_dated(db: &Db, date: &str, needle: &str) -> TransactionRow {
     all_lines(db)
         .into_iter()
-        .find(|l| l.value_date == date && l.text.contains(needle))
+        .find(|l| l.value_date == date && format!("{} {}", l.text, l.extra).contains(needle))
         .unwrap_or_else(|| panic!("no line {needle} on {date}"))
 }
 
@@ -1520,8 +1520,8 @@ fn a_new_sheet_starts_from_a_bank_line() {
     assert_eq!(
         from_streaming,
         SubscriptionForm {
-            name: "STREAMFLIX WIEN".into(),
-            tone: 3,
+            name: "STREAMFLIX WIEN 1010".into(),
+            tone: 2,
             category: String::new(),
             active: true,
             ended_on: None,

@@ -130,8 +130,8 @@ fn the_account_page_groups_lines_by_statement_newest_first() {
         .collect();
     assert_eq!(heads.len(), 11);
     assert_eq!(heads[0], ("Nr. 011/2026", "1 Nov – 10 Nov", "6 lines"));
-    assert_eq!(heads[1], ("Nr. 010/2026", "1 Oct – 31 Oct", "8 lines"));
-    assert_eq!(heads[10], ("Nr. 001/2026", "1 Jan – 31 Jan", "8 lines"));
+    assert_eq!(heads[1], ("Nr. 010/2026", "1 Oct – 21 Oct", "8 lines"));
+    assert_eq!(heads[10], ("Nr. 001/2026", "1 Jan – 21 Jan", "8 lines"));
 }
 
 #[test]
@@ -165,7 +165,7 @@ fn lines_show_their_day_title_foreign_amount_signed_amount_and_flags() {
                 true,
                 false
             ),
-            ("2 Oct", "HOUSEHOLD", None, "−€500.00", false, true),
+            ("2 Oct", "HOUSEHOLD", None, "−€500.00", false, false),
             (
                 "3 Oct",
                 "HAUSVERWALTUNG MUSTER",
@@ -176,13 +176,20 @@ fn lines_show_their_day_title_foreign_amount_signed_amount_and_flags() {
             ),
             (
                 "5 Oct",
-                "TANKSTELLE RHEIN LUSTENAU",
+                "TANKSTELLE RHEIN LUSTENAU 6890",
                 None,
                 "−€58.30",
                 false,
                 false
             ),
-            ("7 Oct", "STREAMFLIX WIEN", None, "−€12.99", false, false),
+            (
+                "7 Oct",
+                "STREAMFLIX WIEN 1010",
+                None,
+                "−€12.99",
+                false,
+                false
+            ),
             (
                 "10 Oct",
                 "LUMEN AI SAN FRANCISCO",
@@ -201,7 +208,7 @@ fn lines_show_their_day_title_foreign_amount_signed_amount_and_flags() {
             ),
             (
                 "21 Oct",
-                "CAFE LINDE DORNBIRN",
+                "CAFE LINDE DORNBIRN 6850",
                 None,
                 "−€6.21",
                 false,
@@ -229,7 +236,7 @@ fn amounts_and_days_follow_the_number_format_and_date_order() {
         (first.date.as_str(), first.amount.as_str()),
         ("Oct 1", "+€2.850,00")
     );
-    assert_eq!(page.groups[1].range, "Oct 1 – Oct 31");
+    assert_eq!(page.groups[1].range, "Oct 1 – Oct 21");
     let foreign = &page.groups[1].lines[5];
     assert_eq!(foreign.original.as_deref(), Some("USD 24,00"));
 }
@@ -284,7 +291,7 @@ fn a_query_matches_the_booking_text_of_a_line_shown_under_its_counterparty() {
         .flat_map(|g| &g.lines)
         .map(|l| l.title.as_str())
         .collect();
-    assert_eq!(titles, ["HOUSEHOLD", "HAUSVERWALTUNG MUSTER"]);
+    assert_eq!(titles, ["HOUSEHOLD"]);
 }
 
 #[test]
@@ -359,7 +366,7 @@ fn an_ignored_transfer_between_own_accounts_is_a_transfer_without_a_note() {
 #[test]
 fn an_ignore_by_rule_says_so_and_an_ignore_by_hand_does_not() {
     let (_dir, db) = decided_october();
-    decide_by_hand(&db, "STREAMFLIX WIEN", Action::Ignore);
+    decide_by_hand(&db, "STREAMFLIX WIEN 1010", Action::Ignore);
 
     let page = lines_of(&db, "account-1");
 
@@ -368,7 +375,7 @@ fn an_ignore_by_rule_says_so_and_an_ignore_by_hand_does_not() {
         (LineStatus::Ignored, Some("Ignored by rule".into()))
     );
     assert_eq!(
-        status_of(&page, "STREAMFLIX WIEN"),
+        status_of(&page, "STREAMFLIX WIEN 1010"),
         (LineStatus::Ignored, Some("Ignored".into()))
     );
 }
@@ -380,7 +387,7 @@ fn a_subscription_decision_is_a_subscription_without_a_note() {
         &db,
         &subscription_form("Streamflix", "NO SUCH TEXT", "12.99"),
     );
-    let line_id = line_titled(&lines_of(&db, "account-1"), "STREAMFLIX WIEN")
+    let line_id = line_titled(&lines_of(&db, "account-1"), "STREAMFLIX WIEN 1010")
         .id
         .clone();
     review::decide(
@@ -398,7 +405,7 @@ fn a_subscription_decision_is_a_subscription_without_a_note() {
     let page = lines_of(&db, "account-1");
 
     assert_eq!(
-        status_of(&page, "STREAMFLIX WIEN"),
+        status_of(&page, "STREAMFLIX WIEN 1010"),
         (LineStatus::Subscription, None)
     );
 }

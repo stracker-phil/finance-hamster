@@ -85,19 +85,36 @@ fn months(today: NaiveDate) -> Vec<NaiveDate> {
         .collect()
 }
 
+fn follows(previous: &StatementRow, s: &StatementRow) -> bool {
+    (s.year == previous.year && s.number == previous.number + 1)
+        || (s.year == previous.year + 1 && s.number == 1)
+}
+
+/// Each statement's days with its label. A statement runs from its first to its last booking, so one that
+/// directly follows the previous statement also covers the quiet days since that one ended.
+fn ranges(statements: &[StatementRow]) -> Vec<(NaiveDate, NaiveDate, String)> {
+    let mut sorted: Vec<&StatementRow> = statements.iter().collect();
+    sorted.sort_by_key(|s| (s.year, s.number));
+    let mut out = Vec::new();
+    for (i, s) in sorted.iter().enumerate() {
+        let (Some(from), Some(to)) = (date::parse(&s.from_date), date::parse(&s.to_date)) else {
+            continue;
+        };
+        let from = i
+            .checked_sub(1)
+            .map(|p| sorted[p])
+            .filter(|previous| follows(previous, s))
+            .and_then(|previous| date::parse(&previous.to_date))
+            .map_or(from, |end| from.min(end + Days::new(1)));
+        out.push((from, to, format!("Nr. {:03}/{}", s.number, s.year)));
+    }
+    out
+}
+
 fn month_cover(first: NaiveDate, today: NaiveDate, statements: &[StatementRow]) -> MonthCover {
     let next = first.checked_add_months(Months::new(1)).unwrap_or(first);
     let last = (next - Days::new(1)).min(today);
-    let ranges: Vec<(NaiveDate, NaiveDate, String)> = statements
-        .iter()
-        .filter_map(|s| {
-            Some((
-                date::parse(&s.from_date)?,
-                date::parse(&s.to_date)?,
-                format!("Nr. {:03}/{}", s.number, s.year),
-            ))
-        })
-        .collect();
+    let ranges = ranges(statements);
     let days = (last - first).num_days().max(-1) + 1;
     let covered = (0..days)
         .map(|i| first + Days::new(i as u64))
@@ -121,22 +138,24 @@ fn month_cover(first: NaiveDate, today: NaiveDate, statements: &[StatementRow]) 
 }
 
 /// The first break in the chain of statements, oldest first.
-fn chain_note(statements: &[StatementRow]) -> Option<String> {
+fn chain_note(statements: &[StatementRow], order: DateOrder) -> Option<String> {
     let mut sorted: Vec<&StatementRow> = statements.iter().collect();
     sorted.sort_by_key(|s| (s.year, s.number));
     for pair in sorted.windows(2) {
         let (a, b) = (pair[0], pair[1]);
-        let (year, number) = if b.year == a.year {
-            (a.year, a.number + 1)
-        } else {
-            (a.year + 1, 1)
-        };
-        if (b.year, b.number) != (year, number) {
-            let month = date::parse(&a.to_date)
-                .map(|d| date::month(d + Days::new(1)))
-                .unwrap_or("A month");
+        if !follows(a, b) {
+            let (year, number) = if b.year == a.year {
+                (a.year, a.number + 1)
+            } else {
+                (a.year + 1, 1)
+            };
+            let day = |text: &str| date::parse(text).map(|d| date::day_month(d, order));
+            let between = match (day(&a.to_date), day(&b.from_date)) {
+                (Some(end), Some(start)) => format!(": no lines between {end} and {start}"),
+                _ => String::new(),
+            };
             return Some(format!(
-                "{month} is missing: statement Nr. {number:03}/{year} was never imported."
+                "Statement Nr. {number:03}/{year} was never imported{between}."
             ));
         }
         if b.old_balance != a.new_balance {
@@ -191,7 +210,7 @@ fn account_coverage(
             .into_iter()
             .map(|m| month_cover(m, today, statements))
             .collect(),
-        note: chain_note(statements),
+        note: chain_note(statements, order),
     }
 }
 

@@ -70,9 +70,10 @@ fn statement(
     s.iban = account.iban.to_string();
     s.to = month_end(first).min(until);
     if account.pays_household {
+        // The bank prints the receiving account's name, not its IBAN.
         s.lines.push(StatementLine {
-            text: "Dauerauftrag".into(),
-            extra: vec!["HOUSEHOLD".into(), HOUSEHOLD_IBAN.into(), "HAUSHALT".into()],
+            text: "Haushalt".into(),
+            extra: vec!["HOUSEHOLD".into()],
             value_date: first + Days::new(1),
             cents: -50_000,
         });

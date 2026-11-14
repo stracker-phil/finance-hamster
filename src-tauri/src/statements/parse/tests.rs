@@ -1,7 +1,7 @@
 use chrono::NaiveDate;
 
 use super::model::{Card, CardKind, Fx, ParsedLine, ParsedStatement};
-use super::{ParseError, amount, parse, sparkasse};
+use super::{ParseError, amount, parse};
 use crate::platform::pdf::Pdf;
 use crate::statements::check::check;
 use crate::test_support::statements::{Statement, StatementLine, demo_month};
@@ -63,21 +63,6 @@ fn line<'a>(parsed: &'a ParsedStatement, text_prefix: &str) -> &'a ParsedLine {
         .unwrap_or_else(|| panic!("no line starting with {text_prefix}"))
 }
 
-fn edit_line(pages: &mut [Vec<String>], prefix: &str, edit: impl Fn(&str) -> String) {
-    let line = pages
-        .iter_mut()
-        .flatten()
-        .find(|l| l.trim_start().starts_with(prefix))
-        .unwrap_or_else(|| panic!("no line starting with {prefix}"));
-    *line = edit(line);
-}
-
-fn without(pages: &mut [Vec<String>], prefix: &str) {
-    for page in pages {
-        page.retain(|l| !l.trim_start().starts_with(prefix));
-    }
-}
-
 #[test]
 fn printed_amounts_read_as_signed_cents() {
     for (text, expected) in [
@@ -119,35 +104,13 @@ fn text_in_an_unknown_layout_is_rejected() {
 }
 
 #[test]
-fn a_sparkasse_statement_is_recognized_and_read_by_its_parser() {
-    let pages = demo().text_pages();
-    assert!(sparkasse::recognizes(&pages));
-    let parsed = parse(&pages).unwrap();
-    assert_eq!(parsed.layout, sparkasse::LAYOUT);
-    assert_eq!(parsed.layout, "sparkasse-erste-1");
-    assert_eq!(Ok(parsed), sparkasse::parse(&pages));
-}
-
-#[test]
-fn a_statement_without_its_header_lines_is_not_recognized() {
-    let mut no_number = demo().text_pages();
-    edit_line(&mut no_number, "Example", |_| "Example Sparkasse".into());
-    let mut no_iban = demo().text_pages();
-    edit_line(&mut no_iban, "IBAN:", |_| "Konto".into());
-    for pages in [no_number, no_iban, Vec::new()] {
-        assert!(!sparkasse::recognizes(&pages));
-        assert_eq!(parse(&pages), Err(ParseError::UnknownLayout));
-    }
-}
-
-#[test]
-fn the_header_is_read_with_a_normalized_iban_number_year_and_period() {
+fn the_header_is_read_with_a_normalized_iban_number_year_and_the_first_and_last_value_date() {
     let parsed = read(&demo());
     assert_eq!(parsed.iban, "AT241999900000000001");
     assert_eq!(parsed.number, 10);
     assert_eq!(parsed.year, 2026);
     assert_eq!(parsed.from, date(2026, 10, 1));
-    assert_eq!(parsed.to, date(2026, 10, 28));
+    assert_eq!(parsed.to, date(2026, 10, 21));
 }
 
 #[test]
@@ -180,34 +143,34 @@ fn every_booking_line_keeps_its_page_row_text_value_date_and_signed_cents() {
     assert_eq!(
         lines,
         vec![
-            (1, 0, "Gehalt", date(2026, 10, 1), 285_000),
-            (1, 4, "Dauerauftrag", date(2026, 10, 3), -98_000),
+            (1, 0, "GEHALT 10/2026", date(2026, 10, 1), 285_000),
+            (1, 4, "Miete 10/2026", date(2026, 10, 3), -98_000),
             (
                 1,
-                8,
-                "POS 58,30 AT K1 04.10. 17:40 TANKSTELLE RHEIN LUSTENAU 040",
+                7,
+                "POS 58,30 AT K1 04.10. 17:40",
                 date(2026, 10, 5),
                 -5_830
             ),
             (
                 1,
                 9,
-                "E-COMM 12,99 AT K1 06.10. STREAMFLIX WIEN 040",
+                "E-COMM 12,99 AT K1 06.10. 00:00",
                 date(2026, 10, 7),
                 -1_299
             ),
             (
                 1,
-                10,
-                "E-COMM 24,00 USD K1 08.10. LUMEN AI SAN FRANCISCO 840",
+                11,
+                "E-COMM 24,00 USD K1 08.10. 00:00",
                 date(2026, 10, 10),
                 -2_248
             ),
-            (1, 12, "Lastschrift", date(2026, 10, 14), -4_690),
+            (1, 14, "RE 2026-0412", date(2026, 10, 14), -4_690),
             (
                 1,
-                16,
-                "POS 6,21 AT K1 20.10. 09:12 CAFE LINDE DORNBIRN 040",
+                17,
+                "POS 6,21 AT K1 20.10. 09:12",
                 date(2026, 10, 21),
                 -621
             ),
@@ -219,39 +182,37 @@ fn every_booking_line_keeps_its_page_row_text_value_date_and_signed_cents() {
 fn the_indented_lines_below_a_booking_are_kept_trimmed_as_its_extra_lines() {
     let parsed = read(&demo());
     assert_eq!(
-        line(&parsed, "Gehalt").extra,
+        line(&parsed, "GEHALT").extra,
         vec![
             "NORDWIND SOFTWARE GMBH",
-            "AT94 1999 9000 0000 0099",
-            "REF: LOHN"
+            "260101000000001",
+            "GEHALT 10/2026"
         ]
     );
     assert_eq!(
         line(&parsed, "E-COMM 24,00").extra,
-        vec!["SPESEN: 0,49 KURS: 1,0912 VOM: 06.10.2026"]
+        vec![
+            "LUMEN AI SAN FRANCISCO 840",
+            "SPESEN: 0,49 KURS: 1,0912 VOM: 06.10.2026"
+        ]
     );
-    assert!(line(&parsed, "POS 58,30").extra.is_empty());
+    assert_eq!(
+        line(&parsed, "POS 58,30").extra,
+        vec!["TANKSTELLE RHEIN LUSTENAU 6890 040"]
+    );
 }
 
 #[test]
 fn the_counterparty_is_the_first_extra_line_of_a_transfer() {
     let parsed = read(&demo());
-    for (text, expected, iban) in [
-        ("Gehalt", "NORDWIND SOFTWARE GMBH", "AT941999900000000099"),
-        (
-            "Dauerauftrag",
-            "HAUSVERWALTUNG MUSTER",
-            "AT811999900000000042",
-        ),
-        (
-            "Lastschrift",
-            "BUCHHANDLUNG SEITENWEISE",
-            "AT091999900000000077",
-        ),
+    for (text, expected) in [
+        ("GEHALT", "NORDWIND SOFTWARE GMBH"),
+        ("Miete", "HAUSVERWALTUNG MUSTER"),
+        ("RE 2026", "BUCHHANDLUNG SEITENWEISE"),
     ] {
         let l = line(&parsed, text);
         assert_eq!(l.counterparty.as_deref(), Some(expected), "{text}");
-        assert_eq!(l.counterparty_iban.as_deref(), Some(iban), "{text}");
+        assert_eq!(l.counterparty_iban, None, "{text}");
     }
 }
 
@@ -347,7 +308,7 @@ fn an_online_card_payment_in_the_home_country_has_no_original_amount_or_fx() {
             kind: CardKind::Online,
             date: date(2026, 10, 6),
             time: None,
-            merchant: "STREAMFLIX WIEN".into(),
+            merchant: "STREAMFLIX WIEN 1010".into(),
             original: None,
         })
     );
@@ -355,7 +316,7 @@ fn an_online_card_payment_in_the_home_country_has_no_original_amount_or_fx() {
 }
 
 #[test]
-fn a_terminal_payment_has_a_time_and_a_merchant_without_the_country_code() {
+fn a_terminal_payment_has_a_time_and_a_merchant_from_the_detail_line_without_the_country_code() {
     let parsed = read(&demo());
     assert_eq!(
         line(&parsed, "POS 58,30").card,
@@ -363,7 +324,7 @@ fn a_terminal_payment_has_a_time_and_a_merchant_without_the_country_code() {
             kind: CardKind::Terminal,
             date: date(2026, 10, 4),
             time: Some("17:40".into()),
-            merchant: "TANKSTELLE RHEIN LUSTENAU".into(),
+            merchant: "TANKSTELLE RHEIN LUSTENAU 6890".into(),
             original: None,
         })
     );
@@ -373,7 +334,7 @@ fn a_terminal_payment_has_a_time_and_a_merchant_without_the_country_code() {
             kind: CardKind::Terminal,
             date: date(2026, 10, 20),
             time: Some("09:12".into()),
-            merchant: "CAFE LINDE DORNBIRN".into(),
+            merchant: "CAFE LINDE DORNBIRN 6850".into(),
             original: None,
         })
     );
@@ -429,10 +390,11 @@ fn a_statement_across_new_year_puts_december_lines_in_the_year_before() {
 }
 
 #[test]
-fn a_statement_without_lines_reads_with_no_booking() {
-    let parsed = read(&with_lines(Vec::new()));
-    assert!(parsed.lines.is_empty());
-    assert_eq!((parsed.credits, parsed.debits), (0, 0));
+fn a_statement_without_lines_has_no_booking_to_read() {
+    assert_eq!(
+        parse(&with_lines(Vec::new()).text_pages()),
+        Err(ParseError::Missing("booking".into()))
+    );
 }
 
 #[test]
@@ -446,13 +408,14 @@ fn a_multi_page_statement_reads_the_lines_of_every_page_in_order() {
         parsed.lines.iter().map(|l| l.cents).collect::<Vec<_>>(),
         statement.lines.iter().map(|l| l.cents).collect::<Vec<_>>()
     );
-    assert_eq!(parsed.lines.last().map(|l| l.page), Some(pages.len()));
-    assert_eq!(parsed.sums_page, pages.len());
+    assert!(parsed.lines.iter().any(|l| l.page == pages.len()));
+    assert_eq!(parsed.sums_page, 1);
     for l in &parsed.lines {
         let printed = pages[l.page - 1]
             .iter()
             .filter(|p| !p.trim().is_empty())
-            .nth(l.row - 1);
+            .nth(l.row - 1)
+            .map(|p| p.split_whitespace().collect::<Vec<_>>().join(" "));
         assert!(
             printed.is_some_and(|p| p.starts_with(&l.text)),
             "page {} row {}",
@@ -463,12 +426,13 @@ fn a_multi_page_statement_reads_the_lines_of_every_page_in_order() {
 }
 
 #[test]
-fn rows_count_from_the_header_on_each_page_and_continuation_headers_are_skipped() {
+fn later_pages_repeat_only_the_bank_lines_and_column_titles_so_bookings_start_at_row_five() {
     let pages = long_statement().text_pages();
     let parsed = parse(&pages).unwrap();
-    let first_on = |page: usize| parsed.lines.iter().find(|l| l.page == page).unwrap().row;
-    for page in 2..=pages.len() {
-        assert_eq!(first_on(page) + 1, first_on(1), "page {page}");
+    assert!(pages.len() >= 3);
+    for page in 2..pages.len() {
+        let first_row = parsed.lines.iter().find(|l| l.page == page).map(|l| l.row);
+        assert_eq!(first_row, Some(5), "page {page}");
     }
     assert!(
         parsed
@@ -477,76 +441,12 @@ fn rows_count_from_the_header_on_each_page_and_continuation_headers_are_skipped(
             .all(|l| !l.text.contains("Kontoauszug") && !l.text.contains("Seite"))
     );
     assert_eq!(
-        parsed.lines.iter().filter(|l| l.extra.len() == 2).count(),
+        parsed
+            .lines
+            .iter()
+            .filter(|l| l.text.starts_with("Rate ") && l.extra == ["A", "B"])
+            .count(),
         30
-    );
-}
-
-#[test]
-fn a_missing_header_part_or_sum_is_reported_by_name() {
-    for (prefix, replacement, missing) in [
-        ("Example", Some("Example Sparkasse"), "Kontoauszug Nr."),
-        ("IBAN:", Some("Konto"), "IBAN"),
-        ("Zeitraum:", Some(""), "Zeitraum"),
-        ("Alter Saldo", None, "Alter Saldo"),
-        ("Summe Gutschriften", None, "Summe Gutschriften"),
-        ("Summe Lastschriften", None, "Summe Lastschriften"),
-        ("Neuer Saldo", None, "Neuer Saldo"),
-    ] {
-        let mut pages = demo().text_pages();
-        match replacement {
-            Some(text) => edit_line(&mut pages, prefix, |_| text.to_string()),
-            None => without(&mut pages, prefix),
-        }
-        assert_eq!(
-            sparkasse::parse(&pages),
-            Err(ParseError::Missing(missing.into())),
-            "{prefix}"
-        );
-    }
-}
-
-#[test]
-fn an_iban_with_a_wrong_checksum_is_unreadable() {
-    let mut pages = demo().text_pages();
-    edit_line(&mut pages, "IBAN:", |l| l.replace("AT24", "AT25"));
-    assert_eq!(
-        parse(&pages),
-        Err(ParseError::Unreadable(
-            "IBAN AT25 1999 9000 0000 0001".into()
-        ))
-    );
-}
-
-#[test]
-fn a_booking_line_without_a_signed_amount_is_unreadable_and_names_its_page() {
-    let mut pages = demo().text_pages();
-    edit_line(&mut pages, "Gehalt", |l| {
-        l.replace("+2.850,00", " 2.850,00")
-    });
-    let edited = pages[0].iter().find(|l| l.starts_with("Gehalt")).unwrap();
-    assert_eq!(
-        parse(&pages),
-        Err(ParseError::Unreadable(format!("page 1: {}", edited.trim())))
-    );
-}
-
-#[test]
-fn an_unreadable_booking_on_a_later_page_names_that_page() {
-    let mut pages = long_statement().text_pages();
-    let last = pages.len();
-    assert!(last >= 2);
-    edit_line(&mut pages, "Rate 29", |l| l.replace("-10,00", " 10,00"));
-    let edited = pages[last - 1]
-        .iter()
-        .find(|l| l.starts_with("Rate 29"))
-        .unwrap();
-    assert_eq!(
-        parse(&pages),
-        Err(ParseError::Unreadable(format!(
-            "page {last}: {}",
-            edited.trim()
-        )))
     );
 }
 

@@ -312,12 +312,12 @@ fn committing_copies_the_pdf_unchanged_and_stores_the_statement() {
         number: 10,
         year: 2026,
         from_date: "2026-10-01".into(),
-        to_date: "2026-10-28".into(),
+        to_date: "2026-10-21".into(),
         old_balance: 141_230,
         credits: 285_000,
         debits: -112_688,
         new_balance: 313_542,
-        layout: "sparkasse-erste-1".into(),
+        layout: "sparkasse-george-1".into(),
         file_hash: hash,
         file: "statements/2026/private-010.pdf".into(),
         pages: 1,
@@ -344,29 +344,13 @@ fn committing_stores_one_transaction_per_line_in_printed_order() {
     assert_eq!(
         shown,
         vec![
-            ("Gehalt", 285_000, "2026-10-01"),
-            ("Dauerauftrag", -98_000, "2026-10-03"),
-            (
-                "POS 58,30 AT K1 04.10. 17:40 TANKSTELLE RHEIN LUSTENAU 040",
-                -5_830,
-                "2026-10-05"
-            ),
-            (
-                "E-COMM 12,99 AT K1 06.10. STREAMFLIX WIEN 040",
-                -1_299,
-                "2026-10-07"
-            ),
-            (
-                "E-COMM 24,00 USD K1 08.10. LUMEN AI SAN FRANCISCO 840",
-                -2_248,
-                "2026-10-10"
-            ),
-            ("Lastschrift", -4_690, "2026-10-14"),
-            (
-                "POS 6,21 AT K1 20.10. 09:12 CAFE LINDE DORNBIRN 040",
-                -621,
-                "2026-10-21"
-            ),
+            ("GEHALT 10/2026", 285_000, "2026-10-01"),
+            ("Miete 10/2026", -98_000, "2026-10-03"),
+            ("POS 58,30 AT K1 04.10. 17:40", -5_830, "2026-10-05"),
+            ("E-COMM 12,99 AT K1 06.10. 00:00", -1_299, "2026-10-07"),
+            ("E-COMM 24,00 USD K1 08.10. 00:00", -2_248, "2026-10-10"),
+            ("RE 2026-0412", -4_690, "2026-10-14"),
+            ("POS 6,21 AT K1 20.10. 09:12", -621, "2026-10-21"),
         ]
     );
     for line in &lines {
@@ -386,16 +370,13 @@ fn a_transfer_line_keeps_its_counterparty_and_detail_lines() {
     let salary = &lines[0];
     assert_eq!(
         salary.extra,
-        r#"["NORDWIND SOFTWARE GMBH","AT94 1999 9000 0000 0099","REF: LOHN"]"#
+        r#"["NORDWIND SOFTWARE GMBH","260101000000001","GEHALT 10/2026"]"#
     );
     assert_eq!(
         salary.counterparty.as_deref(),
         Some("NORDWIND SOFTWARE GMBH")
     );
-    assert_eq!(
-        salary.counterparty_iban.as_deref(),
-        Some("AT941999900000000099")
-    );
+    assert_eq!(salary.counterparty_iban, None);
     assert_eq!(salary.card_kind, None);
     assert_eq!(salary.merchant, None);
 }
@@ -412,7 +393,7 @@ fn card_payments_store_their_kind_date_time_merchant_and_foreign_amount() {
             .unwrap_or_else(|| panic!("no line of {merchant}"))
     };
 
-    let terminal = by_merchant("TANKSTELLE RHEIN LUSTENAU");
+    let terminal = by_merchant("TANKSTELLE RHEIN LUSTENAU 6890");
     assert_eq!(terminal.card_kind.as_deref(), Some("terminal"));
     assert_eq!(terminal.card_date.as_deref(), Some("2026-10-04"));
     assert_eq!(terminal.card_time.as_deref(), Some("17:40"));
@@ -426,7 +407,7 @@ fn card_payments_store_their_kind_date_time_merchant_and_foreign_amount() {
         (None, &None, &None)
     );
 
-    let online = by_merchant("STREAMFLIX WIEN");
+    let online = by_merchant("STREAMFLIX WIEN 1010");
     assert_eq!(online.card_kind.as_deref(), Some("online"));
     assert_eq!(online.card_time, None);
 
@@ -528,7 +509,7 @@ fn the_first_statement_of_an_account_previews_with_its_balance_equation() {
         ImportPreview {
             token: "token-1".into(),
             file_name: "october.pdf".into(),
-            summary: "Kontoauszug Nr. 010/2026 · 1 page · 1 Oct – 28 Oct 2026".into(),
+            summary: "Kontoauszug Nr. 010/2026 · 1 page · 1 Oct – 21 Oct 2026".into(),
             account_name: "Private".into(),
             lines: 7,
             balance: "1,412.30 + 2,850.00 − 1,126.88 = 3,135.42".into(),
@@ -557,7 +538,7 @@ fn the_summary_follows_the_date_order_and_the_balance_the_number_format() {
 
     assert_eq!(
         preview.summary,
-        "Kontoauszug Nr. 010/2026 · 1 page · Oct 1 – Oct 28, 2026"
+        "Kontoauszug Nr. 010/2026 · 1 page · Oct 1 – Oct 21, 2026"
     );
     assert_eq!(preview.balance, "1.412,30 + 2.850,00 − 1.126,88 = 3.135,42");
 }

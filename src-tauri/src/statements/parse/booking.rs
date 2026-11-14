@@ -1,5 +1,4 @@
-//! What the layouts share: printed dates, and what a booking's text and detail lines say (card, FX,
-//! counterparty and its IBAN).
+//! Printed dates, and what a booking's text and detail lines say: card, FX, counterparty and its IBAN.
 
 use chrono::{Datelike, NaiveDate};
 

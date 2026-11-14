@@ -406,7 +406,7 @@ mod tests {
             .read(statements::all_transactions)
             .unwrap()
             .into_iter()
-            .find(|t| t.text.contains("LUMEN AI"))
+            .find(|t| format!("{} {}", t.text, t.extra).contains("LUMEN AI"))
             .unwrap();
 
         let dues = due_with(&db, &Settings::default(), today(), "plan:");
@@ -437,9 +437,9 @@ mod tests {
         let (_dir, db) = imported(&[demo_month(10, 2026, 10, 141_230)]);
 
         for (on, expected) in [
-            (day(2026, 11, 26), vec![]),
-            (day(2026, 11, 27), vec!["import:account-1:2026-10-28"]),
-            (day(2026, 12, 15), vec!["import:account-1:2026-10-28"]),
+            (day(2026, 11, 19), vec![]),
+            (day(2026, 11, 20), vec!["import:account-1:2026-10-21"]),
+            (day(2026, 12, 15), vec!["import:account-1:2026-10-21"]),
         ] {
             let dues = due_with(&db, &Settings::default(), on, "import:");
             assert_eq!(keys(&dues), expected, "{on}");
@@ -450,15 +450,15 @@ mod tests {
     fn the_import_reminder_names_the_account_and_the_end_of_its_last_statement() {
         let (_dir, db) = imported(&[demo_month(10, 2026, 10, 141_230)]);
 
-        let dues = due_with(&db, &Settings::default(), day(2026, 11, 27), "import:");
+        let dues = due_with(&db, &Settings::default(), day(2026, 11, 20), "import:");
 
         assert_eq!(
             dues,
             vec![Due {
-                key: "import:account-1:2026-10-28".into(),
+                key: "import:account-1:2026-10-21".into(),
                 notification: notification(
                     "Import the Private statement",
-                    "Its last statement ended on 28 Oct."
+                    "Its last statement ended on 21 Oct."
                 ),
             }]
         );
@@ -470,8 +470,8 @@ mod tests {
         let settings = settings_with(|s| s.import_after_days = 5);
 
         for (on, expected) in [
-            (day(2026, 11, 1), vec![]),
-            (day(2026, 11, 2), vec!["import:account-1:2026-10-28"]),
+            (day(2026, 10, 25), vec![]),
+            (day(2026, 10, 26), vec!["import:account-1:2026-10-21"]),
         ] {
             assert_eq!(
                 keys(&due_with(&db, &settings, on, "import:")),
@@ -506,11 +506,11 @@ mod tests {
         assert_eq!(
             dues,
             vec![Due {
-                key: "gap:account-1:August is missing: statement Nr. 009/2026 was never imported."
+                key: "gap:account-1:Statement Nr. 009/2026 was never imported: no lines between 21 Aug and 1 Oct."
                     .into(),
                 notification: notification(
                     "A Private statement is missing",
-                    "August is missing: statement Nr. 009/2026 was never imported."
+                    "Statement Nr. 009/2026 was never imported: no lines between 21 Aug and 1 Oct."
                 ),
             }]
         );

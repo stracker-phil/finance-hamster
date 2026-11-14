@@ -319,13 +319,15 @@ mod tests {
     }
 
     #[test]
-    fn seeded_transfers_to_household_are_ignored_by_the_built_in_rule() {
+    fn seeded_transfers_to_household_stay_undecided_because_statements_print_no_counterparty_iban()
+    {
         let dir = temp_config_dir();
         let db = Db::open(dir.path()).unwrap();
         seed_if_empty(&db, dir.path(), today()).unwrap();
 
-        all_decided_as(&db, "HOUSEHOLD", Action::Ignore, None, "builtin-transfers");
-        assert_eq!(outcomes_of_lines_containing(&db, "HOUSEHOLD").len(), 11);
+        let outcomes = outcomes_of_lines_containing(&db, "HOUSEHOLD");
+
+        assert_eq!(outcomes, vec![None; 11]);
     }
 
     #[test]

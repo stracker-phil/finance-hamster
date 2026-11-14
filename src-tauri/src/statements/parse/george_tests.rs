@@ -1,15 +1,17 @@
 use chrono::NaiveDate;
 
 use super::model::{Card, CardKind, Fx, ParsedLine, ParsedStatement};
-use super::{ParseError, amount, george, parse, sparkasse};
+use super::{ParseError, george, parse};
 use crate::statements::check::check;
 use crate::test_support::statements::demo_month;
 
 const IBAN_LINE: &str = "                                              IBAN:  AT241999900000000001";
-const NUMBER_LINE: &str = "                                              Kontoauszug              Nr. 004/2026";
+const NUMBER_LINE: &str =
+    "                                              Kontoauszug              Nr. 004/2026";
 const COLUMNS_LINE: &str =
     " Buchungstext/Booking Text                        Valuta/Value   Beträge/Amounts in EUR";
-const FOOTER: &str = "AT241999900000000001 12.11.202621:00        0                 004             1";
+const FOOTER: &str =
+    "AT241999900000000001 12.11.202621:00        0                 004             1";
 const FOOTER_TITLES: &str =
     "IBAN                Datum/DateUhrzeit/Time Belege(*)/VouchersAuszug/StatementSeite/Page";
 
@@ -118,7 +120,10 @@ fn a_multi_page_statement_reads_its_header_sums_and_every_booking_and_passes_the
     assert_eq!(parsed.layout, "sparkasse-george-1");
     assert_eq!(parsed.iban, "AT241999900000000001");
     assert_eq!((parsed.number, parsed.year), (4, 2026));
-    assert_eq!((parsed.from, parsed.to), (date(2026, 9, 27), date(2026, 10, 2)));
+    assert_eq!(
+        (parsed.from, parsed.to),
+        (date(2026, 9, 27), date(2026, 10, 2))
+    );
     assert_eq!(parsed.old_balance, 100_000);
     assert_eq!(parsed.credits, 200_000);
     assert_eq!(parsed.debits, -56_293);
@@ -331,7 +336,10 @@ fn a_card_date_in_december_of_a_statement_running_into_january_is_in_the_year_be
         " E-COMM       10,00 AT  K1   30.12. SHOP WIEN 040   31.12.2026                10,00-",
     ]);
     let parsed = read(&pages);
-    assert_eq!((parsed.from, parsed.to), (date(2026, 12, 31), date(2027, 1, 5)));
+    assert_eq!(
+        (parsed.from, parsed.to),
+        (date(2026, 12, 31), date(2027, 1, 5))
+    );
     assert_eq!(
         line(&parsed, "E-COMM").card.as_ref().map(|c| c.date),
         Some(date(2026, 12, 30))
@@ -402,25 +410,18 @@ fn only_pages_with_the_column_titles_and_an_iban_are_recognized() {
 }
 
 #[test]
-fn each_layout_is_read_by_its_own_parser() {
-    let george_pages = statement_pages();
-    assert_eq!(parse(&george_pages).unwrap().layout, "sparkasse-george-1");
-    assert_eq!(parse(&george_pages), george::parse(&george_pages));
-
-    let old_pages = demo_month(10, 2026, 10, 141_230).text_pages();
-    assert!(!george::recognizes(&old_pages));
-    assert!(sparkasse::recognizes(&old_pages));
-    assert_eq!(parse(&old_pages).unwrap().layout, "sparkasse-erste-1");
+fn a_printed_statement_is_read_by_the_george_parser() {
+    let pages = statement_pages();
+    assert_eq!(parse(&pages).unwrap().layout, "sparkasse-george-1");
+    assert_eq!(parse(&pages), george::parse(&pages));
 }
 
 #[test]
-fn a_trailing_minus_makes_a_printed_amount_negative_and_a_second_sign_is_rejected() {
-    for (text, expected) in [
-        ("980,00-", Some(-98_000)),
-        ("1.234,56-", Some(-123_456)),
-        ("-980,00-", None),
-        ("+980,00-", None),
-    ] {
-        assert_eq!(amount(text), expected, "{text}");
-    }
+fn the_generated_demo_statement_is_recognized_and_read_as_the_george_layout() {
+    let pages = demo_month(10, 2026, 10, 141_230).text_pages();
+    assert!(george::recognizes(&pages));
+    let parsed = parse(&pages).unwrap();
+    assert_eq!(parsed.layout, "sparkasse-george-1");
+    assert_eq!(Ok(parsed.clone()), george::parse(&pages));
+    assert_eq!(check(&parsed), Ok(()));
 }

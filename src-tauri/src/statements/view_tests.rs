@@ -8,7 +8,7 @@ use crate::db::{Db, Source};
 use crate::rules::store::Action;
 use crate::rules::{RuleForm, save};
 use crate::test_support::demo::seed_if_empty;
-use crate::test_support::statements::{Statement, demo_month};
+use crate::test_support::statements::{Statement, StatementLine, demo_month};
 use crate::test_support::temp_config_dir;
 
 pub(super) fn day(year: i32, month: u32, day: u32) -> NaiveDate {
@@ -50,6 +50,18 @@ fn ending(number: u32, month: u32, to: NaiveDate, old_balance: i64) -> Statement
     let mut statement = demo_month(number, 2026, month, old_balance);
     statement.to = to;
     statement.lines.retain(|l| l.value_date <= to);
+    statement
+}
+
+/// `ending`, with one more booking on `to`, so the statement's last booking is that day.
+fn ending_on_a_booking(number: u32, month: u32, to: NaiveDate, old_balance: i64) -> Statement {
+    let mut statement = ending(number, month, to, old_balance);
+    statement.lines.push(StatementLine {
+        text: "Entgelt".into(),
+        extra: Vec::new(),
+        value_date: to,
+        cents: -250,
+    });
     statement
 }
 
@@ -119,7 +131,7 @@ fn months_are_full_part_or_missing_by_the_days_the_statements_cover() {
     assert_eq!(
         covers(account(&overview, "Household")),
         [
-            Missing, Full, Missing, Full, Full, Full, Full, Full, Full, Full, Full, Part
+            Missing, Part, Missing, Full, Full, Full, Full, Full, Full, Full, Full, Part
         ]
     );
     assert_eq!(
@@ -146,8 +158,8 @@ fn month_tips_name_the_statements_that_cover_them() {
         tips(private, &[0, 1, 10, 11]),
         [
             "December 2025 · no statement",
-            "January 2026 · Nr. 001/2026",
-            "October 2026 · Nr. 010/2026",
+            "January 2026 · Nr. 001/2026, Nr. 002/2026",
+            "October 2026 · Nr. 010/2026, Nr. 011/2026",
             "November 2026 · partly, Nr. 011/2026",
         ]
     );
@@ -158,7 +170,11 @@ fn month_tips_name_the_statements_that_cover_them() {
 fn the_current_month_counts_only_up_to_today() {
     let (dir, db) = open_with_accounts();
     ignore_everything_of_private(&db);
-    import_statement(&db, dir.path(), &ending(11, 11, today(), 141_230));
+    import_statement(
+        &db,
+        dir.path(),
+        &ending_on_a_booking(11, 11, today(), 141_230),
+    );
 
     let overview = overview(&db);
     let private = account(&overview, "Private");
@@ -185,6 +201,52 @@ fn a_statement_that_covers_some_days_of_a_past_month_makes_it_partly_covered() {
 }
 
 #[test]
+fn a_statement_directly_after_another_covers_the_days_between_their_bookings_but_not_across_a_numbering_gap()
+ {
+    for (october_number, cover, tip) in [
+        (
+            10,
+            Cover::Full,
+            "September 2026 · Nr. 009/2026, Nr. 010/2026",
+        ),
+        (11, Cover::Part, "September 2026 · partly, Nr. 009/2026"),
+    ] {
+        let (dir, db) = open_with_accounts();
+        let september = demo_month(9, 2026, 9, 141_230);
+        import_statement(&db, dir.path(), &september);
+        let october = demo_month(october_number, 2026, 10, september.new_balance());
+        import_statement(&db, dir.path(), &october);
+
+        let overview = overview(&db);
+        let september_cover = &account(&overview, "Private").months[9];
+
+        assert_eq!(september_cover.cover, cover, "Nr. {october_number}");
+        assert_eq!(september_cover.tip, tip, "Nr. {october_number}");
+    }
+}
+
+#[test]
+fn the_first_statement_of_a_new_year_covers_the_days_since_the_last_of_the_year_before() {
+    let (dir, db) = open_with_accounts();
+    let december = demo_month(12, 2025, 12, 141_230);
+    import_statement(&db, dir.path(), &december);
+    import_statement(
+        &db,
+        dir.path(),
+        &demo_month(1, 2026, 1, december.new_balance()),
+    );
+
+    let overview = overview(&db);
+    let december_cover = &account(&overview, "Private").months[0];
+
+    assert_eq!(december_cover.cover, Cover::Full);
+    assert_eq!(
+        december_cover.tip,
+        "December 2025 · Nr. 012/2025, Nr. 001/2026"
+    );
+}
+
+#[test]
 fn the_last_statement_is_named_with_its_number_and_end_day() {
     let (_dir, db) = seeded();
     let overview = overview(&db);
@@ -207,7 +269,11 @@ fn an_account_is_up_to_date_within_seven_days_of_its_last_statements_end() {
         let (dir, db) = open_with_accounts();
         ignore_everything_of_private(&db);
         let end = today() - chrono::Days::new(days_ago);
-        import_statement(&db, dir.path(), &ending(10, end.month(), end, 141_230));
+        import_statement(
+            &db,
+            dir.path(),
+            &ending_on_a_booking(10, end.month(), end, 141_230),
+        );
 
         let overview = overview(&db);
         let private = account(&overview, "Private");
@@ -222,7 +288,7 @@ fn the_seeded_demo_accounts_are_current_but_have_lines_to_review() {
     let (_dir, db) = seeded();
     let overview = overview(&db);
 
-    for (name, waiting) in [("Private", 10), ("Household", 9), ("Business", 2)] {
+    for (name, waiting) in [("Private", 21), ("Household", 9), ("Business", 2)] {
         let account = account(&overview, name);
         assert_eq!(account.state, AccountState::Review, "{name}");
         assert_eq!(account.to_review, waiting, "{name}");
@@ -304,13 +370,13 @@ fn an_account_without_statements_is_behind_with_every_month_missing() {
 }
 
 #[test]
-fn a_skipped_statement_number_is_a_note_naming_the_missing_month() {
+fn a_skipped_statement_number_is_a_note_naming_the_uncovered_days() {
     let (_dir, db) = seeded();
     let overview = overview(&db);
 
     assert_eq!(
         account(&overview, "Household").note.as_deref(),
-        Some("February is missing: statement Nr. 002/2026 was never imported.")
+        Some("Statement Nr. 002/2026 was never imported: no lines between 21 Jan and 1 Mar.")
     );
     assert_eq!(account(&overview, "Private").note, None);
     assert_eq!(account(&overview, "Business").note, None);

@@ -378,7 +378,7 @@ mod tests {
             row_of(&groups(&db, dir.path(), None), "Statements", "Private"),
             row(
                 "Private",
-                "Chain complete · balances check out · until 28 Oct",
+                "Chain complete · balances check out · until 21 Oct",
                 "OK",
                 true
             )
@@ -396,7 +396,7 @@ mod tests {
             row_of(&groups(&db, dir.path(), None), "Statements", "Private"),
             row(
                 "Private",
-                "August is missing: statement Nr. 002/2026 was never imported. · until 28 Oct",
+                "Statement Nr. 002/2026 was never imported: no lines between 21 Aug and 1 Oct. · until 21 Oct",
                 "Gap",
                 false
             )
@@ -414,7 +414,7 @@ mod tests {
             row_of(&groups(&db, dir.path(), None), "Statements", "Private"),
             row(
                 "Private",
-                "The balances of Nr. 001/2026 and Nr. 002/2026 don't connect. · until 28 Oct",
+                "The balances of Nr. 001/2026 and Nr. 002/2026 don't connect. · until 21 Oct",
                 "Gap",
                 false
             )

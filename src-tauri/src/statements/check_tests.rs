@@ -95,15 +95,14 @@ fn a_changed_credit_with_the_original_sums_printed_fails_naming_both_sums() {
 }
 
 #[test]
-fn the_failure_names_the_page_the_sums_are_printed_on() {
+fn the_failure_names_the_first_page_where_the_sums_are_printed() {
     let statement = long_statement();
     let forged = read_forged(&statement, 10, -2_000);
-    let pages = statement.text_pages().len();
-    assert!(pages >= 2);
-    assert_eq!(forged.sums_page, pages);
+    assert!(statement.text_pages().len() >= 2);
+    assert_eq!(forged.sums_page, 1);
     assert!(matches!(
         check(&forged),
-        Err(CheckError::Debits { page, .. }) if page == pages
+        Err(CheckError::Debits { page: 1, .. })
     ));
 }
 
@@ -113,7 +112,7 @@ fn a_printed_new_balance_that_does_not_add_up_fails_with_the_difference() {
     let line = pages
         .iter_mut()
         .flatten()
-        .find(|l| l.starts_with("Neuer Saldo"))
+        .find(|l| l.trim_start().starts_with("Neuer Kontostand") && l.contains("3.135,42"))
         .unwrap();
     *line = line.replace("3.135,42", "3.135,00");
     let parsed = parse(&pages).unwrap();

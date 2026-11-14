@@ -4,7 +4,6 @@
 mod booking;
 pub mod george;
 pub mod model;
-pub mod sparkasse;
 
 #[cfg(test)]
 mod george_tests;
@@ -29,16 +28,10 @@ pub struct Parser {
     pub parse: fn(&[Vec<String>]) -> Result<ParsedStatement, ParseError>,
 }
 
-pub const PARSERS: &[Parser] = &[
-    Parser {
-        recognizes: george::recognizes,
-        parse: george::parse,
-    },
-    Parser {
-        recognizes: sparkasse::recognizes,
-        parse: sparkasse::parse,
-    },
-];
+pub const PARSERS: &[Parser] = &[Parser {
+    recognizes: george::recognizes,
+    parse: george::parse,
+}];
 
 /// Reads the pages with the first parser that recognizes them.
 pub fn parse(pages: &[Vec<String>]) -> Result<ParsedStatement, ParseError> {

@@ -162,7 +162,7 @@ mod tests {
             RulePreview {
                 count: 1,
                 text: "Matches 1 line.".into(),
-                examples: examples(&["Wed, 7 Oct · STREAMFLIX WIEN · −€12.99"]),
+                examples: examples(&["Wed, 7 Oct · STREAMFLIX WIEN 1010 · −€12.99"]),
             }
         );
     }
@@ -176,8 +176,8 @@ mod tests {
                 count: 2,
                 text: "Matches 2 lines.".into(),
                 examples: examples(&[
-                    "Wed, 21 Oct · CAFE LINDE DORNBIRN · −€6.21",
-                    "Mon, 5 Oct · TANKSTELLE RHEIN LUSTENAU · −€58.30",
+                    "Wed, 21 Oct · CAFE LINDE DORNBIRN 6850 · −€6.21",
+                    "Mon, 5 Oct · TANKSTELLE RHEIN LUSTENAU 6890 · −€58.30",
                 ]),
             }
         );
@@ -209,7 +209,7 @@ mod tests {
                 count: 7,
                 text: "Matches 7 lines.".into(),
                 examples: examples(&[
-                    "Wed, 21 Oct · CAFE LINDE DORNBIRN · −€6.21",
+                    "Wed, 21 Oct · CAFE LINDE DORNBIRN 6850 · −€6.21",
                     "Wed, 14 Oct · BUCHHANDLUNG SEITENWEISE · −€46.90",
                     "Sat, 10 Oct · LUMEN AI SAN FRANCISCO · −€22.48",
                 ]),
@@ -237,7 +237,7 @@ mod tests {
             };
             assert_eq!(
                 run(&db, &form).examples,
-                examples(&["Wed, 7 Oct · STREAMFLIX WIEN · −€12.99"]),
+                examples(&["Wed, 7 Oct · STREAMFLIX WIEN 1010 · −€12.99"]),
                 "{amount}"
             );
         }
@@ -258,7 +258,7 @@ mod tests {
                 text: "Matches 2 lines.".into(),
                 examples: examples(&[
                     "Sat, 10 Oct · LUMEN AI SAN FRANCISCO · −€22.48",
-                    "Wed, 7 Oct · STREAMFLIX WIEN · −€12.99",
+                    "Wed, 7 Oct · STREAMFLIX WIEN 1010 · −€12.99",
                 ]),
             }
         );
@@ -352,7 +352,7 @@ mod tests {
         .unwrap();
         assert_eq!(
             shown.examples,
-            examples(&["Wed, Oct 7 · STREAMFLIX WIEN · −€12,99"])
+            examples(&["Wed, Oct 7 · STREAMFLIX WIEN 1010 · −€12,99"])
         );
     }
 
@@ -361,14 +361,14 @@ mod tests {
         let preview = RulePreview {
             count: 1,
             text: "Matches 1 line.".into(),
-            examples: examples(&["Wed, 7 Oct · STREAMFLIX WIEN · −€12.99"]),
+            examples: examples(&["Wed, 7 Oct · STREAMFLIX WIEN 1010 · −€12.99"]),
         };
         assert_eq!(
             serde_json::to_value(&preview).unwrap(),
             serde_json::json!({
                 "count": 1,
                 "text": "Matches 1 line.",
-                "examples": ["Wed, 7 Oct · STREAMFLIX WIEN · −€12.99"]
+                "examples": ["Wed, 7 Oct · STREAMFLIX WIEN 1010 · −€12.99"]
             })
         );
     }

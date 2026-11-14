@@ -327,11 +327,11 @@ mod pdf {
         let pages = demo_pdf().text_pages().expect("text");
         let entry = pages[0]
             .iter()
-            .find(|l| l.starts_with("Gehalt"))
+            .find(|l| l.trim_start().starts_with("GEHALT"))
             .expect("salary line");
         assert_eq!(
-            &entry[statements::VALUE_COLUMN..statements::VALUE_COLUMN + 6],
-            "01.10."
+            &entry[statements::VALUE_COLUMN..statements::VALUE_COLUMN + 10],
+            "01.10.2026"
         );
         assert_eq!(entry.chars().count(), statements::WIDTH);
     }
