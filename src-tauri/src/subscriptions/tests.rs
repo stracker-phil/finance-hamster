@@ -1548,6 +1548,52 @@ fn a_new_sheet_starts_from_a_bank_line() {
 }
 
 #[test]
+fn a_new_sheet_starts_at_the_oldest_line_of_the_account_with_the_match_text() {
+    let (_dir, db) = imported(&[month(8), month(9), month(10)]);
+    let october = line_dated(&db, "2026-10-07", "STREAMFLIX");
+
+    let form = db
+        .read(|c| prefill(c, &october.id, None, &fmt()))
+        .unwrap();
+
+    assert_eq!(form.start, "2026-08-07");
+}
+
+#[test]
+fn a_new_sheet_ignores_matching_lines_of_another_account() {
+    let mut other = month(7);
+    other.iban = "AT94 1999 9000 0000 0002".into();
+    let (_dir, db) = imported(&[other, month(9), month(10)]);
+    let october = line_dated(&db, "2026-10-07", "STREAMFLIX");
+    let in_other_account = line_dated(&db, "2026-07-07", "STREAMFLIX");
+    assert_ne!(in_other_account.account_id, october.account_id);
+
+    let form = db
+        .read(|c| prefill(c, &october.id, None, &fmt()))
+        .unwrap();
+
+    assert_eq!(form.start, "2026-09-07");
+}
+
+#[test]
+fn a_selected_term_narrows_which_lines_set_the_start() {
+    let (_dir, db) = imported(&[month(9), month(10)]);
+    let october = line_dated(&db, "2026-10-07", "STREAMFLIX");
+
+    let whole = db
+        .read(|c| prefill(c, &october.id, None, &fmt()))
+        .unwrap();
+    let narrowed = db
+        .read(|c| prefill(c, &october.id, Some("06.10."), &fmt()))
+        .unwrap();
+
+    assert_eq!(
+        (whole.start.as_str(), narrowed.start.as_str()),
+        ("2026-09-07", "2026-10-07")
+    );
+}
+
+#[test]
 fn a_new_sheet_types_amounts_the_way_the_number_format_reads() {
     let (_dir, db) = imported(&[month(10)]);
     let streaming = line_dated(&db, "2026-10-07", "STREAMFLIX");

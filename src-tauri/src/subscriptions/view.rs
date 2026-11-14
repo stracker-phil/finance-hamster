@@ -349,8 +349,20 @@ pub fn prefill(
 ) -> AppResult<SubscriptionForm> {
     let line = statements::transaction_by_id(conn, line_id)?
         .ok_or_else(|| AppError::NotFound(format!("No line {line_id}")))?;
+    let match_text = crate::review::rule_term(&line, term)?;
+    // The first charge is the oldest line of the account with that text, not the one being reviewed.
+    let start = statements::all_transactions(conn)?
+        .into_iter()
+        .filter(|t| {
+            t.account_id == line.account_id
+                && crate::rules::engine::line_text(t).contains(&match_text)
+        })
+        .map(|t| t.value_date)
+        .min()
+        .unwrap_or_else(|| line.value_date.clone());
     Ok(SubscriptionForm {
-        match_text: crate::review::rule_term(&line, term)?,
+        match_text,
+        start,
         ..prefill_from(&line, format)
     })
 }
