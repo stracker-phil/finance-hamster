@@ -5,7 +5,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use chrono::NaiveDate;
 
-use super::model::{EstimateRule, Evidence, ItemKind, QuestionType, Ruleset, Vehicle};
+use super::model::{Ask, EstimateRule, Evidence, ItemKind, QuestionType, Ruleset, Vehicle};
 
 const SCHEMA_VERSION: u32 = 1;
 
@@ -101,6 +101,7 @@ fn schema_constraints(r: &Ruleset, p: &mut Vec<String>) {
         if !is_key(&q.id) {
             p.push(format!("questions[{i}].id: \"{}\" isn't a key", q.id));
         }
+        ask_text(q.ask.as_ref(), &format!("questions[{i}]"), p);
     }
     if r.sections.is_empty() {
         p.push("sections: at least one section is needed".into());
@@ -137,6 +138,25 @@ fn schema_constraints(r: &Ruleset, p: &mut Vec<String>) {
                 "{at}.evidence: an item reported by others takes no evidence"
             ));
         }
+        ask_text(item.ask.as_ref(), &at, p);
+        if item.ask.is_some() {
+            if !item.visible {
+                p.push(format!(
+                    "{at}.ask: a hidden item can't be asked about; show it or remove ask"
+                ));
+            }
+            if item.kind == ItemKind::ReportedByOthers {
+                p.push(format!(
+                    "{at}.ask: an item reported by others has nothing to add"
+                ));
+            }
+        }
+    }
+}
+
+fn ask_text(ask: Option<&Ask>, at: &str, p: &mut Vec<String>) {
+    if ask.is_some_and(|a| a.question.trim().is_empty()) {
+        p.push(format!("{at}.ask.question: the question is empty"));
     }
 }
 

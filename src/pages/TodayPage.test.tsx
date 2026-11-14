@@ -35,6 +35,7 @@ describe("TodayPage", () => {
       ["review", step({ button: "Start review", target: { kind: "review" } }), { page: "review" }],
       ["the tax year", step({ button: "Open tax year", target: { kind: "year", year: 2026 } }), { page: "year", year: 2026 }],
       ["a document", step({ button: "Attach PDF", target: { kind: "document", id: "doc-7", year: 2026 } }), { page: "document", documentId: "doc-7", year: 2026 }],
+      ["the year check", step({ button: "Start year check", target: { kind: "yearCheck", year: 2026 } }), { page: "yearCheck", year: 2026 }],
     ])("sends the button to %s", async (_name, next, route) => {
       mocked.todayView.mockResolvedValue(todayView({ next }));
       renderWithQuery(<TodayPage />);

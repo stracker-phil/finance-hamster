@@ -9,7 +9,7 @@ import { HOME } from "../state/route";
 import { useStore } from "../state/store";
 import { addPreview } from "../test/documents";
 import { renderWithQuery } from "../test/renderWithQuery";
-import { attentionView, kennzahlView, monthView, questionView, yearPage, yearRow } from "../test/year";
+import { attentionView, kennzahlView, monthView, questionView, yearCheckView, yearPage, yearRow } from "../test/year";
 import { YearPage } from "./YearPage";
 
 const mocked = vi.mocked(api, true);
@@ -544,6 +544,27 @@ describe("YearPage", () => {
         await vi.waitFor(() => expect(mocked.yearEntryAttach).toHaveBeenCalledWith(2026, "e1", "/Users/example/Receipts/lamp-receipt.pdf"));
         expect(mocked.documentAddChoose).not.toHaveBeenCalled();
       });
+    });
+  });
+
+  describe("year check", () => {
+    it("shows the last run line of an open year and starts the year check from its button", async () => {
+      mocked.yearCheckView.mockResolvedValue(yearCheckView({ line: "Year check: last run 2 Jun 2026 · run it again after 31 Dec" }));
+      await show();
+
+      expect(await screen.findByText("Year check: last run 2 Jun 2026 · run it again after 31 Dec")).toBeTruthy();
+      await userEvent.click(screen.getByRole("button", { name: "Start Year Check" }));
+
+      expect(useStore.getState().route).toEqual({ page: "yearCheck", year: 2026 });
+    });
+
+    it("shows neither the line nor the button for a closed year", async () => {
+      mocked.yearCheckView.mockResolvedValue(yearCheckView({ open: false, line: "Year check: closed line" }));
+      await show({ state: "closed" });
+
+      expect(await screen.findByText(/Closed, read-only/)).toBeTruthy();
+      expect(screen.queryByText("Year check: closed line")).toBeNull();
+      expect(screen.queryByRole("button", { name: "Start Year Check" })).toBeNull();
     });
   });
 

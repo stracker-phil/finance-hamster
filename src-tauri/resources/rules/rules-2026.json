@@ -27,8 +27,8 @@
   },
 
   "questions": [
-    { "id": "telearbeitstage", "label": "Telearbeitstage (Homeoffice days)", "help": "From your Lohnzettel", "type": "integer", "unit": "days" },
-    { "id": "telearbeitspauschale", "label": "Tax-free Telearbeitspauschale received", "help": "From your Lohnzettel", "type": "amount", "unit": "€" }
+    { "id": "telearbeitstage", "label": "Telearbeitstage (Homeoffice days)", "help": "From your Lohnzettel", "type": "integer", "unit": "days", "ask": { "order": 10, "question": "How many Telearbeitstage are on your Lohnzettel?", "hint": "Days you worked only from home. Needed for KZ 158." } },
+    { "id": "telearbeitspauschale", "label": "Tax-free Telearbeitspauschale received", "help": "From your Lohnzettel", "type": "amount", "unit": "€", "ask": { "order": 90, "question": "How much tax-free Telearbeitspauschale did you receive?", "hint": "On the Lohnzettel. The tax office subtracts it from KZ 169." } }
   ],
 
   "sections": [
@@ -36,29 +36,35 @@
   ],
 
   "items": [
-    { "key": "union-dues", "kz": "717", "name": "Gewerkschaftsbeiträge", "section": "werbungskosten", "kind": "amount", "evidence": "optional" },
+    { "key": "union-dues", "kz": "717", "name": "Gewerkschaftsbeiträge", "section": "werbungskosten", "kind": "amount", "evidence": "optional", "ask": { "order": 70, "question": "Did you pay union dues?", "hint": "Often already on the Lohnzettel" } },
 
     { "key": "commuting", "kz": "718/916", "name": "Pendlerpauschale", "section": "werbungskosten", "kind": "amount", "visible": false, "evidence": "optional" },
 
     { "key": "work-equipment", "kz": "719", "name": "Arbeitsmittel", "section": "werbungskosten", "kind": "documents",
-      "depreciation": { "assetClass": "furniture" } },
+      "depreciation": { "assetClass": "furniture" },
+      "ask": { "order": 80, "question": "Did you buy other tools or supplies for work?", "hint": "Work clothing, bags, stationery, tools" }
+    },
 
-    { "key": "literature", "kz": "720", "name": "Fachliteratur", "section": "werbungskosten", "kind": "documents" },
+    { "key": "literature", "kz": "720", "name": "Fachliteratur", "section": "werbungskosten", "kind": "documents", "ask": { "order": 60, "question": "Did you buy books or magazines for work?", "hint": "Technical books, e-books, magazine subscriptions" } },
 
     { "key": "travel", "kz": "721", "name": "Reisekosten", "section": "werbungskosten", "kind": "trips", "vehicle": "car", "evidence": "none",
-      "note": "Round trips. Keep date, destination and purpose in case the tax office asks." },
+      "note": "Round trips. Keep date, destination and purpose in case the tax office asks.",
+      "ask": { "order": 20, "question": "Did you travel for work?", "hint": "Conferences, client visits, meetups, team days" }
+    },
 
-    { "key": "training", "kz": "722", "name": "Fortbildung", "section": "werbungskosten", "kind": "documents" },
+    { "key": "training", "kz": "722", "name": "Fortbildung", "section": "werbungskosten", "kind": "documents", "ask": { "order": 50, "question": "Did you pay for courses, conferences or exams?", "hint": "Conference tickets, online courses, certification fees" } },
 
     { "key": "double-household", "kz": "723", "name": "Doppelte Haushaltsführung", "section": "werbungskosten", "kind": "documents", "visible": false },
 
-    { "key": "other", "kz": "724", "name": "Sonstige Werbungskosten", "section": "werbungskosten", "kind": "documents" },
+    { "key": "other", "kz": "724", "name": "Sonstige Werbungskosten", "section": "werbungskosten", "kind": "documents", "ask": { "order": 100, "question": "Any other work costs?", "hint": "Coworking rent, professional memberships, job applications" } },
 
     { "key": "digital-equipment", "kz": "169", "name": "Digitale Arbeitsmittel", "section": "werbungskosten", "kind": "documents",
       "privateShare": 40,
       "depreciation": { "assetClass": "computer" },
       "estimate": [ { "type": "reduceBy", "question": "telearbeitspauschale" } ],
-      "note": "The tax office subtracts the Telearbeitspauschale you received." },
+      "note": "The tax office subtracts the Telearbeitspauschale you received.",
+      "ask": { "order": 30, "question": "Did you buy hardware or software for work?", "hint": "Laptop, monitor, printer, phone, backup drive, software licences" }
+    },
 
     { "key": "ergonomic-furniture", "kz": "158", "name": "Ergonomisches Mobiliar", "section": "werbungskosten", "kind": "documents",
       "estimate": [
@@ -66,7 +72,9 @@
         { "type": "cap", "amount": 300.00, "carryOver": true }
       ],
       "note": "Enter the full amount. The tax office counts up to €300 per year.",
-      "verified": false },
+      "verified": false,
+      "ask": { "order": 40, "question": "Did you buy furniture for working from home?", "hint": "Desk, office chair, desk lamp, laptop stand" }
+    },
 
     { "key": "home-office-room", "kz": "159", "name": "Arbeitszimmer", "section": "werbungskosten", "kind": "documents", "visible": false },
 

@@ -58,9 +58,9 @@ export function RemindersPage() {
           onChange={(remindFiling) => mutate({ remindFiling })}
         />
         <Switch
-          label="Year questions"
-          description="On 1 November, while questions for the open tax year are unanswered."
-          anchor="year-questions"
+          label="Year check"
+          description="From 1 November until it ran, and again after 31 Dec until it ran once more."
+          anchor="year-check"
           checked={settings?.remindQuestions ?? true}
           onChange={(remindQuestions) => mutate({ remindQuestions })}
         />

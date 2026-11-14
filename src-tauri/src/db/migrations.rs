@@ -220,6 +220,12 @@ pub const MIGRATIONS: &[&str] = &[
         file TEXT NOT NULL
     );
     CREATE INDEX snapshots_year ON snapshots (year);",
+    // 12: when each tax year's year check was last completed; nothing per question.
+    "CREATE TABLE year_checks (
+        id TEXT PRIMARY KEY,
+        year INTEGER NOT NULL UNIQUE,
+        completed_at INTEGER NOT NULL
+    );",
 ];
 
 pub fn version(conn: &Connection) -> AppResult<usize> {
@@ -289,6 +295,7 @@ mod tests {
             "tax_years",
             "transactions",
             "vendors",
+            "year_checks",
         ]
         .map(String::from)
         .to_vec()

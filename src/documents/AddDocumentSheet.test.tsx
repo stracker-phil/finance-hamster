@@ -247,6 +247,28 @@ describe("AddDocumentSheet", () => {
       expect(useStore.getState().addPreview).toEqual(preview);
     });
 
+    it("hands the added label to the callback given with the preview", async () => {
+      const onAdded = vi.fn();
+      useStore.getState().setAddPreview(preview, onAdded);
+      renderSheet();
+
+      await userEvent.click(addButton());
+
+      await waitFor(() => expect(onAdded).toHaveBeenCalledWith("Added Demo Cloud Ltd"));
+    });
+
+    it("does not call the callback when the commit is refused", async () => {
+      const onAdded = vi.fn();
+      useStore.getState().setAddPreview(preview, onAdded);
+      mocked.documentAddCommit.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
+      renderSheet();
+
+      await userEvent.click(addButton());
+
+      await screen.findByRole("alert");
+      expect(onAdded).not.toHaveBeenCalled();
+    });
+
     it("is disabled while the commit runs", async () => {
       mocked.documentAddCommit.mockReturnValue(new Promise(() => {}));
       renderSheet();
@@ -266,6 +288,17 @@ describe("AddDocumentSheet", () => {
       expect(mocked.documentAddCancel).toHaveBeenCalledWith("add-1");
       expect(mocked.documentAddCommit).not.toHaveBeenCalled();
       expect(useStore.getState().addPreview).toBeNull();
+    });
+
+    it("never calls the callback given with the preview", async () => {
+      const onAdded = vi.fn();
+      useStore.getState().setAddPreview(preview, onAdded);
+      renderSheet();
+
+      await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+      expect(onAdded).not.toHaveBeenCalled();
+      expect(useStore.getState().addOnAdded).toBeNull();
     });
 
     it("does the same on Escape", async () => {

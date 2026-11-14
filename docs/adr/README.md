@@ -52,3 +52,4 @@ Why Hamster is built the way it is. One record per decision, in Nygard format, a
 | [0040](0040-tax-rules-live-in-a-json-file-per-year.md) | Tax rules live in a JSON file per year; the tax year shows one copy value per Kennzahl | Accepted (2026-11-13) |
 | [0041](0041-subscriptions-match-their-own-charges.md) | Subscriptions match their own charges, by plan period | Accepted (2026-11-13) |
 | [0042](0042-reminders-are-told-by-the-running-app.md) | Reminders are told by the running app | Accepted (2026-11-13) |
+| [0043](0043-the-year-check-stores-only-its-date.md) | The year check asks from the ruleset and stores only its date | Accepted (2026-11-14) |

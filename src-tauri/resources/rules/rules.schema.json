@@ -68,7 +68,8 @@
           "label": { "type": "string" },
           "help": { "type": "string", "description": "Short hint under the label, e.g. where to find the number." },
           "type": { "type": "string", "enum": ["integer", "amount"] },
-          "unit": { "type": "string", "description": "Shown next to the field, e.g. \"days\" or \"€\"." }
+          "unit": { "type": "string", "description": "Shown next to the field, e.g. \"days\" or \"€\"." },
+          "ask": { "$ref": "#/$defs/ask" }
         }
       }
     },
@@ -107,6 +108,18 @@
       "properties": { "label": { "type": "string" }, "url": { "type": "string", "format": "uri" } }
     },
 
+    "ask": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["order", "question"],
+      "description": "Asks about this item or question in the year check. Without ask it is never asked. Not allowed on hidden items or items reported by others.",
+      "properties": {
+        "order": { "type": "integer", "minimum": 0, "description": "Lower comes first; equal orders keep the file's order." },
+        "question": { "type": "string", "minLength": 1, "description": "A yes/no question for an item (\"Did you travel for work?\"), or what to type for a question." },
+        "hint": { "type": "string", "description": "One line of examples under the question." }
+      }
+    },
+
     "item": {
       "type": "object",
       "additionalProperties": false,
@@ -139,7 +152,8 @@
         },
         "note": { "type": "string", "description": "One line shown under the Kennzahl." },
         "verified": { "$ref": "#/$defs/verified" },
-        "source": { "$ref": "#/$defs/source" }
+        "source": { "$ref": "#/$defs/source" },
+        "ask": { "$ref": "#/$defs/ask" }
       },
       "allOf": [
         { "if": { "properties": { "kind": { "const": "trips" } } }, "then": { "required": ["vehicle"] } },

@@ -70,6 +70,8 @@ export function createApiMock(overrides: Partial<Api> = {}): Api {
     yearEntryAttach: vi.fn().mockResolvedValue("Attach PDF"),
     yearEvidenceChoose: vi.fn().mockResolvedValue(null),
     yearEvidenceOpen: vi.fn().mockResolvedValue(undefined),
+    yearCheckView: vi.fn().mockResolvedValue({ year: 2026, open: true, questions: [], lastRun: null, yearOver: false, line: "Year check: not run yet", closePrompt: null }),
+    yearCheckComplete: vi.fn().mockResolvedValue({ year: 2026, open: true, questions: [], lastRun: null, yearOver: false, line: "Year check: not run yet", closePrompt: null }),
     yearCloseCheck: vi.fn().mockResolvedValue({ blockers: [], warnings: [] }),
     yearClose: vi.fn().mockResolvedValue("Close Tax Year 2026"),
     yearReopen: vi.fn().mockResolvedValue("Reopen Tax Year 2026"),

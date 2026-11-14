@@ -10,7 +10,8 @@ export type Route =
   /** `year` is the tax year it was opened from; null when opened from Documents. */
   | { page: "document"; documentId: string; year: number | null }
   | { page: "log"; year: number }
-  | { page: "archive"; year: number };
+  | { page: "archive"; year: number }
+  | { page: "yearCheck"; year: number };
 
 export type PageId = Route["page"];
 
@@ -26,6 +27,7 @@ export function sidebarKey(route: Route): string {
       return route.year === null ? "documents" : `year:${route.year}`;
     case "log":
     case "archive":
+    case "yearCheck":
     case "year":
       return `year:${route.year}`;
     default:

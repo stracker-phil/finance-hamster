@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { Car, Copy, Euro, FileText, Landmark, Trash2 } from "lucide-react";
+import { Car, Copy, Euro, FileText, Landmark, ListChecks, Trash2 } from "lucide-react";
 import { api, type AttentionView, type KennzahlView, type MonthView, type QuestionView, type YearRow } from "../api";
 import { startAddDocument } from "../documents/addFlow";
 import { copyText } from "../lib/clipboard";
 import { showError } from "../lib/undoToast";
 import { useYearPage } from "../queries/year";
+import { useYearCheck } from "../queries/yearCheck";
 import { useStore } from "../state/store";
 import { AddButton, AddEntry } from "../year/AddEntry";
 import { YearMenu } from "../year/YearMenu";
@@ -176,6 +177,22 @@ function MonthList({ year, months, open }: { year: number; months: MonthView[]; 
   );
 }
 
+/** "Year check: last run …" with its button, on an open year. */
+function CheckLine({ year }: { year: number }) {
+  const { data } = useYearCheck(year);
+  const navigate = useStore((s) => s.navigate);
+  if (!data?.open) return null;
+  return (
+    <div className="check-line">
+      <ListChecks size={15} />
+      <span>{data.line}</span>
+      <button className="btn btn--small" onClick={() => navigate({ page: "yearCheck", year })}>
+        Start Year Check
+      </button>
+    </div>
+  );
+}
+
 export function YearPage({ year }: { year: number }) {
   const filter = useStore((s) => s.filter);
   const [view, setView] = useState<"kennzahl" | "month">("kennzahl");
@@ -203,6 +220,8 @@ export function YearPage({ year }: { year: number }) {
           </div>
           <YearMenu year={data.year} archived={data.archived} closed={!open} />
         </div>
+
+        {open && <CheckLine year={data.year} />}
 
         {open && data.questions.length > 0 && (
           <section aria-label={`Questions for ${data.year}`}>

@@ -10,8 +10,10 @@ const startDate = (year: number) => (today().startsWith(String(year)) ? today() 
 
 const fileName = (path: string) => path.split("/").pop() ?? path;
 
-/** The inline row that adds an amount or a trip to a Kennzahl. */
-export function AddEntry({ year, item, onDone }: { year: number; item: KennzahlView; onDone: () => void }) {
+type EntryTarget = Pick<KennzahlView, "key" | "kz" | "add"> & { rate?: string | null };
+
+/** The inline row that adds an amount or a trip to a Kennzahl; `onAdded` gets what it added: its text, else its label. */
+export function AddEntry({ year, item, onDone, onAdded }: { year: number; item: EntryTarget; onDone: () => void; onAdded?: (label: string) => void }) {
   const trip = item.add === "trip";
   const [date, setDate] = useState(() => startDate(year));
   const [text, setText] = useState("");
@@ -27,6 +29,7 @@ export function AddEntry({ year, item, onDone }: { year: number; item: KennzahlV
       .yearEntryAdd(year, entry())
       .then((label) => {
         undoToast(label);
+        onAdded?.(text.trim() || label);
         onDone();
       })
       .catch((e: unknown) => {
@@ -95,10 +98,11 @@ export function AddButton({ item, adding, onToggle }: { item: KennzahlView; addi
   );
 }
 
-async function startDocument(itemKey: string) {
+/** Chooses a PDF and opens Add Document preset to the item; `onAdded` gets the label once it is added. */
+export async function startDocument(itemKey: string, onAdded?: (label: string) => void) {
   try {
     const preview = await api.documentAddChoose();
-    if (preview) useStore.getState().setAddPreview({ ...preview, itemKey, itemWhy: null });
+    if (preview) useStore.getState().setAddPreview({ ...preview, itemKey, itemWhy: null }, onAdded);
   } catch (e) {
     showError(e);
   }

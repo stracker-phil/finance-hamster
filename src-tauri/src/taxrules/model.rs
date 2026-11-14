@@ -127,6 +127,19 @@ pub struct Question {
     pub kind: QuestionType,
     #[serde(default)]
     pub unit: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ask: Option<Ask>,
+}
+
+/// How the year check asks about an item or question.
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Ask {
+    /// Lower comes first; equal orders keep the file's order.
+    pub order: u32,
+    pub question: String,
+    #[serde(default)]
+    pub hint: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
@@ -186,6 +199,8 @@ pub struct Item {
     pub verified: bool,
     #[serde(default)]
     pub source: Option<SourceRef>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ask: Option<Ask>,
 }
 
 impl Item {

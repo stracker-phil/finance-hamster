@@ -55,6 +55,110 @@ fn the_shipped_seed_is_valid_with_twelve_items_of_which_two_are_unverified() {
 }
 
 #[test]
+fn the_shipped_seed_asks_ten_things_in_the_year_check() {
+    let ruleset = read(SEED, &no_keys()).unwrap();
+    let asked = ruleset.items.iter().filter(|i| i.ask.is_some()).count()
+        + ruleset.questions.iter().filter(|q| q.ask.is_some()).count();
+    assert_eq!(asked, 10);
+}
+
+fn ask(order: u32, question: &str) -> Value {
+    json!({ "order": order, "question": question })
+}
+
+#[test]
+fn an_ask_on_an_item_and_on_a_question_reads_with_its_order_question_and_hint() {
+    let ruleset = read_value(&edited(&[
+        (
+            "/questions",
+            json!([{
+                "id": "days", "label": "Days", "type": "integer",
+                "ask": { "order": 2, "question": "How many days?", "hint": "See the calendar" }
+            }]),
+        ),
+        ("/items/0/ask", ask(1, "Did you buy books?")),
+    ]))
+    .unwrap();
+
+    let item = ruleset.items[0].ask.as_ref().unwrap();
+    assert_eq!(
+        (item.order, item.question.as_str(), item.hint.as_deref()),
+        (1, "Did you buy books?", None)
+    );
+    let question = ruleset.questions[0].ask.as_ref().unwrap();
+    assert_eq!(
+        (
+            question.order,
+            question.question.as_str(),
+            question.hint.as_deref()
+        ),
+        (2, "How many days?", Some("See the calendar"))
+    );
+}
+
+#[test]
+fn an_empty_ask_question_is_reported_where_it_is() {
+    let questions = json!([{
+        "id": "days", "label": "Days", "type": "integer",
+        "ask": { "order": 1, "question": "  " }
+    }]);
+    assert_eq!(
+        problems_of(&[("/items/0/ask", ask(1, ""))]),
+        vec!["items[0].ask.question: the question is empty".to_string()]
+    );
+    assert_eq!(
+        problems_of(&[("/questions", questions)]),
+        vec!["questions[0].ask.question: the question is empty".to_string()]
+    );
+}
+
+#[test]
+fn a_hidden_item_or_one_reported_by_others_cannot_be_asked_about() {
+    assert_eq!(
+        problems_of(&[
+            ("/items/0/visible", json!(false)),
+            ("/items/0/ask", ask(1, "Books?")),
+        ]),
+        vec!["items[0].ask: a hidden item can't be asked about; show it or remove ask".to_string()]
+    );
+    assert_eq!(
+        problems_of(&[
+            ("/items/0/kind", json!("reportedByOthers")),
+            ("/items/0/ask", ask(1, "Books?")),
+        ]),
+        vec!["items[0].ask: an item reported by others has nothing to add".to_string()]
+    );
+}
+
+#[test]
+fn an_ask_with_an_unknown_field_fails_to_parse() {
+    let problems = problems_of(&[(
+        "/items/0/ask",
+        json!({ "order": 1, "question": "Books?", "colour": "red" }),
+    )]);
+    assert_eq!(problems.len(), 1, "{problems:?}");
+    assert!(
+        problems[0].contains("unknown field `colour`"),
+        "{problems:?}"
+    );
+}
+
+#[test]
+fn a_ruleset_with_ask_round_trips_and_one_without_serializes_no_ask_key() {
+    let with = read_value(&edited(&[("/items/0/ask", ask(3, "Books?"))])).unwrap();
+    let copy: Ruleset = serde_json::from_str(&serde_json::to_string(&with).unwrap()).unwrap();
+    assert_eq!(copy, with);
+    assert_eq!(
+        serde_json::to_value(&with).unwrap()["items"][0]["ask"],
+        json!({ "order": 3, "question": "Books?", "hint": null })
+    );
+
+    let without = read_value(&minimal_rules(2026)).unwrap();
+    let value = serde_json::to_value(&without).unwrap();
+    assert!(value["items"][0].get("ask").is_none());
+}
+
+#[test]
 fn a_second_section_and_an_item_reported_by_others_are_valid_without_code_changes() {
     let mut rules: Value = serde_json::from_str(SEED).unwrap();
     rules["sections"]

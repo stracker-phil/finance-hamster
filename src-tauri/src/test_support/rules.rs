@@ -40,6 +40,15 @@ pub fn rules_text(rules: &Value) -> String {
     text
 }
 
+/// Noon of a local day as millis, the way a completed year check is stamped.
+pub fn local_millis(year: i32, month: u32, day: u32) -> i64 {
+    use chrono::TimeZone;
+    chrono::Local
+        .with_ymd_and_hms(year, month, day, 12, 0, 0)
+        .unwrap()
+        .timestamp_millis()
+}
+
 /// `minimal_rules(year)` as file text.
 pub fn minimal_text(year: i32) -> String {
     rules_text(&minimal_rules(year))

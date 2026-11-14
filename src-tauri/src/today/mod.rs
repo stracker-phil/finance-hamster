@@ -30,13 +30,14 @@ pub enum StepTarget {
     Year { year: i32 },
     Import,
     Document { id: String, year: i32 },
+    YearCheck { year: i32 },
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "src/api/types.gen.ts")]
 pub struct Step {
-    /// `review`, `attach`, `import`, `questions`, `draft`: also the dot's colour.
+    /// `review`, `attach`, `import`, `check`, `questions`, `draft`: also the dot's colour.
     pub key: String,
     /// `12 new transactions to review`.
     pub title: String,
@@ -233,6 +234,33 @@ fn questions_step(page: &YearPage) -> Option<Step> {
     })
 }
 
+fn year_check_step(
+    db: &Db,
+    today: NaiveDate,
+    number: NumberFormat,
+    order: DateOrder,
+) -> AppResult<Option<Step>> {
+    let Some(&year) = crate::yearcheck::due_years(db, today)?.first() else {
+        return Ok(None);
+    };
+    let view = crate::yearcheck::view(db, year, today, number, order)?;
+    let count = view.questions.len();
+    let run = view
+        .last_run
+        .map_or("Not run yet".to_string(), |d| format!("Last run {d}"));
+    Ok(Some(Step {
+        key: "check".into(),
+        title: format!("Year check for {year}"),
+        detail: format!(
+            "{run} · {}",
+            plural(count, "quick question", "quick questions")
+        ),
+        line: "Things you might forget to claim. Most are a quick No.".into(),
+        button: "Start Year Check".into(),
+        target: StepTarget::YearCheck { year },
+    }))
+}
+
 fn draft_step(page: &YearPage) -> Option<Step> {
     let year = page.year;
     let drafts: Vec<_> = page
@@ -344,11 +372,19 @@ pub fn today_view(
         .map(|year| year_page::page(db, year, "", number, order))
         .transpose()?;
     let from_year = |step: fn(&YearPage) -> Option<Step>| page.as_ref().and_then(step);
+    // The year check asks the year's questions too, so its step takes their place.
+    let check = year_check_step(db, today, number, order)?;
+    let questions = if check.is_some() {
+        None
+    } else {
+        from_year(questions_step)
+    };
     let mut steps = [
         review_step(db)?,
         from_year(attach_step),
         import_step(db, today, order)?,
-        from_year(questions_step),
+        check,
+        questions,
         from_year(draft_step),
     ]
     .into_iter()

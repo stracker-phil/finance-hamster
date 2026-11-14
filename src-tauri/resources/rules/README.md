@@ -33,6 +33,21 @@ Location: `~/Library/Application Support/com.philippstracker.hamster/rules/`
 
 Adding a new rule type needs code. Everything else is data.
 
+## Year check
+
+The year check asks about every item and question that has an `ask` block, lowest `order` first (equal orders
+keep the file's order). Without `ask`, it is never asked.
+
+```json
+"ask": { "order": 20, "question": "Did you travel for work?", "hint": "Conferences, client visits" }
+```
+
+- On an item, `question` is a yes/no question; Yes opens the item's input (Add document, a trip, an amount).
+- On a question, `question` says what to type; the answer is the same one the tax year page shows.
+- Not allowed on hidden items or items reported by others.
+- Hamster stores only the date of the last completed run, nothing per question. Close Year asks for a run
+  after 31 Dec.
+
 ## Checks on Reload (beyond the schema)
 
 Reload fails with a clear message if:
@@ -44,6 +59,7 @@ Reload fails with a clear message if:
 - a `depreciation.assetClass` is missing from `usefulLife`
 - `kilometergeld` ranges for one vehicle overlap or fall outside `year`
 - a `trips` item uses a vehicle with no rate
+- an `ask` sits on a hidden item or an item reported by others, or its `question` is empty
 
 ## Notes on 2026 v1
 

@@ -73,8 +73,10 @@ export function AddDocumentSheet({ preview }: { preview: AddPreview }) {
     api
       .documentAddCommit({ token: preview.token, vendor, itemKey: itemKey || null, lineId })
       .then((label) => {
-        useStore.getState().setAddPreview(null);
-        useStore.getState().showToast("success", label);
+        const { addOnAdded, setAddPreview, showToast } = useStore.getState();
+        setAddPreview(null);
+        showToast("success", label);
+        addOnAdded?.(label);
       })
       .catch((e: unknown) => {
         const failure = toAppError(e);

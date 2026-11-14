@@ -54,7 +54,9 @@ export interface AppStore {
   /** A read statement waiting in the Import sheet. */
   importPreview: ImportPreview | null;
   addPreview: AddPreview | null;
-  setAddPreview: (preview: AddPreview | null) => void;
+  /** Told the new document's label once the open Add Document sheet adds it; never on cancel. */
+  addOnAdded: ((label: string) => void) | null;
+  setAddPreview: (preview: AddPreview | null, onAdded?: (label: string) => void) => void;
   /** The open New, Edit or Change Plan sheet of a subscription. */
   subscriptionSheet: SubscriptionSheet | null;
   setSubscriptionSheet: (sheet: SubscriptionSheet | null) => void;
@@ -121,7 +123,8 @@ export const useStore = create<AppStore>((set, get) => ({
 
   importPreview: null,
   addPreview: null,
-  setAddPreview: (addPreview) => set({ addPreview }),
+  addOnAdded: null,
+  setAddPreview: (addPreview, onAdded) => set({ addPreview, addOnAdded: addPreview ? (onAdded ?? null) : null }),
   subscriptionSheet: null,
   setSubscriptionSheet: (subscriptionSheet) => set({ subscriptionSheet }),
   setImportPreview: (importPreview) => set({ importPreview }),

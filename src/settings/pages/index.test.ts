@@ -56,7 +56,7 @@ describe("SETTINGS_PAGES", () => {
     ["overdue", "reminders/import-after"],
     ["gaps", "reminders/gaps"],
     ["Filing reminder", "reminders/filing"],
-    ["november", "reminders/year-questions"],
+    ["november", "reminders/year-check"],
   ])("finds the Reminders row for %s", (query, hit) => {
     expect(found(query)).toContain(hit);
   });

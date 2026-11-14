@@ -6,6 +6,8 @@
 }
 .btn:hover { background: var(--fill-subtle); }
 .btn--small { height: 28px; padding: 0 10px; }
+.btn--ghost { background: transparent; border-color: transparent; box-shadow: none; color: var(--text-muted); }
+.btn--ghost:hover { background: var(--fill-hover); color: var(--text); }
 .btn--primary { background: var(--accent); border-color: var(--accent); color: var(--text-on-accent); font-weight: 600; }
 .btn--primary:hover { background: color-mix(in srgb, var(--accent) 88%, var(--text)); }
 .btn--danger { background: var(--danger); border-color: var(--danger); color: var(--text-on-accent); font-weight: 600; }

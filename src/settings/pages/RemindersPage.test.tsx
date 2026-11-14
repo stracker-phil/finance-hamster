@@ -48,7 +48,7 @@ describe("RemindersPage", () => {
     ["Tell me when a price changes", "remindPriceChanges"],
     ["Tell me about gaps", "remindGaps"],
     ["Filing reminder", "remindFiling"],
-    ["Year questions", "remindQuestions"],
+    ["Year check", "remindQuestions"],
   ] as const)("the %s switch", (label, field) => {
     it("reflects its setting", async () => {
       mocked.getSettings.mockResolvedValue(settings({ [field]: false }));

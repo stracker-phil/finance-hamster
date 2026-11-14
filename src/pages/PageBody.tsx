@@ -8,6 +8,7 @@ import { ReviewPage } from "./ReviewPage";
 import { StatementsPage } from "./StatementsPage";
 import { SubscriptionsPage } from "./SubscriptionsPage";
 import { TodayPage } from "./TodayPage";
+import { YearCheckPage } from "./YearCheckPage";
 import { YearPage } from "./YearPage";
 
 /** The body of the current page. */
@@ -33,5 +34,7 @@ export function PageBody({ route }: { route: Route }) {
       return <LogPage year={route.year} />;
     case "archive":
       return <ArchivePage year={route.year} />;
+    case "yearCheck":
+      return <YearCheckPage year={route.year} />;
   }
 }

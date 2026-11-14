@@ -74,7 +74,7 @@ pub struct Settings {
     pub remind_gaps: bool,
     /// On 1 March, once the previous tax year can be closed.
     pub remind_filing: bool,
-    /// On 1 November, while the open tax year has unanswered questions.
+    /// The year check, from 1 November and again after 31 Dec until a run (named for its first use).
     pub remind_questions: bool,
 }
 

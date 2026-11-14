@@ -1,4 +1,4 @@
-import type { AttentionView, Elsewhere, KennzahlView, MonthView, QuestionView, YearPage, YearRow } from "../api";
+import type { AttentionView, CheckQuestion, Elsewhere, KennzahlView, MonthView, QuestionView, YearCheckView, YearPage, YearRow } from "../api";
 
 /** A demo document row of the tax year page, with `patch` applied. */
 export function yearRow(patch: Partial<YearRow> = {}): YearRow {
@@ -53,6 +53,16 @@ export function yearPage(patch: Partial<YearPage> = {}): YearPage {
     archived: 0,
     ...patch,
   };
+}
+
+/** A demo year check question that asks for a document, with `patch` applied. */
+export function checkQuestion(patch: Partial<CheckQuestion> = {}): CheckQuestion {
+  return { key: "books", kz: "720", question: "Did you buy work books?", hint: null, add: "document", unit: null, value: "", ...patch };
+}
+
+/** A demo year check of an open year with no questions, with `patch` applied. */
+export function yearCheckView(patch: Partial<YearCheckView> = {}): YearCheckView {
+  return { year: 2026, open: true, questions: [], lastRun: null, yearOver: false, line: "Year check: not run yet", closePrompt: null, ...patch };
 }
 
 /** A demo search match, with `patch` applied. */

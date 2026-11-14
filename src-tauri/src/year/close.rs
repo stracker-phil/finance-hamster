@@ -201,9 +201,14 @@ pub fn close(
         closed_at: Some(now),
         ..before.clone()
     };
+    let label = if crate::yearcheck::close_needs_run(db, year)? {
+        format!("Close Tax Year {year} without year check")
+    } else {
+        format!("Close Tax Year {year}")
+    };
     db.write(
         Op::new(
-            format!("Close Tax Year {year}"),
+            label,
             vec![
                 Change::insert(SNAPSHOTS, &snapshot)?,
                 Change::update(taxyears::TABLE, &before, &after)?,
@@ -440,6 +445,35 @@ mod tests {
 
         assert_eq!(written.label, "Close Tax Year 2026");
         assert_eq!(year_state(&db), (YearState::Closed, Some(500)));
+    }
+
+    #[test]
+    fn closing_labels_the_op_without_year_check_unless_one_ran_after_31_dec() {
+        let mut asking = crate::year::tests::rules();
+        crate::test_support::rules::set(
+            &mut asking,
+            "/items/0/ask",
+            serde_json::json!({ "order": 1, "question": "Did you buy books?" }),
+        );
+        let cases = [
+            (None, "Close Tax Year 2026 without year check"),
+            (
+                Some((2026, 11, 14)),
+                "Close Tax Year 2026 without year check",
+            ),
+            (Some((2027, 1, 9)), "Close Tax Year 2026"),
+        ];
+        for (ran, label) in cases {
+            let (dir, db) = crate::year::tests::open_year_with(&asking);
+            if let Some((y, m, d)) = ran {
+                let at = crate::test_support::rules::local_millis(y, m, d);
+                crate::yearcheck::complete(&db, 2026, at, Source::Ui).unwrap();
+            }
+
+            let written = close_2026(&db, dir.path(), 500).unwrap();
+
+            assert_eq!(written.label, label, "{ran:?}");
+        }
     }
 
     #[test]

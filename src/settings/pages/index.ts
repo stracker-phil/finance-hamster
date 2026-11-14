@@ -76,7 +76,7 @@ export const SETTINGS_PAGES: SettingsPage[] = [
       { id: "import-after", title: "Remind me to import after", keywords: ["statement", "overdue"] },
       { id: "gaps", title: "Tell me about gaps", keywords: ["statement", "missing"] },
       { id: "filing", title: "Filing reminder", keywords: ["tax year", "march", "close"] },
-      { id: "year-questions", title: "Year questions", keywords: ["november", "questions"] },
+      { id: "year-check", title: "Year check", keywords: ["november", "questions", "year check"] },
     ],
   },
   {

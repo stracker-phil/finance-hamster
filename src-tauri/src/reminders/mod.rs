@@ -129,24 +129,6 @@ fn statements_due(
     Ok(out)
 }
 
-/// The year's questions are asked from 1 November until the year ends.
-fn questions_open(year: i32, today: NaiveDate) -> bool {
-    today.year() == year && NaiveDate::from_ymd_opt(year, 11, 1).is_some_and(|d| today >= d)
-}
-
-fn open_question_count(db: &Db, year: i32) -> AppResult<usize> {
-    let answered = crate::year::answers::answers(db, year)?;
-    let ruleset = db
-        .read(|c| taxyears::row(c, year))?
-        .and_then(|r| serde_json::from_str::<crate::taxrules::model::Ruleset>(&r.rules).ok());
-    Ok(ruleset.map_or(0, |r| {
-        r.questions
-            .iter()
-            .filter(|q| !answered.contains_key(&q.id))
-            .count()
-    }))
-}
-
 fn tax_years(db: &Db, settings: &Settings, today: NaiveDate) -> AppResult<Vec<Due>> {
     let open: Vec<i32> = db
         .read(taxyears::rows)?
@@ -165,19 +147,23 @@ fn tax_years(db: &Db, settings: &Settings, today: NaiveDate) -> AppResult<Vec<Du
             ));
         }
     }
-    if let Some(&year) = open.iter().max()
-        && settings.remind_questions
-        && questions_open(year, today)
-    {
-        let count = open_question_count(db, year)?;
-        if count > 0 {
+    for &year in &open {
+        if settings.remind_questions && crate::yearcheck::due_on(db, year, today)? {
+            let (phase, body) = if today.year() > year {
+                (
+                    "after",
+                    "The year is over: run the year check once more before closing it.",
+                )
+            } else {
+                (
+                    "november",
+                    "A few quick questions about things you might forget to claim.",
+                )
+            };
             out.push(due(
-                format!("questions:{year}"),
-                format!(
-                    "{count} {} for Tax year {year}",
-                    if count == 1 { "question" } else { "questions" }
-                ),
-                "Answer them on the tax year page; they decide what the tax office accepts.".into(),
+                format!("yearcheck:{year}:{phase}"),
+                format!("Year check for Tax year {year}"),
+                body.into(),
             ));
         }
     }
@@ -238,12 +224,12 @@ mod tests {
     use crate::subscriptions::edit::SubscriptionForm;
     use crate::subscriptions::store::{PlanRow, SubscriptionRow};
     use crate::taxyears::TaxYearRow;
-    use crate::test_support::rules::minimal_text;
+    use crate::test_support::rules::{local_millis, minimal_rules, minimal_text, rules_text, set};
     use crate::test_support::statements::demo_month;
     use crate::test_support::subscriptions::{
-        NOW, add, day, form, imported, insert_rows, plan_row, subscription_row, today,
+        add, day, form, imported, insert_rows, plan_row, subscription_row, today,
     };
-    use crate::year::tests::{insert, open_year, ruleset};
+    use crate::year::tests::{insert, open_year};
 
     const ORDER: DateOrder = DateOrder::DayFirst;
 
@@ -590,73 +576,123 @@ mod tests {
         assert_eq!(due_with(&db, &settings, today(), "filing:"), vec![]);
     }
 
+    fn asking_rules() -> serde_json::Value {
+        let mut rules = minimal_rules(2026);
+        set(
+            &mut rules,
+            "/items/0/ask",
+            serde_json::json!({ "order": 1, "question": "Did you buy books?" }),
+        );
+        rules
+    }
+
+    fn asking_year(state: YearState) -> (tempfile::TempDir, Db) {
+        let (dir, db) = open_with_accounts();
+        insert(
+            &db,
+            crate::taxyears::TABLE,
+            &TaxYearRow {
+                state,
+                closed_at: (state == YearState::Closed).then_some(2),
+                ..TaxYearRow::new(2026, "2026 v1".into(), rules_text(&asking_rules()), 1)
+            },
+        );
+        (dir, db)
+    }
+
+    fn ran_on(db: &Db, (y, m, d): (i32, u32, u32)) {
+        crate::yearcheck::complete(db, 2026, local_millis(y, m, d), Source::Ui).unwrap();
+    }
+
     #[test]
-    fn unanswered_questions_are_reminded_from_the_first_of_november_through_the_year_end() {
-        let (_dir, db) = open_year();
+    fn the_year_check_is_reminded_in_november_and_december_and_again_after_the_year() {
+        let (_dir, db) = asking_year(YearState::Open);
 
         for (on, expected) in [
             (day(2026, 10, 31), vec![]),
-            (day(2026, 11, 1), vec!["questions:2026"]),
-            (day(2026, 12, 31), vec!["questions:2026"]),
-            (day(2027, 1, 1), vec![]),
+            (day(2026, 11, 1), vec!["yearcheck:2026:november"]),
+            (day(2026, 12, 31), vec!["yearcheck:2026:november"]),
+            (day(2027, 1, 1), vec!["yearcheck:2026:after"]),
         ] {
-            let dues = due_with(&db, &Settings::default(), on, "questions:");
+            let dues = due_with(&db, &Settings::default(), on, "yearcheck:");
             assert_eq!(keys(&dues), expected, "{on}");
         }
     }
 
     #[test]
-    fn the_questions_reminder_counts_what_is_still_unanswered() {
-        let (_dir, db) = open_year();
+    fn the_year_check_reminders_name_the_year_and_say_what_to_do() {
+        let (_dir, db) = asking_year(YearState::Open);
         let settings = Settings::default();
 
-        let both = due_with(&db, &settings, today(), "questions:");
         assert_eq!(
-            both,
+            due_with(&db, &settings, today(), "yearcheck:"),
             vec![Due {
-                key: "questions:2026".into(),
+                key: "yearcheck:2026:november".into(),
                 notification: notification(
-                    "2 questions for Tax year 2026",
-                    "Answer them on the tax year page; they decide what the tax office accepts."
+                    "Year check for Tax year 2026",
+                    "A few quick questions about things you might forget to claim."
                 ),
             }]
         );
-
-        crate::year::answers::answer(
-            &db,
-            &ruleset(),
-            2026,
-            "telearbeitstage",
-            "28",
-            NOW,
-            Source::Ui,
-        )
-        .unwrap();
-        let one = due_with(&db, &settings, today(), "questions:");
-        assert_eq!(one[0].notification.title, "1 question for Tax year 2026");
-
-        crate::year::answers::answer(&db, &ruleset(), 2026, "pauschale", "120", NOW, Source::Ui)
-            .unwrap();
-        assert_eq!(due_with(&db, &settings, today(), "questions:"), vec![]);
-    }
-
-    #[test]
-    fn question_reminders_can_be_turned_off() {
-        let (_dir, db) = open_year();
-        let settings = settings_with(|s| s.remind_questions = false);
-
-        assert_eq!(due_with(&db, &settings, today(), "questions:"), vec![]);
-    }
-
-    #[test]
-    fn a_closed_year_asks_no_questions() {
-        let (_dir, db) = open_with_accounts();
-        insert(&db, crate::taxyears::TABLE, &year_row(2026, true));
-
         assert_eq!(
-            due_with(&db, &Settings::default(), today(), "questions:"),
+            due_with(&db, &settings, day(2027, 1, 9), "yearcheck:"),
+            vec![Due {
+                key: "yearcheck:2026:after".into(),
+                notification: notification(
+                    "Year check for Tax year 2026",
+                    "The year is over: run the year check once more before closing it."
+                ),
+            }]
+        );
+    }
+
+    #[test]
+    fn a_completed_run_silences_the_reminder_until_the_year_is_over() {
+        let (_dir, db) = asking_year(YearState::Open);
+        let settings = Settings::default();
+        ran_on(&db, (2026, 11, 10));
+
+        assert_eq!(due_with(&db, &settings, today(), "yearcheck:"), vec![]);
+        assert_eq!(
+            keys(&due_with(&db, &settings, day(2027, 1, 9), "yearcheck:")),
+            ["yearcheck:2026:after"]
+        );
+
+        ran_on(&db, (2027, 1, 9));
+        assert_eq!(
+            due_with(&db, &settings, day(2027, 1, 9), "yearcheck:"),
             vec![]
         );
+    }
+
+    #[test]
+    fn year_check_reminders_can_be_turned_off() {
+        let (_dir, db) = asking_year(YearState::Open);
+        let settings = settings_with(|s| s.remind_questions = false);
+
+        for on in [today(), day(2027, 1, 9)] {
+            assert_eq!(due_with(&db, &settings, on, "yearcheck:"), vec![], "{on}");
+        }
+    }
+
+    #[test]
+    fn a_closed_year_and_a_ruleset_without_ask_are_never_reminded() {
+        let (_closed_dir, closed) = asking_year(YearState::Closed);
+        let (_plain_dir, plain) = open_year();
+
+        for on in [today(), day(2027, 1, 9)] {
+            let settings = Settings::default();
+            assert_eq!(
+                due_with(&closed, &settings, on, "yearcheck:"),
+                vec![],
+                "closed {on}"
+            );
+            assert_eq!(
+                due_with(&plain, &settings, on, "yearcheck:"),
+                vec![],
+                "plain {on}"
+            );
+        }
     }
 
     #[test]
