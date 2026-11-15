@@ -79,7 +79,7 @@
 .status-value .status-value__copy { display: none; color: var(--text-tertiary); }
 .status-value:is(:hover, :focus-visible) .status-value__copy { display: block; }
 .status-value:is(:hover, :focus-visible) .status-value__tone { display: none; }
-.dialog.rules-sheet { width: min(620px, calc(100vw - 32px)); max-height: calc(100vh - 64px); display: flex; flex-direction: column; }
+.dialog.rules-sheet { width: min(620px, calc(100vw - 32px)); max-height: calc(100vh - 200px); display: flex; flex-direction: column; }
 .rules-sheet__body { min-height: 0; overflow-y: auto; margin: 12px -4px 0; padding: 0 4px; }
 .rules-field { width: 96px; }
 .rules-field:read-only { border-color: transparent; background: transparent; }

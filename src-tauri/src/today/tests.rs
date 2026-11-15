@@ -558,7 +558,7 @@ fn steps_read_in_german_with_singular_and_plural() {
             key: "draft".into(),
             title: "2 Entwürfe fertigzumachen".into(),
             detail: "doc-d1 und doc-d2".into(),
-            line: "Schließe sie ab, um ihre Werte für das Steuerjahr festzuschreiben.".into(),
+            line: "Mach sie fertig, damit ihre Werte für das Steuerjahr feststehen.".into(),
             button: "Entwürfe zeigen".into(),
             target: StepTarget::Year {
                 year: 2026,

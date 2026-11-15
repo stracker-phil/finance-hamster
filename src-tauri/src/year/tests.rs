@@ -818,6 +818,63 @@ fn a_kennzahl_reads_its_label_examples_and_hint_in_german_when_the_language_is_g
 }
 
 #[test]
+fn a_kennzahl_carries_its_items_note_as_hint_and_none_without_one() {
+    let mut noted = rules();
+    set(&mut noted, "/items/0/note", json!("Keep the receipts"));
+    let (_dir, db) = open_year_with(&noted);
+
+    let page = year_page(&db);
+
+    let hints: Vec<Option<&str>> = page.kennzahlen.iter().map(|k| k.hint.as_deref()).collect();
+    assert_eq!(hints, [Some("Keep the receipts"), None, None, None, None]);
+    assert_eq!(
+        serde_json::to_value(&page.kennzahlen[0]).unwrap()["hint"],
+        json!("Keep the receipts")
+    );
+}
+
+#[test]
+fn a_kennzahl_hint_is_german_when_the_language_is_german_and_falls_back_to_english() {
+    let mut german = rules();
+    set(&mut german, "/items/0/note", json!("Keep the receipts"));
+    set(
+        &mut german,
+        "/items/0/de",
+        json!({ "note": "Heb die Belege auf" }),
+    );
+    set(&mut german, "/items/1/note", json!("Keep the contract"));
+    let (_dir, db) = open_year_with(&german);
+
+    let page = crate::i18n::with_lang(crate::settings::Language::De, || year_page(&db));
+
+    assert_eq!(
+        page.kennzahlen[0].hint.as_deref(),
+        Some("Heb die Belege auf")
+    );
+    assert_eq!(
+        page.kennzahlen[1].hint.as_deref(),
+        Some("Keep the contract")
+    );
+}
+
+#[test]
+fn a_draft_is_listed_under_attention_in_german_when_the_language_is_german() {
+    let (_dir, db) = open_year();
+    add_document(&db, "doc-d1", |d| {
+        d.state = DocState::Draft;
+        d.item_key = Some("books".into());
+        d.pay_date = Some("2026-03-03".into());
+    });
+
+    let page = crate::i18n::with_lang(crate::settings::Language::De, || year_page(&db));
+
+    assert_eq!(
+        page.attention[0].detail,
+        "Mach ihn fertig, damit seine Werte für das Steuerjahr feststehen"
+    );
+}
+
+#[test]
 fn a_kennzahl_serializes_its_label_examples_and_total_in_camel_case() {
     let (_dir, db) = open_year();
 

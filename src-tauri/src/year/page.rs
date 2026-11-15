@@ -112,6 +112,8 @@ pub struct KennzahlView {
     pub total: String,
     pub rows: Vec<YearRow>,
     pub note: Option<String>,
+    /// The item's own note from the rules, shown when filing.
+    pub hint: Option<String>,
     /// None for an item others report, which never counts.
     pub add: Option<AddKind>,
     /// A trips item's rate, `× €0.50 / km`.

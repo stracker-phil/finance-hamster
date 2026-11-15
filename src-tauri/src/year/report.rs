@@ -159,6 +159,7 @@ mod tests {
             total: format!("€{}", copy.replace(',', ".")),
             rows,
             note: None,
+            hint: None,
             add: None,
             rate: None,
             reported: false,

@@ -421,6 +421,10 @@ copy: string,
  */
 total: string, rows: Array<YearRow>, note: string | null, 
 /**
+ * The item's own note from the rules, shown when filing.
+ */
+hint: string | null, 
+/**
  * None for an item others report, which never counts.
  */
 add: AddKind | null, 

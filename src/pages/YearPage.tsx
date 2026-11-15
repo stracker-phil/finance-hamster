@@ -133,6 +133,7 @@ function Kennzahl({ item, year }: { item: KennzahlView; year: number }) {
       {item.rows.map((row) => (
         <Row key={row.id} row={row} year={year} withAmount={item.rows.length > 1} open={false} />
       ))}
+      {item.hint && <div className="kennzahl__note">{item.hint}</div>}
       {item.note && <div className="kennzahl__note">{item.note}</div>}
     </section>
   );

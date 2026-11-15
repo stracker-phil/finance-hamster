@@ -246,12 +246,12 @@ pub(super) fn draft_step(page: &YearPage) -> Option<Step> {
         line: if single {
             tr!(
                 "Finish it to lock its values for the tax year.",
-                "Schließe ihn ab, um seine Werte für das Steuerjahr festzuschreiben."
+                "Mach ihn fertig, damit seine Werte für das Steuerjahr feststehen."
             )
         } else {
             tr!(
                 "Finish them to lock their values for the tax year.",
-                "Schließe sie ab, um ihre Werte für das Steuerjahr festzuschreiben."
+                "Mach sie fertig, damit ihre Werte für das Steuerjahr feststehen."
             )
         },
         button: if single {

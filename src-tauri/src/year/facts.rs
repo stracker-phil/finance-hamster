@@ -196,7 +196,7 @@ fn count_state(doc: &DocumentRow, title: &str, facts: &mut Facts) {
             kind: AttentionKind::Draft,
             detail: crate::tr!(
                 "Finish it to lock its values for the tax year",
-                "Schließ ihn ab, damit seine Werte für das Steuerjahr feststehen"
+                "Mach ihn fertig, damit seine Werte für das Steuerjahr feststehen"
             ),
             title: title.to_string(),
             document_id: Some(doc.id.clone()),

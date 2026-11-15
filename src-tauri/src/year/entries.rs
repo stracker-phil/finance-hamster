@@ -913,6 +913,7 @@ mod tests {
                 "total": "€0.00",
                 "rows": [],
                 "note": null,
+                "hint": null,
                 "add": "trip",
                 "rate": "× €0.60 / km",
                 "reported": false

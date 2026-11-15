@@ -327,10 +327,11 @@ describe("YearPage", () => {
       expect(within(screen.getByRole("region", { name: "Work books" })).queryByText("Books, journals")).toBeNull();
     });
 
-    it("shows no note", async () => {
-      await show({ kennzahlen: [kennzahlView({ note: "Estimated from 3 documents" })] });
+    it("shows neither the item's hint nor its note", async () => {
+      await show({ kennzahlen: [kennzahlView({ hint: "Only the work share counts", note: "Estimated from 3 documents" })] });
 
       expect(screen.queryByText("Estimated from 3 documents")).toBeNull();
+      expect(screen.queryByText("Only the work share counts")).toBeNull();
     });
 
     it("keeps the data's order", async () => {
@@ -383,6 +384,14 @@ describe("YearPage", () => {
       await show({ state: "closed", kennzahlen: [kennzahlView({ note: "About €928.40 counts" })] });
 
       expect(screen.getByText("About €928.40 counts")).toBeTruthy();
+    });
+
+    it("shows an item's hint above its note", async () => {
+      await show({ state: "closed", kennzahlen: [kennzahlView({ hint: "Only the work share counts", note: "About €928.40 counts" })] });
+
+      const hint = screen.getByText("Only the work share counts");
+      const note = screen.getByText("About €928.40 counts");
+      expect(hint.compareDocumentPosition(note) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
     it("shows Not counted instead of a copy button for a reported item", async () => {

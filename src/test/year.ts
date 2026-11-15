@@ -27,6 +27,7 @@ export function kennzahlView(patch: Partial<KennzahlView> = {}): KennzahlView {
     copy: "1228,40",
     total: "€1,000.00",
     rows: [yearRow()],
+    hint: null,
     note: null,
     add: null,
     rate: null,

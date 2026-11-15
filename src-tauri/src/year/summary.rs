@@ -137,6 +137,7 @@ pub fn kennzahlen(
                         "Von anderen gemeldet; nur zur Information, hier nie gezählt"
                     ))
                 },
+                hint: item.display_note().map(str::to_string),
                 rows: own
                     .into_iter()
                     .filter(|p| shown(p, item))
