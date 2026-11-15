@@ -342,7 +342,7 @@ mod tests {
     }
 
     #[test]
-    fn the_shipped_seed_starts_its_year() {
+    fn the_shipped_seeds_start_both_years() {
         let (dir, db) = setup();
         files::install(dir.path()).unwrap();
 
@@ -352,11 +352,18 @@ mod tests {
 
         assert_eq!(
             list(&db).unwrap(),
-            vec![TaxYear {
-                year: 2026,
-                state: YearState::Open,
-                ruleset: "2026 v1".into()
-            }]
+            vec![
+                TaxYear {
+                    year: 2026,
+                    state: YearState::Open,
+                    ruleset: "2026 v2".into()
+                },
+                TaxYear {
+                    year: 2025,
+                    state: YearState::Open,
+                    ruleset: "2025 v1".into()
+                }
+            ]
         );
     }
 

@@ -546,7 +546,7 @@ mod tests {
             .collect();
 
         assert!(dir.path().join("rules").is_dir());
-        assert_eq!(years.first(), Some(&2026));
+        assert_eq!(years, vec![2026, 2025]);
         assert!(items.contains(&"literature".to_string()));
         assert!(items.contains(&"digital-equipment".to_string()));
     }

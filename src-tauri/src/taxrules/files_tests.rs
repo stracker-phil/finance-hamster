@@ -13,6 +13,7 @@ use crate::test_support::temp_config_dir;
 const SCHEMA: &str = include_str!("../../resources/rules/rules.schema.json");
 const README: &str = include_str!("../../resources/rules/README.md");
 const SEED: &str = include_str!("../../resources/rules/rules-2026.json");
+const SEED_2025: &str = include_str!("../../resources/rules/rules-2025.json");
 
 fn with_rules_folder() -> (tempfile::TempDir, PathBuf) {
     let config = temp_config_dir();
@@ -56,14 +57,23 @@ fn file_names_follow_the_year() {
 }
 
 #[test]
-fn install_writes_the_schema_the_readme_and_the_seed_into_an_empty_folder() {
+fn install_writes_the_schema_the_readme_and_both_seeds_into_an_empty_folder() {
     let config = temp_config_dir();
     install(config.path()).unwrap();
 
     let folder = dir(config.path());
     assert_eq!(
         names_in(&folder),
-        vec!["README.md", "rules-2026.json", "rules.schema.json"]
+        vec![
+            "README.md",
+            "rules-2025.json",
+            "rules-2026.json",
+            "rules.schema.json"
+        ]
+    );
+    assert_eq!(
+        std::fs::read_to_string(folder.join("rules-2025.json")).unwrap(),
+        SEED_2025
     );
     assert_eq!(
         std::fs::read_to_string(folder.join("rules.schema.json")).unwrap(),
@@ -100,14 +110,22 @@ fn install_never_seeds_next_to_an_existing_rules_file() {
 fn install_leaves_an_edited_rules_file_alone_and_seeds_again_only_when_no_year_file_remains() {
     let config = temp_config_dir();
     install(config.path()).unwrap();
-    let path = dir(config.path()).join("rules-2026.json");
+    let folder = dir(config.path());
+    let path = folder.join("rules-2026.json");
+    let path_2025 = folder.join("rules-2025.json");
     std::fs::write(&path, "edited").unwrap();
     install(config.path()).unwrap();
     assert_eq!(std::fs::read_to_string(&path).unwrap(), "edited");
+    assert_eq!(std::fs::read_to_string(&path_2025).unwrap(), SEED_2025);
 
-    std::fs::rename(&path, dir(config.path()).join("rules-2026.v1.json")).unwrap();
+    std::fs::rename(&path, folder.join("rules-2026.v1.json")).unwrap();
+    install(config.path()).unwrap();
+    assert!(!path.exists());
+
+    std::fs::rename(&path_2025, folder.join("rules-2025.v1.json")).unwrap();
     install(config.path()).unwrap();
     assert_eq!(std::fs::read_to_string(&path).unwrap(), SEED);
+    assert_eq!(std::fs::read_to_string(&path_2025).unwrap(), SEED_2025);
 }
 
 #[test]
@@ -257,7 +275,7 @@ fn next_year_of_the_seed_moves_the_year_the_ruleset_and_the_kilometergeld_dates(
     let mut expected: Value = serde_json::from_str(SEED).unwrap();
     set(&mut expected, "/year", json!(2027));
     set(&mut expected, "/ruleset", json!("2027 v1"));
-    set(&mut expected, "/basedOn", json!("2026 v1"));
+    set(&mut expected, "/basedOn", json!("2026 v2"));
     set(
         &mut expected,
         "/rates/kilometergeld/0/from",
@@ -299,7 +317,7 @@ fn next_year_of_the_seed_passes_the_checks() {
     let text = next_year_text(SEED).unwrap();
     let ruleset = check::read(&text, &BTreeSet::new()).unwrap();
     assert_eq!(ruleset.year, 2027);
-    assert_eq!(ruleset.based_on.as_deref(), Some("2026 v1"));
+    assert_eq!(ruleset.based_on.as_deref(), Some("2026 v2"));
     assert_eq!(ruleset.items.len(), 12);
 }
 

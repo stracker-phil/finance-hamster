@@ -61,8 +61,12 @@ Reload fails with a clear message if:
 - a `trips` item uses a vehicle with no rate
 - an `ask` sits on a hidden item or an item reported by others, or its `question` is empty
 
-## Notes on 2026 v1
+## Notes on 2025 v1 and 2026 v2
 
-- KZ 159 is Arbeitszimmer (hidden). The furniture rule needs 26 **Telearbeitstage**; "Homeoffice days" was renamed in 2025.
-- The Telearbeitspauschale reduces **KZ 169** (digital equipment), not 158.
-- Kilometergeld and the KZ 158 cap/carry-over are `verified: false`. Check them before closing the year.
+- Checked on 15 November 2026 against EStG § 16, the BMF L1 field lists and the Kilometergeldverordnung; the sources are in each file.
+- The Kennzahlen and amounts are the same in both years. KZ 159 is Arbeitszimmer (hidden); it can't be filed together with KZ 158.
+- KZ 158 needs 26 **Telearbeitstage** (called Homeoffice days until 2024). Enter the full amount: the tax office counts €300 a year and the rest in later years.
+- KZ 169 is reduced by €3 per Telearbeitstag (at most 100 days): the employer's Telearbeitspauschale plus the difference the tax office grants itself. The question asks for that total.
+- Kilometergeld for a car is €0.50 per km all year in both years.
+- `usefulLife.furniture` is an estimate; Austria has no official table.
+- From 2027 the Telearbeitspauschale ends and KZ 158 no longer needs Telearbeitstage. A 2027 file needs those changes.

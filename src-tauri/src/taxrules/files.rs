@@ -15,10 +15,17 @@ const SCHEMA: (&str, &str) = (
     include_str!("../../resources/rules/rules.schema.json"),
 );
 const README: (&str, &str) = ("README.md", include_str!("../../resources/rules/README.md"));
-const SEED: (&str, &str) = (
-    "rules-2026.json",
-    include_str!("../../resources/rules/rules-2026.json"),
-);
+/// The year to file and the year under way when Hamster was built; a first launch starts both.
+const SEEDS: [(&str, &str); 2] = [
+    (
+        "rules-2025.json",
+        include_str!("../../resources/rules/rules-2025.json"),
+    ),
+    (
+        "rules-2026.json",
+        include_str!("../../resources/rules/rules-2026.json"),
+    ),
+];
 
 pub fn dir(config_dir: &Path) -> PathBuf {
     config_dir.join(DIR)
@@ -37,7 +44,7 @@ pub fn year_of(file_name: &str) -> Option<i32> {
     year.parse().ok()
 }
 
-/// Keeps the schema and README current and writes the seed when the folder holds no rules file yet.
+/// Keeps the schema and README current and writes the seeds when the folder holds no rules file yet.
 pub fn install(config_dir: &Path) -> AppResult<()> {
     let dir = dir(config_dir);
     create_private_dir(&dir)?;
@@ -48,7 +55,9 @@ pub fn install(config_dir: &Path) -> AppResult<()> {
         }
     }
     if list(config_dir)?.is_empty() {
-        write_atomic(&dir.join(SEED.0), SEED.1)?;
+        for (name, text) in SEEDS {
+            write_atomic(&dir.join(name), text)?;
+        }
     }
     Ok(())
 }

@@ -7,6 +7,7 @@ use super::model::{Evidence, Ruleset};
 use crate::test_support::rules::{minimal_rules, set};
 
 const SEED: &str = include_str!("../../resources/rules/rules-2026.json");
+const SEED_2025: &str = include_str!("../../resources/rules/rules-2025.json");
 
 fn no_keys() -> BTreeSet<String> {
     BTreeSet::new()
@@ -46,12 +47,36 @@ fn a_minimal_file_reads_back_as_typed_rules() {
 }
 
 #[test]
-fn the_shipped_seed_is_valid_with_twelve_items_of_which_two_are_unverified() {
+fn the_shipped_seed_is_valid_with_twelve_items_all_verified() {
     let ruleset = read(SEED, &no_keys()).unwrap();
     assert_eq!(ruleset.year, 2026);
-    assert_eq!(ruleset.ruleset, "2026 v1");
+    assert_eq!(ruleset.ruleset, "2026 v2");
     assert_eq!(ruleset.items.len(), 12);
-    assert_eq!(ruleset.unverified_count(), 2);
+    assert_eq!(ruleset.unverified_count(), 0);
+}
+
+#[test]
+fn the_shipped_2025_seed_is_valid_with_twelve_items_all_verified() {
+    let ruleset = read(SEED_2025, &no_keys()).unwrap();
+    assert_eq!(ruleset.year, 2025);
+    assert_eq!(ruleset.ruleset, "2025 v1");
+    assert_eq!(ruleset.items.len(), 12);
+    assert_eq!(ruleset.unverified_count(), 0);
+}
+
+#[test]
+fn both_shipped_seeds_carry_the_same_items_and_kennzahlen() {
+    let keys_and_kz = |text: &str| -> Vec<(String, String)> {
+        let rules: Value = serde_json::from_str(text).unwrap();
+        rules["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|i| (i["key"].to_string(), i["kz"].to_string()))
+            .collect()
+    };
+
+    assert_eq!(keys_and_kz(SEED_2025), keys_and_kz(SEED));
 }
 
 #[test]

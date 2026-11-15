@@ -1,12 +1,17 @@
 {
   "$schema": "./rules.schema.json",
   "schemaVersion": 1,
-  "ruleset": "2026 v1",
+  "ruleset": "2026 v2",
   "year": 2026,
-  "basedOn": "2025 v2",
+  "basedOn": "2025 v1",
+  "notes": "Checked 2026-11-15 against EStG § 16 (version 24.12.2025 to 31.12.2026), the BMF L1 field list for 2026 and the Kilometergeldverordnung. usefulLife.furniture is an estimate: Austria has no official table. From 2027 the Telearbeitspauschale and the 26-day rule for KZ 158 are gone (BGBl. I Nr. 62/2026, 88/2026).",
   "sources": [
+    { "label": "RIS – EStG § 16, version 24.12.2025 to 31.12.2026", "url": "https://www.ris.bka.gv.at/Dokumente/Bundesnormen/NOR40274823/NOR40274823.html" },
+    { "label": "BMF – L1 fields (Allgemeines Arbeitnehmerveranlagung 2026)", "url": "https://www.bmf.gv.at/dam/jcr:eb55cf73-a1a9-40d1-9398-9976eb867158/BMF_Allgemeines_Arbeitnehmerveranlagung_2026.pdf" },
+    { "label": "BMF – Prüfungen Arbeitnehmerveranlagung 2026", "url": "https://www.bmf.gv.at/dam/jcr:526e52a3-b303-408b-a320-ffd11754da05/BMF_Pruefungen_Arbeitnehmerveranlagung_2026.pdf" },
+    { "label": "BMF – Kilometergeld", "url": "https://www.bmf.gv.at/steuern/fahrzeuge/kilometergeld.html" },
     { "label": "BMF – Telearbeitspauschale FAQ", "url": "https://www.bmf.gv.at/themen/steuern/arbeitnehmerveranlagung/was-kann-ich-geltend-machen/werbungskosten/home-office-pauschale.html" },
-    { "label": "BMF – Prüfungen Arbeitnehmerveranlagung 2026", "url": "https://www.bmf.gv.at/dam/jcr:526e52a3-b303-408b-a320-ffd11754da05/BMF_Pruefungen_Arbeitnehmerveranlagung_2026.pdf" }
+    { "label": "BMF – Das Steuerbuch 2025 (computers, GWG, half-year AfA)", "url": "https://www.bmf.gv.at/dam/jcr:060eafef-ba40-43e1-bce2-ac046673681c/250506_Steuerbuch2025_DE_BF.pdf" }
   ],
 
   "settings": {
@@ -22,13 +27,13 @@
 
   "rates": {
     "kilometergeld": [
-      { "vehicle": "car", "perKm": 0.50, "from": "2026-01-01", "to": "2026-12-31", "verified": false }
+      { "vehicle": "car", "perKm": 0.50, "from": "2026-01-01", "to": "2026-12-31", "source": { "label": "Kilometergeldverordnung, BGBl. II Nr. 289/2024", "url": "https://www.bmf.gv.at/steuern/fahrzeuge/kilometergeld.html" } }
     ]
   },
 
   "questions": [
     { "id": "telearbeitstage", "label": "Telearbeitstage (Homeoffice days)", "help": "From your Lohnzettel", "type": "integer", "unit": "days", "ask": { "order": 10, "question": "How many Telearbeitstage are on your Lohnzettel?", "hint": "Days you worked only from home. Needed for KZ 158." } },
-    { "id": "telearbeitspauschale", "label": "Tax-free Telearbeitspauschale received", "help": "From your Lohnzettel", "type": "amount", "unit": "€", "ask": { "order": 90, "question": "How much tax-free Telearbeitspauschale did you receive?", "hint": "On the Lohnzettel. The tax office subtracts it from KZ 169." } }
+    { "id": "telearbeitspauschale", "label": "Telearbeitspauschale (€3 per Telearbeitstag)", "help": "€3 × Telearbeitstage, at most 100 days", "type": "amount", "unit": "€", "ask": { "order": 90, "question": "What is €3 times your Telearbeitstage, counting at most 100 days?", "hint": "The tax office subtracts this from KZ 169 whatever your employer paid; it grants any shortfall itself." } }
   ],
 
   "sections": [
@@ -62,7 +67,7 @@
       "privateShare": 40,
       "depreciation": { "assetClass": "computer" },
       "estimate": [ { "type": "reduceBy", "question": "telearbeitspauschale" } ],
-      "note": "The tax office subtracts the Telearbeitspauschale you received.",
+      "note": "The tax office subtracts €3 per Telearbeitstag (at most €300): the employer's Telearbeitspauschale plus the difference it grants.",
       "ask": { "order": 30, "question": "Did you buy hardware or software for work?", "hint": "Laptop, monitor, printer, phone, backup drive, software licences" }
     },
 
@@ -71,8 +76,7 @@
         { "type": "requires", "question": "telearbeitstage", "min": 26 },
         { "type": "cap", "amount": 300.00, "carryOver": true }
       ],
-      "note": "Enter the full amount. The tax office counts up to €300 per year.",
-      "verified": false,
+      "note": "Enter the full amount. The tax office counts up to €300 per year and the rest in later years.",
       "ask": { "order": 40, "question": "Did you buy furniture for working from home?", "hint": "Desk, office chair, desk lamp, laptop stand" }
     },
 
