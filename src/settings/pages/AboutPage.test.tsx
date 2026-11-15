@@ -27,6 +27,13 @@ describe("AboutPage", () => {
     expect(screen.getByText("Version")).toBeTruthy();
   });
 
+  it("titles the page with the app's full name", async () => {
+    renderWithQuery(<AboutPage />);
+    await screen.findByText("2.4.1");
+
+    expect(screen.getByRole("heading", { name: "Finance Hamster" })).toBeTruthy();
+  });
+
   it("has a row for every About entry of the Settings search index", async () => {
     const rows = SETTINGS_PAGES.find((p) => p.id === "about")?.rows ?? [];
     renderWithQuery(<AboutPage />);

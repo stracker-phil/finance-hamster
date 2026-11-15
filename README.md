@@ -1,4 +1,4 @@
-# Hamster
+# Finance Hamster
 
 My offline money archive for macOS. It hoards every invoice and bank statement so none gets lost, asks only
 what it can't know, and ends each tax year with the numbers to type into the tax return.

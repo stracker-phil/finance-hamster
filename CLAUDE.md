@@ -1,4 +1,6 @@
-# Hamster
+# Finance Hamster
+
+The official full name is "Finance Hamster" (README, About); everywhere else the app is simply "Hamster".
 
 A private, offline macOS app for one person with three jobs: collect ANV documents (Werbungskosten) with the
 real EUR amount paid, keep bank statements as a permanent record, and track subscriptions. It imports the

@@ -8,7 +8,7 @@ const run = (id: string) => () => void api.runCommand(id).catch((e: unknown) => 
 export function AboutPage() {
   const { data } = useQuery({ queryKey: ["app-info"], queryFn: api.appInfo });
   return (
-    <Group title="Hamster" anchor="version">
+    <Group title="Finance Hamster" anchor="version">
       <Row label="Version">
         <span className="settings-value">{data?.version ?? ""}</span>
       </Row>
