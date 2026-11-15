@@ -1,89 +1,58 @@
 {
   "$schema": "./rules.schema.json",
   "schemaVersion": 1,
-  "ruleset": "2025 v2",
+  "ruleset": "2025 v3",
   "year": 2025,
-  "notes": "Checked 2026-11-15 against EStG § 16 (version 01.01.2025 to 23.12.2025), the BMF L1 field list for 2025 and the Kilometergeldverordnung. 2025 renamed Homeoffice to Telearbeit; amounts and Kennzahlen are unchanged. usefulLife.furniture is an estimate: Austria has no official table.",
+  "notes": "Checked 2026-11-15 against EStG § 16 (version 01.01.2025 to 23.12.2025), the BMF L1 field list for 2025 and the Kilometergeldverordnung. 2025 renamed Homeoffice to Telearbeit; amounts and Kennzahlen are unchanged. usefulLife.furniture is an estimate: Austria has no official table. The year check is retired: items carry plain labels and examples, and KZ 169's reduction is worked out from the home office days.",
   "sources": [
-    { "label": "RIS – EStG § 16, version 01.01.2025 to 23.12.2025", "url": "https://www.ris.bka.gv.at/Dokumente/Bundesnormen/NOR40265469/NOR40265469.html" },
-    { "label": "BMF – L1 fields (Allgemeines Arbeitnehmerveranlagung 2025)", "url": "https://www.bmf.gv.at/dam/jcr:d3ad1562-2905-4195-b08c-22f3780919fc/BMF_Allgemeines_Arbeitnehmerveranlagung_2025.pdf" },
-    { "label": "BMF – Prüfungen Arbeitnehmerveranlagung 2025", "url": "https://www.bmf.gv.at/dam/jcr:81eaf8ee-7ef9-4539-add5-f94f9be8829d/BMF_Pruefungen_Arbeitnehmerveranlagung_2025.pdf" },
-    { "label": "BMF – Kilometergeld", "url": "https://www.bmf.gv.at/steuern/fahrzeuge/kilometergeld.html" },
-    { "label": "BMF – Telearbeitspauschale FAQ", "url": "https://www.bmf.gv.at/themen/steuern/arbeitnehmerveranlagung/was-kann-ich-geltend-machen/werbungskosten/home-office-pauschale.html" },
-    { "label": "BMF – Das Steuerbuch 2025 (computers, GWG, half-year AfA)", "url": "https://www.bmf.gv.at/dam/jcr:060eafef-ba40-43e1-bce2-ac046673681c/250506_Steuerbuch2025_DE_BF.pdf" }
+    {"label": "RIS – EStG § 16, version 01.01.2025 to 23.12.2025", "url": "https://www.ris.bka.gv.at/Dokumente/Bundesnormen/NOR40265469/NOR40265469.html"},
+    {"label": "BMF – L1 fields (Allgemeines Arbeitnehmerveranlagung 2025)", "url": "https://www.bmf.gv.at/dam/jcr:d3ad1562-2905-4195-b08c-22f3780919fc/BMF_Allgemeines_Arbeitnehmerveranlagung_2025.pdf"},
+    {"label": "BMF – Prüfungen Arbeitnehmerveranlagung 2025", "url": "https://www.bmf.gv.at/dam/jcr:81eaf8ee-7ef9-4539-add5-f94f9be8829d/BMF_Pruefungen_Arbeitnehmerveranlagung_2025.pdf"},
+    {"label": "BMF – Kilometergeld", "url": "https://www.bmf.gv.at/steuern/fahrzeuge/kilometergeld.html"},
+    {"label": "BMF – Telearbeitspauschale FAQ", "url": "https://www.bmf.gv.at/themen/steuern/arbeitnehmerveranlagung/was-kann-ich-geltend-machen/werbungskosten/home-office-pauschale.html"},
+    {"label": "BMF – Das Steuerbuch 2025 (computers, GWG, half-year AfA)", "url": "https://www.bmf.gv.at/dam/jcr:060eafef-ba40-43e1-bce2-ac046673681c/250506_Steuerbuch2025_DE_BF.pdf"}
   ],
-
   "settings": {
     "gwgLimit": 1000.00,
     "halfYearFrom": "07-01",
     "werbungskostenpauschale": 132.00
   },
-
   "usefulLife": {
     "computer": 3,
     "furniture": 10
   },
-
   "rates": {
     "kilometergeld": [
-      { "vehicle": "car", "perKm": 0.50, "from": "2025-01-01", "to": "2025-12-31", "source": { "label": "Kilometergeldverordnung, BGBl. II Nr. 289/2024", "url": "https://www.bmf.gv.at/steuern/fahrzeuge/kilometergeld.html" } }
+      {
+        "vehicle": "car",
+        "perKm": 0.50,
+        "from": "2025-01-01",
+        "to": "2025-12-31",
+        "source": {
+          "label": "Kilometergeldverordnung, BGBl. II Nr. 289/2024",
+          "url": "https://www.bmf.gv.at/steuern/fahrzeuge/kilometergeld.html"
+        }
+      }
     ]
   },
-
   "questions": [
-    { "id": "telearbeitstage", "label": "Telearbeitstage (Homeoffice days)", "help": "From your Lohnzettel", "type": "integer", "unit": "days", "de": { "label": "Telearbeitstage", "help": "Laut Lohnzettel", "unit": "Tage" }, "ask": { "order": 10, "question": "How many Telearbeitstage are on your Lohnzettel?", "hint": "Days you worked only from home. Needed for KZ 158.", "de": { "question": "Wie viele Telearbeitstage stehen auf deinem Lohnzettel?", "hint": "Tage, an denen du ausschließlich zu Hause gearbeitet hast. Nötig für KZ 158." } } },
-    { "id": "telearbeitspauschale", "label": "Telearbeitspauschale (€3 per Telearbeitstag)", "help": "€3 × Telearbeitstage, at most 100 days", "type": "amount", "unit": "€", "de": { "label": "Telearbeitspauschale (3 € pro Telearbeitstag)", "help": "3 € × Telearbeitstage, höchstens 100 Tage" }, "ask": { "order": 90, "question": "What is €3 times your Telearbeitstage, counting at most 100 days?", "hint": "The tax office subtracts this from KZ 169 whatever your employer paid; it grants any shortfall itself.", "de": { "question": "Wie viel sind 3 € mal deine Telearbeitstage, höchstens 100 Tage?", "hint": "Das Finanzamt zieht das von KZ 169 ab, egal was dein Arbeitgeber gezahlt hat; die Differenz gewährt es selbst." } } }
+    {"id": "telearbeitstage", "label": "Home office days", "help": "The Telearbeitstage on your payslip (Lohnzettel)", "type": "integer", "unit": "days", "de": {"label": "Homeoffice-Tage", "help": "Die Telearbeitstage laut Lohnzettel", "unit": "Tage"}}
   ],
-
   "sections": [
-    { "id": "werbungskosten", "name": "Werbungskosten" }
+    {"id": "werbungskosten", "name": "Werbungskosten"}
   ],
-
   "items": [
-    { "key": "union-dues", "kz": "717", "name": "Gewerkschaftsbeiträge", "section": "werbungskosten", "kind": "amount", "evidence": "optional", "ask": { "order": 70, "question": "Did you pay union dues?", "hint": "Often already on the Lohnzettel", "de": { "question": "Hast du Gewerkschaftsbeiträge gezahlt?", "hint": "Stehen oft schon auf dem Lohnzettel" } } },
-
-    { "key": "commuting", "kz": "718/916", "name": "Pendlerpauschale", "section": "werbungskosten", "kind": "amount", "visible": false, "evidence": "optional" },
-
-    { "key": "work-equipment", "kz": "719", "name": "Arbeitsmittel", "section": "werbungskosten", "kind": "documents",
-      "depreciation": { "assetClass": "furniture" },
-      "ask": { "order": 80, "question": "Did you buy other tools or supplies for work?", "hint": "Work clothing, bags, stationery, tools", "de": { "question": "Hast du andere Werkzeuge oder Arbeitsmaterial gekauft?", "hint": "Arbeitskleidung, Taschen, Büromaterial, Werkzeug" } }
-    },
-
-    { "key": "literature", "kz": "720", "name": "Fachliteratur", "section": "werbungskosten", "kind": "documents", "ask": { "order": 60, "question": "Did you buy books or magazines for work?", "hint": "Technical books, e-books, magazine subscriptions", "de": { "question": "Hast du beruflich Bücher oder Zeitschriften gekauft?", "hint": "Fachbücher, E-Books, Zeitschriften-Abos" } } },
-
-    { "key": "travel", "kz": "721", "name": "Reisekosten", "section": "werbungskosten", "kind": "trips", "vehicle": "car", "evidence": "none",
-      "note": "Round trips. Keep date, destination and purpose in case the tax office asks.",
-      "de": { "note": "Hin und zurück. Heb Datum, Ziel und Zweck auf, falls das Finanzamt fragt." },
-      "ask": { "order": 20, "question": "Did you travel for work?", "hint": "Conferences, client visits, meetups, team days", "de": { "question": "Bist du beruflich gereist?", "hint": "Konferenzen, Kundenbesuche, Meetups, Teamtage" } }
-    },
-
-    { "key": "training", "kz": "722", "name": "Fortbildung", "section": "werbungskosten", "kind": "documents", "ask": { "order": 50, "question": "Did you pay for courses, conferences or exams?", "hint": "Conference tickets, online courses, certification fees", "de": { "question": "Hast du für Kurse, Konferenzen oder Prüfungen bezahlt?", "hint": "Konferenztickets, Onlinekurse, Zertifizierungsgebühren" } } },
-
-    { "key": "double-household", "kz": "723", "name": "Doppelte Haushaltsführung", "section": "werbungskosten", "kind": "documents", "visible": false },
-
-    { "key": "other", "kz": "724", "name": "Sonstige Werbungskosten", "section": "werbungskosten", "kind": "documents", "ask": { "order": 100, "question": "Any other work costs?", "hint": "Coworking rent, professional memberships, job applications", "de": { "question": "Hattest du andere berufliche Ausgaben?", "hint": "Coworking-Miete, Berufsverbände, Bewerbungen" } } },
-
-    { "key": "digital-equipment", "kz": "169", "name": "Digitale Arbeitsmittel", "section": "werbungskosten", "kind": "documents",
-      "privateShare": 40,
-      "depreciation": { "assetClass": "computer" },
-      "estimate": [ { "type": "reduceBy", "question": "telearbeitspauschale" } ],
-      "note": "The tax office subtracts €3 per Telearbeitstag (at most €300): the employer's Telearbeitspauschale plus the difference it grants.",
-      "de": { "note": "Das Finanzamt zieht 3 € pro Telearbeitstag ab (höchstens 300 €): die Telearbeitspauschale des Arbeitgebers plus die Differenz, die es selbst gewährt." },
-      "ask": { "order": 30, "question": "Did you buy hardware or software for work?", "hint": "Laptop, monitor, printer, phone, backup drive, software licences", "de": { "question": "Hast du beruflich Hardware oder Software gekauft?", "hint": "Laptop, Monitor, Drucker, Handy, Backup-Festplatte, Softwarelizenzen" } }
-    },
-
-    { "key": "ergonomic-furniture", "kz": "158", "name": "Ergonomisches Mobiliar", "section": "werbungskosten", "kind": "documents",
-      "estimate": [
-        { "type": "requires", "question": "telearbeitstage", "min": 26 },
-        { "type": "cap", "amount": 300.00, "carryOver": true }
-      ],
-      "note": "Enter the full amount. The tax office counts up to €300 per year and the rest in later years.",
-      "de": { "note": "Trag den vollen Betrag ein. Das Finanzamt zählt bis zu 300 € pro Jahr und den Rest in späteren Jahren." },
-      "ask": { "order": 40, "question": "Did you buy furniture for working from home?", "hint": "Desk, office chair, desk lamp, laptop stand", "de": { "question": "Hast du Möbel fürs Arbeiten zu Hause gekauft?", "hint": "Schreibtisch, Bürostuhl, Schreibtischlampe, Laptopständer" } }
-    },
-
-    { "key": "home-office-room", "kz": "159", "name": "Arbeitszimmer", "section": "werbungskosten", "kind": "documents", "visible": false },
-
-    { "key": "family-trips-home", "kz": "300", "name": "Familienheimfahrten", "section": "werbungskosten", "kind": "trips", "vehicle": "car", "evidence": "none", "visible": false }
+    {"key": "travel", "kz": "721", "name": "Reisekosten", "label": "Work trips", "examples": "Conferences, client visits, meetups, team days", "section": "werbungskosten", "kind": "trips", "evidence": "none", "vehicle": "car", "note": "Round trips. Keep date, destination and purpose in case the tax office asks.", "de": {"label": "Dienstreisen", "examples": "Konferenzen, Kundenbesuche, Meetups, Teamtage", "note": "Hin und zurück. Heb Datum, Ziel und Zweck auf, falls das Finanzamt fragt."}},
+    {"key": "digital-equipment", "kz": "169", "name": "Digitale Arbeitsmittel", "label": "Computer, phone & software", "examples": "Laptop, monitor, printer, phone, backup drive, software licences", "section": "werbungskosten", "kind": "documents", "privateShare": 40, "depreciation": {"assetClass": "computer"}, "estimate": [{"type": "reduceByPerUnit", "question": "telearbeitstage", "perUnit": 3.00, "maxUnits": 100}], "note": "Enter the full amount. The tax office subtracts €3 per Telearbeitstag (at most 100 days) itself.", "de": {"label": "Computer, Handy & Software", "examples": "Laptop, Monitor, Drucker, Handy, Backup-Festplatte, Softwarelizenzen", "note": "Trag den vollen Betrag ein. Das Finanzamt zieht selbst 3 € pro Telearbeitstag ab (höchstens 100 Tage)."}},
+    {"key": "ergonomic-furniture", "kz": "158", "name": "Ergonomisches Mobiliar", "label": "Home office furniture", "examples": "Desk, office chair, desk lamp, laptop stand", "section": "werbungskosten", "kind": "documents", "estimate": [{"type": "requires", "question": "telearbeitstage", "min": 26}, {"type": "cap", "amount": 300.00, "carryOver": true}], "note": "Enter the full amount. The tax office counts up to €300 per year and the rest in later years.", "de": {"label": "Möbel fürs Homeoffice", "examples": "Schreibtisch, Bürostuhl, Schreibtischlampe, Laptopständer", "note": "Trag den vollen Betrag ein. Das Finanzamt zählt bis zu 300 € pro Jahr und den Rest in späteren Jahren."}},
+    {"key": "training", "kz": "722", "name": "Fortbildung", "label": "Courses & training", "examples": "Conference tickets, online courses, certification fees", "section": "werbungskosten", "kind": "documents", "de": {"label": "Kurse & Weiterbildung", "examples": "Konferenztickets, Onlinekurse, Zertifizierungsgebühren"}},
+    {"key": "literature", "kz": "720", "name": "Fachliteratur", "label": "Books & magazines", "examples": "Technical books, e-books, magazine subscriptions", "section": "werbungskosten", "kind": "documents", "de": {"label": "Fachbücher & Zeitschriften", "examples": "Fachbücher, E-Books, Zeitschriften-Abos"}},
+    {"key": "union-dues", "kz": "717", "name": "Gewerkschaftsbeiträge", "label": "Union dues", "examples": "Often already on your payslip", "section": "werbungskosten", "kind": "amount", "evidence": "optional", "de": {"label": "Gewerkschaftsbeiträge", "examples": "Stehen oft schon auf dem Lohnzettel"}},
+    {"key": "work-equipment", "kz": "719", "name": "Arbeitsmittel", "label": "Work tools & supplies", "examples": "Work clothing, bags, stationery, tools", "section": "werbungskosten", "kind": "documents", "depreciation": {"assetClass": "furniture"}, "de": {"label": "Arbeitsmittel & Werkzeug", "examples": "Arbeitskleidung, Taschen, Büromaterial, Werkzeug"}},
+    {"key": "other", "kz": "724", "name": "Sonstige Werbungskosten", "label": "Other work costs", "examples": "Coworking rent, professional memberships, job applications", "section": "werbungskosten", "kind": "documents", "de": {"label": "Andere berufliche Ausgaben", "examples": "Coworking-Miete, Berufsverbände, Bewerbungen"}},
+    {"key": "commuting", "kz": "718/916", "name": "Pendlerpauschale", "label": "Commuting allowance", "section": "werbungskosten", "kind": "amount", "visible": false, "evidence": "optional", "de": {"label": "Pendlerpauschale"}},
+    {"key": "double-household", "kz": "723", "name": "Doppelte Haushaltsführung", "label": "Second household", "section": "werbungskosten", "kind": "documents", "visible": false, "de": {"label": "Zweiter Haushalt"}},
+    {"key": "home-office-room", "kz": "159", "name": "Arbeitszimmer", "label": "Home office room", "section": "werbungskosten", "kind": "documents", "visible": false, "de": {"label": "Arbeitszimmer"}},
+    {"key": "family-trips-home", "kz": "300", "name": "Familienheimfahrten", "label": "Trips home to family", "section": "werbungskosten", "kind": "trips", "visible": false, "evidence": "none", "vehicle": "car", "de": {"label": "Fahrten zur Familie"}}
   ]
 }

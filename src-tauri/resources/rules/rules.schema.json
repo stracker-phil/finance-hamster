@@ -114,7 +114,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["order", "question"],
-      "description": "Asks about this item or question in the year check. Without ask it is never asked. Not allowed on hidden items or items reported by others.",
+      "description": "No longer used: older files carry it from the retired year check, and its hint stands in for missing examples.",
       "properties": {
         "order": { "type": "integer", "minimum": 0, "description": "Lower comes first; equal orders keep the file's order." },
         "question": { "type": "string", "minLength": 1, "description": "A yes/no question for an item (\"Did you travel for work?\"), or what to type for a question." },
@@ -130,7 +130,9 @@
       "properties": {
         "key": { "$ref": "#/$defs/key" },
         "kz": { "type": "string", "pattern": "^\\d{3}(/\\d{3})*$", "description": "Kennzahl in the L1 form. \"718/916\" for fields that belong together." },
-        "name": { "type": "string" },
+        "name": { "type": "string", "description": "The legal name, as FinanzOnline shows it." },
+        "label": { "type": "string", "minLength": 1, "description": "The plain name shown while recording. Defaults to name." },
+        "examples": { "type": "string", "minLength": 1, "description": "What belongs here, shown under the label while recording." },
         "section": { "$ref": "#/$defs/key", "description": "id of a section." },
         "kind": {
           "type": "string",
@@ -153,11 +155,11 @@
           "description": "What the tax office applies after you copy the value. Never changes the copy value; only adds a note.",
           "items": { "$ref": "#/$defs/estimateRule" }
         },
-        "note": { "type": "string", "description": "One line shown under the Kennzahl." },
+        "note": { "type": "string", "description": "One line shown under the Kennzahl in the FinanzOnline view." },
         "verified": { "$ref": "#/$defs/verified" },
         "source": { "$ref": "#/$defs/source" },
         "ask": { "$ref": "#/$defs/ask" },
-        "de": { "type": "object", "additionalProperties": false, "description": "German texts shown when the app's language is German; missing ones fall back to English.", "properties": { "name": { "type": "string", "minLength": 1 }, "note": { "type": "string", "minLength": 1 } } }
+        "de": { "type": "object", "additionalProperties": false, "description": "German texts shown when the app's language is German; missing ones fall back to English.", "properties": { "name": { "type": "string", "minLength": 1 }, "label": { "type": "string", "minLength": 1 }, "examples": { "type": "string", "minLength": 1 }, "note": { "type": "string", "minLength": 1 } } }
       },
       "allOf": [
         { "if": { "properties": { "kind": { "const": "trips" } } }, "then": { "required": ["vehicle"] } },
@@ -193,6 +195,16 @@
           "properties": {
             "type": { "const": "reduceBy" },
             "question": { "$ref": "#/$defs/key", "description": "An amount question whose answer the tax office subtracts." }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "required": ["type", "question", "perUnit", "maxUnits"],
+          "properties": {
+            "type": { "const": "reduceByPerUnit" },
+            "question": { "$ref": "#/$defs/key", "description": "An integer question, such as days." },
+            "perUnit": { "$ref": "#/$defs/amount", "description": "What the tax office subtracts per unit." },
+            "maxUnits": { "type": "integer", "minimum": 0, "description": "Units counted at most." }
           }
         }
       ]

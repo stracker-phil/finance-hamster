@@ -50,7 +50,7 @@ fn a_minimal_file_reads_back_as_typed_rules() {
 fn the_shipped_seed_is_valid_with_twelve_items_all_verified() {
     let ruleset = read(SEED, &no_keys()).unwrap();
     assert_eq!(ruleset.year, 2026);
-    assert_eq!(ruleset.ruleset, "2026 v3");
+    assert_eq!(ruleset.ruleset, "2026 v4");
     assert_eq!(ruleset.items.len(), 12);
     assert_eq!(ruleset.unverified_count(), 0);
 }
@@ -59,7 +59,7 @@ fn the_shipped_seed_is_valid_with_twelve_items_all_verified() {
 fn the_shipped_2025_seed_is_valid_with_twelve_items_all_verified() {
     let ruleset = read(SEED_2025, &no_keys()).unwrap();
     assert_eq!(ruleset.year, 2025);
-    assert_eq!(ruleset.ruleset, "2025 v2");
+    assert_eq!(ruleset.ruleset, "2025 v3");
     assert_eq!(ruleset.items.len(), 12);
     assert_eq!(ruleset.unverified_count(), 0);
 }
@@ -80,11 +80,108 @@ fn both_shipped_seeds_carry_the_same_items_and_kennzahlen() {
 }
 
 #[test]
-fn the_shipped_seed_asks_ten_things_in_the_year_check() {
-    let ruleset = read(SEED, &no_keys()).unwrap();
-    let asked = ruleset.items.iter().filter(|i| i.ask.is_some()).count()
-        + ruleset.questions.iter().filter(|q| q.ask.is_some()).count();
-    assert_eq!(asked, 10);
+fn both_shipped_seeds_label_every_visible_item_in_english_and_german_and_ask_nothing() {
+    for (name, text) in [("2025", SEED_2025), ("2026", SEED)] {
+        let ruleset = read(text, &no_keys()).unwrap();
+        for item in ruleset.items.iter().filter(|i| i.visible) {
+            assert!(
+                item.label.as_deref().is_some_and(|l| !l.trim().is_empty()),
+                "{name} label of {}",
+                item.key
+            );
+            let german = item.de.as_ref().and_then(|d| d.label.as_deref());
+            assert!(
+                german.is_some_and(|l| !l.trim().is_empty()),
+                "{name} German label of {}",
+                item.key
+            );
+        }
+        assert!(
+            ruleset.items.iter().all(|i| i.ask.is_none()),
+            "{name} items"
+        );
+        assert!(
+            ruleset.questions.iter().all(|q| q.ask.is_none()),
+            "{name} questions"
+        );
+        assert!(
+            ruleset
+                .questions
+                .iter()
+                .all(|q| q.id != "telearbeitspauschale"),
+            "{name} questions"
+        );
+    }
+}
+
+fn days_and_paid() -> Value {
+    json!([
+        { "id": "days", "label": "Days", "type": "integer" },
+        { "id": "paid", "label": "Paid", "type": "amount" }
+    ])
+}
+
+fn per_unit(question: &str) -> Value {
+    json!([{ "type": "reduceByPerUnit", "question": question, "perUnit": 3.0, "maxUnits": 100 }])
+}
+
+#[test]
+fn a_per_unit_reduction_must_name_an_existing_question() {
+    assert_eq!(
+        problems_of(&[("/items/0/estimate", per_unit("days"))]),
+        vec!["items[0] (books): the question \"days\" doesn't exist".to_string()]
+    );
+}
+
+#[test]
+fn a_per_unit_reduction_needs_an_integer_question() {
+    assert_eq!(
+        problems_of(&[
+            ("/questions", days_and_paid()),
+            ("/items/0/estimate", per_unit("paid"))
+        ]),
+        vec![
+            "items[0] (books): reduceByPerUnit needs an integer question, \"paid\" is an amount"
+                .to_string()
+        ]
+    );
+    assert!(
+        read_value(&edited(&[
+            ("/questions", days_and_paid()),
+            ("/items/0/estimate", per_unit("days"))
+        ]))
+        .is_ok()
+    );
+}
+
+#[test]
+fn a_per_unit_reduction_problem_reads_in_german_when_the_language_is_german() {
+    let problems = crate::i18n::with_lang(crate::settings::Language::De, || {
+        problems_of(&[
+            ("/questions", days_and_paid()),
+            ("/items/0/estimate", per_unit("paid")),
+        ])
+    });
+    assert_eq!(
+        problems,
+        vec![
+            "items[0] (books): reduceByPerUnit braucht eine Ganzzahlfrage, „paid“ ist ein Betrag"
+                .to_string()
+        ]
+    );
+}
+
+#[test]
+fn an_empty_german_item_label_or_examples_text_is_reported_with_its_field() {
+    for field in ["label", "examples"] {
+        assert_eq!(
+            problems_of(&[("/items/0/de", json!({ field: "  " }))]),
+            vec![format!(
+                "items[0].de.{field}: the German text is empty; remove it to show the English one"
+            )],
+            "{field}"
+        );
+    }
 }
 
 fn ask(order: u32, question: &str) -> Value {

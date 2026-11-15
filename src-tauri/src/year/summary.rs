@@ -111,14 +111,15 @@ pub fn kennzahlen(
         .filter(|i| i.visible)
         .map(|item| {
             let own: Vec<&Placed> = facts.placed.iter().filter(|p| p.item == item.key).collect();
+            let total = own.iter().map(|p| p.cents).sum();
             KennzahlView {
                 key: item.key.clone(),
                 kz: item.kz.clone(),
                 name: item.display_name().to_string(),
-                copy: copy_value(own.iter().map(|p| p.cents).sum()),
+                copy: copy_value(total),
                 note: if is_countable(item) {
                     (!own.is_empty())
-                        .then(|| notes::note(item, &ruleset.questions, given, format))
+                        .then(|| notes::note(item, &ruleset.questions, given, total, format))
                         .flatten()
                 } else {
                     Some(crate::tr!(

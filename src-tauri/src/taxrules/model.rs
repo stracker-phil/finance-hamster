@@ -272,7 +272,14 @@ pub struct Depreciation {
 pub struct Item {
     pub key: String,
     pub kz: String,
+    /// The legal name, as FinanzOnline shows it.
     pub name: String,
+    /// The plain name shown while recording; `name` when missing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    /// What belongs here, as examples ("Laptop, monitor, …").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub examples: Option<String>,
     pub section: String,
     pub kind: ItemKind,
     #[serde(default = "default_true")]
@@ -305,12 +312,38 @@ pub struct ItemDe {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub examples: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub note: Option<String>,
 }
 
 impl Item {
     pub fn display_name(&self) -> &str {
         shown(&self.name, self.de.as_ref().and_then(|d| d.name.as_ref()))
+    }
+
+    pub fn display_label(&self) -> &str {
+        let de = self.de.as_ref();
+        match self.label.as_ref() {
+            Some(label) => shown(label, de.and_then(|d| d.label.as_ref())),
+            None => self.display_name(),
+        }
+    }
+
+    /// The examples; older files that predate them fall back to their year check hint.
+    pub fn display_examples(&self) -> Option<&str> {
+        let de = self.de.as_ref();
+        shown_opt(self.examples.as_ref(), de.and_then(|d| d.examples.as_ref()))
+            .or_else(|| self.ask.as_ref().and_then(Ask::display_hint))
+    }
+
+    pub fn display_note(&self) -> Option<&str> {
+        shown_opt(
+            self.note.as_ref(),
+            self.de.as_ref().and_then(|d| d.note.as_ref()),
+        )
     }
 
     /// What the entry needs before it counts; information-only items never need a PDF.
@@ -322,7 +355,7 @@ impl Item {
     }
 }
 
-/// What the tax office applies after the value is copied; it only adds a note (ADR 0040).
+/// What the tax office applies after the value is copied; it only adds a note in the FinanzOnline view.
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
 #[serde(tag = "type", rename_all = "camelCase", deny_unknown_fields)]
 pub enum EstimateRule {
@@ -338,6 +371,13 @@ pub enum EstimateRule {
     },
     ReduceBy {
         question: String,
+    },
+    /// `perUnit` for each unit the integer question counts, at most `maxUnits` of them.
+    #[serde(rename_all = "camelCase")]
+    ReduceByPerUnit {
+        question: String,
+        per_unit: Cents,
+        max_units: u32,
     },
 }
 
@@ -494,6 +534,137 @@ mod tests {
 
         let copy: Ruleset = serde_json::from_value(value).unwrap();
         assert_eq!(copy, rules);
+    }
+
+    fn item_json(extra: serde_json::Value) -> Item {
+        let mut item = json!({
+            "key": "books", "kz": "720", "name": "Fachliteratur", "section": "main", "kind": "documents"
+        });
+        item.as_object_mut()
+            .unwrap()
+            .extend(extra.as_object().unwrap().clone());
+        serde_json::from_value(item).unwrap()
+    }
+
+    #[test]
+    fn an_item_label_falls_back_to_its_name() {
+        let item = item_json(json!({ "de": { "name": "Fachbücher" } }));
+
+        for (language, expected) in [
+            (Language::En, "Fachliteratur"),
+            (Language::De, "Fachbücher"),
+        ] {
+            crate::i18n::with_lang(language, || {
+                assert_eq!(item.display_label(), expected, "{language:?}");
+            });
+        }
+    }
+
+    #[test]
+    fn an_item_label_is_german_only_when_the_file_has_a_german_label() {
+        let with_german = item_json(json!({
+            "label": "Books", "de": { "name": "Fachbücher", "label": "Bücher" }
+        }));
+        let english_only = item_json(json!({ "label": "Books", "de": { "name": "Fachbücher" } }));
+
+        crate::i18n::with_lang(Language::En, || {
+            assert_eq!(with_german.display_label(), "Books");
+        });
+        crate::i18n::with_lang(Language::De, || {
+            assert_eq!(with_german.display_label(), "Bücher");
+            assert_eq!(english_only.display_label(), "Books");
+        });
+    }
+
+    #[test]
+    fn item_examples_are_german_when_the_language_is_german_and_the_file_has_them() {
+        let item = item_json(json!({
+            "examples": "Laptop, monitor", "de": { "examples": "Laptop, Bildschirm" }
+        }));
+
+        crate::i18n::with_lang(Language::En, || {
+            assert_eq!(item.display_examples(), Some("Laptop, monitor"));
+        });
+        crate::i18n::with_lang(Language::De, || {
+            assert_eq!(item.display_examples(), Some("Laptop, Bildschirm"));
+        });
+    }
+
+    #[test]
+    fn item_examples_fall_back_to_the_ask_hint_and_then_to_nothing() {
+        let hinted = item_json(json!({
+            "ask": {
+                "order": 1, "question": "Books?", "hint": "Contract or device",
+                "de": { "hint": "Vertrag oder Gerät" }
+            }
+        }));
+        let both = item_json(json!({
+            "examples": "Laptop", "ask": { "order": 1, "question": "Books?", "hint": "Contract" }
+        }));
+        let bare = item_json(json!({}));
+
+        crate::i18n::with_lang(Language::En, || {
+            assert_eq!(hinted.display_examples(), Some("Contract or device"));
+            assert_eq!(both.display_examples(), Some("Laptop"));
+            assert_eq!(bare.display_examples(), None);
+        });
+        crate::i18n::with_lang(Language::De, || {
+            assert_eq!(hinted.display_examples(), Some("Vertrag oder Gerät"));
+        });
+    }
+
+    #[test]
+    fn an_item_note_is_german_when_available_and_english_otherwise() {
+        let with_german =
+            item_json(json!({ "note": "Keep receipts", "de": { "note": "Belege aufheben" } }));
+        let english_only = item_json(json!({ "note": "Keep receipts" }));
+        let bare = item_json(json!({}));
+
+        crate::i18n::with_lang(Language::En, || {
+            assert_eq!(with_german.display_note(), Some("Keep receipts"));
+        });
+        crate::i18n::with_lang(Language::De, || {
+            assert_eq!(with_german.display_note(), Some("Belege aufheben"));
+            assert_eq!(english_only.display_note(), Some("Keep receipts"));
+            assert_eq!(bare.display_note(), None);
+        });
+    }
+
+    #[test]
+    fn item_label_and_examples_round_trip_and_are_left_out_when_absent() {
+        let item = item_json(json!({
+            "label": "Books", "examples": "Novels",
+            "de": { "label": "Bücher", "examples": "Romane" }
+        }));
+        let value = serde_json::to_value(&item).unwrap();
+        assert_eq!(value["label"], json!("Books"));
+        assert_eq!(value["examples"], json!("Novels"));
+        assert_eq!(
+            value["de"],
+            json!({ "label": "Bücher", "examples": "Romane" })
+        );
+        assert_eq!(serde_json::from_value::<Item>(value).unwrap(), item);
+
+        let bare = serde_json::to_value(item_json(json!({}))).unwrap();
+        assert!(bare.get("label").is_none());
+        assert!(bare.get("examples").is_none());
+    }
+
+    #[test]
+    fn a_per_unit_reduction_reads_from_json() {
+        let rule: EstimateRule = serde_json::from_value(json!({
+            "type": "reduceByPerUnit", "question": "days", "perUnit": 3.00, "maxUnits": 100
+        }))
+        .unwrap();
+
+        assert_eq!(
+            rule,
+            EstimateRule::ReduceByPerUnit {
+                question: "days".into(),
+                per_unit: Cents(300),
+                max_units: 100,
+            }
+        );
     }
 
     #[test]

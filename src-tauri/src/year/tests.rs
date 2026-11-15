@@ -720,9 +720,9 @@ fn a_kennzahl_has_a_note_only_when_it_has_rows() {
     assert_eq!(
         notes,
         [
-            Some("Enter the full amount. The tax office counts up to €300.00 per year."),
             None,
-            Some("Answer Telearbeitstage under Questions first."),
+            None,
+            Some("Enter your Telearbeitstage first."),
             None,
             Some("Reported by others; shown for reference, never counted here")
         ]

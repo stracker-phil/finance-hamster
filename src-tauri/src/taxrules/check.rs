@@ -186,7 +186,16 @@ fn schema_constraints(r: &Ruleset, p: &mut Vec<String>) {
         }
         ask_text(item.ask.as_ref(), &at, p);
         if let Some(de) = &item.de {
-            german(&[("name", &de.name), ("note", &de.note)], &at, p);
+            german(
+                &[
+                    ("name", &de.name),
+                    ("label", &de.label),
+                    ("examples", &de.examples),
+                    ("note", &de.note),
+                ],
+                &at,
+                p,
+            );
         }
         if item.ask.is_some() {
             if !item.visible {
@@ -301,6 +310,16 @@ fn reload_checks(r: &Ruleset, used_keys: &BTreeSet<String>, p: &mut Vec<String>)
                     )),
                     Some(QuestionType::Amount) => {}
                 },
+                EstimateRule::ReduceByPerUnit { question, .. } => {
+                    match questions.get(question.as_str()) {
+                        None => p.push(missing_question(&at, question)),
+                        Some(QuestionType::Amount) => p.push(crate::tr!(
+                            "{at}: reduceByPerUnit needs an integer question, \"{question}\" is an amount",
+                            "{at}: reduceByPerUnit braucht eine Ganzzahlfrage, „{question}“ ist ein Betrag"
+                        )),
+                        Some(QuestionType::Integer) => {}
+                    }
+                }
                 EstimateRule::Requires { .. } | EstimateRule::Cap { .. } => {}
             }
         }

@@ -360,12 +360,12 @@ mod tests {
                 TaxYear {
                     year: 2026,
                     state: YearState::Open,
-                    ruleset: "2026 v3".into()
+                    ruleset: "2026 v4".into()
                 },
                 TaxYear {
                     year: 2025,
                     state: YearState::Open,
-                    ruleset: "2025 v2".into()
+                    ruleset: "2025 v3".into()
                 }
             ]
         );
