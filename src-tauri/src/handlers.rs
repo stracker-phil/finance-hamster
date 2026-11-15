@@ -29,6 +29,8 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static
         crate::taxrules::commands::rules_set_json,
         crate::taxrules::commands::rules_use_builtin,
         crate::taxrules::commands::rules_start_next,
+        crate::taxrules::commands::rules_import_choose,
+        crate::taxrules::commands::rules_import,
         crate::taxrules::commands::rules_take_notices,
         crate::preview::commands::pdf_view_show,
         crate::preview::commands::pdf_view_move,

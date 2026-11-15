@@ -1,9 +1,10 @@
+import { ChevronLeft } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Icon } from "../components/icons";
 import { useT } from "../i18n";
 import { SETTINGS_PAGES } from "./pages";
-import { RevealTarget } from "./controls";
-import { groupsOf, resolvePage, searchSettings, type SettingsMatch } from "./registry";
+import { RevealTarget, SettingsOpen } from "./controls";
+import { groupsOf, resolveTarget, searchSettings, type SettingsMatch } from "./registry";
 
 /** What Settings is asked to show: a page or row id. A new object per request, so asking again reveals again. */
 export interface SettingsRequest {
@@ -74,25 +75,39 @@ function SettingsNav({ current, onOpen }: { current: string; onOpen: (id: string
   );
 }
 
-/** `request.id` may name a row: its page opens scrolled to it, washed in the accent once. */
+/** `request.id` may name a row (its page opens scrolled to it, washed in the accent once) or a detail one level
+ *  down (`<page id>/<detail id>`), shown in the pane with a back button. */
 export function SettingsWindow({ request, onOpen }: { request: SettingsRequest; onOpen: (id: string) => void }) {
-  // Page labels and intros read the language; this re-renders them when it changes.
-  useT();
-  const page = resolvePage(SETTINGS_PAGES, request.id);
-  const target = useMemo(() => (request.id && request.id !== page.id ? { id: request.id } : undefined), [request, page]);
+  const text = useT().settings.window;
+  const { page, detail } = resolveTarget(SETTINGS_PAGES, request.id);
+  const target = useMemo(() => (request.id && request.id !== page.id && !detail ? { id: request.id } : undefined), [request, page, detail]);
   const { Body } = page;
+  const Detail = detail !== undefined ? page.detail?.Body : undefined;
   return (
     <div className="settings-window">
       <SettingsNav current={page.id} onOpen={onOpen} />
       <div className="settings-pane">
         <header data-tauri-drag-region>
-          <h2 data-tauri-drag-region>{page.label}</h2>
+          {Detail && (
+            <button type="button" className="icon-btn settings-back" aria-label={text.back(page.label)} onClick={() => onOpen(page.id)}>
+              <ChevronLeft size={18} />
+            </button>
+          )}
+          <h2 data-tauri-drag-region>{Detail && detail ? page.detail?.title(detail) : page.label}</h2>
         </header>
-        <div className="settings-body scroller" key={page.id}>
-          {page.intro && <p className="settings-intro">{page.intro}</p>}
-          <RevealTarget.Provider value={target}>
-            <Body />
-          </RevealTarget.Provider>
+        <div className="settings-body scroller" key={detail === undefined ? page.id : `${page.id}/${detail}`}>
+          <SettingsOpen.Provider value={onOpen}>
+            {Detail && detail ? (
+              <Detail id={detail} />
+            ) : (
+              <>
+                {page.intro && <p className="settings-intro">{page.intro}</p>}
+                <RevealTarget.Provider value={target}>
+                  <Body />
+                </RevealTarget.Provider>
+              </>
+            )}
+          </SettingsOpen.Provider>
         </div>
       </div>
     </div>

@@ -251,10 +251,7 @@ fn item_group(r: &Ruleset, item: &Item, format: NumberFormat) -> Option<RulesGro
                 let per = unit(question).unwrap_or_default();
                 fields.push(amount(
                     path("perUnit"),
-                    crate::tr!(
-                        "The tax office subtracts per {per}",
-                        "Das Finanzamt zieht pro {per} ab"
-                    ),
+                    crate::tr!("Subtracted per unit ({per})", "Abzug pro Einheit ({per})"),
                     per_unit.0,
                     None,
                     format,

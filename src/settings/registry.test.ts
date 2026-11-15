@@ -1,14 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { groupsOf, resolvePage, searchSettings, type SettingsPage } from "./registry";
+import { groupsOf, resolvePage, resolveTarget, searchSettings, type SettingsPage } from "./registry";
 
-const page = (id: string, label: string, group: SettingsPage["group"], rows: SettingsPage["rows"] = []): SettingsPage => ({
-  id,
-  group,
-  label,
-  icon: "settings",
-  Body: () => null,
-  rows,
-});
+const page = (id: string, label: string, group: SettingsPage["group"], rows: SettingsPage["rows"] = []): SettingsPage => ({ id, group, label, icon: "settings", Body: () => null, rows });
 
 const PAGES = [
   page("rules", "Tax Rules", "Finance", [{ id: "reload", title: "Reload rules", keywords: ["refresh"] }]),
@@ -27,6 +20,47 @@ describe("resolvePage", () => {
 
   it.each([undefined, "missing"])("falls back to the first page for %s", (id) => {
     expect(resolvePage(PAGES, id).id).toBe("rules");
+  });
+});
+
+describe("resolveTarget", () => {
+  const withDetail = (p: SettingsPage): SettingsPage => ({ ...p, detail: { title: (id) => `Rules ${id}`, Body: () => null } });
+  const pages = [withDetail(PAGES[0]), PAGES[1], PAGES[2]];
+
+  it("returns the page and the detail for <page id>/<detail id> on a page with details", () => {
+    const target = resolveTarget(pages, "rules/2026");
+
+    expect(target.page.id).toBe("rules");
+    expect(target.detail).toBe("2026");
+  });
+
+  it("keeps slashes inside the detail id", () => {
+    expect(resolveTarget(pages, "rules/a/b").detail).toBe("a/b");
+  });
+
+  it("returns the page without a detail for a plain page id", () => {
+    expect(resolveTarget(pages, "look")).toEqual({ page: PAGES[1] });
+  });
+
+  it("returns the page that holds a row id, without a detail", () => {
+    const target = resolveTarget(pages, "mode");
+
+    expect(target.page.id).toBe("look");
+    expect(target.detail).toBeUndefined();
+  });
+
+  it("falls back for a detail on a page without details", () => {
+    const target = resolveTarget(pages, "keys/x");
+
+    expect(target.page.id).toBe("rules");
+    expect(target.detail).toBeUndefined();
+  });
+
+  it.each([undefined, "missing", "missing/x"])("falls back to the first page for %s", (id) => {
+    const target = resolveTarget(pages, id);
+
+    expect(target.page.id).toBe("rules");
+    expect(target.detail).toBeUndefined();
   });
 });
 

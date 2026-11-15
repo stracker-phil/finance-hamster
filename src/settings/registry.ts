@@ -21,6 +21,8 @@ export interface SettingsPage {
   intro?: ReactNode;
   Body: ComponentType;
   rows: SettingsRow[];
+  /** A page one level down, addressed as `<page id>/<detail id>` and opened from a `DrillRow`. */
+  detail?: { title: (id: string) => string; Body: ComponentType<{ id: string }> };
 }
 
 /** A search hit; `row` is absent when the page itself matched. */
@@ -32,6 +34,13 @@ export interface SettingsMatch {
 /** The named page, the page holding the named row, or the first when the name is absent or unknown. */
 export function resolvePage(pages: SettingsPage[], id: string | undefined): SettingsPage {
   return pages.find((p) => p.id === id) ?? pages.find((p) => p.rows.some((r) => r.id === id)) ?? pages[0];
+}
+
+/** The page a request names and, for `<page id>/<detail id>` on a page with details, the detail it opens. */
+export function resolveTarget(pages: SettingsPage[], id: string | undefined): { page: SettingsPage; detail?: string } {
+  const [pageId, detail] = id?.split(/\/(.*)/s) ?? [];
+  const page = pages.find((p) => p.id === pageId && p.detail);
+  return page && detail ? { page, detail } : { page: resolvePage(pages, id) };
 }
 
 /** Every page and row matching `query`, best first, ranked like the palette. */

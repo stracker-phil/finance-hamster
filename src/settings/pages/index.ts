@@ -8,6 +8,7 @@ import { AppearancePage } from "./AppearancePage";
 import { PrivacyPage } from "./PrivacyPage";
 import { RemindersPage } from "./RemindersPage";
 import { RulesPage } from "./RulesPage";
+import { RulesYearPage } from "./RulesYearPage";
 import { ShortcutsPage } from "./ShortcutsPage";
 import { StatusPage } from "./StatusPage";
 import { TaxRulesPage } from "./TaxRulesPage";
@@ -91,9 +92,11 @@ export const SETTINGS_PAGES: SettingsPage[] = [
       id: "taxrules",
       icon: "taxRules",
       Body: TaxRulesPage,
+      detail: { title: (year) => t().settings.taxRules.yearTitle(year), Body: RulesYearPage },
       rows: [
         row("tax-years", (s) => s.taxRules.years, ["rules", "regeln", "kilometergeld", "kennzahl", "json", "pauschale", "gwg"]),
         row("start-year", (s) => s.taxRules.startButton.replace("…", "").trim(), ["next year", "new year", "nächstes jahr", "neues jahr"]),
+        row("import-rules", (s) => s.taxRules.importTitle, ["json", "file", "datei", "import"]),
       ],
     },
     { group: finance, label: (s) => s.taxRules.label, intro: (s) => s.taxRules.intro },

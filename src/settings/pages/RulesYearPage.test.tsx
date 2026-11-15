@@ -9,17 +9,16 @@ import { useStore } from "../../state/store";
 import { renderWithQuery } from "../../test/renderWithQuery";
 import { rulesField, rulesOverview, rulesYear, rulesYearView } from "../../test/rules";
 import { categoryChoice } from "../../test/year";
-import { RulesYearSheet } from "./RulesYearSheet";
+import { RulesYearPage } from "./RulesYearPage";
 
 const mocked = vi.mocked(api, true);
 
 const toasts = () => useStore.getState().toasts.map((t) => ({ kind: t.kind, message: t.message }));
 const button = (name: string) => screen.getByRole("button", { name });
 
-async function renderSheet(onClose = vi.fn()) {
-  renderWithQuery(<RulesYearSheet year={2026} onClose={onClose} />);
-  await screen.findByRole("dialog", { name: "Tax Rules 2026" });
-  return onClose;
+async function renderSheet() {
+  renderWithQuery(<RulesYearPage id="2026" />);
+  await screen.findByLabelText("Home office limit");
 }
 
 const limit = () => screen.findByLabelText<HTMLInputElement>("Home office limit");
@@ -38,16 +37,34 @@ beforeEach(() => {
   mocked.yearSetCategoryShown.mockResolvedValue(null);
 });
 
-describe("RulesYearSheet", () => {
+describe("RulesYearPage", () => {
   describe("contents", () => {
-    it("says where the year's rules come from and lists the groups, facts and sources", async () => {
-      mocked.rulesYear.mockResolvedValue(
-        rulesYearView({ groups: [{ title: "Home office", fields: [rulesField()], facts: ["Applies per calendar year"] }], sources: ["Example Tax Act §16"] }),
-      );
+    it("describes the year in an intro line like the year list does", async () => {
+      mocked.rulesOverview.mockResolvedValue(rulesOverview([rulesYear({ unverified: 2 })]));
+      await renderSheet();
+
+      expect(await screen.findByText("Built-in rules 2026 v1 · open · 2 unverified")).toBeTruthy();
+    });
+
+    it("falls back to where the rules come from when the overview lacks the year", async () => {
+      mocked.rulesOverview.mockResolvedValue(rulesOverview([rulesYear({ year: 2025 })]));
       await renderSheet();
 
       expect(await screen.findByText("Built-in rules 2026 v1")).toBeTruthy();
-      const group = screen.getByRole("region", { name: "Home office" });
+    });
+
+    it("loads the rules of the year named by the id", async () => {
+      renderWithQuery(<RulesYearPage id="2025" />);
+
+      await screen.findByLabelText("Home office limit");
+      expect(mocked.rulesYear).toHaveBeenCalledWith(2025);
+    });
+
+    it("lists the groups, facts and sources", async () => {
+      mocked.rulesYear.mockResolvedValue(rulesYearView({ groups: [{ title: "Home office", fields: [rulesField()], facts: ["Applies per calendar year"] }], sources: ["Example Tax Act §16"] }));
+      await renderSheet();
+
+      const group = await screen.findByRole("region", { name: "Home office" });
       expect((await within(group).findByLabelText<HTMLInputElement>("Home office limit")).value).toBe("300");
       expect(within(group).getByText("Applies per calendar year")).toBeTruthy();
       expect(within(screen.getByRole("region", { name: "Sources" })).getByText("Example Tax Act §16")).toBeTruthy();
@@ -55,9 +72,10 @@ describe("RulesYearSheet", () => {
 
     it("names the version the owner's rules are based on", async () => {
       mocked.rulesYear.mockResolvedValue(rulesYearView({ source: "own", basedOn: "2026 v1" }));
+      mocked.rulesOverview.mockResolvedValue(rulesOverview([rulesYear({ source: "own", basedOn: "2026 v1" })]));
       await renderSheet();
 
-      expect(await screen.findByText("Your version, based on 2026 v1")).toBeTruthy();
+      expect(await screen.findByText("Your version, based on 2026 v1 · open")).toBeTruthy();
     });
 
     it("lists a switch per category of the year and saves a toggle for that year", async () => {
@@ -147,7 +165,8 @@ describe("RulesYearSheet", () => {
       await limit();
 
       expect(screen.queryByText("Advanced")).toBeNull();
-      expect(screen.queryByRole("button", { name: "Back to the Built-in Rules" })).toBeNull();
+      expect(screen.queryByText("Back to the Built-in Rules")).toBeNull();
+      expect(screen.queryByRole("button", { name: "Use" })).toBeNull();
     });
   });
 
@@ -157,7 +176,8 @@ describe("RulesYearSheet", () => {
       mocked.rulesOverview.mockResolvedValue(rulesOverview([rulesYear({ source: "own", basedOn: "2026 v1" })]));
       await renderSheet();
 
-      await userEvent.click(await screen.findByRole("button", { name: "Back to the Built-in Rules" }));
+      expect(await screen.findByText("Back to the Built-in Rules")).toBeTruthy();
+      await userEvent.click(button("Use"));
 
       await waitFor(() => expect(toasts()).toEqual([{ kind: "success", message: "Use built-in rules" }]));
       expect(mocked.rulesUseBuiltin).toHaveBeenCalledWith(2026);
@@ -168,7 +188,8 @@ describe("RulesYearSheet", () => {
       mocked.rulesOverview.mockResolvedValue(rulesOverview([rulesYear({ source: "own", basedOn: "2026 v1", builtinNewer: "2026 v2" })]));
       await renderSheet();
 
-      await userEvent.click(await screen.findByRole("button", { name: "Use Built-in 2026 v2" }));
+      expect(await screen.findByText("Use Built-in 2026 v2")).toBeTruthy();
+      await userEvent.click(button("Use"));
 
       expect(mocked.rulesUseBuiltin).toHaveBeenCalledWith(2026);
     });
@@ -179,7 +200,7 @@ describe("RulesYearSheet", () => {
       mocked.rulesUseBuiltin.mockRejectedValue({ kind: "invalid_input", message: "Built-in rules can't be used", code: null });
       await renderSheet();
 
-      await userEvent.click(await screen.findByRole("button", { name: "Back to the Built-in Rules" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Use" }));
 
       await waitFor(() => expect(toasts()).toEqual([{ kind: "error", message: "Built-in rules can't be used" }]));
     });
@@ -194,7 +215,8 @@ describe("RulesYearSheet", () => {
       await limit();
       await waitFor(() => expect(mocked.rulesOverview).toHaveBeenCalled());
 
-      expect(screen.queryByRole("button", { name: /Back to the Built-in Rules|Use Built-in/ })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Use" })).toBeNull();
+      expect(screen.queryByText(/Back to the Built-in Rules|Use Built-in/)).toBeNull();
     });
   });
 
@@ -274,7 +296,7 @@ describe("RulesYearSheet", () => {
       await waitFor(() => expect(toasts()).toEqual([{ kind: "success", message: "Edit rules JSON" }]));
       expect(mocked.rulesSetJson).toHaveBeenCalledWith(2026, "demo-jsonx");
       expect(screen.queryByRole("dialog", { name: "Tax Rules 2026 as JSON" })).toBeNull();
-      expect(screen.getByRole("dialog", { name: "Tax Rules 2026" })).toBeTruthy();
+      expect(screen.getByLabelText("Home office limit")).toBeTruthy();
     });
 
     it("keeps the sheet open and shows the error when saving fails", async () => {
@@ -294,16 +316,9 @@ describe("RulesYearSheet", () => {
 
       await userEvent.click(button("Cancel"));
 
-      expect(screen.getByRole("dialog", { name: "Tax Rules 2026" })).toBeTruthy();
+      expect(screen.queryByRole("dialog", { name: "Tax Rules 2026 as JSON" })).toBeNull();
+      expect(screen.getByLabelText("Home office limit")).toBeTruthy();
       expect(mocked.rulesSetJson).not.toHaveBeenCalled();
     });
-  });
-
-  it("calls onClose when Done is clicked", async () => {
-    const onClose = await renderSheet();
-
-    await userEvent.click(button("Done"));
-
-    expect(onClose).toHaveBeenCalled();
   });
 });

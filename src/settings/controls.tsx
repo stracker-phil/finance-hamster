@@ -1,7 +1,11 @@
+import { ChevronRight } from "lucide-react";
 import { createContext, useContext, useEffect, useId, useRef, type ReactNode } from "react";
 
 /** The row Settings opens at; a new object per request, so asking again reveals it again. */
 export const RevealTarget = createContext<{ id: string } | undefined>(undefined);
+
+/** Opens a Settings page, row or detail by id. */
+export const SettingsOpen = createContext<(id: string) => void>(() => {});
 
 /** Scrolls to and washes the element whose `anchor` the open request names. */
 function useReveal<E extends HTMLElement>(anchor: string | undefined) {
@@ -48,6 +52,21 @@ export function Row({ label, description, anchor, htmlFor, children }: RowProps)
       </div>
       {children !== undefined && <div className="settings-row__control">{children}</div>}
     </div>
+  );
+}
+
+/** A row that opens a page one level down (`target`, `<page id>/<detail id>`), marked by a chevron. */
+export function DrillRow({ label, description, anchor, target }: { label: string; description?: ReactNode; anchor?: string; target: string }) {
+  const ref = useReveal<HTMLButtonElement>(anchor);
+  const open = useContext(SettingsOpen);
+  return (
+    <button ref={ref} type="button" className="settings-row settings-row--drill" onClick={() => open(target)}>
+      <span className="settings-row__text">
+        <span>{label}</span>
+        {description && <span className="settings-row__desc">{description}</span>}
+      </span>
+      <ChevronRight className="settings-row__chevron" size={15} aria-hidden="true" />
+    </button>
   );
 }
 

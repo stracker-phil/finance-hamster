@@ -679,6 +679,19 @@ export type RulesGroup = { title: string, fields: Array<RulesField>,
  */
 facts: Array<string>, };
 
+/**
+ * What importing a file would do, shown before it happens.
+ */
+export type RulesImport = { 
+/**
+ * The year the file names; None when it can't be read.
+ */
+year: number | null, text: string, 
+/**
+ * The year exists; importing replaces its rules.
+ */
+replaces: boolean, problems: Array<string>, changes: Array<string>, };
+
 export type RulesOverview = { 
 /**
  * Newest first.

@@ -184,7 +184,7 @@ fn an_item_group_lists_its_private_share_and_each_estimate_value() {
             ),
             field(
                 "items/books/estimate/2/perUnit",
-                "The tax office subtracts per days",
+                "Subtracted per unit (days)",
                 "3.00",
                 "€",
                 FieldKind::Amount

@@ -13,6 +13,8 @@ editing it here and releasing. Bump `ruleset` (`2026 v4` → `2026 v5`) with eve
 | Closed | The year keeps a frozen copy; nothing changes it. |
 
 - **Start <year>** in Settings begins the next year from its built-in file, or as a copy of the newest year.
+- **Import JSON…** in Settings takes a file like these for the year it names: it replaces an open year's rules or
+  starts a year that doesn't exist yet (ADR 0054).
 
 ## How values are calculated
 

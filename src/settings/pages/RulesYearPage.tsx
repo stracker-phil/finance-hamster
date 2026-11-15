@@ -5,6 +5,8 @@ import { useT } from "../../i18n";
 import { showError, undoToast } from "../../lib/undoToast";
 import { useRulesOverview, useRulesYear } from "../../queries/taxYears";
 import { CategorySwitches } from "../../year/CategorySwitches";
+import { Group, Row } from "../controls";
+import { describeYear } from "./TaxRulesPage";
 
 /** One value; saved when it loses focus or on Return, only when it changed. */
 function FieldRow({ year, field, editable }: { year: number; field: RulesField; editable: boolean }) {
@@ -120,67 +122,60 @@ function JsonSheet({ year, onClose }: { year: number; onClose: () => void }) {
   );
 }
 
-/** One year's rules in plain words. */
-export function RulesYearSheet({ year, onClose }: { year: number; onClose: () => void }) {
-  const id = useId();
+/** Settings → Tax Rules → one year: its rules in plain words, editable while the year is open. */
+export function RulesYearPage({ id }: { id: string }) {
+  const year = Number(id);
   const { data } = useRulesYear(year);
   const overview = useRulesOverview().data?.years.find((y) => y.year === year);
   const [editingJson, setEditingJson] = useState(false);
   const text = useT().settings.taxRules;
-  if (editingJson) return <JsonSheet year={year} onClose={() => setEditingJson(false)} />;
   const useBuiltin = () => {
     api.rulesUseBuiltin(year).then(undoToast).catch(showError);
   };
   return (
-    <Modal labelledBy={id} className="sheet rules-sheet" onClose={onClose}>
-      <h2 id={id}>{text.sheetTitle(year)}</h2>
-      {data && <p>{data.source === "own" ? text.own(data.basedOn) : text.builtin(data.ruleset)}</p>}
-      <div className="rules-sheet__body">
-        {data?.groups.map((group) => (
-          <section key={group.title} className="settings-group" aria-label={group.title}>
-            <h3>{group.title}</h3>
-            <div className="settings-card">
-              {group.fields.map((field) => (
-                <FieldRow key={field.path} year={year} field={field} editable={data.editable} />
-              ))}
-              {group.facts.map((fact) => (
-                <div key={fact} className="settings-row settings-row__desc">
-                  {fact}
-                </div>
-              ))}
-            </div>
-          </section>
-        ))}
-        <CategorySwitches year={year} />
-        {data && data.sources.length > 0 && (
-          <section className="settings-group" aria-label={text.sources}>
-            <h3>{text.sources}</h3>
-            <ul className="rules-sources">
-              {data.sources.map((s) => (
-                <li key={s}>{s}</li>
-              ))}
-            </ul>
-          </section>
-        )}
-        {data?.editable && (
-          <details className="rules-advanced">
-            <summary>{text.advanced}</summary>
-            <button type="button" className="btn btn--small" onClick={() => setEditingJson(true)}>
-              {text.editJson}
+    <>
+      {data && <p className="settings-intro">{overview ? describeYear(overview) : data.source === "own" ? text.own(data.basedOn) : text.builtin(data.ruleset)}</p>}
+      {data?.editable && data.source === "own" && overview?.hasBuiltin && (
+        <Group>
+          <Row label={overview.builtinNewer ? text.useBuiltin(overview.builtinNewer) : text.backToBuiltin}>
+            <button type="button" className="btn btn--small" onClick={useBuiltin}>
+              {text.useButton}
             </button>
-          </details>
-        )}
-      </div>
-      <div className="actions">
-        {data?.editable && data.source === "own" && overview?.hasBuiltin && (
-          <button type="button" className="btn" onClick={useBuiltin}>
-            {overview?.builtinNewer ? text.useBuiltin(overview.builtinNewer) : text.backToBuiltin}
+          </Row>
+        </Group>
+      )}
+      {data?.groups.map((group) => (
+        <Group key={group.title} title={group.title}>
+          {group.fields.map((field) => (
+            <FieldRow key={field.path} year={year} field={field} editable={data.editable} />
+          ))}
+          {group.facts.map((fact) => (
+            <div key={fact} className="settings-row settings-row__desc">
+              {fact}
+            </div>
+          ))}
+        </Group>
+      ))}
+      {data && <CategorySwitches year={year} />}
+      {data && data.sources.length > 0 && (
+        <section className="settings-group" aria-label={text.sources}>
+          <h3>{text.sources}</h3>
+          <ul className="rules-sources">
+            {data.sources.map((s) => (
+              <li key={s}>{s}</li>
+            ))}
+          </ul>
+        </section>
+      )}
+      {data?.editable && (
+        <details className="rules-advanced">
+          <summary>{text.advanced}</summary>
+          <button type="button" className="btn btn--small" onClick={() => setEditingJson(true)}>
+            {text.editJson}
           </button>
-        )}
-        <button type="button" className="btn btn--primary" onClick={onClose}>
-          {text.done}
-        </button>
-      </div>
-    </Modal>
+        </details>
+      )}
+      {editingJson && <JsonSheet year={year} onClose={() => setEditingJson(false)} />}
+    </>
   );
 }

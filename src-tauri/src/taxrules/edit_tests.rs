@@ -111,7 +111,7 @@ fn each_kind_of_value_changes_in_place_and_names_itself_in_the_op_label() {
             "4.50",
             "/items/0/estimate/2/perUnit",
             json!(4.5),
-            "Change The tax office subtracts per days for 2026 to €4.50",
+            "Change Subtracted per unit (days) for 2026 to €4.50",
         ),
         (
             "items/books/estimate/2/maxUnits",

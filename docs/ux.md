@@ -142,7 +142,10 @@ years, accounts, subscriptions, documents); ↑↓ wrap, ↩ runs, Esc closes.
 
 ## Settings (ADR 0034)
 Own window in System Settings layout: 190px page list with drag strip and search; page title in the strip,
-an optional one-line intro; groups of rows (label and description left, control right). The current page is
+an optional one-line intro; groups of rows (label and description left, control right). A row with a chevron
+opens a page one level down in the same pane (System Settings' drill-down): a back button beside its title
+returns, the parent page stays selected in the list. Tax Rules lists Start <next year> above the years (newest
+first), each year drilling down to its values, and Import JSON… at the end. The current page is
 filled with the accent. Pages, Finance: Rules, Vendors, Accounts, Tax Rules; App: Reminders, Privacy & Data,
 Appearance, Shortcuts, Status, About. The search finds every row. Status values copy on click ("Copied
 <label>"); only ok, warning and error carry an icon, and a clipboard icon takes its place on hover or focus.

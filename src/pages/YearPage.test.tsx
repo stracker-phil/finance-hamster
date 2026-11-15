@@ -968,13 +968,13 @@ describe("YearPage", () => {
       expect(useStore.getState().route).toEqual({ page: "archive", year: 2026 });
     });
 
-    it("opens the Tax Rules page in Settings and closes the menu", async () => {
+    it("opens the rules of the year in Settings and closes the menu", async () => {
       await show();
       await openMenu();
 
       await userEvent.click(screen.getByRole("menuitem", { name: "Tax Rules…" }));
 
-      expect(mocked.settingsShow).toHaveBeenCalledWith("tax-years");
+      expect(mocked.settingsShow).toHaveBeenCalledWith("taxrules/2026");
       expect(screen.queryByRole("menu")).toBeNull();
     });
 

@@ -2,9 +2,11 @@
 
 use std::collections::BTreeSet;
 
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Manager, State};
+use tauri_plugin_dialog::DialogExt;
 
 use super::edit::{self, JsonPreview};
+use super::import::{self, RulesImport};
 use super::view::{self, RulesYearView};
 use super::{RulesOverview, check};
 use crate::date::DateOrder;
@@ -96,6 +98,49 @@ pub fn rules_use_builtin(
 #[tauri::command]
 pub fn rules_start_next(app: AppHandle, state: State<'_, AppState>) -> AppResult<String> {
     let written = super::start_next(&state.db, now())?;
+    Ok(announced(&app, written))
+}
+
+/// Asks for a rules file and tells what importing it would do; None when cancelled.
+#[tauri::command]
+pub async fn rules_import_choose(app: AppHandle) -> AppResult<Option<RulesImport>> {
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    app.dialog()
+        .file()
+        .set_title(crate::tr!("Import Tax Rules", "Steuerregeln importieren"))
+        .add_filter("JSON", &["json"])
+        .pick_file(move |path| {
+            let _ = tx.send(path);
+        });
+    let chosen = rx.await.map_err(|_| {
+        AppError::Io(crate::tr!(
+            "The file panel closed without an answer",
+            "Das Dateifenster wurde ohne Antwort geschlossen"
+        ))
+    })?;
+    let Some(chosen) = chosen else {
+        return Ok(None);
+    };
+    let path = chosen.into_path().map_err(|e| {
+        AppError::Io(crate::tr!(
+            "The chosen file isn't a file path: {e}",
+            "Die gewählte Datei ist kein Dateipfad: {e}"
+        ))
+    })?;
+    let text = std::fs::read_to_string(&path).map_err(|e| {
+        AppError::Io(crate::tr!(
+            "{} couldn't be read: {e}",
+            "{} ließ sich nicht lesen: {e}",
+            path.display()
+        ))
+    })?;
+    import::preview(&app.state::<AppState>().db, text).map(Some)
+}
+
+/// Imports the rules `rules_import_choose` read; the label of the change.
+#[tauri::command]
+pub fn rules_import(app: AppHandle, state: State<'_, AppState>, text: String) -> AppResult<String> {
+    let written = import::import(&state.db, &text, now())?;
     Ok(announced(&app, written))
 }
 

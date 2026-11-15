@@ -7,6 +7,7 @@ pub mod commands;
 pub mod diff;
 pub mod edit;
 pub mod files;
+pub mod import;
 pub mod model;
 pub mod view;
 
@@ -18,6 +19,8 @@ mod diff_tests;
 mod edit_tests;
 #[cfg(test)]
 mod files_tests;
+#[cfg(test)]
+mod import_tests;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]

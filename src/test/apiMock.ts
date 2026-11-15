@@ -35,6 +35,8 @@ export function createApiMock(overrides: Partial<Api> = {}): Api {
     rulesSetJson: vi.fn().mockResolvedValue("Edit rules JSON"),
     rulesUseBuiltin: vi.fn().mockResolvedValue("Use built-in rules"),
     rulesStartNext: vi.fn().mockResolvedValue("Start 2027"),
+    rulesImportChoose: vi.fn().mockResolvedValue(null),
+    rulesImport: vi.fn().mockResolvedValue("Import the Tax Rules for 2029"),
     rulesTakeNotices: vi.fn().mockResolvedValue([]),
     rulesView: vi.fn().mockResolvedValue({ groups: [], items: [] }),
     rulePreview: vi.fn().mockResolvedValue({ count: 0, text: "", examples: [] }),

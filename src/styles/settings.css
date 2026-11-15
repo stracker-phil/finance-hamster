@@ -19,9 +19,10 @@
 .settings-nav__empty { padding: 12px 8px; color: var(--text-muted); font-size: 13px; }
 
 .settings-pane { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.settings-pane > header { height: 46px; flex: none; display: flex; align-items: center; padding: 0 28px; }
+.settings-pane > header { height: 46px; flex: none; display: flex; align-items: center; gap: 4px; padding: 0 28px; }
+.settings-back { margin-left: -6px; }
 .settings-pane h2 { margin: 0; font-size: 15px; font-weight: 700; }
-.settings-body { flex: 1; min-height: 0; padding: 4px 28px 28px; }
+.settings-body { flex: 1; min-height: 0; padding: 4px 28px 28px; animation: fade-in var(--motion-base) var(--ease-out); }
 .settings-intro { margin: 0 0 18px; font-size: 13px; line-height: 1.5; color: var(--text-tertiary); }
 
 .settings-group { margin-bottom: 24px; }
@@ -29,6 +30,11 @@
 .settings-card { border-radius: 12px; background: var(--fill-subtle); overflow: hidden; }
 .settings-row { display: flex; align-items: center; gap: 16px; min-height: 44px; padding: 10px 14px; border-top: 1px solid var(--border); }
 .settings-row:first-child { border-top: 0; }
+/* A drill-down row (System Settings): the whole row is the button, a chevron at its end. */
+.settings-row--drill { width: 100%; border-left: 0; border-right: 0; border-bottom: 0; background: transparent; font: inherit; color: var(--text); text-align: left; }
+.settings-row--drill:first-child { border-top: 0; }
+.settings-row--drill:hover { background: var(--fill-hover); }
+.settings-row__chevron { flex: none; color: var(--text-muted); }
 .settings-row__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
 .settings-row__desc { font-size: 12px; line-height: 1.4; color: var(--text-muted); }
 .settings-row__control { flex: none; display: flex; align-items: center; gap: 8px; }
@@ -79,8 +85,6 @@
 .status-value .status-value__copy { display: none; color: var(--text-tertiary); }
 .status-value:is(:hover, :focus-visible) .status-value__copy { display: block; }
 .status-value:is(:hover, :focus-visible) .status-value__tone { display: none; }
-.dialog.rules-sheet { width: min(620px, calc(100vw - 32px)); max-height: calc(100vh - 200px); display: flex; flex-direction: column; }
-.rules-sheet__body { min-height: 0; overflow-y: auto; margin: 12px -4px 0; padding: 0 4px; }
 .rules-field { width: 96px; }
 .rules-field:read-only { border-color: transparent; background: transparent; }
 .rules-unit { min-width: 44px; color: var(--text-muted); font-size: 12px; }
