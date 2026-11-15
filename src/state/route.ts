@@ -39,4 +39,11 @@ export function sidebarKey(route: Route): string {
   }
 }
 
-export const sameRoute = (a: Route, b: Route) => JSON.stringify(a) === JSON.stringify(b);
+/** Routes are flat objects; equal when they hold the same keys with the same values, in any order. Absent and
+ *  undefined keys count the same. */
+export const sameRoute = (a: Route, b: Route) => {
+  const entries = (r: Route) => Object.entries(r).filter(([, v]) => v !== undefined);
+  const ea = entries(a);
+  const fields = new Map(entries(b));
+  return ea.length === fields.size && ea.every(([k, v]) => fields.get(k) === v);
+};
