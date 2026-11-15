@@ -251,10 +251,16 @@ pub fn add(
         created_at: now,
     };
     let label = match kind {
-        EntryKind::Amount => {
-            crate::tr!("Add Amount to KZ {}", "Betrag zu KZ {} hinzufügen", item.kz)
-        }
-        EntryKind::Trip => crate::tr!("Add Trip to KZ {}", "Fahrt zu KZ {} hinzufügen", item.kz),
+        EntryKind::Amount => crate::tr!(
+            "Add Amount to {}",
+            "Betrag zu {} hinzufügen",
+            item.display_label()
+        ),
+        EntryKind::Trip => crate::tr!(
+            "Add Trip to {}",
+            "Fahrt zu {} hinzufügen",
+            item.display_label()
+        ),
     };
     db.write(Op::new(label, vec![Change::insert(ENTRIES, &row)?]), source)
 }
@@ -489,7 +495,7 @@ mod tests {
         assert_eq!(
             written,
             Written {
-                label: "Add Amount to KZ 722".into(),
+                label: "Add Amount to Tips".into(),
                 tables: vec!["entries".into()],
             }
         );
@@ -512,14 +518,14 @@ mod tests {
     }
 
     #[test]
-    fn a_trip_stores_its_kilometres_and_is_labelled_with_the_kennzahl() {
+    fn a_trip_stores_its_kilometres_and_is_labelled_with_its_item() {
         let f = fixture();
 
         let written = f
             .add(&trip("parking", "2026-11-12", " 12 ", "Client visit"))
             .unwrap();
 
-        assert_eq!(written.label, "Add Trip to KZ 724");
+        assert_eq!(written.label, "Add Trip to Parking");
         let stored = f.only();
         assert_eq!(
             (stored.kind, stored.cents, stored.km, stored.text.as_str()),
@@ -805,7 +811,7 @@ mod tests {
             [AttentionView {
                 kind: AttentionKind::MissingInvoice,
                 title: "Exam fee · €80.00".into(),
-                detail: "KZ 727 needs evidence before it counts".into(),
+                detail: "Fees counts once its evidence is attached".into(),
                 document_id: None,
                 entry_id: Some(id.clone()),
                 line_id: None,

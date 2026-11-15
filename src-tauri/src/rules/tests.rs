@@ -337,7 +337,7 @@ fn items_list_the_visible_items_of_the_open_year_with_their_kz() {
         items(&db).unwrap(),
         vec![ItemOption {
             key: "books".into(),
-            label: "KZ 720 · Fachliteratur".into(),
+            label: "Fachliteratur".into(),
             kz: "720".into(),
         }]
     );
@@ -367,7 +367,7 @@ fn there_are_no_rules_for_a_year_while_no_tax_year_exists() {
 }
 
 #[test]
-fn item_options_leave_out_hidden_items_and_label_by_kz_and_name() {
+fn item_options_leave_out_hidden_items_and_carry_the_plain_label() {
     let ruleset: crate::taxrules::model::Ruleset =
         serde_json::from_value(rules_json(2026, "Fachliteratur")).unwrap();
 
@@ -375,10 +375,32 @@ fn item_options_leave_out_hidden_items_and_label_by_kz_and_name() {
         super::item_options(&ruleset),
         vec![ItemOption {
             key: "books".into(),
-            label: "KZ 720 · Fachliteratur".into(),
+            label: "Fachliteratur".into(),
             kz: "720".into(),
         }]
     );
+}
+
+#[test]
+fn an_items_own_label_wins_over_its_name_and_reads_in_german_when_it_has_one() {
+    let mut rules = rules_json(2026, "Books");
+    set(&mut rules, "/items/0/label", json!("Work books"));
+    set(&mut rules, "/items/0/de", json!({ "label": "Fachbücher" }));
+    let ruleset: crate::taxrules::model::Ruleset = serde_json::from_value(rules).unwrap();
+
+    for (language, expected) in [
+        (crate::settings::Language::En, "Work books"),
+        (crate::settings::Language::De, "Fachbücher"),
+    ] {
+        let labels: Vec<String> = crate::i18n::with_lang(language, || {
+            super::item_options(&ruleset)
+                .into_iter()
+                .map(|i| i.label)
+                .collect()
+        });
+
+        assert_eq!(labels, vec![expected], "{language:?}");
+    }
 }
 
 #[test]
@@ -421,7 +443,7 @@ fn the_open_year_gives_the_items_even_when_a_newer_year_is_closed() {
 
     let labels: Vec<String> = items(&db).unwrap().into_iter().map(|i| i.label).collect();
 
-    assert_eq!(labels, vec!["KZ 720 · Fachliteratur"]);
+    assert_eq!(labels, vec!["Fachliteratur"]);
 }
 
 #[test]
@@ -432,7 +454,7 @@ fn with_only_closed_years_the_newest_gives_the_items() {
 
     let labels: Vec<String> = items(&db).unwrap().into_iter().map(|i| i.label).collect();
 
-    assert_eq!(labels, vec!["KZ 720 · Neu"]);
+    assert_eq!(labels, vec!["Neu"]);
 }
 
 /// December 2025 and October 2026 imported, both with E-COMM card payments on the 7th and 10th.

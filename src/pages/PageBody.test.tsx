@@ -85,7 +85,7 @@ describe("PageBody", () => {
 
     renderWithQuery(<PageBody route={{ page: "archive", year: 2026 }} />);
 
-    expect(await screen.findByText("Documents/2026/sample-books.pdf")).toBeTruthy();
+    expect(await screen.findByText("Sample Books")).toBeTruthy();
     expect(mocked.archiveList).toHaveBeenCalledWith(2026);
   });
 

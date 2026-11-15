@@ -34,7 +34,7 @@ pub struct Estimate {
     pub anv: String,
     /// `€121.23 × 60 %`.
     pub formula: String,
-    /// `€121.23 is below the GWG limit (€1,000.00): counts fully in 2026.`
+    /// `Counts over several years: it cost more than €1,000.00.`; None when it counts fully this year.
     pub gwg: Option<String>,
 }
 
@@ -43,7 +43,6 @@ pub fn estimate(
     paid_cents: i64,
     item_key: Option<&str>,
     work_share: i64,
-    year: i32,
     format: NumberFormat,
 ) -> Estimate {
     let eur = |cents: i64| format_money(&Money::eur(cents), format);
@@ -54,29 +53,16 @@ pub fn estimate(
         .and_then(|i| i.private_share)
         .map(|p| tr!("from the item: {p} % private", "vom Posten: {p} % privat"));
     let anv = anv_cents(paid_cents, work_share);
-    let gwg = ruleset.zip(item).map(|(r, i)| {
+    // Said only when the amount doesn't simply count in full this year.
+    let gwg = ruleset.zip(item).and_then(|(r, i)| {
         let limit = r.settings.gwg_limit.0;
-        if anv <= limit {
+        (anv > limit && i.depreciation.is_some()).then(|| {
             tr!(
-                "{} is below the GWG limit ({}): counts fully in {year}.",
-                "{} liegt unter der GWG-Grenze ({}): zählt voll in {year}.",
-                eur(anv),
+                "Counts over several years: it cost more than {}.",
+                "Zählt über mehrere Jahre: Es hat mehr als {} gekostet.",
                 eur(limit)
             )
-        } else if i.depreciation.is_none() {
-            tr!(
-                "{} counts fully in {year}: this item is never depreciated.",
-                "{} zählt voll in {year}: dieser Posten wird nie abgeschrieben.",
-                eur(anv)
-            )
-        } else {
-            tr!(
-                "{} is above the GWG limit ({}): it is depreciated over several years.",
-                "{} liegt über der GWG-Grenze ({}): wird über mehrere Jahre abgeschrieben.",
-                eur(anv),
-                eur(limit)
-            )
-        }
+        })
     });
     Estimate {
         work_share,
@@ -113,7 +99,7 @@ mod tests {
     }
 
     fn estimate_of(item: Option<&str>, paid: i64, share: i64, format: NumberFormat) -> Estimate {
-        estimate(Some(&ruleset()), paid, item, share, 2026, format)
+        estimate(Some(&ruleset()), paid, item, share, format)
     }
 
     #[test]
@@ -162,9 +148,7 @@ mod tests {
                 share_hint: Some("from the item: 40 % private".into()),
                 anv: "€72.74".into(),
                 formula: "€121.23 × 60 %".into(),
-                gwg: Some(
-                    "€72.74 is below the GWG limit (€1,000.00): counts fully in 2026.".into()
-                ),
+                gwg: None,
             }
         );
     }
@@ -188,14 +172,7 @@ mod tests {
     #[test]
     fn without_a_ruleset_or_an_item_there_is_no_hint_and_no_gwg_note() {
         for estimate in [
-            estimate(
-                None,
-                12_123,
-                Some("phone"),
-                100,
-                2026,
-                NumberFormat::DotDecimal,
-            ),
+            estimate(None, 12_123, Some("phone"), 100, NumberFormat::DotDecimal),
             estimate_of(None, 12_123, 100, NumberFormat::DotDecimal),
             estimate_of(Some("unknown"), 12_123, 100, NumberFormat::DotDecimal),
         ] {
@@ -210,42 +187,52 @@ mod tests {
         let estimate = estimate_of(Some("books"), 2_000, 100, NumberFormat::DotDecimal);
 
         assert_eq!(estimate.share_hint, None);
-        assert_eq!(
-            estimate.gwg.as_deref(),
-            Some("€20.00 is below the GWG limit (€1,000.00): counts fully in 2026.")
-        );
+        assert_eq!(estimate.gwg, None);
     }
 
     #[test]
-    fn a_depreciable_item_above_the_limit_is_spread_over_several_years() {
+    fn a_depreciable_item_above_the_limit_says_it_counts_over_several_years() {
         let estimate = estimate_of(Some("laptop"), 150_000, 100, NumberFormat::DotDecimal);
 
         assert_eq!(
             estimate.gwg.as_deref(),
-            Some(
-                "€1,500.00 is above the GWG limit (€1,000.00): it is depreciated over several years."
-            )
+            Some("Counts over several years: it cost more than €1,000.00.")
         );
     }
 
     #[test]
-    fn a_depreciable_item_at_the_limit_counts_fully() {
-        let estimate = estimate_of(Some("laptop"), 100_000, 100, NumberFormat::DotDecimal);
+    fn the_several_years_note_reads_in_german() {
+        let estimate = crate::i18n::with_lang(crate::settings::Language::De, || {
+            estimate_of(Some("laptop"), 150_000, 100, NumberFormat::CommaDecimal)
+        });
 
         assert_eq!(
             estimate.gwg.as_deref(),
-            Some("€1,000.00 is below the GWG limit (€1,000.00): counts fully in 2026.")
+            Some("Zählt über mehrere Jahre: Es hat mehr als €1.000,00 gekostet.")
         );
     }
 
     #[test]
-    fn an_item_without_depreciation_above_the_limit_counts_fully_as_it_is_never_depreciated() {
+    fn a_depreciable_item_at_or_below_the_limit_has_no_note() {
+        for paid in [100_000, 500, 0] {
+            let estimate = estimate_of(Some("laptop"), paid, 100, NumberFormat::DotDecimal);
+
+            assert_eq!(estimate.gwg, None, "{paid}");
+        }
+    }
+
+    #[test]
+    fn an_item_without_depreciation_has_no_note_even_above_the_limit() {
         let estimate = estimate_of(Some("books"), 150_000, 100, NumberFormat::DotDecimal);
 
-        assert_eq!(
-            estimate.gwg.as_deref(),
-            Some("€1,500.00 counts fully in 2026: this item is never depreciated.")
-        );
+        assert_eq!(estimate.gwg, None);
+    }
+
+    #[test]
+    fn the_limit_applies_to_the_counted_amount_not_the_paid_amount() {
+        let estimate = estimate_of(Some("laptop"), 150_000, 60, NumberFormat::DotDecimal);
+
+        assert_eq!(estimate.gwg, None);
     }
 
     #[test]
@@ -259,7 +246,7 @@ mod tests {
                 "shareHint": "from the item: 40 % private",
                 "anv": "€72.74",
                 "formula": "€121.23 × 60 %",
-                "gwg": "€72.74 is below the GWG limit (€1,000.00): counts fully in 2026."
+                "gwg": null
             })
         );
     }

@@ -57,9 +57,7 @@ export function ImportSheet({ preview, onImported }: { preview: ImportPreview; o
         <CheckRow ok title={text.balance} detail={text.balanceDetail(preview.balance)} mono />
         <CheckRow ok={preview.chain !== "gap"} title={preview.chainTitle} detail={preview.chainDetail} />
       </div>
-      <p>
-        {text.copiedTo} <span className="mono">{preview.file}</span>.
-      </p>
+      <p title={preview.file}>{text.copiedTo}</p>
       <div className="actions">
         <button type="button" className="btn" onClick={close}>
           {cancel}

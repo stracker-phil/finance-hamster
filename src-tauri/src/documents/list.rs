@@ -23,7 +23,7 @@ use crate::{tr, tr_plural};
 pub struct DocumentRowView {
     pub id: String,
     pub title: String,
-    /// `10 Nov · KZ 720 Fachliteratur`.
+    /// `10 Nov · Books & magazines`.
     pub sub: String,
     pub state: DocState,
     /// The ANV amount, empty while unknown.
@@ -143,7 +143,7 @@ pub fn documents(
         let item = match (year, &doc.item_key) {
             (Some(y), Some(key)) => rules::ruleset_for_year(db, y)?
                 .and_then(|r| r.items.into_iter().find(|i| &i.key == key))
-                .map(|i| format!("KZ {} {}", i.kz, i.display_name())),
+                .map(|i| i.display_label().to_string()),
             _ => None,
         };
         let anv = paid.map(|p| anv_cents(p, doc.work_share));

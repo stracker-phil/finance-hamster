@@ -58,12 +58,12 @@ fn status(
     };
     match d.kind {
         Action::Anv => {
-            let kz = d
+            let label = d
                 .item_key
                 .as_ref()
                 .and_then(|key| items.iter().find(|i| &i.key == key))
-                .map(|i| format!("KZ {}", i.kz));
-            (LineStatus::Anv, kz)
+                .map(|i| i.label.clone());
+            (LineStatus::Anv, label)
         }
         Action::Subscription => (LineStatus::Subscription, None),
         Action::Ignore

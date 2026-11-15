@@ -16,7 +16,7 @@ use crate::{tr, tr_plural};
 pub struct VendorView {
     pub id: String,
     pub name: String,
-    /// `2 documents · KZ 169`.
+    /// `2 documents · Computer, phone & software`.
     pub detail: String,
     pub default_item_key: Option<String>,
     /// No document uses it.
@@ -50,7 +50,7 @@ pub fn view(db: &Db) -> AppResult<VendorsView> {
                     items
                         .iter()
                         .find(|i| i.key == key)
-                        .map_or(key, |i| format!("KZ {}", i.kz))
+                        .map_or(key, |i| i.label.clone())
                 });
             let n = own.len();
             let count = tr_plural!(

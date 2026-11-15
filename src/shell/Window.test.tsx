@@ -196,7 +196,7 @@ describe("first run", () => {
 
     expect(await screen.findByRole("heading", { name: "Import your first statement" })).toBeTruthy();
     expect(screen.getByText("Step 2 of 2")).toBeTruthy();
-    expect(screen.getByText("Tax year 2026 is ready with the rules 2026 v1.")).toBeTruthy();
+    expect(screen.getByText("Tax year 2026 is ready, with its tax rules built in.")).toBeTruthy();
   });
 
   it("leads to the main window when the statement step is skipped", async () => {

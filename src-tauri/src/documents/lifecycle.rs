@@ -65,7 +65,7 @@ pub fn missing(db: &Db, doc: &DocumentRow) -> AppResult<Vec<String>> {
         (doc.pay_date.is_none(), tr!("payment date", "Zahlungsdatum")),
         (
             paid_cents(doc, &lines).is_none(),
-            tr!("amount paid", "bezahlten Betrag"),
+            tr!("amount paid", "bezahlter Betrag"),
         ),
         (doc.vendor_id.is_none(), tr!("vendor", "Händler")),
         (doc.item_key.is_none(), tr!("item", "Posten")),
@@ -82,7 +82,7 @@ pub fn finish(db: &Db, id: &str, now: i64, source: Source) -> AppResult<Written>
     if doc.state != DocState::Draft {
         return Err(AppError::InvalidInput(tr!(
             "Only a draft can be finished",
-            "Nur ein Entwurf kann abgeschlossen werden"
+            "Nur ein Entwurf kann als fertig markiert werden"
         )));
     }
     let gaps = missing(db, &doc)?;
@@ -90,10 +90,10 @@ pub fn finish(db: &Db, id: &str, now: i64, source: Source) -> AppResult<Written>
         let gaps = gaps.join(", ");
         return Err(AppError::InvalidInput(tr!(
             "Set the {gaps} first",
-            "Setze zuerst: {gaps}"
+            "Noch offen: {gaps}"
         )));
     }
-    let label = |title: &str| tr!("Finish {title}", "Abschließen: {title}");
+    let label = |title: &str| tr!("Finish {title}", "{title} als fertig markieren");
     transition(db, doc, label, source, |d| {
         d.state = DocState::Finished;
         d.finished_at = Some(now);
@@ -106,7 +106,7 @@ pub fn unlock(db: &Db, id: &str, source: Source) -> AppResult<Written> {
     if doc.state != DocState::Finished {
         return Err(AppError::InvalidInput(tr!(
             "Only a finished document can be unlocked",
-            "Nur ein abgeschlossener Beleg kann entsperrt werden"
+            "Nur ein fertiger Beleg kann entsperrt werden"
         )));
     }
     crate::taxyears::refuse_closed(db, &[doc.pay_date.as_deref()])?;

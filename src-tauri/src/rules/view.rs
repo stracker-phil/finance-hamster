@@ -21,7 +21,7 @@ pub struct RuleView {
     pub id: String,
     /// `Bank text contains CLOUDBOX and amount 25.95`.
     pub label: String,
-    /// `→ assign item KZ 724 · 10 matches · last 7 Nov`.
+    /// `→ assign item Other work costs · 10 matches · last 7 Nov`.
     pub detail: String,
     pub builtin: bool,
     pub form: RuleForm,
@@ -105,7 +105,7 @@ fn detail(rule: &RuleRow, items: &[ItemOption], matches: &Matches, order: DateOr
         let target = items
             .iter()
             .find(|i| i.key == key)
-            .map_or(key, |i| format!("KZ {}", i.kz));
+            .map_or(key, |i| i.label.clone());
         parts.push(tr!("→ assign item {target}", "→ Posten {target} zuordnen"));
     }
     let count = matches.count;

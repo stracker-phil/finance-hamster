@@ -70,7 +70,7 @@ describe("SubscriptionPanel", () => {
       expect(screen.getByText("Counts for ANV")).toBeTruthy();
       expect(screen.getByText("Reminder")).toBeTruthy();
       expect(screen.getByText("3 days before")).toBeTruthy();
-      expect(screen.getByText("Found by rule")).toBeTruthy();
+      expect(screen.getByText("Found in the bank text by")).toBeTruthy();
       expect(screen.getByText("LUMEN AI")).toBeTruthy();
     });
 

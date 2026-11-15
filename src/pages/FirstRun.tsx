@@ -37,7 +37,7 @@ export function FirstRun({ onAccountAdded, onDone }: Props) {
             <h1>{text.statementTitle}</h1>
             <p>{text.statementText}</p>
             {year && (
-              <p>{text.ready(year.year, year.ruleset)}</p>
+              <p>{text.ready(year.year)}</p>
             )}
             <div className="actions">
               <button type="button" className="btn" onClick={onDone}>

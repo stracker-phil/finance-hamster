@@ -167,7 +167,7 @@ describe("TodayPage", () => {
       const section = await screen.findByRole("region", { name: "Tax year 2026" });
       expect(section.textContent).toContain("Tax year 2026");
       expect(screen.getByText("€1,228.40")).toBeTruthy();
-      expect(screen.getByText("Werbungskosten so far")).toBeTruthy();
+      expect(screen.getByText("Work costs so far")).toBeTruthy();
       expect(screen.getByText("4 of 6 items answered")).toBeTruthy();
     });
 
@@ -202,7 +202,7 @@ describe("TodayPage", () => {
 
       renderWithQuery(<TodayPage />);
 
-      await screen.findByText("Werbungskosten so far");
+      await screen.findByText("Work costs so far");
       expect(screen.queryByText(/Statements:/)).toBeNull();
     });
 
@@ -211,7 +211,7 @@ describe("TodayPage", () => {
 
       await screen.findByText("No subscription charges ahead.");
       expect(screen.queryByText(/Tax year/)).toBeNull();
-      expect(screen.queryByText("Werbungskosten so far")).toBeNull();
+      expect(screen.queryByText("Work costs so far")).toBeNull();
       expect(screen.queryByRole("button", { name: "Show Tax Year" })).toBeNull();
     });
 

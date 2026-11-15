@@ -579,13 +579,13 @@ describe("YearPage", () => {
     });
 
     describe("trip", () => {
-      const showTrip = () => show({ kennzahlen: [kennzahlView({ key: "trips", kz: "721", name: "Trips", add: "trip", rate: "€0.50 per km" })] });
+      const showTrip = () => show({ kennzahlen: [kennzahlView({ key: "trips", kz: "721", name: "Trips", label: "Business trips", add: "trip", rate: "€0.50 per km" })] });
       const openTrip = async () => {
         await showTrip();
         await userEvent.click(screen.getByRole("button", { name: "+ Trip" }));
       };
       const fillTrip = async () => {
-        const fields = group("Add a trip to KZ 721");
+        const fields = group("Add a trip to Business trips");
         const date = fields.getByLabelText("Date");
         await userEvent.clear(date);
         await userEvent.type(date, "2026-11-05");
@@ -596,7 +596,7 @@ describe("YearPage", () => {
       it("opens an inline group with date, destination, kilometres and the rate", async () => {
         await openTrip();
 
-        const fields = group("Add a trip to KZ 721");
+        const fields = group("Add a trip to Business trips");
         expect(fields.getByLabelText("Date")).toBeTruthy();
         expect(fields.getByRole("textbox", { name: "Destination and purpose" })).toBeTruthy();
         expect(fields.getByRole("textbox", { name: "Kilometres" })).toBeTruthy();
@@ -608,7 +608,7 @@ describe("YearPage", () => {
 
         await userEvent.click(screen.getByRole("button", { name: "+ Trip" }));
 
-        expect(screen.queryByRole("group", { name: "Add a trip to KZ 721" })).toBeNull();
+        expect(screen.queryByRole("group", { name: "Add a trip to Business trips" })).toBeNull();
       });
 
       it("sends the trip, closes the row and shows the label with Undo", async () => {
@@ -616,10 +616,10 @@ describe("YearPage", () => {
         await openTrip();
         await fillTrip();
 
-        await userEvent.click(group("Add a trip to KZ 721").getByRole("button", { name: "Add" }));
+        await userEvent.click(group("Add a trip to Business trips").getByRole("button", { name: "Add" }));
 
         expect(mocked.yearEntryAdd).toHaveBeenCalledWith(2026, { kind: "trip", itemKey: "trips", date: "2026-11-05", km: "312", text: "Linz · client workshop" });
-        await vi.waitFor(() => expect(screen.queryByRole("group", { name: "Add a trip to KZ 721" })).toBeNull());
+        await vi.waitFor(() => expect(screen.queryByRole("group", { name: "Add a trip to Business trips" })).toBeNull());
         expect(toastMessages()).toEqual(["Add trip Linz"]);
         expect(useStore.getState().toasts[0].action?.label).toBe("Undo");
       });
@@ -628,7 +628,7 @@ describe("YearPage", () => {
         await openTrip();
         await fillTrip();
 
-        await userEvent.type(group("Add a trip to KZ 721").getByRole("textbox", { name: "Kilometres" }), "{Enter}");
+        await userEvent.type(group("Add a trip to Business trips").getByRole("textbox", { name: "Kilometres" }), "{Enter}");
 
         expect(mocked.yearEntryAdd).toHaveBeenCalledWith(2026, expect.objectContaining({ kind: "trip", km: "312" }));
       });
@@ -636,9 +636,9 @@ describe("YearPage", () => {
       it("closes on Escape without adding", async () => {
         await openTrip();
 
-        await userEvent.type(group("Add a trip to KZ 721").getByRole("textbox", { name: "Kilometres" }), "{Escape}");
+        await userEvent.type(group("Add a trip to Business trips").getByRole("textbox", { name: "Kilometres" }), "{Escape}");
 
-        expect(screen.queryByRole("group", { name: "Add a trip to KZ 721" })).toBeNull();
+        expect(screen.queryByRole("group", { name: "Add a trip to Business trips" })).toBeNull();
         expect(mocked.yearEntryAdd).not.toHaveBeenCalled();
       });
 
@@ -646,7 +646,7 @@ describe("YearPage", () => {
         mocked.yearEntryAdd.mockRejectedValue({ kind: "invalid_input", message: "entry.km: Whole kilometres", code: null, field: { path: "entry.km", message: "Whole kilometres" } });
         await openTrip();
 
-        await userEvent.click(group("Add a trip to KZ 721").getByRole("button", { name: "Add" }));
+        await userEvent.click(group("Add a trip to Business trips").getByRole("button", { name: "Add" }));
 
         expect((await screen.findByRole("alert")).textContent).toBe("Whole kilometres");
       });
@@ -655,20 +655,20 @@ describe("YearPage", () => {
         mocked.yearEntryAdd.mockRejectedValue({ kind: "invalid_input", message: "Enter the kilometres", code: null });
         await openTrip();
 
-        await userEvent.click(group("Add a trip to KZ 721").getByRole("button", { name: "Add" }));
+        await userEvent.click(group("Add a trip to Business trips").getByRole("button", { name: "Add" }));
 
         expect((await screen.findByRole("alert")).textContent).toBe("Enter the kilometres");
-        expect(screen.getByRole("group", { name: "Add a trip to KZ 721" })).toBeTruthy();
+        expect(screen.getByRole("group", { name: "Add a trip to Business trips" })).toBeTruthy();
         expect(toastMessages()).toEqual([]);
       });
     });
 
     describe("amount", () => {
       const showAmount = async () => {
-        await show({ kennzahlen: [kennzahlView({ key: "other", kz: "722", name: "Other", add: "amount" })] });
+        await show({ kennzahlen: [kennzahlView({ key: "other", kz: "722", name: "Other", label: "Other costs", add: "amount" })] });
         await userEvent.click(screen.getByRole("button", { name: "+ Amount" }));
       };
-      const name = "Add an amount to KZ 722";
+      const name = "Add an amount to Other costs";
 
       it("opens an inline group with note, amount and a PDF button", async () => {
         await showAmount();

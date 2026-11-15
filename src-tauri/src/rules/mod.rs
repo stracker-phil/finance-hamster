@@ -47,7 +47,7 @@ pub struct RuleForm {
 #[ts(export, export_to = "src/api/types.gen.ts")]
 pub struct ItemOption {
     pub key: String,
-    /// `KZ 169 · Digitale Arbeitsmittel`.
+    /// The plain label, `Computer, phone & software`.
     pub label: String,
     pub kz: String,
 }
@@ -91,7 +91,7 @@ pub fn item_options(ruleset: &Ruleset) -> Vec<ItemOption> {
         .iter()
         .filter(|i| i.visible)
         .map(|i| ItemOption {
-            label: format!("KZ {} · {}", i.kz, i.display_name()),
+            label: i.display_label().to_string(),
             key: i.key.clone(),
             kz: i.kz.clone(),
         })

@@ -1935,11 +1935,7 @@ fn the_detail_shows_amount_next_charge_timeline_plans_rule_charges_and_the_edit_
             detail.reminder.as_str(),
             detail.rule.as_str()
         ),
-        (
-            "No",
-            "Off",
-            "text contains STREAMFLIX · another amount asks"
-        )
+        ("No", "Off", "STREAMFLIX · another amount asks")
     );
     let charge = |id: String, date: &str| ChargeView {
         id,
@@ -2042,11 +2038,12 @@ fn a_subscription_for_anv_in_dollars_shows_the_item_euro_cost_reminder_and_rule(
             "Monthly · USD 24.00",
             "€22.48 / month",
             Some("Tue, 10 Nov · 3 days ago"),
-            format!("Yes · {}", item.label).as_str(),
+            "Yes · Books",
             "3 days before",
-            "text contains LUMEN AI · another amount asks",
+            "LUMEN AI · another amount asks",
         )
     );
+    assert_eq!(item.label, "Books");
     assert_eq!(detail.plans[0].price, "USD 24.00 monthly");
 }
 
@@ -2054,8 +2051,8 @@ fn a_subscription_for_anv_in_dollars_shows_the_item_euro_cost_reminder_and_rule(
 fn the_rule_text_says_whether_another_amount_asks_or_only_the_exact_amount_counts() {
     let (_dir, db) = imported(&[]);
     for (exact_only, expected) in [
-        (false, "text contains STREAMFLIX · another amount asks"),
-        (true, "text contains STREAMFLIX · exact amount only"),
+        (false, "STREAMFLIX · another amount asks"),
+        (true, "STREAMFLIX · exact amount only"),
     ] {
         let mut new = streamflix();
         new.name = format!("Streamflix {exact_only}");

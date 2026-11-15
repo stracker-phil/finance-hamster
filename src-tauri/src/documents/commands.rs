@@ -139,17 +139,11 @@ pub fn document_estimate(
     };
     let ruleset = rules::ruleset(&state.db)?;
     let share = amounts::default_work_share(ruleset.as_ref(), item_key.as_deref());
-    let year = line
-        .value_date
-        .get(..4)
-        .and_then(|y| y.parse().ok())
-        .unwrap_or(0);
     Ok(Some(amounts::estimate(
         ruleset.as_ref(),
         line.cents,
         item_key.as_deref(),
         share,
-        year,
         state.settings.get().number_format,
     )))
 }

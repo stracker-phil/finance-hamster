@@ -40,7 +40,8 @@ describe("ImportSheet", () => {
     expect(screen.getByText(/1,412.30 \+ 2,250.00 − 1,986.44 = 1,675.86/)).toBeTruthy();
     expect(screen.getByText("Follows statement Nr. 009/2026")).toBeTruthy();
     expect(screen.getByText("Opening balance matches the previous closing balance.")).toBeTruthy();
-    expect(screen.getByText("statements/2026/2026-11-10 Private.pdf")).toBeTruthy();
+    expect(screen.getByText("Hamster keeps the PDF unchanged in its data folder.").getAttribute("title")).toBe("statements/2026/2026-11-10 Private.pdf");
+    expect(screen.queryByText("statements/2026/2026-11-10 Private.pdf")).toBeNull();
   });
 
   it("shows the title and detail of a gap in the chain", () => {

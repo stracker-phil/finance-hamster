@@ -92,7 +92,7 @@ fn rules_are_grouped_by_action_and_described_in_words_with_their_matches() {
                 "ANV",
                 vec![(
                     "Bank text contains Seitenweise",
-                    "→ assign item KZ 720 · 1 match · last 14 Oct"
+                    "→ assign item Fachliteratur · 1 match · last 14 Oct"
                 )]
             ),
         ]
@@ -148,7 +148,7 @@ fn amounts_and_dates_follow_the_number_format_and_the_date_order() {
     );
     assert_eq!(
         shown[1].1[0].1,
-        "→ assign item KZ 720 · 1 match · last Oct 14"
+        "→ assign item Fachliteratur · 1 match · last Oct 14"
     );
 }
 
@@ -225,7 +225,7 @@ fn the_items_list_offers_the_visible_items_with_their_labels() {
         view.items,
         vec![ItemOption {
             key: "books".into(),
-            label: "KZ 720 · Fachliteratur".into(),
+            label: "Fachliteratur".into(),
             kz: "720".into(),
         }]
     );
@@ -314,7 +314,7 @@ fn a_rules_view_serializes_with_its_groups_and_items() {
                 "rules": [{
                     "id": "rule-item",
                     "label": "Bank text contains a",
-                    "detail": "→ assign item KZ 720 · 0 matches",
+                    "detail": "→ assign item Fachliteratur · 0 matches",
                     "builtin": false,
                     "form": {
                         "contains": ["a"],
@@ -327,7 +327,7 @@ fn a_rules_view_serializes_with_its_groups_and_items() {
                     }
                 }]
             }],
-            "items": [{ "key": "books", "label": "KZ 720 · Fachliteratur", "kz": "720" }]
+            "items": [{ "key": "books", "label": "Fachliteratur", "kz": "720" }]
         })
     );
 }

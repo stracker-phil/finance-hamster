@@ -37,10 +37,9 @@ export function DocumentPage({ documentId }: { documentId: string }) {
       )}
       <div className="doc-page">
         <div className="doc-page__file">
-          <div className="doc-page__preview">
+          <div className="doc-page__preview" title={doc?.file}>
             <PdfPreview source={{ kind: "document", id: documentId }} />
           </div>
-          {doc && <div className="doc-page__path mono">{doc.file}</div>}
           <div className="add-doc__hint">{text.selectHint}</div>
         </div>
         {doc && <DocumentForm doc={doc} onExclude={() => setExcluding(true)} />}

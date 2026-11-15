@@ -91,6 +91,8 @@ fn rows_of(conn: &Connection, doc_id: &str) -> AppResult<Vec<Row>> {
 /// Names for the ids journal rows hold, and how values read.
 struct Context {
     vendors: HashMap<String, String>,
+    /// Item labels by key, from every tax year's rules (keys stay the same across years).
+    items: HashMap<String, String>,
     lines: HashMap<String, String>,
     format: NumberFormat,
     order: DateOrder,
@@ -114,6 +116,9 @@ impl Context {
                 .as_i64()
                 .map(|c| format_money(&Money::eur(c), self.format).replace('€', ""))
                 .unwrap_or_default(),
+            ("item_key", Value::String(key)) => {
+                self.items.get(key).cloned().unwrap_or_else(|| key.clone())
+            }
             ("work_share", Value::Number(n)) => format!("{n} %"),
             (_, Value::String(text)) => text.clone(),
             (_, other) => other.to_string(),
@@ -172,7 +177,7 @@ fn document_entries(
             .map(|r| format!(": {r}"))
             .unwrap_or_default();
         out.push(match (from.as_str(), to.as_str()) {
-            (_, "finished") => (HistoryKind::Finished, tr!("Finished", "Abgeschlossen")),
+            (_, "finished") => (HistoryKind::Finished, tr!("Finished", "Fertig")),
             ("finished", "draft") => (HistoryKind::Unlocked, tr!("Unlocked", "Entsperrt")),
             (_, "excluded") => (
                 HistoryKind::Excluded,
@@ -258,8 +263,21 @@ fn context(db: &Db, format: NumberFormat, order: DateOrder) -> AppResult<Context
             (t.id, label)
         })
         .collect();
+    let mut items = HashMap::new();
+    for row in db.read(crate::taxyears::rows)? {
+        let Ok(ruleset) = serde_json::from_str::<crate::taxrules::model::Ruleset>(&row.rules)
+        else {
+            continue;
+        };
+        for item in &ruleset.items {
+            items
+                .entry(item.key.clone())
+                .or_insert_with(|| item.display_label().to_string());
+        }
+    }
     Ok(Context {
         vendors,
+        items,
         lines,
         format,
         order,

@@ -183,7 +183,7 @@ export type DepreciationView = {
  */
 cost: string, years: number, 
 /**
- * The years the rules give, shown beside the choice: `3 years for computer in ruleset 2026 v1`.
+ * The years the rules give, shown beside the choice: `The rules give computers 3 years`.
  */
 rule: string, 
 /**
@@ -223,7 +223,7 @@ total: string | null, documents: Array<DocumentRowView>, };
 
 export type DocumentRowView = { id: string, title: string, 
 /**
- * `10 Nov · KZ 720 Fachliteratur`.
+ * `10 Nov · Books & magazines`.
  */
 sub: string, state: DocState, 
 /**
@@ -316,7 +316,7 @@ anv: string,
  */
 formula: string, 
 /**
- * `€121.23 is below the GWG limit (€1,000.00): counts fully in 2026.`
+ * `Counts over several years: it cost more than €1,000.00.`; None when it counts fully this year.
  */
 gwg: string | null, };
 
@@ -390,7 +390,7 @@ export type Interval = "monthly" | "quarterly" | "yearly";
  */
 export type ItemOption = { key: string, 
 /**
- * `KZ 169 · Digitale Arbeitsmittel`.
+ * The plain label, `Computer, phone & software`.
  */
 label: string, kz: string, };
 
@@ -642,7 +642,7 @@ export type RuleView = { id: string,
  */
 label: string, 
 /**
- * `→ assign item KZ 724 · 10 matches · last 7 Nov`.
+ * `→ assign item Other work costs · 10 matches · last 7 Nov`.
  */
 detail: string, builtin: boolean, form: RuleForm, };
 
@@ -838,11 +838,11 @@ next: string | null,
  */
 ended: string | null, year: number, timeline: Array<TimelineMonth>, plans: Array<PlanView>, 
 /**
- * `Yes · KZ 169 Digitale Arbeitsmittel` or `No`.
+ * `Yes · Computer, phone & software` or `No`.
  */
 anv: string, reminder: string, 
 /**
- * `text contains LUMEN AI · ± €1.00`.
+ * `LUMEN AI · another amount asks`.
  */
 rule: string, charges: Array<ChargeView>, 
 /**
@@ -976,7 +976,7 @@ detail: string, };
 
 export type VendorView = { id: string, name: string, 
 /**
- * `2 documents · KZ 169`.
+ * `2 documents · Computer, phone & software`.
  */
 detail: string, defaultItemKey: string | null, 
 /**

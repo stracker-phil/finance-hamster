@@ -1116,7 +1116,7 @@ fn an_anv_line_on_an_item_that_needs_an_invoice_is_missing_its_invoice_and_does_
         [AttentionView {
             kind: AttentionKind::MissingInvoice,
             title: "Lastschrift SEITENWEISE · €58.30".into(),
-            detail: "5 Oct · KZ 720 needs the invoice before it counts".into(),
+            detail: "5 Oct · Books counts once the invoice is attached".into(),
             document_id: None,
             entry_id: None,
             line_id: Some("l-m".into()),
@@ -1144,7 +1144,7 @@ fn bank_line_details_read_in_german_when_the_language_is_german() {
 
     assert_eq!(
         page.attention[0].detail,
-        "5. Jan. · KZ 720 braucht die Rechnung, bevor sie zählt"
+        "5. Jan. · Books zählt, sobald die Rechnung angehängt ist"
     );
     assert_eq!(rows_of(&page, "722")[0].detail, "10. Jan. · Buchung");
 }
@@ -1214,10 +1214,10 @@ fn progress_reads_in_german_with_the_verb_agreeing_in_number() {
         with_lang(Language::De, || year_page(&db).progress)
     };
 
-    assert_eq!(progress(true), "1 Entwurf abzuschließen · 1 Antwort fehlt");
+    assert_eq!(progress(true), "1 Entwurf fertigzumachen · 1 Antwort fehlt");
     assert_eq!(
         progress(false),
-        "1 Entwurf abzuschließen · 2 Antworten fehlen"
+        "1 Entwurf fertigzumachen · 2 Antworten fehlen"
     );
 }
 

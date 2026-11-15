@@ -10,7 +10,7 @@ import { AddEntry } from "./AddEntry";
 
 const mocked = vi.mocked(api, true);
 
-const item = { key: "other", kz: "722", add: "amount" } as const;
+const item = { key: "other", kz: "722", label: "Other costs", add: "amount" } as const;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -19,6 +19,15 @@ beforeEach(() => {
 });
 
 describe("AddEntry", () => {
+  it.each([
+    ["amount", "Add an amount to Other costs"],
+    ["trip", "Add a trip to Other costs"],
+  ] as const)("names its %s group after the item's label", (add, name) => {
+    render(<AddEntry year={2026} item={{ ...item, add, label: "Other costs" }} onDone={() => {}} />);
+
+    expect(screen.getByRole("group", { name })).toBeTruthy();
+  });
+
   describe("onAdded", () => {
     it("gets the typed text after a successful add", async () => {
       const onAdded = vi.fn();

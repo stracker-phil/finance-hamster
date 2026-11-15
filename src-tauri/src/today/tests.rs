@@ -516,7 +516,7 @@ fn steps_read_in_german_with_singular_and_plural() {
         drafts,
         Step {
             key: "draft".into(),
-            title: "2 Entwürfe abzuschließen".into(),
+            title: "2 Entwürfe fertigzumachen".into(),
             detail: "doc-d1 und doc-d2".into(),
             line: "Schließe sie ab, um ihre Werte für das Steuerjahr festzuschreiben.".into(),
             button: "Entwürfe zeigen".into(),

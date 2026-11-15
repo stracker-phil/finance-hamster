@@ -231,8 +231,8 @@ pub(super) fn draft_step(page: &YearPage) -> Option<Step> {
             count,
             "{count} draft to finish",
             "{count} drafts to finish",
-            "{count} Entwurf abzuschließen",
-            "{count} Entwürfe abzuschließen"
+            "{count} Entwurf fertigzumachen",
+            "{count} Entwürfe fertigzumachen"
         ),
         detail: first_names(drafts.iter().map(|d| d.title.clone())),
         line: if single {

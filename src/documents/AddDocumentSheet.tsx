@@ -133,9 +133,7 @@ export function AddDocumentSheet({ preview }: { preview: AddPreview }) {
       <h3 className="add-doc__heading">{text.paidWith}</h3>
       <PaidWithPicker lines={preview.lines} value={lineId} onChange={setLineId} />
       {estimate?.gwg && (
-        <div className="add-doc__ok add-doc__gwg">
-          <Check size={12} /> {estimate.gwg}
-        </div>
+        <div className="add-doc__hint add-doc__gwg">{estimate.gwg}</div>
       )}
       <p className="add-doc__summary">
         {estimate ? text.countsAs(estimate.anv, estimate.formula) : ""}

@@ -76,7 +76,7 @@ describe("FirstRun account step", () => {
 });
 
 describe("FirstRun statement step", () => {
-  it("names the open tax year and its rules", async () => {
+  it("names the open tax year and says its rules are built in", async () => {
     mocked.listTaxYears.mockResolvedValue([
       { year: 2025, state: "closed", ruleset: "2025 v2" },
       { year: 2026, state: "open", ruleset: "2026 v1" },
@@ -85,7 +85,7 @@ describe("FirstRun statement step", () => {
 
     await addAccount();
 
-    expect(await screen.findByText("Tax year 2026 is ready with the rules 2026 v1.")).toBeTruthy();
+    expect(await screen.findByText("Tax year 2026 is ready, with its tax rules built in.")).toBeTruthy();
   });
 
   it("mentions no tax year when none is open", async () => {
@@ -96,7 +96,7 @@ describe("FirstRun statement step", () => {
 
     await screen.findByRole("heading", { name: "Import your first statement" });
     await waitFor(() => expect(mocked.listTaxYears).toHaveBeenCalled());
-    expect(screen.queryByText(/is ready with the rules/)).toBeNull();
+    expect(screen.queryByText(/is ready, with its tax rules built in/)).toBeNull();
   });
 
   it("finishes on Skip for Now without importing", async () => {

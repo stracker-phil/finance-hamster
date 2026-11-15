@@ -70,10 +70,10 @@ pub struct SubscriptionDetail {
     pub year: i32,
     pub timeline: Vec<TimelineMonth>,
     pub plans: Vec<PlanView>,
-    /// `Yes · KZ 169 Digitale Arbeitsmittel` or `No`.
+    /// `Yes · Computer, phone & software` or `No`.
     pub anv: String,
     pub reminder: String,
-    /// `text contains LUMEN AI · ± €1.00`.
+    /// `LUMEN AI · another amount asks`.
     pub rule: String,
     pub charges: Vec<ChargeView>,
     /// What Edit starts from.
@@ -247,13 +247,7 @@ pub fn detail(
             .collect(),
         anv,
         reminder: sub.reminder.label().into(),
-        rule: {
-            let text = sub.match_text.to_uppercase();
-            tr!(
-                "text contains {text} · {amount_rule}",
-                "Text enthält {text} · {amount_rule}"
-            )
-        },
+        rule: format!("{} · {amount_rule}", sub.match_text.to_uppercase()),
         charges,
         form: form_of(sub, plan_on(&running.plans, &date::iso(today)), format),
         current_plan,

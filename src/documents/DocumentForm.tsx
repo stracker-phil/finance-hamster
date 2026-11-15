@@ -208,11 +208,7 @@ export function DocumentForm({ doc, onExclude }: { doc: DocumentView; onExclude:
             )}
           </div>
         )}
-        {doc.estimate?.gwg && (
-          <div className={doc.depreciation ? "add-doc__hint add-doc__gwg" : "add-doc__ok add-doc__gwg"}>
-            {!doc.depreciation && <Check size={12} />} {doc.estimate.gwg}
-          </div>
-        )}
+        {doc.estimate?.gwg && !doc.depreciation && <div className="add-doc__hint add-doc__gwg">{doc.estimate.gwg}</div>}
 
         {doc.depreciation && <DepreciationBlock depreciation={doc.depreciation} disabled={locked} onYears={(years) => save({ field: "usefulLife", years })} />}
         <FieldError message={errors["document.usefulLife"]} />

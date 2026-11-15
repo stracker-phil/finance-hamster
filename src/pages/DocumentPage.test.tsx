@@ -20,12 +20,13 @@ beforeEach(() => {
 });
 
 describe("DocumentPage", () => {
-  it("shows the file path and the form of the document", async () => {
+  it("shows the form of the document and the file path only as a tooltip on the preview", async () => {
     mocked.documentView.mockResolvedValue(documentView({ missing: ["vendor"] }));
     renderWithQuery(<DocumentPage documentId="doc-1" />);
 
-    expect(await screen.findByText("Documents/Inbox/demo-cloud-1109.pdf")).toBeTruthy();
-    expect(screen.getByText("Missing: vendor")).toBeTruthy();
+    expect(await screen.findByText("Missing: vendor")).toBeTruthy();
+    expect(screen.queryByText("Documents/Inbox/demo-cloud-1109.pdf")).toBeNull();
+    expect(screen.getByTitle("Documents/Inbox/demo-cloud-1109.pdf")).toBeTruthy();
     expect(mocked.documentView).toHaveBeenCalledWith("doc-1");
   });
 

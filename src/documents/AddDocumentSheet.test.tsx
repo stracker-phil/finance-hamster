@@ -164,7 +164,7 @@ describe("AddDocumentSheet", () => {
       renderSheet();
 
       expect(await screen.findByText("60 % · from the item: 40 % private")).toBeTruthy();
-      expect(screen.getByText(/Counts as €72.74 \(€121.23 × 60 %\)\. Saved as a draft; finish it whenever you like\./)).toBeTruthy();
+      expect(screen.getByText(/Counts as €72.74 \(€121.23 × 60 %\)\. It is saved as a draft; finish it whenever you like\./)).toBeTruthy();
       expect(mocked.documentEstimate).toHaveBeenCalledWith("line-1", "kz-169");
     });
 
@@ -175,11 +175,12 @@ describe("AddDocumentSheet", () => {
       expect(await screen.findByText("60 %")).toBeTruthy();
     });
 
-    it("shows the GWG text when the estimate has one", async () => {
+    it("shows the GWG text as a plain hint without an icon when the estimate has one", async () => {
       mocked.documentEstimate.mockResolvedValue(estimate({ gwg: "€121.23 is below the GWG limit (€1,000.00): counts fully in 2026." }));
       renderSheet();
 
-      expect(await screen.findByText(/below the GWG limit/)).toBeTruthy();
+      const hint = await screen.findByText(/below the GWG limit/);
+      expect(hint.querySelector("svg")).toBeNull();
     });
 
     it("asks again with no line and no item when both are cleared", async () => {
@@ -195,7 +196,7 @@ describe("AddDocumentSheet", () => {
       renderSheet();
 
       await waitFor(() => expect(mocked.documentEstimate).toHaveBeenCalled());
-      expect(screen.getByText("Saved as a draft; finish it whenever you like.")).toBeTruthy();
+      expect(screen.getByText("It is saved as a draft; finish it whenever you like.")).toBeTruthy();
       expect(screen.queryByText("Work share")).toBeNull();
     });
   });

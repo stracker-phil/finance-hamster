@@ -11,7 +11,7 @@ const startDate = (year: number) => (today().startsWith(String(year)) ? today() 
 
 const fileName = (path: string) => path.split("/").pop() ?? path;
 
-type EntryTarget = Pick<KennzahlView, "key" | "kz" | "add"> & { rate?: string | null };
+type EntryTarget = Pick<KennzahlView, "key" | "kz" | "label" | "add"> & { rate?: string | null };
 
 /** The inline row that adds an amount or a trip to a Kennzahl; `onAdded` gets what it added: its text, else its label. */
 export function AddEntry({ year, item, onDone, onAdded }: { year: number; item: EntryTarget; onDone: () => void; onAdded?: (label: string) => void }) {
@@ -53,7 +53,7 @@ export function AddEntry({ year, item, onDone, onAdded }: { year: number; item: 
   };
 
   return (
-    <div className="entry-add" role="group" aria-label={trip ? words.addTrip(item.kz) : words.addAmount(item.kz)}>
+    <div className="entry-add" role="group" aria-label={trip ? words.addTrip(item.label) : words.addAmount(item.label)}>
       <div className="entry-add__row" onKeyDown={onKey}>
         <span className="year-dot year-dot--accent" />
         <input type="date" className="field entry-add__date" aria-label={words.date} value={date} onChange={(e) => setDate(e.target.value)} />

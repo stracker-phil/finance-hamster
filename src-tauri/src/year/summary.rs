@@ -68,8 +68,8 @@ pub fn progress_text(facts: &Facts, unanswered: usize, questions: usize) -> (Str
             drafts,
             "{drafts} draft to finish",
             "{drafts} drafts to finish",
-            "{drafts} Entwurf abzuschließen",
-            "{drafts} Entwürfe abzuschließen"
+            "{drafts} Entwurf fertigzumachen",
+            "{drafts} Entwürfe fertigzumachen"
         ));
     }
     if !missing.is_empty() {

@@ -38,9 +38,9 @@ pub(super) fn entry_rows(
                     facts.flag_missing_invoice(
                         format!("{} · {}", entry.text, eur(cents, format)),
                         crate::tr!(
-                            "KZ {} needs evidence before it counts",
-                            "KZ {} zählt erst mit Nachweis",
-                            item.kz
+                            "{} counts once its evidence is attached",
+                            "{} zählt, sobald der Nachweis angehängt ist",
+                            item.display_label()
                         ),
                         Some(entry.id.clone()),
                         None,
@@ -147,9 +147,9 @@ pub(super) fn decided_lines(
             facts.flag_missing_invoice(
                 format!("{title} · {}", eur(line.cents.abs(), format)),
                 crate::tr!(
-                    "{day} · KZ {} needs the invoice before it counts",
-                    "{day} · KZ {} braucht die Rechnung, bevor sie zählt",
-                    item.kz
+                    "{day} · {} counts once the invoice is attached",
+                    "{day} · {} zählt, sobald die Rechnung angehängt ist",
+                    item.display_label()
                 ),
                 None,
                 Some(line.id.clone()),

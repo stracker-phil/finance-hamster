@@ -72,8 +72,8 @@ pub fn check(page: &YearPage) -> CloseCheck {
             drafts,
             "{drafts} draft to finish",
             "{drafts} drafts to finish",
-            "{drafts} Entwurf abzuschließen",
-            "{drafts} Entwürfe abzuschließen"
+            "{drafts} Entwurf fertigzumachen",
+            "{drafts} Entwürfe fertigzumachen"
         ));
     }
     let undated = count(AttentionKind::Undated);
@@ -468,7 +468,7 @@ mod tests {
             one,
             CloseCheck {
                 blockers: vec![
-                    "1 Entwurf abzuschließen".into(),
+                    "1 Entwurf fertigzumachen".into(),
                     "1 Beleg ohne Zahlungsdatum".into()
                 ],
                 warnings: vec![
@@ -481,7 +481,7 @@ mod tests {
             many,
             CloseCheck {
                 blockers: vec![
-                    "2 Entwürfe abzuschließen".into(),
+                    "2 Entwürfe fertigzumachen".into(),
                     "2 Belege ohne Zahlungsdatum".into()
                 ],
                 warnings: vec![

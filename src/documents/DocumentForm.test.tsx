@@ -301,16 +301,16 @@ describe("DocumentForm", () => {
     describe("GWG line", () => {
       const gwg = "€121.23 is below the GWG limit (€1,000.00): counts fully in 2026.";
 
-      it("shows the text with a check icon when the purchase is not spread", () => {
+      it("shows the text as a plain hint without an icon when the purchase is not spread", () => {
         renderForm({ estimate: estimate({ gwg }) });
 
-        expect(screen.getByText(gwg).querySelector("svg")).not.toBeNull();
+        expect(screen.getByText(gwg).querySelector("svg")).toBeNull();
       });
 
-      it("shows the same text without the check icon when the purchase is spread", () => {
+      it("leaves the text out when the purchase is spread", () => {
         renderForm({ estimate: estimate({ gwg }), depreciation: depreciationView() });
 
-        expect(screen.getByText(gwg).querySelector("svg")).toBeNull();
+        expect(screen.queryByText(gwg)).toBeNull();
       });
     });
 

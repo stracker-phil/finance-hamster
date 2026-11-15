@@ -66,7 +66,8 @@ pub fn kind_of(path: &str) -> FieldKind {
     }
 }
 
-fn asset_class(class: &str) -> String {
+/// The plain name of a `usefulLife` class.
+pub fn asset_class(class: &str) -> String {
     match class {
         "computer" => crate::tr!("Computers", "Computer"),
         "furniture" => crate::tr!("Furniture", "Möbel"),

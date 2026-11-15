@@ -88,7 +88,7 @@ pub struct DepreciationView {
     /// What is spread: the counted amount, `€1,500.00`.
     pub cost: String,
     pub years: u32,
-    /// The years the rules give, shown beside the choice: `3 years for computer in ruleset 2026 v1`.
+    /// The years the rules give, shown beside the choice: `The rules give computers 3 years`.
     pub rule: String,
     /// Changed from the rule's years for this document.
     pub own: bool,
@@ -216,7 +216,6 @@ pub fn document(
             p,
             doc.item_key.as_deref(),
             doc.work_share,
-            year.unwrap_or_default(),
             format,
         )
     });
@@ -288,7 +287,7 @@ pub fn editable(doc: &DocumentRow) -> AppResult<()> {
         DocState::Draft => Ok(()),
         DocState::Finished => Err(AppError::InvalidInput(tr!(
             "This document is finished; unlock it to change it",
-            "Dieser Beleg ist abgeschlossen; entsperre ihn, um ihn zu ändern"
+            "Dieser Beleg ist fertig; entsperre ihn, um ihn zu ändern"
         ))),
         DocState::Excluded => Err(AppError::InvalidInput(tr!(
             "This document is excluded; restore it to change it",
@@ -340,27 +339,33 @@ fn depreciation_view(
     let (cost_text, limit) = (eur(cost), eur(ruleset.settings.gwg_limit.0));
     let mut why = tr_plural!(
         years,
-        "{cost_text} is above the GWG limit of {limit}, so it counts over {years} year",
-        "{cost_text} is above the GWG limit of {limit}, so it counts over {years} years",
-        "{cost_text} liegt über der GWG-Grenze von {limit} und zählt daher über {years} Jahr",
-        "{cost_text} liegt über der GWG-Grenze von {limit} und zählt daher über {years} Jahre"
+        "{cost_text} is more than {limit}, so it counts over {years} year",
+        "{cost_text} is more than {limit}, so it counts over {years} years",
+        "{cost_text} ist mehr als {limit} und zählt daher über {years} Jahr",
+        "{cost_text} ist mehr als {limit} und zählt daher über {years} Jahre"
     );
     if half_year {
-        let from = &ruleset.settings.half_year_from;
+        let setting = &ruleset.settings.half_year_from;
+        let from = crate::date::parse(&format!("{year}-{setting}")).map_or_else(
+            || setting.clone(),
+            |d| crate::date::day_month(d, DateOrder::system()),
+        );
         why.push_str(&tr!(
-            "; bought on or after {from}, the first and the last year count half",
-            "; gekauft am oder nach dem {from}, zählen das erste und das letzte Jahr halb"
+            "; bought from {from} on, the first and the last year count half",
+            "; ab {from} gekauft, zählen das erste und das letzte Jahr halb"
         ));
     }
     why.push('.');
     Ok(Some(DepreciationView {
         cost: eur(cost),
         years,
-        rule: tr!(
-            "{rule_years} years for {asset_class} in ruleset {}",
-            "{rule_years} Jahre für {asset_class} im Regelwerk {}",
-            ruleset.ruleset
-        ),
+        rule: {
+            let class = crate::taxrules::view::asset_class(&asset_class);
+            tr!(
+                "The rules give {class} {rule_years} years",
+                "Die Regeln geben {class} {rule_years} Jahre"
+            )
+        },
         own: doc.useful_life.is_some_and(|y| y != rule_years),
         why,
         slices: slices

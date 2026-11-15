@@ -626,12 +626,12 @@ fn an_unknown_vendor_is_suggested_from_the_pdf_with_its_invoice_facts() {
             items: vec![
                 ItemOption {
                     key: "books".into(),
-                    label: "KZ 720 · Books".into(),
+                    label: "Books".into(),
                     kz: "720".into()
                 },
                 ItemOption {
                     key: "phone".into(),
-                    label: "KZ 721 · Phone".into(),
+                    label: "Phone".into(),
                     kz: "721".into()
                 },
             ],
@@ -936,8 +936,8 @@ fn an_add_preview_and_input_travel_in_camel_case() {
             "invoice": "PF-2026-1109 · 9 Nov 2026",
             "invoiceAmount": "USD 129.00",
             "items": [
-                { "key": "books", "label": "KZ 720 · Books", "kz": "720" },
-                { "key": "phone", "label": "KZ 721 · Phone", "kz": "721" }
+                { "key": "books", "label": "Books", "kz": "720" },
+                { "key": "phone", "label": "Phone", "kz": "721" }
             ],
             "itemKey": null,
             "itemWhy": null,
@@ -1220,12 +1220,12 @@ fn items_of_setup() -> Vec<ItemOption> {
     vec![
         ItemOption {
             key: "books".into(),
-            label: "KZ 720 · Books".into(),
+            label: "Books".into(),
             kz: "720".into(),
         },
         ItemOption {
             key: "phone".into(),
-            label: "KZ 721 · Phone".into(),
+            label: "Phone".into(),
             kz: "721".into(),
         },
     ]
@@ -1321,9 +1321,7 @@ fn the_page_of_a_dated_document_shows_its_lines_amount_vendor_items_and_estimate
                 share_hint: Some("from the item: 40 % private".into()),
                 anv: "€34.14".into(),
                 formula: "€56.90 × 60 %".into(),
-                gwg: Some(
-                    "€34.14 is below the GWG limit (€1,000.00): counts fully in 2026.".into()
-                ),
+                gwg: None,
             }),
             note: "Seminar".into(),
             invoice_amount: Some("46.90".into()),
@@ -1500,7 +1498,7 @@ fn the_items_come_from_the_payment_years_rules_or_else_the_newest_open_year() {
         page(&db, "in-2025").items,
         vec![ItemOption {
             key: "books".into(),
-            label: "KZ 720 · Old Books".into(),
+            label: "Old Books".into(),
             kz: "720".into(),
         }]
     );
@@ -2509,14 +2507,14 @@ fn documents_are_grouped_inbox_first_then_years_newest_first_and_newest_payment_
                     row_view(
                         "b",
                         "Pixelforge Ltd. invoice",
-                        "10 Nov · KZ 720 Books",
+                        "10 Nov · Books",
                         DocState::Finished,
                         "€10.00"
                     ),
                     row_view(
                         "a",
                         "Pixelforge Ltd. invoice",
-                        "14 Oct · KZ 721 Phone",
+                        "14 Oct · Phone",
                         DocState::Draft,
                         "€28.14"
                     ),
@@ -2530,7 +2528,7 @@ fn documents_are_grouped_inbox_first_then_years_newest_first_and_newest_payment_
                 documents: vec![row_view(
                     "c",
                     "Beleg-Maerz",
-                    "1 Mar · KZ 720 Books",
+                    "1 Mar · Books",
                     DocState::Draft,
                     ""
                 )],
@@ -2546,7 +2544,7 @@ fn the_sub_line_reads_the_date_in_the_chosen_order() {
 
     let groups = list::documents(&db, "seminar", FORMAT, DateOrder::MonthFirst).unwrap();
 
-    assert_eq!(groups[0].documents[0].sub, "Oct 14 · KZ 721 Phone");
+    assert_eq!(groups[0].documents[0].sub, "Oct 14 · Phone");
 }
 
 #[test]
@@ -2669,14 +2667,14 @@ fn the_vendor_list_shows_documents_and_the_default_or_last_used_item() {
                 VendorView {
                     id: "v-nord".into(),
                     name: "Nordbook".into(),
-                    detail: "1 document · KZ 720".into(),
+                    detail: "1 document · Books".into(),
                     default_item_key: Some("books".into()),
                     unused: false,
                 },
                 VendorView {
                     id: "v-pixel".into(),
                     name: "Pixelforge Ltd.".into(),
-                    detail: "3 documents · KZ 720".into(),
+                    detail: "3 documents · Books".into(),
                     default_item_key: None,
                     unused: false,
                 },
@@ -2715,13 +2713,13 @@ fn the_vendor_view_travels_in_camel_case() {
             "vendors": [{
                 "id": "v-1",
                 "name": "Nordbook",
-                "detail": "0 documents · KZ 720",
+                "detail": "0 documents · Books",
                 "defaultItemKey": "books",
                 "unused": true
             }],
             "items": [
-                { "key": "books", "label": "KZ 720 · Books", "kz": "720" },
-                { "key": "phone", "label": "KZ 721 · Phone", "kz": "721" }
+                { "key": "books", "label": "Books", "kz": "720" },
+                { "key": "phone", "label": "Phone", "kz": "721" }
             ]
         })
     );
@@ -3011,9 +3009,33 @@ fn finishing_speaks_german_in_its_refusal_and_its_op_label() {
 
     assert_eq!(
         refusal,
-        "Setze zuerst: Zahlungsdatum, bezahlten Betrag, Händler, Posten"
+        "Noch offen: Zahlungsdatum, bezahlter Betrag, Händler, Posten"
     );
-    assert_eq!(written.label, "Abschließen: Rechnung Pixelforge Ltd.");
+    assert_eq!(
+        written.label,
+        "Rechnung Pixelforge Ltd. als fertig markieren"
+    );
+}
+
+#[test]
+fn the_state_refusals_say_fertig_in_german() {
+    use crate::i18n::with_lang;
+    use crate::settings::Language;
+    let (_dir, db) = setup_with_vendor();
+    complete_draft(&db, "doc-a");
+    draft(&db, "doc-b", |_| {});
+    lifecycle::finish(&db, "doc-a", 1, Source::Ui).unwrap();
+
+    with_lang(Language::De, || {
+        assert_eq!(
+            refused(lifecycle::finish(&db, "doc-a", 1, Source::Ui)),
+            "Nur ein Entwurf kann als fertig markiert werden"
+        );
+        assert_eq!(
+            refused(lifecycle::unlock(&db, "doc-b", Source::Ui)),
+            "Nur ein fertiger Beleg kann entsperrt werden"
+        );
+    });
 }
 
 #[test]
@@ -3808,6 +3830,18 @@ fn a_documents_history_tells_its_life_newest_first() {
 }
 
 #[test]
+fn a_finished_document_reads_as_fertig_in_german_history() {
+    let (_dir, db) = setup_with_vendor();
+    complete_draft(&db, "doc-a");
+    lifecycle::finish(&db, "doc-a", 1, Source::Ui).unwrap();
+
+    let entries =
+        crate::i18n::with_lang(crate::settings::Language::De, || entries_of(&db, "doc-a"));
+
+    assert_eq!(entries[0], (HistoryKind::Finished, "Fertig".to_string()));
+}
+
+#[test]
 fn excluding_a_finished_document_reads_as_excluded_not_unlocked() {
     let (_dir, db) = setup_with_vendor();
     complete_draft(&db, "doc-a");
@@ -3850,7 +3884,7 @@ fn each_changed_field_reads_as_label_old_to_new_with_names_dates_and_amounts_res
             DocumentEdit::Item {
                 key: Some("books".into()),
             },
-            vec!["Item: — → books"],
+            vec!["Item: — → Books"],
         ),
         (
             DocumentEdit::WorkShare { value: "50".into() },
@@ -3890,6 +3924,66 @@ fn each_changed_field_reads_as_label_old_to_new_with_names_dates_and_amounts_res
         texts.sort_unstable();
         assert_eq!(texts, expected, "{expected:?}");
     }
+}
+
+#[test]
+fn an_item_change_reads_with_item_labels_from_any_tax_years_rules() {
+    let (_dir, db) = setup_with_vendor();
+    let mut rules = minimal_rules(2025);
+    set(
+        &mut rules,
+        "/items",
+        json!([
+            { "key": "books", "kz": "720", "name": "Books", "section": "main", "kind": "documents" },
+            { "key": "fees", "kz": "724", "name": "Fees", "label": "Bank fees", "section": "main", "kind": "documents" }
+        ]),
+    );
+    insert(
+        &db,
+        taxyears::TABLE,
+        &TaxYearRow::new(2025, "2025 v1".into(), rules_text(&rules), 1),
+    );
+    draft(&db, "doc-a", |d| {
+        d.item_key = Some("fees".into());
+        d.pay_date = Some("2026-10-14".into());
+    });
+
+    apply(
+        &db,
+        "doc-a",
+        DocumentEdit::Item {
+            key: Some("books".into()),
+        },
+    )
+    .unwrap();
+
+    assert_eq!(
+        entries_of(&db, "doc-a")[0],
+        (HistoryKind::Changed, "Item: Bank fees → Books".to_string())
+    );
+}
+
+#[test]
+fn an_item_change_from_an_unknown_item_reads_with_its_key() {
+    let (_dir, db) = setup_with_vendor();
+    draft(&db, "doc-a", |d| {
+        d.item_key = Some("legacy".into());
+        d.pay_date = Some("2026-10-14".into());
+    });
+
+    apply(
+        &db,
+        "doc-a",
+        DocumentEdit::Item {
+            key: Some("phone".into()),
+        },
+    )
+    .unwrap();
+
+    assert_eq!(
+        entries_of(&db, "doc-a")[0],
+        (HistoryKind::Changed, "Item: legacy → Phone".to_string())
+    );
 }
 
 #[test]
@@ -4245,9 +4339,9 @@ fn a_purchase_above_the_gwg_limit_shows_its_schedule_with_the_rule_and_the_reaso
         Some(DepreciationView {
             cost: "€1,500.00".into(),
             years: 3,
-            rule: "3 years for computer in ruleset 2026 v1".into(),
+            rule: "The rules give Computers 3 years".into(),
             own: false,
-            why: "€1,500.00 is above the GWG limit of €1,000.00, so it counts over 3 years.".into(),
+            why: "€1,500.00 is more than €1,000.00, so it counts over 3 years.".into(),
             slices: vec![
                 slice_view(2026, "€500.00", None),
                 slice_view(2027, "€500.00", None),
@@ -4266,7 +4360,7 @@ fn a_purchase_in_the_second_half_says_so_and_marks_its_half_year_slices() {
 
     assert_eq!(
         view.why,
-        "€1,500.00 is above the GWG limit of €1,000.00, so it counts over 3 years; bought on or after 07-01, the first and the last year count half."
+        "€1,500.00 is more than €1,000.00, so it counts over 3 years; bought from 1 Jul on, the first and the last year count half."
     );
     assert_eq!(
         view.slices,
@@ -4318,7 +4412,46 @@ fn slices_flag_frozen_by_field_and_name_their_notes_in_german() {
             (Some("halbes Jahr"), false)
         ]
     );
-    assert_eq!(view.rule, "3 Jahre für computer im Regelwerk 2026 v1");
+    assert_eq!(view.rule, "Die Regeln geben Computer 3 Jahre");
+    assert_eq!(
+        view.why,
+        "€1,500.00 ist mehr als €1,000.00 und zählt daher über 3 Jahre; ab 1. Juli gekauft, zählen das erste und das letzte Jahr halb."
+    );
+}
+
+#[test]
+fn the_rule_names_the_asset_class_in_plain_words_or_as_the_rules_spell_it() {
+    for (class, expected) in [
+        ("computer", "The rules give Computers 3 years"),
+        ("furniture", "The rules give Furniture 3 years"),
+        ("vehicle", "The rules give vehicle 3 years"),
+    ] {
+        let (_dir, db) = open_with_accounts();
+        let mut rules = minimal_rules(2026);
+        set(&mut rules, "/usefulLife", json!({ class: 3 }));
+        set(
+            &mut rules,
+            "/items",
+            json!([{
+                "key": "gear", "kz": "720", "name": "Gear", "section": "main",
+                "kind": "documents", "depreciation": { "assetClass": class }
+            }]),
+        );
+        insert(
+            &db,
+            taxyears::TABLE,
+            &TaxYearRow::new(2026, "2026 v1".into(), rules_text(&rules), 1),
+        );
+        draft(&db, "gear", |d| {
+            d.item_key = Some("gear".into());
+            d.pay_date = Some("2026-03-10".into());
+            d.paid_cents = Some(150_000);
+        });
+
+        let view = page(&db, "gear").depreciation.unwrap();
+
+        assert_eq!(view.rule, expected, "{class}");
+    }
 }
 
 #[test]
@@ -4330,10 +4463,7 @@ fn an_own_useful_life_is_flagged_only_when_it_differs_from_the_rule() {
         let view = page(&db, "pc").depreciation.unwrap();
 
         assert_eq!((view.years, view.own), (years, flagged), "{own:?}");
-        assert_eq!(
-            view.rule, "3 years for computer in ruleset 2026 v1",
-            "{own:?}"
-        );
+        assert_eq!(view.rule, "The rules give Computers 3 years", "{own:?}");
         assert_eq!(view.slices.len(), years as usize, "{own:?}");
     }
 }
@@ -4431,9 +4561,9 @@ fn a_depreciation_view_travels_in_camel_case() {
         json!({
             "cost": "€1,500.00",
             "years": 1,
-            "rule": "3 years for computer in ruleset 2026 v1",
+            "rule": "The rules give Computers 3 years",
             "own": true,
-            "why": "€1,500.00 is above the GWG limit of €1,000.00, so it counts over 1 year; bought on or after 07-01, the first and the last year count half.",
+            "why": "€1,500.00 is more than €1,000.00, so it counts over 1 year; bought from 1 Jul on, the first and the last year count half.",
             "slices": [
                 { "year": 2026, "amount": "€750.00", "note": "half year", "frozen": false },
                 { "year": 2027, "amount": "€750.00", "note": "frozen", "frozen": true }

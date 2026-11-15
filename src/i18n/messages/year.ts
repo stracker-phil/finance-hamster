@@ -3,8 +3,8 @@ import { both } from "../both";
 export const year = both(
   {
     entry: {
-      addTrip: (kz: string) => `Add a trip to KZ ${kz}`,
-      addAmount: (kz: string) => `Add an amount to KZ ${kz}`,
+      addTrip: (label: string) => `Add a trip to ${label}`,
+      addAmount: (label: string) => `Add an amount to ${label}`,
       date: "Date",
       destination: "Destination and purpose",
       note: "Note",
@@ -48,8 +48,8 @@ export const year = both(
   },
   {
     entry: {
-      addTrip: (kz: string) => `Fahrt zu KZ ${kz} hinzufügen`,
-      addAmount: (kz: string) => `Betrag zu KZ ${kz} hinzufügen`,
+      addTrip: (label: string) => `Fahrt zu ${label} hinzufügen`,
+      addAmount: (label: string) => `Betrag zu ${label} hinzufügen`,
       date: "Datum",
       destination: "Ziel und Zweck",
       note: "Notiz",

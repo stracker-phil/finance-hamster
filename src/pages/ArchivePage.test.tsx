@@ -22,10 +22,12 @@ beforeEach(() => {
 });
 
 describe("ArchivePage", () => {
-  it("lists each excluded document with its file, reason and exclusion date", async () => {
+  it("lists each excluded document by title with its reason and exclusion date, the file only as tooltip", async () => {
     renderWithQuery(<ArchivePage year={2026} />);
 
-    expect(await screen.findByText("Documents/2026/sample-books.pdf")).toBeTruthy();
+    const title = await screen.findByText("Sample Books");
+    expect(title.getAttribute("title")).toBe("Documents/2026/sample-books.pdf");
+    expect(screen.queryByText("Documents/2026/sample-books.pdf")).toBeNull();
     expect(screen.getByText("Duplicate of another invoice · Excluded 2 Nov 2026")).toBeTruthy();
     expect(mocked.archiveList).toHaveBeenCalledWith(2026);
   });

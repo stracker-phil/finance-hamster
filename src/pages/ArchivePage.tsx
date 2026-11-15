@@ -24,7 +24,9 @@ export function ArchivePage({ year }: { year: number }) {
         <div key={doc.id} className="archive-row">
           <FileText size={18} strokeWidth={1.8} className="docs-row__icon" />
           <div className="docs-row__text">
-            <span className="mono archive-row__file">{doc.file}</span>
+            <span className="archive-row__title" title={doc.file}>
+              {doc.title}
+            </span>
             <span className="add-doc__hint">
               {doc.reason} · {doc.excluded}
             </span>

@@ -404,14 +404,14 @@ fn a_line_without_a_decision_waits_for_review() {
 }
 
 #[test]
-fn an_item_decision_shows_the_kz_of_its_item() {
+fn an_item_decision_shows_the_label_of_its_item() {
     let (_dir, db) = decided_october();
 
     let page = lines_of(&db, "account-1");
 
     assert_eq!(
         status_of(&page, "BUCHHANDLUNG SEITENWEISE"),
-        (LineStatus::Anv, Some("KZ 720".into()))
+        (LineStatus::Anv, Some("Books".into()))
     );
 }
 
