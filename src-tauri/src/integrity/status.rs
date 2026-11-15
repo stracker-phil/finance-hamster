@@ -237,50 +237,36 @@ fn file_rows(
     ])
 }
 
-fn rules_rows(db: &Db, config_dir: &Path, order: DateOrder) -> AppResult<Vec<StatusRow>> {
-    let label = |ms: i64| local_day(ms, order);
-    let files = taxrules::overview(db, config_dir, &label)?;
-    let mut rows: Vec<StatusRow> = files
+fn rules_rows(db: &Db) -> AppResult<Vec<StatusRow>> {
+    let overview = taxrules::overview(db)?;
+    let mut rows: Vec<StatusRow> = overview
+        .years
         .iter()
-        .map(|f| {
-            if f.problems.is_empty() && !f.missing {
-                let when = f
-                    .loaded_on
-                    .as_ref()
-                    .map(|d| tr!(" · loaded {d}", " · geladen am {d}"))
-                    .unwrap_or_default();
-                row(
-                    &f.file_name,
-                    tr!("Valid{when}", "Gültig{when}"),
-                    "OK",
-                    Tone::Ok,
-                )
-            } else if f.missing {
-                row(
-                    &f.file_name,
-                    tr!(
-                        "The file is gone; the year keeps what it applied",
-                        "Die Datei fehlt; das Jahr behält, was es angewendet hat"
-                    ),
-                    tr!("Missing", "Fehlt"),
-                    Tone::Warning,
-                )
+        .map(|y| {
+            let name = tr!("Tax rules {}", "Steuerregeln {}", y.year);
+            if y.problems.is_empty() {
+                row(&name, y.ruleset.clone(), "OK", Tone::Ok)
             } else {
                 row(
-                    &f.file_name,
-                    f.problems.join(" · "),
-                    tr!("Invalid", "Ungültig"),
-                    Tone::Error,
+                    &name,
+                    tr!(
+                        "Built-in {} can't be taken on: {}",
+                        "Eingebaute {} lassen sich nicht übernehmen: {}",
+                        y.builtin_newer.clone().unwrap_or_default(),
+                        y.problems.join(" · ")
+                    ),
+                    tr!("Kept", "Beibehalten"),
+                    Tone::Warning,
                 )
             }
         })
         .collect();
-    let unverified: u32 = files.iter().map(|f| f.unverified).sum();
+    let unverified: u32 = overview.years.iter().map(|y| y.unverified).sum();
     rows.push(row(
         tr!("Unverified values", "Ungeprüfte Werte"),
         tr!(
-            "Marked \"verified\": false in the files",
-            "In den Dateien mit \"verified\": false markiert"
+            "Marked \"verified\": false in the rules",
+            "In den Regeln mit \"verified\": false markiert"
         ),
         unverified.to_string(),
         Tone::ok_or(unverified == 0, Tone::Warning),
@@ -309,7 +295,7 @@ pub fn status(
         StatusGroup {
             id: "rules".into(),
             title: tr!("Rules", "Regeln"),
-            rows: rules_rows(db, config_dir, order)?,
+            rows: rules_rows(db)?,
         },
     ])
 }
@@ -324,7 +310,7 @@ mod tests {
     use crate::integrity::{FileProblem, FileTrouble};
     use crate::statements::import;
     use crate::statements::import_tests::open_with_accounts_and_year;
-    use crate::taxyears::{self, TaxYearRow};
+    use crate::taxyears::{self, RulesSource, TaxYearRow};
     use crate::test_support::rules::{minimal_rules, minimal_text, rules_text, set};
     use crate::test_support::statements::{Statement, demo_month};
     use crate::test_support::temp_config_dir;
@@ -380,7 +366,11 @@ mod tests {
     }
 
     fn add_document(db: &Db, id: &str, pay_date: Option<&str>, state: DocState) {
-        let row = DocumentRow {
+        insert_document(db, &document_row(id, pay_date, state));
+    }
+
+    fn document_row(id: &str, pay_date: Option<&str>, state: DocState) -> DocumentRow {
+        DocumentRow {
             id: id.into(),
             state,
             file: format!("docs/inbox/{id}.pdf"),
@@ -401,11 +391,14 @@ mod tests {
             excluded_at: None,
             exclude_reason: None,
             useful_life: None,
-        };
+        }
+    }
+
+    fn insert_document(db: &Db, row: &DocumentRow) {
         db.write(
             Op::new(
                 "Add document",
-                vec![Change::insert(DOCUMENTS, &row).unwrap()],
+                vec![Change::insert(DOCUMENTS, row).unwrap()],
             ),
             Source::Seed,
         )
@@ -423,8 +416,14 @@ mod tests {
         (dir, db)
     }
 
-    fn open_year(db: &Db, year: i32, text: &str, loaded_at: i64) {
-        let row = TaxYearRow::new(year, format!("{year} v1"), text.into(), loaded_at);
+    fn open_year(db: &Db, year: i32, text: &str) {
+        add_year(
+            db,
+            TaxYearRow::new(year, format!("{year} v1"), text.into(), 1),
+        );
+    }
+
+    fn add_year(db: &Db, row: TaxYearRow) {
         db.write(
             Op::new(
                 "Add year",
@@ -438,7 +437,7 @@ mod tests {
     fn unverified_row(count: u32) -> StatusRow {
         row(
             "Unverified values",
-            "Marked \"verified\": false in the files",
+            "Marked \"verified\": false in the rules",
             count.to_string(),
             if count == 0 { Tone::Ok } else { Tone::Warning },
         )
@@ -764,7 +763,7 @@ mod tests {
     }
 
     #[test]
-    fn without_rules_files_only_the_unverified_count_remains() {
+    fn without_tax_years_only_the_unverified_count_remains() {
         let (dir, db) = rules_db();
 
         assert_eq!(
@@ -774,56 +773,56 @@ mod tests {
     }
 
     #[test]
-    fn a_valid_open_year_file_is_listed_with_the_day_it_was_loaded() {
+    fn every_tax_year_is_listed_newest_first_with_its_ruleset() {
         let (dir, db) = rules_db();
-        let text = minimal_text(2026);
-        crate::taxrules::files::create(dir.path(), 2026, &text).unwrap();
-        open_year(&db, 2026, &text, NOW);
+        open_year(&db, 2025, &minimal_text(2025));
+        open_year(&db, 2026, &minimal_text(2026));
 
         assert_eq!(
             rows_of(&groups(&db, dir.path(), None), "Rules"),
             [
-                row(
-                    "rules-2026.json",
-                    format!("Valid · loaded {}", label(NOW)),
-                    "OK",
-                    Tone::Ok
-                ),
+                row("Tax rules 2026", "2026 v1", "OK", Tone::Ok),
+                row("Tax rules 2025", "2025 v1", "OK", Tone::Ok),
                 unverified_row(0)
             ]
         );
     }
 
     #[test]
-    fn an_invalid_file_shows_its_problems_and_is_invalid() {
+    fn a_year_with_the_owners_version_is_listed_as_ok() {
         let (dir, db) = rules_db();
-        let mut rules = minimal_rules(2026);
-        set(&mut rules, "/schemaVersion", json!(2));
-        crate::taxrules::files::create(dir.path(), 2026, &rules_text(&rules)).unwrap();
-        open_year(&db, 2026, &minimal_text(2026), NOW);
+        add_year(
+            &db,
+            TaxYearRow {
+                rules_source: RulesSource::Own,
+                ..TaxYearRow::new(2026, "2026 v4 (own)".into(), minimal_text(2026), 1)
+            },
+        );
 
         assert_eq!(
             rows_of(&groups(&db, dir.path(), None), "Rules")[0],
-            row(
-                "rules-2026.json",
-                "schemaVersion: this Hamster reads version 1, not 2",
-                "Invalid",
-                Tone::Error
-            )
+            row("Tax rules 2026", "2026 v4 (own)", "OK", Tone::Ok)
         );
     }
 
     #[test]
-    fn a_year_whose_file_is_gone_is_missing() {
+    fn a_built_in_version_that_recorded_data_rules_out_is_kept_out_with_a_warning() {
         let (dir, db) = rules_db();
-        open_year(&db, 2026, &minimal_text(2026), NOW);
+        open_year(&db, 2026, &minimal_text(2026));
+        insert_document(
+            &db,
+            &DocumentRow {
+                item_key: Some("books".into()),
+                ..document_row("doc-books", Some("2026-03-03"), DocState::Draft)
+            },
+        );
 
         assert_eq!(
             rows_of(&groups(&db, dir.path(), None), "Rules")[0],
             row(
-                "rules-2026.json",
-                "The file is gone; the year keeps what it applied",
-                "Missing",
+                "Tax rules 2026",
+                "Built-in 2026 v4 can't be taken on: items: \"books\" is missing, but entries use it; keys can't be removed or renamed",
+                "Kept",
                 Tone::Warning
             )
         );
@@ -884,12 +883,12 @@ mod tests {
     }
 
     #[test]
-    fn unverified_values_are_summed_over_all_files() {
+    fn unverified_values_are_summed_over_all_years() {
         let (dir, db) = rules_db();
         for year in [2026, 2027] {
             let mut rules = minimal_rules(year);
             set(&mut rules, "/items/0/verified", json!(false));
-            crate::taxrules::files::create(dir.path(), year, &rules_text(&rules)).unwrap();
+            open_year(&db, year, &rules_text(&rules));
         }
 
         assert_eq!(

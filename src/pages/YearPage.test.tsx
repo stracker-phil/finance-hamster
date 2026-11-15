@@ -754,13 +754,13 @@ describe("YearPage", () => {
       expect(useStore.getState().route).toEqual({ page: "archive", year: 2026 });
     });
 
-    it("opens the ruleset JSON of the year and closes the menu", async () => {
+    it("opens the Tax Rules page in Settings and closes the menu", async () => {
       await show();
       await openMenu();
 
-      await userEvent.click(screen.getByRole("menuitem", { name: "Open Ruleset JSON" }));
+      await userEvent.click(screen.getByRole("menuitem", { name: "Tax Rules…" }));
 
-      expect(mocked.rulesOpen).toHaveBeenCalledWith(2026);
+      expect(mocked.settingsShow).toHaveBeenCalledWith("tax-years");
       expect(screen.queryByRole("menu")).toBeNull();
     });
 
@@ -768,11 +768,11 @@ describe("YearPage", () => {
     const toastMessages = () => useStore.getState().toasts.map((t) => t.message);
 
     describe("of an open year", () => {
-      it("lists Log, Archive, Export Summary PDF, Open Ruleset JSON and Close Year", async () => {
+      it("lists Log, Archive, Export Summary PDF, Tax Rules and Close Year", async () => {
         await show({ archived: 3 });
         await openMenu();
 
-        expect(itemNames()).toEqual(["Log", "Archive", "Export Summary PDF…", "Open Ruleset JSON", "Close Year…"]);
+        expect(itemNames()).toEqual(["Log", "Archive", "Export Summary PDF…", "Tax Rules…", "Close Year…"]);
       });
 
       it("offers neither Reopen Year nor Open Snapshot PDF", async () => {
@@ -799,7 +799,7 @@ describe("YearPage", () => {
       it("lists Open Snapshot PDF and Reopen Year but no Close Year", async () => {
         await showClosed();
 
-        expect(itemNames()).toEqual(["Log", "Archive", "Export Summary PDF…", "Open Ruleset JSON", "Open Snapshot PDF", "Reopen Year…"]);
+        expect(itemNames()).toEqual(["Log", "Archive", "Export Summary PDF…", "Tax Rules…", "Open Snapshot PDF", "Reopen Year…"]);
       });
 
       it("opens the snapshot PDF of the year", async () => {

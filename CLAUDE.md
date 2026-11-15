@@ -82,9 +82,9 @@ Document by file and symbol, never by line number.
 - Network: none; no HTTP client in the crate, tests check the dependency tree (ADR 0016). PDF text and
   previews come from PDFKit: a native `PDFView` over the page, so text can be selected (ADR 0018,
   ADR 0037).
-- Tax rules live in `rules/rules-<year>.json` (schema-validated, edited outside the app, reloaded in Settings,
-  frozen with a closed year); the tax year page shows one copy value per Kennzahl and estimate rules only add
-  a note (ADR 0040). Werbungskosten only, other L1 sections possible as data (ADR 0039).
+- Tax rules are built in from `resources/rules/rules-<year>.json` (schema-validated; open years follow newer
+  built-in versions; values changed in Settings make the owner's version; frozen with a closed year; ADR 0051);
+  the tax year page shows one copy value per Kennzahl and estimate rules only add a note (ADR 0040). Werbungskosten only, other L1 sections possible as data (ADR 0039).
 - A Dock app: closing hides the window; reminders are scheduled macOS notifications (ADR 0035). No status
   bar (ADR 0036).
 - Repository map: `docs/architecture.md`.

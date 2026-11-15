@@ -183,10 +183,18 @@ fn start_reminders(app: AppHandle) {
 
 fn start_tax_years(app: &tauri::App) {
     let state = app.state::<AppState>();
-    let started =
-        crate::taxyears::start_on_launch(&state.db, &crate::config_dir(), chrono::Local::now());
-    if let Err(e) = started {
-        log::warn!("Couldn't start the tax years: {e}");
+    match crate::taxyears::start_on_launch(&state.db, chrono::Local::now()) {
+        Ok(written) => {
+            if let Ok(mut notices) = state.notices.lock() {
+                notices.extend(
+                    written
+                        .into_iter()
+                        .filter(|w| w.tables.iter().any(|t| t == "tax_years"))
+                        .map(|w| w.label),
+                );
+            }
+        }
+        Err(e) => log::warn!("Couldn't start the tax years: {e}"),
     }
 }
 

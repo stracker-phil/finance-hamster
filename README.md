@@ -35,8 +35,8 @@ support. To build it or port it, point a coding agent at [AGENTS.md](AGENTS.md).
   charge per period, so a second charge the next day isn't mistaken for it.
 - **Documents:** drop an invoice PDF and Hamster reads the vendor, amount and date, and finds the bank line
   that paid it. Finished documents are locked; deleting one needs a reason and is logged.
-- **The tax year:** one copy value per Kennzahl with the documents, amounts and trips behind it, rules from a
-  JSON file per year (edited outside the app, frozen with a closed year), and a year check in November that
+- **The tax year:** one copy value per Kennzahl with the documents, amounts and trips behind it, rules built into
+  the app for each year (kept up to date, changeable in Settings, frozen with a closed year), and a year check in November that
   asks about the deductions people forget.
 - **Keyboard first:** ⌘K finds anything and runs any command, every action has a menu item and a shortcut, and
   the `hamster` command line drives the running app.

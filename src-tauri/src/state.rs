@@ -18,6 +18,8 @@ pub struct AppState {
     pub notifier: Notifier,
     pub imports: ImportQueue,
     pub adds: AddQueue,
+    /// Messages for the window from work done before it opened.
+    pub notices: std::sync::Mutex<Vec<String>>,
 }
 
 impl AppState {
@@ -29,6 +31,7 @@ impl AppState {
             notifier: Notifier::default(),
             imports: ImportQueue::default(),
             adds: AddQueue::default(),
+            notices: Default::default(),
         })
     }
 }

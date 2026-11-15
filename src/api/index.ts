@@ -1,7 +1,7 @@
 import { getName, getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { YearCheckView, Account, AccountEdit, AccountLines, Action, Elsewhere, YearPage, NewEntry, TodayView, RulePreview, FileCheck, StatusGroup, CloseCheck, SubscriptionsView, SubscriptionDetail, SubscriptionForm, PlanForm, MatchCount, AddInput, AddPreview, ArchivedDocument, DeletionView, DocumentEdit, DocumentGroup, DocumentStep, DocumentView, HistoryEntry, VendorChange, VendorsView, Estimate, LineChoice, Coverage, ReviewQueue, RuleForm, RulesView, Frame, ImportPreview, PdfSource, AppError, AppInfo, CommandInfo, KeyConflict, ErrorKind, EventName, EventPayloads, Imported, LaunchEvent, NewAccount, ReloadPreview, RulesFile, Settings, SettingsPatch, TaxYear } from "./types";
+import type { YearCheckView, Account, AccountEdit, AccountLines, Action, Elsewhere, YearPage, NewEntry, TodayView, RulePreview, FileCheck, StatusGroup, CloseCheck, SubscriptionsView, SubscriptionDetail, SubscriptionForm, PlanForm, MatchCount, AddInput, AddPreview, ArchivedDocument, DeletionView, DocumentEdit, DocumentGroup, DocumentStep, DocumentView, HistoryEntry, VendorChange, VendorsView, Estimate, LineChoice, Coverage, ReviewQueue, RuleForm, RulesView, Frame, ImportPreview, PdfSource, AppError, AppInfo, CommandInfo, KeyConflict, ErrorKind, EventName, EventPayloads, JsonPreview, LaunchEvent, NewAccount, RulesOverview, RulesYearView, Settings, SettingsPatch, TaxYear } from "./types";
 
 export * from "./types";
 
@@ -32,16 +32,17 @@ export const api = {
   addAccount: (account: NewAccount) => invoke<Account>("add_account", { account }),
   editAccount: (id: string, account: AccountEdit) => invoke<void>("edit_account", { id, account }),
   listTaxYears: () => invoke<TaxYear[]>("list_tax_years"),
-  rulesOverview: () => invoke<RulesFile[]>("rules_overview"),
-  rulesReloadPreview: () => invoke<ReloadPreview[]>("rules_reload_preview"),
-  /** The label of the applied change, or null when no file had changed. */
-  rulesReloadApply: () => invoke<string | null>("rules_reload_apply"),
-  /** Null when the file panel was cancelled. */
-  rulesImport: () => invoke<Imported | null>("rules_import"),
-  /** The new draft's file name. */
-  rulesDuplicate: () => invoke<string>("rules_duplicate"),
-  rulesOpen: (year: number) => invoke<void>("rules_open", { year }),
-  rulesShowFolder: () => invoke<void>("rules_show_folder"),
+  rulesOverview: () => invoke<RulesOverview>("rules_overview"),
+  rulesYear: (year: number) => invoke<RulesYearView>("rules_year", { year }),
+  /** Each returns the label of its change. */
+  rulesSetValue: (year: number, path: string, value: string) => invoke<string>("rules_set_value", { year, path, value }),
+  rulesJson: (year: number) => invoke<string>("rules_json", { year }),
+  rulesPreviewJson: (year: number, text: string) => invoke<JsonPreview>("rules_preview_json", { year, text }),
+  rulesSetJson: (year: number, text: string) => invoke<string>("rules_set_json", { year, text }),
+  rulesUseBuiltin: (year: number) => invoke<string>("rules_use_builtin", { year }),
+  rulesStartNext: () => invoke<string>("rules_start_next"),
+  /** What happened to the rules while the app started; empty after the first call. */
+  rulesTakeNotices: () => invoke<string[]>("rules_take_notices"),
   /** Asks for a statement PDF and reads it; null when the panel was cancelled. */
   statementImportChoose: () => invoke<ImportPreview | null>("statement_import_choose"),
   /** The label of the import. */

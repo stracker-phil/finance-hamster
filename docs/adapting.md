@@ -47,7 +47,7 @@ CLI's Unix socket in the config dir. A new host or listener needs an ADR and a r
 | A new CLI subcommand | `src-tauri/src/cli/`, `src-tauri/src/remote/` |
 | A new color | a token in every palette under `src/styles/palettes/` |
 | A new bank statement layout | a new parser module beside the existing ones, its synthetic fixture, the layout id stored on each statement |
-| A new tax year's Kennzahlen | Settings → Tax Rules duplicates the previous ruleset; seed defaults in the rulesets module |
+| A new tax year's Kennzahlen | add `resources/rules/rules-<year>.json` and list it in `taxrules::files::BUNDLED`; without a release, Settings → Tax Rules → Start <year> copies the previous year |
 | A new journaled field | the op that writes it, its inverse, the History label |
 
 ## Conventions to keep

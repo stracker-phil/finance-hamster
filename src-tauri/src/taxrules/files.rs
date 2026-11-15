@@ -1,146 +1,26 @@
-//! The `rules/` folder: one `rules-<year>.json` per tax year, next to the schema and README the app ships
-//! (ADR 0040). Hamster writes a file only when asked (seed, Import, Duplicate); editing happens outside.
-
-use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
+//! The rules built into the app: one checked `rules-<year>.json` per year from `resources/rules/`, compiled in
+//! (ADR 0051). A year starts from its built-in rules; edits made in Settings live in the year's row.
 
 use serde_json::{Map, Value};
 
 use crate::error::{AppError, AppResult};
-use crate::store::json_file::create_private_dir;
 
-pub const DIR: &str = "rules";
-const SCHEMA: (&str, &str) = (
-    "rules.schema.json",
-    include_str!("../../resources/rules/rules.schema.json"),
-);
-const README: (&str, &str) = ("README.md", include_str!("../../resources/rules/README.md"));
-/// The year to file and the year under way when Hamster was built; a first launch starts both.
-const SEEDS: [(&str, &str); 2] = [
-    (
-        "rules-2025.json",
-        include_str!("../../resources/rules/rules-2025.json"),
-    ),
-    (
-        "rules-2026.json",
-        include_str!("../../resources/rules/rules-2026.json"),
-    ),
+const BUNDLED: [(i32, &str); 2] = [
+    (2025, include_str!("../../resources/rules/rules-2025.json")),
+    (2026, include_str!("../../resources/rules/rules-2026.json")),
 ];
 
-pub fn dir(config_dir: &Path) -> PathBuf {
-    config_dir.join(DIR)
+/// The built-in rules text for `year`, if the app has one.
+pub fn bundled(year: i32) -> Option<&'static str> {
+    BUNDLED
+        .iter()
+        .find(|(y, _)| *y == year)
+        .map(|(_, text)| *text)
 }
 
-pub fn file_name(year: i32) -> String {
-    format!("rules-{year}.json")
-}
-
-/// The year of `rules-<year>.json`; backups (`rules-2026.v1.json`) and other files have none.
-pub fn year_of(file_name: &str) -> Option<i32> {
-    let year = file_name.strip_prefix("rules-")?.strip_suffix(".json")?;
-    if year.len() != 4 || !year.chars().all(|c| c.is_ascii_digit()) {
-        return None;
-    }
-    year.parse().ok()
-}
-
-/// Keeps the schema and README current and writes the seeds when the folder holds no rules file yet.
-pub fn install(config_dir: &Path) -> AppResult<()> {
-    let dir = dir(config_dir);
-    create_private_dir(&dir)?;
-    for (name, text) in [SCHEMA, README] {
-        let path = dir.join(name);
-        if std::fs::read_to_string(&path).ok().as_deref() != Some(text) {
-            write_atomic(&path, text)?;
-        }
-    }
-    if list(config_dir)?.is_empty() {
-        for (name, text) in SEEDS {
-            write_atomic(&dir.join(name), text)?;
-        }
-    }
-    Ok(())
-}
-
-/// Every `rules-<year>.json` in the folder, by year.
-pub fn list(config_dir: &Path) -> AppResult<BTreeMap<i32, PathBuf>> {
-    let mut files = BTreeMap::new();
-    let Ok(entries) = std::fs::read_dir(dir(config_dir)) else {
-        return Ok(files);
-    };
-    for entry in entries {
-        let path = entry?.path();
-        if let Some(year) = path.file_name().and_then(|n| n.to_str()).and_then(year_of) {
-            files.insert(year, path);
-        }
-    }
-    Ok(files)
-}
-
-pub fn read(config_dir: &Path, year: i32) -> AppResult<Option<String>> {
-    let path = dir(config_dir).join(file_name(year));
-    match std::fs::read_to_string(&path) {
-        Ok(text) => Ok(Some(text)),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(e) => Err(e.into()),
-    }
-}
-
-/// Replaces the year's file with `text`; an existing file is first kept as `rules-<year>.v<N>.json`, `N` from
-/// its ruleset name. Returns the backup's file name.
-pub fn replace(
-    config_dir: &Path,
-    year: i32,
-    text: &str,
-    old_ruleset: Option<&str>,
-) -> AppResult<Option<String>> {
-    let dir = dir(config_dir);
-    let path = dir.join(file_name(year));
-    let backup = if path.exists() {
-        let version = old_ruleset
-            .and_then(|r| r.split_once(" v"))
-            .map_or("0", |(_, v)| v);
-        let name = free_name(&dir, &format!("rules-{year}.v{version}"));
-        std::fs::rename(&path, dir.join(&name))?;
-        Some(name)
-    } else {
-        None
-    };
-    write_atomic(&path, text)?;
-    Ok(backup)
-}
-
-/// Writes a year's first file; an existing one is never overwritten.
-pub fn create(config_dir: &Path, year: i32, text: &str) -> AppResult<()> {
-    let path = dir(config_dir).join(file_name(year));
-    if path.exists() {
-        return Err(AppError::InvalidInput(crate::tr!(
-            "{} already exists",
-            "{} gibt es schon",
-            file_name(year)
-        )));
-    }
-    write_atomic(&path, text)
-}
-
-fn free_name(dir: &Path, stem: &str) -> String {
-    let mut name = format!("{stem}.json");
-    let mut n = 2;
-    while dir.join(&name).exists() {
-        name = format!("{stem}-{n}.json");
-        n += 1;
-    }
-    name
-}
-
-fn write_atomic(path: &Path, text: &str) -> AppResult<()> {
-    if let Some(dir) = path.parent() {
-        create_private_dir(dir)?;
-    }
-    let temp = path.with_extension("json.tmp");
-    std::fs::write(&temp, text)?;
-    std::fs::rename(&temp, path)?;
-    Ok(())
+/// Every year the app has built-in rules for, oldest first.
+pub fn bundled_years() -> impl Iterator<Item = i32> {
+    BUNDLED.iter().map(|(year, _)| *year)
 }
 
 /// Next year's draft from an open year's file: its year, `<year> v1`, `basedOn` the old ruleset and the

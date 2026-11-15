@@ -12,8 +12,8 @@ fn lines(old: Value, new: Value) -> Vec<String> {
     describe(&typed(old), &typed(new))
 }
 
-/// The lines for `mutate` applied to the minimal file, with the ruleset bumped so no hint is added; the
-/// ruleset's own line is checked and left out.
+/// The lines for `mutate` applied to the minimal file with the ruleset bumped; the ruleset's own line is
+/// checked and left out.
 fn changes(mutate: impl FnOnce(&mut Value)) -> Vec<String> {
     let mut new = minimal_rules(2026);
     mutate(&mut new);
@@ -53,16 +53,13 @@ fn a_changed_setting_and_a_bumped_ruleset_read_as_two_lines() {
 }
 
 #[test]
-fn a_change_under_the_same_ruleset_name_adds_a_hint_to_bump_it() {
+fn a_change_under_the_same_ruleset_name_is_one_line_without_a_hint() {
     let mut new = minimal_rules(2026);
     set(&mut new, "/settings/gwgLimit", json!(1200.00));
 
     assert_eq!(
         lines(minimal_rules(2026), new),
-        vec![
-            "settings.gwgLimit: 1000 → 1200".to_string(),
-            "The ruleset is still \"2026 v1\"; bump it to tell the versions apart".to_string(),
-        ]
+        vec!["settings.gwgLimit: 1000 → 1200".to_string()]
     );
 }
 
@@ -120,10 +117,7 @@ fn a_changed_kilometergeld_rate_is_named_by_its_position() {
     };
     assert_eq!(
         lines(with_rate(0.5), with_rate(0.6)),
-        vec![
-            "rates.kilometergeld[0].perKm: 0.5 → 0.6".to_string(),
-            "The ruleset is still \"2026 v1\"; bump it to tell the versions apart".to_string(),
-        ]
+        vec!["rates.kilometergeld[0].perKm: 0.5 → 0.6".to_string()]
     );
 }
 

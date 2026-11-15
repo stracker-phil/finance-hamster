@@ -1,270 +1,39 @@
 use std::collections::BTreeSet;
-use std::path::{Path, PathBuf};
 
 use serde_json::{Value, json};
 
 use super::check;
 use super::files::*;
 use crate::error::AppError;
-use crate::store::json_file::create_private_dir;
 use crate::test_support::rules::{minimal_rules, minimal_text, rules_text, set};
-use crate::test_support::temp_config_dir;
 
-const SCHEMA: &str = include_str!("../../resources/rules/rules.schema.json");
-const README: &str = include_str!("../../resources/rules/README.md");
 const SEED: &str = include_str!("../../resources/rules/rules-2026.json");
 const SEED_2025: &str = include_str!("../../resources/rules/rules-2025.json");
 
-fn with_rules_folder() -> (tempfile::TempDir, PathBuf) {
-    let config = temp_config_dir();
-    let folder = dir(config.path());
-    create_private_dir(&folder).unwrap();
-    (config, folder)
-}
-
-fn names_in(folder: &Path) -> Vec<String> {
-    let mut names: Vec<String> = std::fs::read_dir(folder)
-        .unwrap()
-        .map(|e| e.unwrap().file_name().into_string().unwrap())
-        .collect();
-    names.sort();
-    names
+#[test]
+fn the_built_in_rules_are_the_checked_files_of_the_resources_folder() {
+    assert_eq!(bundled(2025), Some(SEED_2025));
+    assert_eq!(bundled(2026), Some(SEED));
 }
 
 #[test]
-fn only_a_plain_year_file_has_a_year() {
-    for (name, expected) in [
-        ("rules-2026.json", Some(2026)),
-        ("rules-1999.json", Some(1999)),
-        ("rules-2026.v1.json", None),
-        ("rules-2026.v1-2.json", None),
-        ("rules-26.json", None),
-        ("rules-20260.json", None),
-        ("rules-abcd.json", None),
-        ("rules-2026.json.tmp", None),
-        ("rules.schema.json", None),
-        ("README.md", None),
-        ("2026.json", None),
-    ] {
-        assert_eq!(year_of(name), expected, "{name}");
+fn a_year_without_built_in_rules_has_none() {
+    for year in [2024, 2027, 0] {
+        assert_eq!(bundled(year), None, "{year}");
     }
 }
 
 #[test]
-fn file_names_follow_the_year() {
-    assert_eq!(file_name(2027), "rules-2027.json");
-    assert_eq!(year_of(&file_name(2027)), Some(2027));
+fn the_built_in_years_come_oldest_first() {
+    assert_eq!(bundled_years().collect::<Vec<_>>(), vec![2025, 2026]);
 }
 
 #[test]
-fn install_writes_the_schema_the_readme_and_both_seeds_into_an_empty_folder() {
-    let config = temp_config_dir();
-    install(config.path()).unwrap();
-
-    let folder = dir(config.path());
-    assert_eq!(
-        names_in(&folder),
-        vec![
-            "README.md",
-            "rules-2025.json",
-            "rules-2026.json",
-            "rules.schema.json"
-        ]
-    );
-    assert_eq!(
-        std::fs::read_to_string(folder.join("rules-2025.json")).unwrap(),
-        SEED_2025
-    );
-    assert_eq!(
-        std::fs::read_to_string(folder.join("rules.schema.json")).unwrap(),
-        SCHEMA
-    );
-    assert_eq!(
-        std::fs::read_to_string(folder.join("README.md")).unwrap(),
-        README
-    );
-    assert_eq!(
-        std::fs::read_to_string(folder.join("rules-2026.json")).unwrap(),
-        SEED
-    );
-}
-
-#[test]
-fn install_never_seeds_next_to_an_existing_rules_file() {
-    let (config, folder) = with_rules_folder();
-    std::fs::write(folder.join("rules-2025.json"), "mine").unwrap();
-
-    install(config.path()).unwrap();
-
-    assert_eq!(
-        names_in(&folder),
-        vec!["README.md", "rules-2025.json", "rules.schema.json"]
-    );
-    assert_eq!(
-        std::fs::read_to_string(folder.join("rules-2025.json")).unwrap(),
-        "mine"
-    );
-}
-
-#[test]
-fn install_leaves_an_edited_rules_file_alone_and_seeds_again_only_when_no_year_file_remains() {
-    let config = temp_config_dir();
-    install(config.path()).unwrap();
-    let folder = dir(config.path());
-    let path = folder.join("rules-2026.json");
-    let path_2025 = folder.join("rules-2025.json");
-    std::fs::write(&path, "edited").unwrap();
-    install(config.path()).unwrap();
-    assert_eq!(std::fs::read_to_string(&path).unwrap(), "edited");
-    assert_eq!(std::fs::read_to_string(&path_2025).unwrap(), SEED_2025);
-
-    std::fs::rename(&path, folder.join("rules-2026.v1.json")).unwrap();
-    install(config.path()).unwrap();
-    assert!(!path.exists());
-
-    std::fs::rename(&path_2025, folder.join("rules-2025.v1.json")).unwrap();
-    install(config.path()).unwrap();
-    assert_eq!(std::fs::read_to_string(&path).unwrap(), SEED);
-    assert_eq!(std::fs::read_to_string(&path_2025).unwrap(), SEED_2025);
-}
-
-#[test]
-fn install_rewrites_a_changed_schema_and_readme() {
-    let config = temp_config_dir();
-    install(config.path()).unwrap();
-    let folder = dir(config.path());
-    std::fs::write(folder.join("rules.schema.json"), "old").unwrap();
-    std::fs::write(folder.join("README.md"), "old").unwrap();
-
-    install(config.path()).unwrap();
-
-    assert_eq!(
-        std::fs::read_to_string(folder.join("rules.schema.json")).unwrap(),
-        SCHEMA
-    );
-    assert_eq!(
-        std::fs::read_to_string(folder.join("README.md")).unwrap(),
-        README
-    );
-}
-
-#[test]
-fn list_finds_year_files_by_year_and_ignores_backups_and_other_files() {
-    let (config, folder) = with_rules_folder();
-    for name in [
-        "rules-2026.json",
-        "rules-2025.json",
-        "rules-2025.v1.json",
-        "rules.schema.json",
-        "README.md",
-    ] {
-        std::fs::write(folder.join(name), "{}").unwrap();
+fn every_built_in_text_passes_the_checks_and_names_its_own_year() {
+    for year in bundled_years() {
+        let ruleset = check::read(bundled(year).unwrap(), &BTreeSet::new()).unwrap();
+        assert_eq!(ruleset.year, year, "{year}");
     }
-
-    let listed = list(config.path()).unwrap();
-    assert_eq!(
-        listed.into_iter().collect::<Vec<_>>(),
-        vec![
-            (2025, folder.join("rules-2025.json")),
-            (2026, folder.join("rules-2026.json")),
-        ]
-    );
-}
-
-#[test]
-fn list_without_a_rules_folder_is_empty() {
-    let config = temp_config_dir();
-    assert!(list(config.path()).unwrap().is_empty());
-}
-
-#[test]
-fn read_returns_the_text_or_none_when_the_file_is_missing() {
-    let (config, folder) = with_rules_folder();
-    std::fs::write(folder.join("rules-2026.json"), "text").unwrap();
-
-    assert_eq!(read(config.path(), 2026).unwrap(), Some("text".to_string()));
-    assert_eq!(read(config.path(), 2027).unwrap(), None);
-}
-
-#[test]
-fn replace_without_an_old_file_writes_it_and_returns_no_backup() {
-    let (config, folder) = with_rules_folder();
-
-    assert_eq!(replace(config.path(), 2026, "new", None).unwrap(), None);
-
-    assert_eq!(names_in(&folder), vec!["rules-2026.json"]);
-    assert_eq!(read(config.path(), 2026).unwrap(), Some("new".to_string()));
-}
-
-#[test]
-fn replace_keeps_the_old_file_under_the_version_of_its_ruleset() {
-    let (config, folder) = with_rules_folder();
-    std::fs::write(folder.join("rules-2026.json"), "old").unwrap();
-
-    let backup = replace(config.path(), 2026, "new", Some("2026 v3")).unwrap();
-
-    assert_eq!(backup, Some("rules-2026.v3.json".to_string()));
-    assert_eq!(
-        std::fs::read_to_string(folder.join("rules-2026.v3.json")).unwrap(),
-        "old"
-    );
-    assert_eq!(read(config.path(), 2026).unwrap(), Some("new".to_string()));
-}
-
-#[test]
-fn replace_numbers_a_backup_whose_name_is_taken() {
-    let (config, folder) = with_rules_folder();
-    std::fs::write(folder.join("rules-2026.json"), "first").unwrap();
-    replace(config.path(), 2026, "second", Some("2026 v1")).unwrap();
-
-    let backup = replace(config.path(), 2026, "third", Some("2026 v1")).unwrap();
-
-    assert_eq!(backup, Some("rules-2026.v1-2.json".to_string()));
-    assert_eq!(
-        std::fs::read_to_string(folder.join("rules-2026.v1.json")).unwrap(),
-        "first"
-    );
-    assert_eq!(
-        std::fs::read_to_string(folder.join("rules-2026.v1-2.json")).unwrap(),
-        "second"
-    );
-    assert_eq!(
-        read(config.path(), 2026).unwrap(),
-        Some("third".to_string())
-    );
-
-    let fourth = replace(config.path(), 2026, "fourth", Some("2026 v1")).unwrap();
-    assert_eq!(fourth, Some("rules-2026.v1-3.json".to_string()));
-}
-
-#[test]
-fn replace_names_the_backup_v0_when_the_old_ruleset_is_unknown() {
-    let (config, folder) = with_rules_folder();
-    std::fs::write(folder.join("rules-2026.json"), "old").unwrap();
-
-    let backup = replace(config.path(), 2026, "new", None).unwrap();
-
-    assert_eq!(backup, Some("rules-2026.v0.json".to_string()));
-}
-
-#[test]
-fn create_writes_a_new_file_and_refuses_to_overwrite() {
-    let (config, folder) = with_rules_folder();
-    create(config.path(), 2027, "first").unwrap();
-    assert_eq!(
-        std::fs::read_to_string(folder.join("rules-2027.json")).unwrap(),
-        "first"
-    );
-
-    let err = create(config.path(), 2027, "second").unwrap_err();
-    assert_eq!(
-        err,
-        AppError::InvalidInput("rules-2027.json already exists".into())
-    );
-    assert_eq!(
-        std::fs::read_to_string(folder.join("rules-2027.json")).unwrap(),
-        "first"
-    );
 }
 
 #[test]

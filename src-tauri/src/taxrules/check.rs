@@ -38,7 +38,9 @@ fn is_kz(s: &str) -> bool {
         .all(|part| part.len() == 3 && part.chars().all(|c| c.is_ascii_digit()))
 }
 
+/// `2026 v1`, or `2026 v1 (own)` for the owner's version edited in Settings.
 fn is_ruleset_name(s: &str) -> bool {
+    let s = s.strip_suffix(" (own)").unwrap_or(s);
     let Some((year, version)) = s.split_once(" v") else {
         return false;
     };

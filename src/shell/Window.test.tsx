@@ -23,6 +23,7 @@ beforeEach(() => {
   mocked.listCommands.mockResolvedValue([]);
   mocked.listAccounts.mockResolvedValue([account()]);
   mocked.listTaxYears.mockResolvedValue([]);
+  mocked.rulesTakeNotices.mockResolvedValue([]);
 });
 
 const row = (name: string) => screen.getByRole("button", { name });
@@ -94,6 +95,39 @@ describe("settings button", () => {
     await userEvent.click(settingsButton());
 
     expect((await screen.findByRole("alert")).textContent).toContain("No window available");
+  });
+});
+
+describe("tax rules notices", () => {
+  const messages = () => useStore.getState().toasts.map((t) => ({ kind: t.kind, message: t.message }));
+
+  it("tells each notice about the rules as a success toast", async () => {
+    mocked.rulesTakeNotices.mockResolvedValue(["Tax Rules 2026 now use the built-in 2026 v2", "Tax Year 2027 started"]);
+
+    render(<Window />);
+
+    await waitFor(() =>
+      expect(messages()).toEqual([
+        { kind: "success", message: "Tax Rules 2026 now use the built-in 2026 v2" },
+        { kind: "success", message: "Tax Year 2027 started" },
+      ]),
+    );
+  });
+
+  it("shows no toast when there is nothing to tell", async () => {
+    render(<Window />);
+
+    await screen.findByRole("complementary", { name: "Sidebar" });
+    expect(messages()).toEqual([]);
+  });
+
+  it("shows no toast and keeps working when the notices cannot be read", async () => {
+    mocked.rulesTakeNotices.mockRejectedValue({ kind: "internal", message: "No notices", code: null });
+
+    render(<Window />);
+
+    await screen.findByRole("complementary", { name: "Sidebar" });
+    expect(messages()).toEqual([]);
   });
 });
 

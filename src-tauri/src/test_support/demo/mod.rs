@@ -529,7 +529,7 @@ mod tests {
     }
 
     #[test]
-    fn the_seed_installs_the_rules_folder_and_starts_the_current_year_from_it() {
+    fn the_seed_starts_the_built_in_years_without_writing_a_rules_folder() {
         let dir = temp_config_dir();
         let db = Db::open(dir.path()).unwrap();
         seed_if_empty(&db, dir.path(), today()).unwrap();
@@ -545,7 +545,7 @@ mod tests {
             .map(|i| i.key)
             .collect();
 
-        assert!(dir.path().join("rules").is_dir());
+        assert!(!dir.path().join("rules").exists());
         assert_eq!(years, vec![2026, 2025]);
         assert!(items.contains(&"literature".to_string()));
         assert!(items.contains(&"digital-equipment".to_string()));

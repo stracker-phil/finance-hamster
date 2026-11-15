@@ -441,6 +441,21 @@ fn a_second_section_and_an_item_reported_by_others_are_valid_without_code_change
 }
 
 #[test]
+fn a_ruleset_name_may_carry_the_own_suffix_and_no_other() {
+    for (name, valid) in [
+        ("2026 v1", true),
+        ("2026 v1 (own)", true),
+        ("2026 v1 (mine)", false),
+        ("2026 v1(own)", false),
+        ("2026 v (own)", false),
+        ("2026 v1 (own) (own)", false),
+    ] {
+        let result = read_value(&edited(&[("/ruleset", json!(name))]));
+        assert_eq!(result.is_ok(), valid, "{name}: {result:?}");
+    }
+}
+
+#[test]
 fn each_schema_constraint_is_reported_with_where_it_is() {
     let cases: Vec<(Vec<(&str, Value)>, String)> = vec![
         (

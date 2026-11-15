@@ -23,11 +23,13 @@ describe("SETTINGS_PAGES", () => {
   });
 
   it.each([
-    ["Reload after editing", "taxrules/reload"],
+    ["Tax years", "taxrules/tax-years"],
+    ["Kennzahl", "taxrules/tax-years"],
+    ["JSON", "taxrules/tax-years"],
     ["IBAN", "accounts/bank-accounts"],
     ["Hide transfers", "accounts/own-transfers"],
-    ["Start next year", "taxrules/duplicate"],
-    ["Import a JSON file", "taxrules/import"],
+    ["Start next year", "taxrules/start-year"],
+    ["Steuerjahre", "taxrules/tax-years"],
     ["merge", "vendors/vendor-list"],
     ["default item", "vendors/vendor-list"],
     ["Days in Archive", "privacy/archive"],

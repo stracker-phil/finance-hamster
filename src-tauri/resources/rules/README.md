@@ -1,18 +1,18 @@
 # Hamster rules files
 
-One JSON file per tax year: `rules-<year>.json`, validated against `rules.schema.json`.
-Location: `~/Library/Application Support/com.philippstracker.hamster/rules/`
+One JSON file per tax year: `rules-<year>.json`, validated against `rules.schema.json`. These files are built
+into the app (ADR 0051): add a year by adding its file here and to `taxrules::files::BUNDLED`, change one by
+editing it here and releasing. Bump `ruleset` (`2026 v4` → `2026 v5`) with every change.
 
 ## Lifecycle
 
-| Year state | File | What you can do |
-|---|---|---|
-| Draft (next year) | editable | Edit freely. Not used yet. |
-| Open | editable | Edit, then **Reload** in Settings → Tax Rules. Hamster shows what changes before applying. Bump `ruleset` (`2026 v1` → `2026 v2`). |
-| Closed | frozen | Hamster keeps a copy inside the closed year. Editing the file has no effect. |
+| Year state | What happens |
+|---|---|
+| Open, built-in rules | At launch the year takes on a newer version of its file, after the checks below. |
+| Open, the owner's version | A value changed in Settings → Tax Rules (or JSON saved there) made it the owner's. A newer built-in version is offered, never applied by itself. |
+| Closed | The year keeps a frozen copy; nothing changes it. |
 
-- **Import…** replaces a draft or open year's file and keeps the old one as `rules-2026.v1.json`.
-- **Duplicate…** copies the open file to next year as a draft.
+- **Start <year>** in Settings begins the next year from its built-in file, or as a copy of the newest year.
 
 ## How values are calculated
 
@@ -45,9 +45,9 @@ what belongs there; both have German versions in `de`. Without a `label` the `na
 Older files carry `ask` blocks from the retired year check. They still load and are otherwise ignored, except
 that an `ask.hint` stands in for missing `examples`.
 
-## Checks on Reload (beyond the schema)
+## Checks before any rules are used (beyond the schema)
 
-Reload fails with a clear message if:
+New rules are refused with a clear message if:
 
 - a `key` is used twice, or a key that existing entries use was removed or renamed
 - an item's `section` doesn't exist in `sections`

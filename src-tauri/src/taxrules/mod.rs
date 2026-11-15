@@ -1,327 +1,305 @@
-//! Tax rules files (ADR 0040): their state beside the tax years, Reload with a preview, Import and Duplicate.
-//! An open year applies the rules text stored in its row; the file takes effect only through Reload.
+//! Tax rules (ADR 0051): every year starts from the rules built into the app and follows newer built-in
+//! versions until the owner edits it in Settings; then it keeps the owner's version. A closed year's rules
+//! are frozen in its row.
 
 pub mod check;
 pub mod commands;
 pub mod diff;
+pub mod edit;
 pub mod files;
 pub mod model;
+pub mod view;
 
 #[cfg(test)]
 mod check_tests;
 #[cfg(test)]
 mod diff_tests;
 #[cfg(test)]
+mod edit_tests;
+#[cfg(test)]
 mod files_tests;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod view_tests;
 
-use std::collections::{BTreeMap, BTreeSet};
-use std::path::{Path, PathBuf};
+use std::collections::BTreeSet;
 
+use rusqlite::Connection;
 use serde::Serialize;
 use ts_rs::TS;
 
 use crate::db::{Change, Db, Op, Source, Written};
 use crate::error::{AppError, AppResult};
-use crate::taxyears::{self, TaxYearRow, YearState};
+use crate::taxyears::{self, RulesSource, TaxYearRow, YearState};
 
-#[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq, TS)]
-#[serde(rename_all = "snake_case")]
-#[ts(export, export_to = "src/api/types.gen.ts")]
-pub enum RulesState {
-    /// A future year's file, not used yet.
-    Draft,
-    Open,
-    Closed,
-}
-
-/// One row of Settings → Tax Rules.
+/// One year in Settings → Tax Rules.
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "src/api/types.gen.ts")]
-pub struct RulesFile {
-    pub file_name: String,
+pub struct RulesYear {
     pub year: i32,
-    pub state: RulesState,
-    /// The file's ruleset name, or the applied one when the file can't be read.
-    pub ruleset: Option<String>,
+    pub state: YearState,
+    pub source: RulesSource,
+    pub ruleset: String,
+    /// The ruleset the owner's version started from.
     pub based_on: Option<String>,
-    pub items: u32,
+    /// A built-in version the year doesn't use yet: newer than the owner's version, or one that can't be
+    /// taken on (see `problems`).
+    pub builtin_newer: Option<String>,
+    /// Why the built-in version can't be taken on.
+    pub problems: Vec<String>,
+    /// The app has built-in rules for the year, so "Back to built-in" can work.
+    pub has_builtin: bool,
     pub unverified: u32,
-    /// Why the file can't be used; empty when it is valid.
-    pub problems: Vec<String>,
-    /// An open year's file differs from what the year applies, so Reload has something to do.
-    pub edited: bool,
-    /// The year exists but its file is gone; a closed year still has its frozen copy.
-    pub missing: bool,
-    /// When a closed year was closed, as a date label.
-    pub closed_on: Option<String>,
-    /// When an open year last loaded its file, as a date label.
-    pub loaded_on: Option<String>,
-}
-
-/// One open year's pending Reload.
-#[derive(Serialize, Clone, Debug, PartialEq, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "src/api/types.gen.ts")]
-pub struct ReloadPreview {
-    pub year: i32,
-    pub from: String,
-    pub to: Option<String>,
-    pub changes: Vec<String>,
-    pub problems: Vec<String>,
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "src/api/types.gen.ts")]
-pub struct Imported {
-    pub file_name: String,
-    pub year: i32,
-    /// The replaced file's new name, kept as a backup.
-    pub backup: Option<String>,
-    /// The year is open, so a Reload applies the imported file.
-    pub needs_reload: bool,
+pub struct RulesOverview {
+    /// Newest first.
+    pub years: Vec<RulesYear>,
+    /// The year Start would begin, when it doesn't exist yet.
+    pub next_year: Option<i32>,
+    /// Start takes the built-in rules rather than a copy of the newest year.
+    pub next_is_builtin: bool,
 }
 
-fn year_problem(file_year: i32, year: i32) -> Option<String> {
-    (file_year != year).then(|| {
+/// Item keys anything recorded uses; a ruleset can't drop them.
+pub fn used_keys(conn: &Connection) -> AppResult<BTreeSet<String>> {
+    let mut query = conn.prepare(
+        "SELECT item_key FROM documents WHERE item_key IS NOT NULL
+         UNION SELECT item_key FROM entries
+         UNION SELECT item_key FROM decisions WHERE item_key IS NOT NULL
+         UNION SELECT item_key FROM subscriptions WHERE item_key IS NOT NULL
+         UNION SELECT default_item_key FROM vendors WHERE default_item_key IS NOT NULL",
+    )?;
+    let keys = query.query_map([], |r| r.get::<_, String>(0))?;
+    Ok(keys.collect::<Result<_, _>>()?)
+}
+
+fn unusable(problems: &[String]) -> AppError {
+    AppError::InvalidInput(crate::tr!(
+        "These rules can't be used: {}",
+        "Diese Regeln sind nicht verwendbar: {}",
+        problems.join("; ")
+    ))
+}
+
+/// The problem when rules meant for `found` are given to `year`.
+pub(crate) fn wrong_year(found: i32, year: i32) -> Option<String> {
+    (found != year).then(|| {
         crate::tr!(
-            "year: the file says {file_year}, its name says {year}",
-            "year: Die Datei sagt {file_year}, ihr Name sagt {year}"
+            "year: the rules say {found}, not {year}",
+            "year: Die Regeln sagen {found}, nicht {year}"
         )
     })
 }
 
-fn ruleset_name(text: &str) -> Option<String> {
-    let value: serde_json::Value = serde_json::from_str(text).ok()?;
-    Some(value.get("ruleset")?.as_str()?.to_string())
-}
-
-/// Every rules file and every tax year, newest year first.
-pub fn overview(
-    db: &Db,
-    config_dir: &Path,
-    date: &impl Fn(i64) -> String,
-) -> AppResult<Vec<RulesFile>> {
-    let years: BTreeMap<i32, TaxYearRow> = db
-        .read(taxyears::rows)?
-        .into_iter()
-        .map(|r| (r.year, r))
-        .collect();
-    let mut all: BTreeSet<i32> = years.keys().copied().collect();
-    all.extend(files::list(config_dir)?.into_keys());
-    let mut out = Vec::new();
-    for year in all.into_iter().rev() {
-        let row = years.get(&year);
-        let text = files::read(config_dir, year)?;
-        out.push(describe_file(year, row, text.as_deref(), date));
+/// The built-in text a year would move to, with its check; None when it already uses it.
+fn pending_builtin(
+    row: &TaxYearRow,
+    used: &BTreeSet<String>,
+) -> Option<(&'static str, Result<model::Ruleset, Vec<String>>)> {
+    let text = files::bundled(row.year)?;
+    if text == row.rules {
+        return None;
     }
-    Ok(out)
+    Some((
+        text,
+        check::read(text, used).and_then(|r| match wrong_year(r.year, row.year) {
+            Some(problem) => Err(vec![problem]),
+            None => Ok(r),
+        }),
+    ))
 }
 
-fn describe_file(
-    year: i32,
-    row: Option<&TaxYearRow>,
-    text: Option<&str>,
-    date: &impl Fn(i64) -> String,
-) -> RulesFile {
-    let state = match row.map(|r| r.state) {
-        None => RulesState::Draft,
-        Some(YearState::Open) => RulesState::Open,
-        Some(YearState::Closed) => RulesState::Closed,
-    };
-    // A closed year shows its frozen copy; the file beside it no longer matters.
-    let shown = match (state, row) {
-        (RulesState::Closed, Some(r)) => Some(r.rules.as_str()),
-        _ => text,
-    };
-    let checked = shown.map(|t| check::read(t, &BTreeSet::new()));
-    let ruleset = checked.as_ref().and_then(|c| c.as_ref().ok());
-    let mut problems = checked
-        .as_ref()
-        .and_then(|c| c.as_ref().err().cloned())
-        .unwrap_or_default();
-    problems.extend(ruleset.and_then(|r| year_problem(r.year, year)));
-    RulesFile {
-        file_name: files::file_name(year),
-        year,
-        state,
-        ruleset: ruleset
-            .map(|r| r.ruleset.clone())
-            .or_else(|| row.map(|r| r.ruleset.clone())),
-        based_on: ruleset.and_then(|r| r.based_on.clone()),
-        items: ruleset.map_or(0, |r| r.items.len() as u32),
-        unverified: ruleset.map_or(0, |r| r.unverified_count() as u32),
-        problems,
-        edited: state == RulesState::Open
-            && text.is_some_and(|t| row.is_some_and(|r| r.rules != t)),
-        missing: text.is_none(),
-        closed_on: row.and_then(|r| r.closed_at).map(date),
-        loaded_on: row
-            .filter(|r| r.state == YearState::Open)
-            .map(|r| date(r.rules_loaded_at)),
-    }
+/// Every year, newest first, with what Start would add.
+pub fn overview(db: &Db) -> AppResult<RulesOverview> {
+    let rows = db.read(taxyears::rows)?;
+    let used = db.read(used_keys)?;
+    let years = rows.iter().map(|row| describe(row, &used)).collect();
+    let next_year = rows
+        .first()
+        .map(|r| r.year + 1)
+        .or_else(|| files::bundled_years().last());
+    Ok(RulesOverview {
+        years,
+        next_year,
+        next_is_builtin: next_year.is_some_and(|y| files::bundled(y).is_some()),
+    })
 }
 
-/// What Reload would change in each open year whose file differs from the applied rules.
-pub fn preview(db: &Db, config_dir: &Path) -> AppResult<Vec<ReloadPreview>> {
-    let mut out = Vec::new();
-    for row in db.read(taxyears::rows)? {
-        if row.state != YearState::Open {
-            continue;
+fn describe(row: &TaxYearRow, used: &BTreeSet<String>) -> RulesYear {
+    let applied = check::read(&row.rules, &BTreeSet::new()).ok();
+    let bundled = files::bundled(row.year);
+    let builtin = bundled.and_then(|t| check::read(t, &BTreeSet::new()).ok());
+    let (builtin_newer, problems) = match (row.state, row.rules_source) {
+        (YearState::Open, RulesSource::Builtin) => match pending_builtin(row, used) {
+            Some((_, Err(problems))) => (builtin.map(|b| b.ruleset), problems),
+            _ => (None, Vec::new()),
+        },
+        (YearState::Open, RulesSource::Own) => {
+            let base = applied.as_ref().and_then(|a| a.based_on.as_deref());
+            let newer =
+                builtin.filter(|b| Some(b.ruleset.as_str()) != base && b.ruleset != row.ruleset);
+            (newer.map(|b| b.ruleset), Vec::new())
         }
-        let Some(text) = files::read(config_dir, row.year)? else {
-            continue;
-        };
-        if text == row.rules {
-            continue;
-        }
-        out.push(preview_year(&row, &text));
-    }
-    out.sort_by_key(|p| p.year);
-    Ok(out)
-}
-
-fn preview_year(row: &TaxYearRow, text: &str) -> ReloadPreview {
-    let mut preview = ReloadPreview {
+        (YearState::Closed, _) => (None, Vec::new()),
+    };
+    RulesYear {
         year: row.year,
-        from: row.ruleset.clone(),
-        to: None,
-        changes: Vec::new(),
-        problems: Vec::new(),
-    };
-    match check::read(text, &BTreeSet::new()) {
-        Err(problems) => preview.problems = problems,
-        Ok(next) if next.year != row.year => {
-            preview.problems.extend(year_problem(next.year, row.year));
-        }
-        Ok(next) => {
-            preview.changes = match check::read(&row.rules, &BTreeSet::new()) {
-                Ok(current) => diff::describe(&current, &next),
-                Err(_) => vec![crate::tr!(
-                    "The applied rules can't be read; the file replaces them",
-                    "Die angewendeten Regeln sind nicht lesbar; die Datei ersetzt sie"
-                )],
-            };
-            if preview.changes.is_empty() {
-                preview.changes.push(crate::tr!(
-                    "Only the formatting changed",
-                    "Nur die Formatierung hat sich geändert"
-                ));
-            }
-            preview.to = Some(next.ruleset);
-        }
+        state: row.state,
+        source: row.rules_source,
+        ruleset: row.ruleset.clone(),
+        based_on: applied.as_ref().and_then(|a| a.based_on.clone()),
+        builtin_newer,
+        problems,
+        has_builtin: bundled.is_some(),
+        unverified: applied.map_or(0, |a| a.unverified_count() as u32),
     }
-    preview
 }
 
-/// Applies every pending Reload as one undoable change; refused while any file has a problem.
-pub fn apply(db: &Db, config_dir: &Path, now: i64) -> AppResult<Option<Written>> {
-    let previews = preview(db, config_dir)?;
-    if let Some(bad) = previews.iter().find(|p| !p.problems.is_empty()) {
-        return Err(AppError::InvalidInput(crate::tr!(
-            "{} can't be loaded: {}",
-            "{} lässt sich nicht laden: {}",
-            files::file_name(bad.year),
-            bad.problems.join("; ")
-        )));
+/// The row after taking on `text` as the year's rules from `source`.
+fn with_rules(
+    row: &TaxYearRow,
+    ruleset: String,
+    text: String,
+    source: RulesSource,
+    now: i64,
+) -> TaxYearRow {
+    TaxYearRow {
+        ruleset,
+        rules: text,
+        rules_source: source,
+        rules_loaded_at: now,
+        ..row.clone()
     }
+}
+
+/// Moves every open year that follows the built-in rules to a newer built-in version, as one undoable change.
+/// A version that fails the checks is left for Settings to explain.
+pub fn adopt_builtin(db: &Db, now: i64) -> AppResult<Option<Written>> {
+    let used = db.read(used_keys)?;
     let mut changes = Vec::new();
-    for p in &previews {
-        let (Some(before), Some(text)) = (
-            db.read(|c| taxyears::row(c, p.year))?,
-            files::read(config_dir, p.year)?,
-        ) else {
+    let mut names = Vec::new();
+    for row in db.read(taxyears::rows)? {
+        if row.state != YearState::Open || row.rules_source != RulesSource::Builtin {
+            continue;
+        }
+        let Some((text, Ok(next))) = pending_builtin(&row, &used) else {
             continue;
         };
-        let after = TaxYearRow {
-            ruleset: p.to.clone().unwrap_or_else(|| before.ruleset.clone()),
-            rules: text,
-            rules_loaded_at: now,
-            ..before.clone()
-        };
-        changes.push(Change::update(taxyears::TABLE, &before, &after)?);
+        let after = with_rules(
+            &row,
+            next.ruleset.clone(),
+            text.to_string(),
+            RulesSource::Builtin,
+            now,
+        );
+        changes.push(Change::update(taxyears::TABLE, &row, &after)?);
+        names.push(next.ruleset);
     }
     if changes.is_empty() {
         return Ok(None);
     }
+    // Rows come newest first; the label names the years in calendar order.
+    names.reverse();
+    let names = names.join(", ");
     Ok(Some(db.write(
         Op::new(
-            crate::tr!("Reload Tax Rules", "Steuerregeln neu laden"),
+            crate::tr!(
+                "Update Tax Rules to {names}",
+                "Steuerregeln auf {names} aktualisieren"
+            ),
             changes,
         ),
-        Source::Ui,
+        Source::App,
     )?))
 }
 
-/// Puts a checked rules file in place of its year's file, keeping the old one; a closed year refuses.
-pub fn import(db: &Db, config_dir: &Path, text: &str) -> AppResult<Imported> {
-    let ruleset = check::read(text, &BTreeSet::new()).map_err(|problems| {
-        AppError::InvalidInput(crate::tr!(
-            "The file can't be used: {}",
-            "Die Datei ist nicht verwendbar: {}",
-            problems.join("; ")
-        ))
-    })?;
-    let year = ruleset.year;
-    let row = db.read(|c| taxyears::row(c, year))?;
-    if row.as_ref().is_some_and(|r| r.state == YearState::Closed) {
+fn open_row(db: &Db, year: i32) -> AppResult<TaxYearRow> {
+    let row = db
+        .read(|c| taxyears::row(c, year))?
+        .ok_or_else(|| AppError::NotFound(crate::tr!("Tax year {year}", "Steuerjahr {year}")))?;
+    if row.state == YearState::Closed {
         return Err(AppError::InvalidInput(crate::tr!(
             "Tax year {year} is closed; its rules are frozen",
             "Das Steuerjahr {year} ist abgeschlossen; seine Regeln sind eingefroren"
         )));
     }
-    let old_ruleset = files::read(config_dir, year)?.and_then(|old| ruleset_name(&old));
-    let backup = files::replace(config_dir, year, text, old_ruleset.as_deref())?;
-    Ok(Imported {
-        file_name: files::file_name(year),
-        year,
-        backup,
-        needs_reload: row.is_some(),
-    })
+    Ok(row)
 }
 
-/// Reads and imports the file at `path`.
-pub fn import_file(db: &Db, config_dir: &Path, path: &Path) -> AppResult<Imported> {
-    import(db, config_dir, &std::fs::read_to_string(path)?)
-}
-
-/// The file to show for a year: its rules file, or for a closed year a read-only copy of its frozen rules.
-pub fn open_target(db: &Db, config_dir: &Path, year: i32) -> AppResult<PathBuf> {
-    match db.read(|c| taxyears::row(c, year))? {
-        Some(row) if row.state == YearState::Closed => frozen_copy(year, &row.rules),
-        _ => Ok(files::dir(config_dir).join(files::file_name(year))),
+/// Makes `text` the owner's version of the year's rules, after the same checks as any rules.
+pub fn set_own(db: &Db, year: i32, text: String, label: String, now: i64) -> AppResult<Written> {
+    let row = open_row(db, year)?;
+    let used = db.read(used_keys)?;
+    let ruleset = check::read(&text, &used).map_err(|p| unusable(&p))?;
+    if let Some(problem) = wrong_year(ruleset.year, year) {
+        return Err(unusable(&[problem]));
     }
+    let after = with_rules(&row, ruleset.ruleset, text, RulesSource::Own, now);
+    db.write(
+        Op::new(label, vec![Change::update(taxyears::TABLE, &row, &after)?]),
+        Source::Ui,
+    )
 }
 
-fn frozen_copy(year: i32, rules: &str) -> AppResult<PathBuf> {
-    use std::os::unix::fs::PermissionsExt;
-    let path = std::env::temp_dir().join(format!("rules-{year} (closed).json"));
-    // An earlier copy is read-only, so it is replaced rather than written over.
-    if path.exists() {
-        std::fs::remove_file(&path)?;
-    }
-    std::fs::write(&path, rules)?;
-    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o400))?;
-    Ok(path)
+pub fn use_builtin(db: &Db, year: i32, now: i64) -> AppResult<Written> {
+    let row = open_row(db, year)?;
+    let text = files::bundled(year).ok_or_else(|| {
+        AppError::InvalidInput(crate::tr!(
+            "Hamster has no built-in rules for {year}",
+            "Hamster hat keine eingebauten Regeln für {year}"
+        ))
+    })?;
+    let ruleset = check::read(text, &db.read(used_keys)?).map_err(|p| unusable(&p))?;
+    let after = with_rules(
+        &row,
+        ruleset.ruleset,
+        text.to_string(),
+        RulesSource::Builtin,
+        now,
+    );
+    db.write(
+        Op::new(
+            crate::tr!(
+                "Use the Built-in Tax Rules for {year}",
+                "Eingebaute Steuerregeln für {year} verwenden"
+            ),
+            vec![Change::update(taxyears::TABLE, &row, &after)?],
+        ),
+        Source::Ui,
+    )
 }
 
-/// Copies the newest open year's file to the next year as a draft; returns the new file's name.
-pub fn duplicate(db: &Db, config_dir: &Path) -> AppResult<String> {
-    let newest = db
-        .read(taxyears::rows)?
-        .into_iter()
-        .find(|r| r.state == YearState::Open)
-        .ok_or_else(|| {
-            AppError::InvalidInput(crate::tr!(
-                "There is no open tax year to copy",
-                "Es gibt kein offenes Steuerjahr zum Kopieren"
-            ))
-        })?;
-    let text = files::read(config_dir, newest.year)?.unwrap_or(newest.rules);
-    let next = files::next_year_text(&text)?;
-    files::create(config_dir, newest.year + 1, &next)?;
-    Ok(files::file_name(newest.year + 1))
+/// Starts the year after the newest: from its built-in rules when the app has them, else as a copy of the
+/// newest year's rules (the owner's version).
+pub fn start_next(db: &Db, now: i64) -> AppResult<Written> {
+    let rows = db.read(taxyears::rows)?;
+    let Some(newest) = rows.first() else {
+        return Err(AppError::InvalidInput(crate::tr!(
+            "There is no tax year to continue from",
+            "Es gibt kein Steuerjahr, an das sich anschließen lässt"
+        )));
+    };
+    let year = newest.year + 1;
+    let (text, source) = match files::bundled(year) {
+        Some(text) => (text.to_string(), RulesSource::Builtin),
+        None => (files::next_year_text(&newest.rules)?, RulesSource::Own),
+    };
+    let ruleset = check::read(&text, &BTreeSet::new()).map_err(|p| unusable(&p))?;
+    let row = TaxYearRow {
+        rules_source: source,
+        ..TaxYearRow::new(year, ruleset.ruleset, text, now)
+    };
+    db.write(
+        Op::new(
+            crate::tr!("Start Tax Year {year}", "Steuerjahr {year} beginnen"),
+            vec![Change::insert(taxyears::TABLE, &row)?],
+        ),
+        Source::Ui,
+    )
 }

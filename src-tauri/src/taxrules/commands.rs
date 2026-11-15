@@ -1,100 +1,110 @@
 //! Settings → Tax Rules as Tauri commands.
 
-use chrono::{DateTime, Local};
-use tauri::{AppHandle, Manager, State};
-use tauri_plugin_dialog::DialogExt;
+use std::collections::BTreeSet;
 
-use super::{Imported, ReloadPreview, RulesFile, files};
-use crate::date::{self, DateOrder};
+use tauri::{AppHandle, State};
+
+use super::edit::{self, JsonPreview};
+use super::view::{self, RulesYearView};
+use super::{RulesOverview, check};
+use crate::date::DateOrder;
+use crate::db::Written;
 use crate::db::commands::announce;
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
-
-fn date_label(millis: i64) -> String {
-    DateTime::from_timestamp_millis(millis)
-        .map(|at| date::day_month_year(at.with_timezone(&Local).date_naive(), DateOrder::system()))
-        .unwrap_or_default()
-}
+use crate::taxyears;
 
 fn now() -> i64 {
     chrono::Utc::now().timestamp_millis()
 }
 
-#[tauri::command]
-pub fn rules_overview(state: State<'_, AppState>) -> AppResult<Vec<RulesFile>> {
-    super::overview(&state.db, &crate::config_dir(), &date_label)
+fn announced(app: &AppHandle, written: Written) -> String {
+    announce(app, &written);
+    written.label
 }
 
 #[tauri::command]
-pub fn rules_reload_preview(state: State<'_, AppState>) -> AppResult<Vec<ReloadPreview>> {
-    super::preview(&state.db, &crate::config_dir())
-}
-
-/// The label of the applied change, or null when no file had changed.
-#[tauri::command]
-pub fn rules_reload_apply(app: AppHandle, state: State<'_, AppState>) -> AppResult<Option<String>> {
-    let written = super::apply(&state.db, &crate::config_dir(), now())?;
-    if let Some(written) = &written {
-        announce(&app, written);
-    }
-    Ok(written.map(|w| w.label))
-}
-
-/// Asks for a JSON file and imports it; null when the panel was cancelled.
-#[tauri::command]
-pub async fn rules_import(app: AppHandle) -> AppResult<Option<Imported>> {
-    let (tx, rx) = tokio::sync::oneshot::channel();
-    app.dialog()
-        .file()
-        .set_title(crate::tr!("Import a Rules File", "Regeldatei importieren"))
-        .add_filter(crate::tr!("Rules file", "Regeldatei"), &["json"])
-        .pick_file(move |path| {
-            let _ = tx.send(path);
-        });
-    let chosen = rx.await.map_err(|_| {
-        AppError::Io(crate::tr!(
-            "The file panel closed without an answer",
-            "Das Dateifenster wurde ohne Antwort geschlossen"
-        ))
-    })?;
-    let Some(path) = chosen else {
-        return Ok(None);
-    };
-    let path = path.into_path().map_err(|e| {
-        AppError::Io(crate::tr!(
-            "The chosen file isn't a file path: {e}",
-            "Die gewählte Datei ist kein Dateipfad: {e}"
-        ))
-    })?;
-    let state = app.state::<AppState>();
-    super::import_file(&state.db, &crate::config_dir(), &path).map(Some)
+pub fn rules_overview(state: State<'_, AppState>) -> AppResult<RulesOverview> {
+    super::overview(&state.db)
 }
 
 #[tauri::command]
-pub fn rules_duplicate(state: State<'_, AppState>) -> AppResult<String> {
-    super::duplicate(&state.db, &crate::config_dir())
+pub fn rules_year(state: State<'_, AppState>, year: i32) -> AppResult<RulesYearView> {
+    let row = state
+        .db
+        .read(|c| taxyears::row(c, year))?
+        .ok_or_else(|| AppError::NotFound(crate::tr!("Tax year {year}", "Steuerjahr {year}")))?;
+    let ruleset = check::read(&row.rules, &BTreeSet::new())
+        .map_err(|p| AppError::InvalidInput(p.join("; ")))?;
+    Ok(view::year_view(
+        &row,
+        &ruleset,
+        state.settings.get().number_format,
+        DateOrder::system(),
+    ))
 }
 
-/// Opens a year's file in the default editor; a closed year opens a read-only copy of its frozen rules.
+/// The label of the change.
 #[tauri::command]
-pub fn rules_open(state: State<'_, AppState>, year: i32) -> AppResult<()> {
-    let path = super::open_target(&state.db, &crate::config_dir(), year)?;
-    tauri_plugin_opener::open_path(&path, None::<&str>).map_err(|e| {
-        AppError::Internal(crate::tr!(
-            "Couldn't open {}: {e}",
-            "{} ließ sich nicht öffnen: {e}",
-            path.display()
-        ))
-    })
+pub fn rules_set_value(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    year: i32,
+    path: String,
+    value: String,
+) -> AppResult<String> {
+    let format = state.settings.get().number_format;
+    let written = edit::set_value(&state.db, year, &path, &value, format, now())?;
+    Ok(announced(&app, written))
 }
 
 #[tauri::command]
-pub fn rules_show_folder() -> AppResult<()> {
-    let dir = files::dir(&crate::config_dir());
-    tauri_plugin_opener::reveal_item_in_dir(&dir).map_err(|e| {
-        AppError::Internal(crate::tr!(
-            "Couldn't show the rules folder: {e}",
-            "Der Regelordner ließ sich nicht zeigen: {e}"
-        ))
-    })
+pub fn rules_json(state: State<'_, AppState>, year: i32) -> AppResult<String> {
+    edit::json(&state.db, year)
+}
+
+#[tauri::command]
+pub fn rules_preview_json(
+    state: State<'_, AppState>,
+    year: i32,
+    text: String,
+) -> AppResult<JsonPreview> {
+    edit::preview_json(&state.db, year, &text)
+}
+
+#[tauri::command]
+pub fn rules_set_json(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    year: i32,
+    text: String,
+) -> AppResult<String> {
+    let written = edit::set_json(&state.db, year, &text, now())?;
+    Ok(announced(&app, written))
+}
+
+#[tauri::command]
+pub fn rules_use_builtin(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    year: i32,
+) -> AppResult<String> {
+    let written = super::use_builtin(&state.db, year, now())?;
+    Ok(announced(&app, written))
+}
+
+#[tauri::command]
+pub fn rules_start_next(app: AppHandle, state: State<'_, AppState>) -> AppResult<String> {
+    let written = super::start_next(&state.db, now())?;
+    Ok(announced(&app, written))
+}
+
+/// What happened to the rules while the app started (a newer built-in version taken on), once.
+#[tauri::command]
+pub fn rules_take_notices(state: State<'_, AppState>) -> Vec<String> {
+    state
+        .notices
+        .lock()
+        .map(|mut n| std::mem::take(&mut *n))
+        .unwrap_or_default()
 }

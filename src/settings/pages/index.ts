@@ -92,11 +92,8 @@ export const SETTINGS_PAGES: SettingsPage[] = [
       icon: "taxRules",
       Body: TaxRulesPage,
       rows: [
-        row("rulesets", (s) => s.taxRules.rulesets, ["json", "kennzahl", "draft", "open", "closed", "entwurf"]),
-        row("reload", (s) => s.taxRules.reload, ["rules", "regeln"]),
-        row("import", (s) => s.taxRules.import, ["rules", "regeln"]),
-        row("duplicate", (s) => s.taxRules.duplicate, ["duplicate", "rules", "duplizieren"]),
-        row("rules-folder", (s) => s.taxRules.folder, ["finder"]),
+        row("tax-years", (s) => s.taxRules.years, ["rules", "regeln", "kilometergeld", "kennzahl", "json", "pauschale", "gwg"]),
+        row("start-year", (s) => s.taxRules.startButton.replace("…", "").trim(), ["next year", "new year", "nächstes jahr", "neues jahr"]),
       ],
     },
     { group: finance, label: (s) => s.taxRules.label, intro: (s) => s.taxRules.intro },

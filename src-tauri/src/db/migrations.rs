@@ -244,6 +244,8 @@ pub const MIGRATIONS: &[&str] = &[
     // 15: a subscription asks about another amount unless it takes only its exact amount; the tolerance
     // columns stay for the journal's older ops.
     "ALTER TABLE subscriptions ADD COLUMN exact_only INTEGER NOT NULL DEFAULT 0;",
+    // 16: whether a tax year follows the built-in rules or keeps the owner's version (ADR 0051).
+    "ALTER TABLE tax_years ADD COLUMN rules_source TEXT NOT NULL DEFAULT 'builtin';",
 ];
 
 pub fn version(conn: &Connection) -> AppResult<usize> {
@@ -318,6 +320,40 @@ mod tests {
         ]
         .map(String::from)
         .to_vec()
+    }
+
+    #[test]
+    fn a_file_at_version_fifteen_gains_the_built_in_rules_source_for_every_tax_year() {
+        let dir = temp_config_dir();
+        let mut conn = Connection::open(dir.path().join("v15.sqlite")).unwrap();
+        for sql in &MIGRATIONS[..15] {
+            conn.execute_batch(sql).unwrap();
+        }
+        conn.pragma_update(None, "user_version", 15i64).unwrap();
+        for (year, state, closed_at) in [(2025, "closed", Some(5)), (2026, "open", None)] {
+            conn.execute(
+                "INSERT INTO tax_years (id, year, state, ruleset, rules, rules_loaded_at, closed_at) \
+                 VALUES (?1, ?1, ?2, ?3, '{}', 1, ?4)",
+                rusqlite::params![year, state, format!("{year} v1"), closed_at],
+            )
+            .unwrap();
+        }
+
+        migrate(&mut conn).unwrap();
+
+        assert_eq!(version(&conn).unwrap(), MIGRATIONS.len());
+        let mut query = conn
+            .prepare("SELECT year, rules_source FROM tax_years ORDER BY year")
+            .unwrap();
+        let sources: Vec<(i64, String)> = query
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect();
+        assert_eq!(
+            sources,
+            [(2025, "builtin".to_string()), (2026, "builtin".to_string())]
+        );
     }
 
     #[test]

@@ -1,5 +1,6 @@
 import { MenuHost } from "../components/menu";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { api } from "../api";
 import { ConfirmHost } from "../components/ConfirmSheet";
 import { Toasts } from "../components/Toasts";
 import { TooltipHost } from "../components/TooltipHost";
@@ -29,6 +30,13 @@ export function Window() {
   const addPreview = useStore((s) => s.addPreview);
   const { data: openDocument } = useDocument(route.page === "document" ? route.documentId : "", route.page === "document");
   const documentTitle = route.page === "document" ? openDocument?.title : undefined;
+  // Tax rules taken on before the window opened (a newer built-in version) are told once.
+  useEffect(() => {
+    api
+      .rulesTakeNotices()
+      .then((notices) => notices.forEach((n) => useStore.getState().showToast("success", n)))
+      .catch(() => undefined);
+  }, []);
   // Keeps the first run's second step showing once its account exists.
   const [finishingFirstRun, setFinishingFirstRun] = useState(false);
   const importSheet = importPreview && <ImportSheet preview={importPreview} onImported={() => setFinishingFirstRun(false)} />;

@@ -32,7 +32,7 @@ export function YearMenu({ year, archived, closed }: { year: number; archived: n
       { text: text.log, run: () => navigate({ page: "log", year }) },
       { text: text.archive, hint: String(archived), run: () => navigate({ page: "archive", year }) },
       { text: text.export, run: () => exportSummary(year) },
-      { text: text.ruleset, run: () => void api.rulesOpen(year).catch(showError) },
+      { text: text.ruleset, run: () => void api.settingsShow("tax-years").catch(showError) },
       "separator",
       ...(closed
         ? [

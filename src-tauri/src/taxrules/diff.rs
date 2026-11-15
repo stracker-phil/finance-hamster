@@ -1,4 +1,4 @@
-//! What a Reload changes, one plain line per changed value, shown before it is applied.
+//! What new rules change, one line per changed value: shown before saving edited JSON.
 
 use std::collections::BTreeSet;
 
@@ -21,13 +21,6 @@ pub fn describe(old: &Ruleset, new: &Ruleset) -> Vec<String> {
     }
     for (list, id) in KEYED {
         keyed(list, id, o.get(*list), n.get(*list), &mut lines);
-    }
-    if !lines.is_empty() && old.ruleset == new.ruleset {
-        lines.push(crate::tr!(
-            "The ruleset is still \"{}\"; bump it to tell the versions apart",
-            "Das ruleset heißt noch „{}“; erhöh die Version, damit sich die Fassungen unterscheiden",
-            new.ruleset
-        ));
     }
     lines
 }

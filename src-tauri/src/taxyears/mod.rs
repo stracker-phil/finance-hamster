@@ -1,10 +1,9 @@
-//! Tax years: one row per year with its state and the rules text it applies. A year starts from its rules
-//! file once the calendar reaches it; closing it freezes that text (ADR 0040).
+//! Tax years: one row per year with its state and the rules text it applies. A year starts from its built-in
+//! rules once the calendar reaches it; closing it freezes that text (ADR 0051).
 
 pub mod commands;
 
 use std::collections::BTreeSet;
-use std::path::Path;
 
 use rusqlite::{Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
@@ -35,6 +34,19 @@ pub struct TaxYearRow {
     pub rules: String,
     pub rules_loaded_at: i64,
     pub closed_at: Option<i64>,
+    /// Older journal entries predate it; their years used the shipped rules.
+    #[serde(default)]
+    pub rules_source: RulesSource,
+}
+
+/// Where a year's rules come from: the app's built-in copy, or the owner's version edited in Settings.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export, export_to = "src/api/types.gen.ts")]
+pub enum RulesSource {
+    #[default]
+    Builtin,
+    Own,
 }
 
 impl TaxYearRow {
@@ -47,6 +59,7 @@ impl TaxYearRow {
             rules,
             rules_loaded_at: now,
             closed_at: None,
+            rules_source: RulesSource::Builtin,
         }
     }
 }
@@ -61,7 +74,7 @@ pub struct TaxYear {
     pub ruleset: String,
 }
 
-const COLUMNS: &str = "id, year, state, ruleset, rules, rules_loaded_at, closed_at";
+const COLUMNS: &str = "id, year, state, ruleset, rules, rules_loaded_at, closed_at, rules_source";
 
 fn from_sql(row: &rusqlite::Row) -> rusqlite::Result<TaxYearRow> {
     let state: String = row.get(2)?;
@@ -77,6 +90,11 @@ fn from_sql(row: &rusqlite::Row) -> rusqlite::Result<TaxYearRow> {
         rules: row.get(4)?,
         rules_loaded_at: row.get(5)?,
         closed_at: row.get(6)?,
+        rules_source: if row.get::<_, String>(7)? == "own" {
+            RulesSource::Own
+        } else {
+            RulesSource::Builtin
+        },
     })
 }
 
@@ -148,43 +166,35 @@ pub fn list(db: &Db) -> AppResult<Vec<TaxYear>> {
         .collect())
 }
 
-/// Puts the rules folder in place, then starts the years the calendar has reached.
-pub fn start_on_launch(
-    db: &Db,
-    config_dir: &Path,
-    now: chrono::DateTime<chrono::Local>,
-) -> AppResult<Option<Written>> {
+/// Starts the years the calendar has reached that have built-in rules, then moves open years that follow the
+/// built-in rules to a newer built-in version.
+pub fn start_on_launch(db: &Db, now: chrono::DateTime<chrono::Local>) -> AppResult<Vec<Written>> {
     use chrono::Datelike;
-    files::install(config_dir)?;
-    start_from_rules(db, config_dir, now.year(), now.timestamp_millis())
+    let millis = now.timestamp_millis();
+    let mut written: Vec<Written> = start_builtin(db, now.year(), millis)?.into_iter().collect();
+    written.extend(crate::taxrules::adopt_builtin(db, millis)?);
+    Ok(written)
 }
 
-/// Starts every year up to `current_year` that has a valid rules file but no row yet; an invalid file waits
-/// for the owner (Settings → Tax Rules shows why).
-pub fn start_from_rules(
-    db: &Db,
-    config_dir: &Path,
-    current_year: i32,
-    now: i64,
-) -> AppResult<Option<Written>> {
+/// Starts every year up to `current_year` that has built-in rules but no row yet.
+pub fn start_builtin(db: &Db, current_year: i32, now: i64) -> AppResult<Option<Written>> {
     let existing: Vec<i32> = db.read(rows)?.iter().map(|r| r.year).collect();
     let mut changes = Vec::new();
-    for year in files::list(config_dir)?.into_keys() {
+    for year in files::bundled_years() {
         if year > current_year || existing.contains(&year) {
             continue;
         }
-        let Some(text) = files::read(config_dir, year)? else {
+        let Some(text) = files::bundled(year) else {
             continue;
         };
-        match check::read(&text, &BTreeSet::new()) {
+        match check::read(text, &BTreeSet::new()) {
             Ok(ruleset) if ruleset.year == year => {
-                let row = TaxYearRow::new(year, ruleset.ruleset, text, now);
+                let row = TaxYearRow::new(year, ruleset.ruleset, text.to_string(), now);
                 changes.push(Change::insert(TABLE, &row)?);
             }
-            Ok(_) => log::warn!("{} names another year", files::file_name(year)),
+            Ok(_) => log::warn!("The built-in rules for {year} name another year"),
             Err(problems) => log::warn!(
-                "{} isn't valid: {}",
-                files::file_name(year),
+                "The built-in rules for {year} aren't valid: {}",
                 problems.join("; ")
             ),
         }
@@ -201,10 +211,9 @@ pub fn start_from_rules(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::store::json_file::create_private_dir;
-    use crate::test_support::rules::{minimal_rules, minimal_text, set};
+    use crate::test_support::rules::minimal_text;
     use crate::test_support::temp_config_dir;
-    use serde_json::json;
+    use chrono::TimeZone;
 
     fn setup() -> (tempfile::TempDir, Db) {
         let dir = temp_config_dir();
@@ -212,10 +221,10 @@ mod tests {
         (dir, db)
     }
 
-    fn put_file(config: &Path, year: i32, text: &str) {
-        let folder = files::dir(config);
-        create_private_dir(&folder).unwrap();
-        std::fs::write(folder.join(files::file_name(year)), text).unwrap();
+    fn builtin_row(year: i32, now: i64) -> TaxYearRow {
+        let text = files::bundled(year).unwrap();
+        let ruleset = check::read(text, &BTreeSet::new()).unwrap().ruleset;
+        TaxYearRow::new(year, ruleset, text.to_string(), now)
     }
 
     fn years(db: &Db) -> Vec<(i32, YearState)> {
@@ -227,15 +236,10 @@ mod tests {
     }
 
     #[test]
-    fn every_valid_file_up_to_the_current_year_starts_an_open_year() {
-        let (dir, db) = setup();
-        for year in [2025, 2026, 2027] {
-            put_file(dir.path(), year, &minimal_text(year));
-        }
+    fn every_built_in_year_up_to_the_current_year_starts_as_an_open_built_in_year() {
+        let (_dir, db) = setup();
 
-        let written = start_from_rules(&db, dir.path(), 2026, 1000)
-            .unwrap()
-            .unwrap();
+        let written = start_builtin(&db, 2026, 1000).unwrap().unwrap();
 
         assert_eq!(
             written,
@@ -246,114 +250,8 @@ mod tests {
         );
         assert_eq!(
             db.read(rows).unwrap(),
-            vec![
-                TaxYearRow {
-                    id: "2026".into(),
-                    year: 2026,
-                    state: YearState::Open,
-                    ruleset: "2026 v1".into(),
-                    rules: minimal_text(2026),
-                    rules_loaded_at: 1000,
-                    closed_at: None,
-                },
-                TaxYearRow {
-                    id: "2025".into(),
-                    year: 2025,
-                    state: YearState::Open,
-                    ruleset: "2025 v1".into(),
-                    rules: minimal_text(2025),
-                    rules_loaded_at: 1000,
-                    closed_at: None,
-                },
-            ]
+            vec![builtin_row(2026, 1000), builtin_row(2025, 1000)]
         );
-    }
-
-    #[test]
-    fn starting_years_is_not_undoable() {
-        let (dir, db) = setup();
-        put_file(dir.path(), 2026, &minimal_text(2026));
-        start_from_rules(&db, dir.path(), 2026, 1000).unwrap();
-
-        assert_eq!(db.undo().unwrap(), None);
-        assert_eq!(years(&db), vec![(2026, YearState::Open)]);
-    }
-
-    #[test]
-    fn a_future_year_stays_a_draft() {
-        let (dir, db) = setup();
-        put_file(dir.path(), 2027, &minimal_text(2027));
-
-        assert_eq!(start_from_rules(&db, dir.path(), 2026, 1000).unwrap(), None);
-        assert_eq!(years(&db), vec![]);
-    }
-
-    #[test]
-    fn a_year_that_has_a_row_is_left_as_it_is() {
-        let (dir, db) = setup();
-        put_file(dir.path(), 2026, &minimal_text(2026));
-        start_from_rules(&db, dir.path(), 2026, 1000).unwrap();
-        let before = db.read(rows).unwrap();
-        let mut changed = minimal_rules(2026);
-        set(&mut changed, "/settings/gwgLimit", json!(1200.00));
-        put_file(dir.path(), 2026, &changed.to_string());
-
-        assert_eq!(start_from_rules(&db, dir.path(), 2030, 2000).unwrap(), None);
-        assert_eq!(db.read(rows).unwrap(), before);
-    }
-
-    #[test]
-    fn a_new_file_starts_its_year_while_existing_rows_stay() {
-        let (dir, db) = setup();
-        put_file(dir.path(), 2025, &minimal_text(2025));
-        start_from_rules(&db, dir.path(), 2025, 1000).unwrap();
-        put_file(dir.path(), 2026, &minimal_text(2026));
-
-        start_from_rules(&db, dir.path(), 2026, 2000)
-            .unwrap()
-            .unwrap();
-
-        let loaded: Vec<(i32, i64)> = db
-            .read(rows)
-            .unwrap()
-            .iter()
-            .map(|r| (r.year, r.rules_loaded_at))
-            .collect();
-        assert_eq!(loaded, vec![(2026, 2000), (2025, 1000)]);
-    }
-
-    #[test]
-    fn an_invalid_file_or_one_naming_another_year_waits_for_the_owner() {
-        let (dir, db) = setup();
-        put_file(dir.path(), 2023, "not json");
-        let mut broken = minimal_rules(2024);
-        set(&mut broken, "/schemaVersion", json!(2));
-        put_file(dir.path(), 2024, &broken.to_string());
-        put_file(dir.path(), 2025, &minimal_text(2026));
-        put_file(dir.path(), 2026, &minimal_text(2026));
-
-        start_from_rules(&db, dir.path(), 2026, 1000)
-            .unwrap()
-            .unwrap();
-
-        assert_eq!(years(&db), vec![(2026, YearState::Open)]);
-    }
-
-    #[test]
-    fn without_a_rules_folder_nothing_starts() {
-        let (dir, db) = setup();
-        assert_eq!(start_from_rules(&db, dir.path(), 2026, 1000).unwrap(), None);
-    }
-
-    #[test]
-    fn the_shipped_seeds_start_both_years() {
-        let (dir, db) = setup();
-        files::install(dir.path()).unwrap();
-
-        start_from_rules(&db, dir.path(), 2026, 1000)
-            .unwrap()
-            .unwrap();
-
         assert_eq!(
             list(&db).unwrap(),
             vec![
@@ -372,19 +270,137 @@ mod tests {
     }
 
     #[test]
+    fn starting_years_is_not_undoable() {
+        let (_dir, db) = setup();
+        start_builtin(&db, 2026, 1000).unwrap();
+
+        assert_eq!(db.undo().unwrap(), None);
+        assert_eq!(
+            years(&db),
+            vec![(2026, YearState::Open), (2025, YearState::Open)]
+        );
+    }
+
+    #[test]
+    fn a_year_the_calendar_has_not_reached_is_not_started() {
+        let (_dir, db) = setup();
+
+        start_builtin(&db, 2025, 1000).unwrap().unwrap();
+
+        assert_eq!(years(&db), vec![(2025, YearState::Open)]);
+    }
+
+    #[test]
+    fn before_the_first_built_in_year_nothing_starts() {
+        let (_dir, db) = setup();
+
+        assert_eq!(start_builtin(&db, 2024, 1000).unwrap(), None);
+        assert_eq!(years(&db), vec![]);
+    }
+
+    #[test]
+    fn a_year_that_has_a_row_is_never_started_twice() {
+        let (_dir, db) = setup();
+        start_builtin(&db, 2026, 1000).unwrap();
+        let before = db.read(rows).unwrap();
+
+        assert_eq!(start_builtin(&db, 2030, 2000).unwrap(), None);
+        assert_eq!(db.read(rows).unwrap(), before);
+    }
+
+    #[test]
+    fn a_newly_reached_year_starts_while_existing_rows_stay() {
+        let (_dir, db) = setup();
+        start_builtin(&db, 2025, 1000).unwrap();
+
+        start_builtin(&db, 2026, 2000).unwrap().unwrap();
+
+        let loaded: Vec<(i32, i64)> = db
+            .read(rows)
+            .unwrap()
+            .iter()
+            .map(|r| (r.year, r.rules_loaded_at))
+            .collect();
+        assert_eq!(loaded, vec![(2026, 2000), (2025, 1000)]);
+    }
+
+    #[test]
+    fn launching_in_a_year_starts_its_built_in_years_and_has_nothing_to_adopt() {
+        let (_dir, db) = setup();
+        let now = chrono::Local
+            .with_ymd_and_hms(2026, 11, 15, 12, 0, 0)
+            .unwrap();
+
+        let written = start_on_launch(&db, now).unwrap();
+
+        assert_eq!(
+            written,
+            vec![Written {
+                label: "Start tax year".into(),
+                tables: vec!["tax_years".into()]
+            }]
+        );
+        assert_eq!(
+            years(&db),
+            vec![(2026, YearState::Open), (2025, YearState::Open)]
+        );
+    }
+
+    #[test]
+    fn launching_also_moves_an_open_built_in_year_to_a_newer_built_in_version() {
+        let (_dir, db) = setup();
+        let old = TaxYearRow::new(2026, "2026 v1".into(), minimal_text(2026), 1);
+        db.write(
+            Op::new("Add year", vec![Change::insert(TABLE, &old).unwrap()]),
+            Source::App,
+        )
+        .unwrap();
+        let now = chrono::Local
+            .with_ymd_and_hms(2026, 11, 15, 12, 0, 0)
+            .unwrap();
+
+        let written = start_on_launch(&db, now).unwrap();
+
+        let labels: Vec<&str> = written.iter().map(|w| w.label.as_str()).collect();
+        assert_eq!(labels, ["Start tax year", "Update Tax Rules to 2026 v4"]);
+        let row_2026 = db.read(|c| row(c, 2026)).unwrap().unwrap();
+        assert_eq!(row_2026.ruleset, "2026 v4");
+        assert_eq!(row_2026.rules, files::bundled(2026).unwrap());
+    }
+
+    #[test]
     fn years_list_newest_first_and_a_single_year_can_be_read() {
-        let (dir, db) = setup();
-        for year in [2024, 2026, 2025] {
-            put_file(dir.path(), year, &minimal_text(year));
-        }
-        start_from_rules(&db, dir.path(), 2026, 1000).unwrap();
+        let (_dir, db) = setup();
+        start_builtin(&db, 2026, 1000).unwrap();
 
         let listed: Vec<i32> = list(&db).unwrap().iter().map(|y| y.year).collect();
-        assert_eq!(listed, vec![2026, 2025, 2024]);
+        assert_eq!(listed, vec![2026, 2025]);
 
         let row_2025 = db.read(|c| row(c, 2025)).unwrap().unwrap();
-        assert_eq!(row_2025.ruleset, "2025 v1");
+        assert_eq!(row_2025.ruleset, "2025 v3");
         assert_eq!(db.read(|c| row(c, 2030)).unwrap(), None);
+    }
+
+    #[test]
+    fn a_year_row_reads_its_rules_source_and_older_journal_rows_default_to_built_in() {
+        let (_dir, db) = setup();
+        let own = TaxYearRow {
+            rules_source: RulesSource::Own,
+            ..TaxYearRow::new(2026, "2026 v4 (own)".into(), minimal_text(2026), 1)
+        };
+        db.write(
+            Op::new("Add year", vec![Change::insert(TABLE, &own).unwrap()]),
+            Source::App,
+        )
+        .unwrap();
+
+        assert_eq!(db.read(|c| row(c, 2026)).unwrap(), Some(own));
+
+        let mut old_json =
+            serde_json::to_value(TaxYearRow::new(2025, "x".into(), "{}".into(), 1)).unwrap();
+        old_json.as_object_mut().unwrap().remove("rules_source");
+        let old: TaxYearRow = serde_json::from_value(old_json).unwrap();
+        assert_eq!(old.rules_source, RulesSource::Builtin);
     }
 
     fn add_years(db: &Db, states: &[(i32, YearState)]) {

@@ -107,10 +107,7 @@ pub fn seed(db: &Db, config_dir: &Path, today: NaiveDate) -> AppResult<usize> {
         .map(|t| t.and_utc().timestamp_millis())
         .unwrap_or_default();
     let mut count = 0;
-    crate::taxrules::files::install(config_dir)?;
-    if crate::taxyears::start_from_rules(db, config_dir, chrono::Datelike::year(&today), now)?
-        .is_some()
-    {
+    if crate::taxyears::start_builtin(db, chrono::Datelike::year(&today), now)?.is_some() {
         count += 1;
     }
     let lines = db.read(statements::all_transactions)?;

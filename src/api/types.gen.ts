@@ -338,6 +338,8 @@ formula: string,
  */
 gwg: string | null, };
 
+export type FieldKind = "amount" | "count" | "percent";
+
 export type FileCheck = { checked: number, problems: Array<FileProblem>, 
 /**
  * When it ran, in milliseconds.
@@ -399,16 +401,6 @@ file: string, };
  */
 export type ImportReady = { preview: ImportPreview | null, error: string | null, };
 
-export type Imported = { fileName: string, year: number, 
-/**
- * The replaced file's new name, kept as a backup.
- */
-backup: string | null, 
-/**
- * The year is open, so a Reload applies the imported file.
- */
-needsReload: boolean, };
-
 export type Interval = "monthly" | "quarterly" | "yearly";
 
 /**
@@ -419,6 +411,11 @@ export type ItemOption = { key: string,
  * `KZ 169 · Digitale Arbeitsmittel`.
  */
 label: string, kz: string, };
+
+/**
+ * What saving an edited JSON would do.
+ */
+export type JsonPreview = { problems: Array<string>, changes: Array<string>, };
 
 export type KennzahlView = { key: string, kz: string, name: string, 
 /**
@@ -571,11 +568,6 @@ export type QuestionView = { id: string, label: string, help: string | null, uni
 value: string, answered: boolean, };
 
 /**
- * One open year's pending Reload.
- */
-export type ReloadPreview = { year: number, from: string, to: string | null, changes: Array<string>, problems: Array<string>, };
-
-/**
  * How long before a charge the reminder comes.
  */
 export type Reminder = "off" | "one_day" | "three_days" | "one_week";
@@ -656,38 +648,66 @@ label: string,
  */
 detail: string, builtin: boolean, form: RuleForm, };
 
+export type RulesField = { 
 /**
- * One row of Settings → Tax Rules.
+ * `/`-separated path into the rules; items are named by key.
  */
-export type RulesFile = { fileName: string, year: number, state: RulesState, 
+path: string, label: string, 
 /**
- * The file's ruleset name, or the applied one when the file can't be read.
+ * The value as typed in the field.
  */
-ruleset: string | null, basedOn: string | null, items: number, unverified: number, 
+value: string, unit: string | null, kind: FieldKind, };
+
+export type RulesGroup = { title: string, fields: Array<RulesField>, 
 /**
- * Why the file can't be used; empty when it is valid.
+ * Facts shown beside the fields but not edited here.
+ */
+facts: Array<string>, };
+
+export type RulesOverview = { 
+/**
+ * Newest first.
+ */
+years: Array<RulesYear>, 
+/**
+ * The year Start would begin, when it doesn't exist yet.
+ */
+nextYear: number | null, 
+/**
+ * Start takes the built-in rules rather than a copy of the newest year.
+ */
+nextIsBuiltin: boolean, };
+
+/**
+ * Where a year's rules come from: the app's built-in copy, or the owner's version edited in Settings.
+ */
+export type RulesSource = "builtin" | "own";
+
+export type RulesView = { groups: Array<RuleGroup>, items: Array<ItemOption>, };
+
+/**
+ * One year in Settings → Tax Rules.
+ */
+export type RulesYear = { year: number, state: YearState, source: RulesSource, ruleset: string, 
+/**
+ * The ruleset the owner's version started from.
+ */
+basedOn: string | null, 
+/**
+ * A built-in version the year doesn't use yet: newer than the owner's version, or one that can't be
+ * taken on (see `problems`).
+ */
+builtinNewer: string | null, 
+/**
+ * Why the built-in version can't be taken on.
  */
 problems: Array<string>, 
 /**
- * An open year's file differs from what the year applies, so Reload has something to do.
+ * The app has built-in rules for the year, so "Back to built-in" can work.
  */
-edited: boolean, 
-/**
- * The year exists but its file is gone; a closed year still has its frozen copy.
- */
-missing: boolean, 
-/**
- * When a closed year was closed, as a date label.
- */
-closedOn: string | null, 
-/**
- * When an open year last loaded its file, as a date label.
- */
-loadedOn: string | null, };
+hasBuiltin: boolean, unverified: number, };
 
-export type RulesState = "draft" | "open" | "closed";
-
-export type RulesView = { groups: Array<RuleGroup>, items: Array<ItemOption>, };
+export type RulesYearView = { year: number, editable: boolean, source: RulesSource, ruleset: string, basedOn: string | null, groups: Array<RulesGroup>, notes: string | null, sources: Array<string>, };
 
 export type Settings = { language: Language, appearance: Appearance, accent: Accent, numberFormat: NumberFormat, 
 /**

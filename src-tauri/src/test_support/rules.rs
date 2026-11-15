@@ -20,6 +20,51 @@ pub fn minimal_rules(year: i32) -> Value {
     })
 }
 
+/// `minimal_rules(year)` with every kind of value Settings → Tax Rules can edit: a useful life, a Kilometergeld
+/// rate, a question, and items with a private share and with estimate rules, one hidden item and one item
+/// with nothing to edit.
+pub fn rich_rules(year: i32) -> Value {
+    let mut rules = minimal_rules(year);
+    set(&mut rules, "/usefulLife", json!({ "computer": 3 }));
+    set(
+        &mut rules,
+        "/rates",
+        json!({ "kilometergeld": [{
+            "vehicle": "car", "perKm": 0.42,
+            "from": format!("{year}-01-01"), "to": format!("{year}-12-31")
+        }]}),
+    );
+    set(
+        &mut rules,
+        "/questions",
+        json!([{ "id": "days", "label": "Days", "type": "integer", "unit": "days" }]),
+    );
+    set(&mut rules, "/items/0/privateShare", json!(20));
+    set(
+        &mut rules,
+        "/items/0/estimate",
+        json!([
+            { "type": "cap", "amount": 300.00 },
+            { "type": "requires", "question": "days", "min": 5 },
+            { "type": "reduceByPerUnit", "question": "days", "perUnit": 3.00, "maxUnits": 100 }
+        ]),
+    );
+    rules["items"].as_array_mut().expect("items").extend([
+        json!({
+            "key": "notes", "kz": "721", "name": "Notes", "section": "main", "kind": "documents",
+            "visible": false, "privateShare": 50
+        }),
+        json!({
+            "key": "plain", "kz": "722", "name": "Plain", "section": "main", "kind": "documents"
+        }),
+        json!({
+            "key": "dues", "kz": "723", "name": "Dues", "section": "main", "kind": "amount",
+            "estimate": [{ "type": "cap", "amount": 120.00, "carryOver": true }]
+        }),
+    ]);
+    rules
+}
+
 /// Sets the value at a JSON pointer (`/settings/gwgLimit`); the path must exist, or end in a new object key.
 pub fn set(rules: &mut Value, pointer: &str, value: Value) {
     let (parent, key) = pointer.rsplit_once('/').expect("a pointer with a key");
