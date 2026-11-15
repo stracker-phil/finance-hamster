@@ -10,7 +10,7 @@ import { HOME, type Route } from "../state/route";
 import { useStore } from "../state/store";
 import { account } from "../test/accounts";
 import { renderWithQuery as render } from "../test/renderWithQuery";
-import { addPreview, documentView, otherView, statementView } from "../test/documents";
+import { addPreview, documentView, otherGroup, otherView, statementView } from "../test/documents";
 import { settings } from "../test/settings";
 import { accountLines, importPreview } from "../test/statements";
 import { Window } from "./Window";
@@ -311,6 +311,44 @@ describe("document page", () => {
     render(<Window />);
 
     expect(await screen.findByText("Every required fact is set")).toBeTruthy();
+  });
+});
+
+describe("Documents tabs", () => {
+  const tabs = () => screen.queryByRole("group", { name: "Kind of document" });
+
+  it("sit in the header on Documents, with the remembered tab pressed", () => {
+    useStore.setState({ route: { page: "documents" }, documentsTab: "statements" });
+
+    render(<Window />);
+
+    const header = screen.getByRole("banner");
+    expect(within(header).getByRole("group", { name: "Kind of document" })).toBeTruthy();
+    expect(within(header).getByRole("button", { name: "Statements" }).getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it.each<[string, Route]>([
+    ["Today", { page: "today" }],
+    ["a statement", { page: "statement", statementId: "st-10" }],
+    ["the tax year", { page: "year", year: 2026 }],
+  ])("are not in the header on %s", (_name, route) => {
+    useStore.setState({ route });
+
+    render(<Window />);
+
+    expect(tabs()).toBeNull();
+  });
+
+  it("switch the list shown below when a tab is clicked", async () => {
+    useStore.setState({ route: { page: "documents" }, documentsTab: "invoices" });
+    mocked.othersList.mockResolvedValue([otherGroup()]);
+    render(<Window />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Other" }));
+
+    expect(await screen.findByRole("button", { name: /Demo Lease/ })).toBeTruthy();
+    expect(useStore.getState().route).toEqual({ page: "documents", tab: "other" });
+    expect(screen.getByRole("button", { name: "Other" }).getAttribute("aria-pressed")).toBe("true");
   });
 });
 

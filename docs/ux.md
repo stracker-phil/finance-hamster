@@ -37,7 +37,7 @@ on Documents it and the big search field are one search)
 | Payslip | `DetailLayout`: the PDF (or Attach PDF… in its place); on the right the tax year and month pickers (a move is one undoable change), "This month" (Gross, Social insurance, Income tax, Net, Payout, Home office allowance; each says where on the payslip it is printed) and "Year to date" (Home office days), Replace PDF… and Delete Payslip; breadcrumb Documents |
 | Statement | `DetailLayout`: the PDF; on the right its facts (account, number, period, balances, credits, debits, lines, pages, imported on), nothing editable, and Show the Lines (the account page at that statement) |
 | Other document | `DetailLayout`: the PDF; on the right title, date and note, Delete Document |
-| Documents (Dokumente) | sidebar entry; every PDF Hamster keeps (ADR 0056): a large "Is it already here?" field over tabs Invoices · Statements · Payslips · Other, the search filtering the open tab and the tab kept for the session. Invoices by tax year plus Inbox; statements by account, newest first; payslips per year with all twelve months (a missing month offers Enter and Add PDF…); other documents by the year of their date |
+| Documents (Dokumente) | sidebar entry; every PDF Hamster keeps (ADR 0056): the kinds Invoices · Statements · Payslips · Other as a segmented control in the toolbar beside the title (kept for the session), and a large "Is it already here?" field filtering the open kind. Invoices by tax year plus Inbox; statements by account, newest first; payslips per year with all twelve months (a missing month offers Enter and Add PDF…); other documents by the year of their date |
 | Log, Archive | a tax year's journal entries; its excluded documents and the delete flow |
 
 ### Hamster-specific rules

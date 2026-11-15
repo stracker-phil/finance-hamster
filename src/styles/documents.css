@@ -48,6 +48,7 @@
 .line-picker__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; color: var(--text); }
 .line-picker__empty { padding: 10px; font-size: 12px; color: var(--text-muted); }
 .docs-page { max-width: 900px; margin: 0 auto; padding: 28px 32px 40px; }
+.docs-page .big-search { margin-bottom: 26px; }
 .big-search { display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 14px; border: 1px solid var(--border-strong); border-radius: 11px; background: var(--panel-bg); color: var(--text-muted); }
 .big-search input { flex: 1; border: 0; outline: 0; background: transparent; font: inherit; font-size: 15px; color: var(--text); }
 .big-search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
@@ -117,7 +118,6 @@
 .payslip-period { display: flex; gap: 8px; margin-bottom: 14px; }
 .other-form { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
 @media (max-width: 1250px) { .detail__side { width: 340px; } }
-.docs-tabs { display: flex; margin: 0 0 8px; }
 .docs-row--missing { cursor: default; }
 .docs-row--missing:hover { background: transparent; }
 .docs-row--missing .docs-row__title { color: var(--text-muted); }

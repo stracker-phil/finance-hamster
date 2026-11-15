@@ -21,6 +21,7 @@ import { useStore } from "../state/store";
 import { FilesBanner } from "./FilesBanner";
 import { Header } from "./Header";
 import { YearSidebarToggle } from "../year/YearSidebarToggle";
+import { DocumentsTabs } from "../documents/DocumentsTabs";
 import { Sidebar } from "./Sidebar";
 import { titleFor } from "./titles";
 
@@ -66,7 +67,7 @@ export function Window() {
       <Sidebar years={years.map((y) => ({ year: y.year, closed: y.state === "closed" }))} />
       <main className="main">
         <div className="panel">
-          <Header route={route} title={title} trailing={route.page === "year" ? <YearSidebarToggle /> : undefined} />
+          <Header route={route} title={title} controls={route.page === "documents" ? <DocumentsTabs tab={route.tab} /> : undefined} trailing={route.page === "year" ? <YearSidebarToggle /> : undefined} />
           <FilesBanner />
           <section className="page" aria-label={title.title}>
             <PageBody route={route} />

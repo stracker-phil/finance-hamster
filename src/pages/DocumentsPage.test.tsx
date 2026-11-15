@@ -28,51 +28,30 @@ beforeEach(() => {
   mocked.otherAddPdf.mockResolvedValue(null);
 });
 
-const tabButton = (name: string) => screen.getByRole("button", { name });
-
 describe("DocumentsPage", () => {
-  describe("tabs", () => {
-    it("offers Invoices, Statements, Payslips and Other as one group with Invoices pressed first", async () => {
+  describe("which list it shows", () => {
+    it("shows the invoices by default, and carries no tabs of its own", async () => {
       renderWithQuery(<DocumentsPage />);
 
-      const group = screen.getByRole("group", { name: "Kind of document" });
-      expect(within(group).getAllByRole("button").map((b) => b.textContent)).toEqual(["Invoices", "Statements", "Payslips", "Other"]);
-      expect(tabButton("Invoices").getAttribute("aria-pressed")).toBe("true");
-      await screen.findByText("No documents");
+      expect(await screen.findByText("No documents")).toBeTruthy();
+      expect(screen.queryByRole("group", { name: "Kind of document" })).toBeNull();
     });
 
-    it("opens the tab the route asks for", async () => {
+    it("shows the list of the tab the route asks for", async () => {
       mocked.othersList.mockResolvedValue([otherGroup()]);
 
       renderWithQuery(<DocumentsPage tab="other" />);
 
       expect(await screen.findByRole("button", { name: /Demo Lease/ })).toBeTruthy();
-      expect(tabButton("Other").getAttribute("aria-pressed")).toBe("true");
-      expect(tabButton("Invoices").getAttribute("aria-pressed")).toBe("false");
     });
 
-    it("opens the tab opened last when the route names none", async () => {
+    it("shows the list of the tab opened last when the route names none", async () => {
       useStore.setState({ documentsTab: "statements" });
       mocked.statementsList.mockResolvedValue([accountStatements()]);
 
       renderWithQuery(<DocumentsPage />);
 
       expect(await screen.findByRole("region", { name: "Private" })).toBeTruthy();
-      expect(tabButton("Statements").getAttribute("aria-pressed")).toBe("true");
-    });
-
-    it.each([
-      ["Statements", "statements"],
-      ["Payslips", "payslips"],
-      ["Other", "other"],
-      ["Invoices", "invoices"],
-    ] as const)("remembers %s and navigates to it when its tab is clicked", async (name, tab) => {
-      renderWithQuery(<DocumentsPage tab={tab === "invoices" ? "other" : "invoices"} />);
-
-      await userEvent.click(tabButton(name));
-
-      expect(useStore.getState().documentsTab).toBe(tab);
-      expect(useStore.getState().route).toEqual({ page: "documents", tab });
     });
   });
 
