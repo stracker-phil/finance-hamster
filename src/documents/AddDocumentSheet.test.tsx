@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -18,7 +18,7 @@ const preview = addPreview();
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useStore.setState({ addPreview: preview, toasts: [] });
+  useStore.setState({ addPreview: preview, addKind: "invoice", toasts: [] });
   mocked.documentEstimate.mockResolvedValue(estimate());
   mocked.documentAddCommit.mockResolvedValue("Added Demo Cloud Ltd");
 });
@@ -472,6 +472,111 @@ describe("AddDocumentSheet", () => {
 
       expect(mocked.documentAddCancel).toHaveBeenCalledWith("add-1");
       expect(mocked.payslipAddWaiting).not.toHaveBeenCalled();
+      expect(useStore.getState().addPreview).toBeNull();
+    });
+  });
+
+  describe("the kind it starts on", () => {
+    const pressed = (name: "Invoice" | "Payslip" | "Other") => screen.getByRole("button", { name }).getAttribute("aria-pressed");
+
+    beforeEach(() => {
+      mocked.payslipGuess.mockResolvedValue(null);
+      mocked.payslipsYear.mockResolvedValue(payslipsYear());
+      mocked.listTaxYears.mockResolvedValue([{ year: 2026, state: "open", ruleset: "2026 v1" }]);
+    });
+
+    it("is the invoice by default, with Invoice, Payslip and Other to choose from", () => {
+      renderSheet();
+
+      expect(within(screen.getByRole("group", { name: "Kind" })).getAllByRole("button").map((b) => b.textContent)).toEqual(["Invoice", "Payslip", "Other"]);
+      expect(pressed("Invoice")).toBe("true");
+      expect(vendor()).toBeTruthy();
+    });
+
+    it("is the payslip when the sheet was opened for one", async () => {
+      useStore.setState({ addKind: "payslip" });
+
+      renderSheet();
+
+      expect(pressed("Payslip")).toBe("true");
+      expect(screen.getByRole("button", { name: "Add Payslip" })).toBeTruthy();
+      expect(screen.queryByRole("textbox", { name: "Vendor" })).toBeNull();
+      await waitFor(() => expect(mocked.payslipGuess).toHaveBeenCalledWith("add-1"));
+    });
+
+    it("is the other document when the sheet was opened for one", () => {
+      useStore.setState({ addKind: "other" });
+
+      renderSheet();
+
+      expect(pressed("Other")).toBe("true");
+      expect(pressed("Invoice")).toBe("false");
+      expect(screen.queryByRole("textbox", { name: "Vendor" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Add Payslip" })).toBeNull();
+      expect(addButton()).toBeEnabled();
+    });
+  });
+
+  describe("Other", () => {
+    const toastMessages = () => useStore.getState().toasts.map((t) => t.message);
+
+    beforeEach(() => {
+      useStore.setState({ addKind: "other", route: { page: "today" }, back: [], forward: [] });
+      mocked.otherAddWaiting.mockResolvedValue({ id: "other-new", label: "Add invoice-demo-1109" });
+    });
+
+    it("is chosen from the invoice side with the kind buttons and swaps the invoice fields away", async () => {
+      useStore.setState({ addKind: "invoice" });
+      renderSheet();
+
+      await userEvent.click(screen.getByRole("button", { name: "Other" }));
+
+      expect(screen.getByRole("button", { name: "Other" }).getAttribute("aria-pressed")).toBe("true");
+      expect(screen.queryByRole("textbox", { name: "Vendor" })).toBeNull();
+      expect(addButton()).toBeEnabled();
+    });
+
+    it("keeps the waiting PDF as an other document, closes the sheet, says so with Undo and opens it", async () => {
+      renderSheet();
+
+      await userEvent.click(addButton());
+
+      expect(mocked.otherAddWaiting).toHaveBeenCalledWith("add-1");
+      await waitFor(() => expect(useStore.getState().addPreview).toBeNull());
+      expect(useStore.getState().route).toEqual({ page: "other", otherId: "other-new" });
+      expect(toastMessages()).toEqual(["Add invoice-demo-1109"]);
+      expect(useStore.getState().toasts[0].action?.label).toBe("Undo");
+      expect(mocked.documentAddCommit).not.toHaveBeenCalled();
+    });
+
+    it("keeps the sheet, reports an error toast and enables the button again when refused", async () => {
+      mocked.otherAddWaiting.mockRejectedValue({ kind: "invalid_input", message: "This PDF is already kept as Demo Lease", code: null });
+      renderSheet();
+
+      await userEvent.click(addButton());
+
+      await waitFor(() => expect(toastMessages()).toEqual(["This PDF is already kept as Demo Lease"]));
+      expect(useStore.getState().addPreview).toEqual(preview);
+      expect(useStore.getState().route).toEqual({ page: "today" });
+      expect(addButton()).toBeEnabled();
+    });
+
+    it("is disabled while the add runs", async () => {
+      mocked.otherAddWaiting.mockReturnValue(new Promise(() => {}));
+      renderSheet();
+
+      await userEvent.click(addButton());
+
+      expect(addButton()).toBeDisabled();
+    });
+
+    it("discards the waiting PDF by its token on Cancel", async () => {
+      renderSheet();
+
+      await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+      expect(mocked.documentAddCancel).toHaveBeenCalledWith("add-1");
+      expect(mocked.otherAddWaiting).not.toHaveBeenCalled();
       expect(useStore.getState().addPreview).toBeNull();
     });
   });

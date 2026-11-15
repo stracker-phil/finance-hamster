@@ -1,10 +1,13 @@
-import type { AddPreview, ImportPreview, PlanForm, ReviewLine, SubscriptionForm } from "../api";
+import type { AddPreview, DocumentsTab, ImportPreview, PlanForm, ReviewLine, SubscriptionForm } from "../api";
 import { create } from "zustand";
 import type { MenuAt, MenuEntry, OpenMenu } from "../components/menu/types";
 import { t } from "../i18n";
 import { HOME, sameRoute, type Route } from "./route";
 
 export type ToastKind = "success" | "info" | "error";
+
+/** What a PDF in the Add sheet becomes. */
+export type AddKind = "invoice" | "payslip" | "other";
 
 /** New starts empty or from a bank line; Edit and Change Plan start from the subscription. */
 export type SubscriptionSheet =
@@ -58,7 +61,12 @@ export interface AppStore {
   addPreview: AddPreview | null;
   /** Told the new document's label once the open Add Document sheet adds it; never on cancel. */
   addOnAdded: ((label: string) => void) | null;
-  setAddPreview: (preview: AddPreview | null, onAdded?: (label: string) => void) => void;
+  /** The kind the open Add sheet starts on. */
+  addKind: AddKind;
+  setAddPreview: (preview: AddPreview | null, onAdded?: (label: string) => void, kind?: AddKind) => void;
+  /** The tab Dokumente opened last in this session. */
+  documentsTab: DocumentsTab;
+  setDocumentsTab: (tab: DocumentsTab) => void;
   /** The open New, Edit or Change Plan sheet of a subscription. */
   subscriptionSheet: SubscriptionSheet | null;
   setSubscriptionSheet: (sheet: SubscriptionSheet | null) => void;
@@ -133,7 +141,10 @@ export const useStore = create<AppStore>((set, get) => ({
   importPreview: null,
   addPreview: null,
   addOnAdded: null,
-  setAddPreview: (addPreview, onAdded) => set({ addPreview, addOnAdded: addPreview ? (onAdded ?? null) : null }),
+  addKind: "invoice",
+  setAddPreview: (addPreview, onAdded, kind = "invoice") => set({ addPreview, addOnAdded: addPreview ? (onAdded ?? null) : null, addKind: kind }),
+  documentsTab: "invoices",
+  setDocumentsTab: (documentsTab) => set({ documentsTab }),
   subscriptionSheet: null,
   setSubscriptionSheet: (subscriptionSheet) => set({ subscriptionSheet }),
   setImportPreview: (importPreview) => set({ importPreview }),

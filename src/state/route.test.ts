@@ -13,6 +13,9 @@ describe("sameRoute", () => {
     ["another attention filter", { page: "year", year: 2026, attention: "draft" }, { page: "year", year: 2026 }],
     ["another subscription panel", { page: "subscriptions", subscriptionId: "sub-1" }, { page: "subscriptions" }],
     ["another account", { page: "account", accountId: "acc-1" }, { page: "account", accountId: "acc-2" }],
+    ["another tab of Documents", { page: "documents", tab: "payslips" }, { page: "documents", tab: "other" }],
+    ["another statement", { page: "statement", statementId: "st-1" }, { page: "statement", statementId: "st-2" }],
+    ["another statement scrolled to in an account", { page: "account", accountId: "acc-1", statementId: "st-1" }, { page: "account", accountId: "acc-1" }],
     ["another origin of a document", { page: "document", documentId: "doc-1", year: 2026 }, { page: "document", documentId: "doc-1", year: null }],
   ])("is false for %s", (_name, a, b) => {
     expect(sameRoute(a, b)).toBe(false);
@@ -49,12 +52,15 @@ describe("sidebarKey", () => {
     ["subscriptions", { page: "subscriptions", subscriptionId: "sub-1" }, "subscriptions"],
     ["statements", { page: "statements" }, "statements"],
     ["documents", { page: "documents" }, "documents"],
-    ["review under Statements", { page: "review" }, "statements"],
-    ["an account under Statements", { page: "account", accountId: "acc-1" }, "statements"],
+    ["review under Accounts", { page: "review" }, "statements"],
+    ["an account under Accounts", { page: "account", accountId: "acc-1" }, "statements"],
     ["a year", { page: "year", year: 2026 }, "year:2026"],
     ["a year's log under its year", { page: "log", year: 2025 }, "year:2025"],
     ["a year's archive under its year", { page: "archive", year: 2025 }, "year:2025"],
-    ["a payslip under its year", { page: "payslip", payslipId: "ps-1", year: 2026 }, "year:2026"],
+    ["a payslip under Documents", { page: "payslip", payslipId: "ps-1", year: 2026 }, "documents"],
+    ["a statement under Documents", { page: "statement", statementId: "st-1" }, "documents"],
+    ["an other document under Documents", { page: "other", otherId: "other-1" }, "documents"],
+    ["a tab of Documents", { page: "documents", tab: "payslips" }, "documents"],
     ["a document opened from a year under that year", { page: "document", documentId: "doc-1", year: 2026 }, "year:2026"],
     ["a document opened from Documents under Documents", { page: "document", documentId: "doc-1", year: null }, "documents"],
   ])("selects the row for %s", (_name, route, key) => {

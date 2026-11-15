@@ -56,10 +56,21 @@ impl PayslipAmount {
 #[serde(tag = "field", rename_all = "camelCase")]
 #[ts(export, export_to = "src/api/types.gen.ts")]
 pub enum PayslipEdit {
-    Amount { name: PayslipAmount, value: String },
-    TeleworkDays { value: String },
-    Note { text: String },
-    Month { month: u32 },
+    Amount {
+        name: PayslipAmount,
+        value: String,
+    },
+    TeleworkDays {
+        value: String,
+    },
+    Note {
+        text: String,
+    },
+    /// Moves the payslip to another month, also of another year.
+    Period {
+        year: i32,
+        month: u32,
+    },
 }
 
 fn month_title(year: i32, month: u32) -> String {
@@ -231,16 +242,18 @@ pub fn edit(db: &Db, id: &str, change: &PayslipEdit) -> AppResult<Option<Written
                 "Notiz im Lohnzettel {title} ändern"
             )
         }
-        PayslipEdit::Month { month } => {
+        PayslipEdit::Period { year, month } => {
             check_month(*month)?;
-            if *month != before.month && db.read(|c| month_taken(c, before.year, *month))? {
-                return Err(taken(before.year, *month));
+            let moved = (*year, *month) != (before.year, before.month);
+            if moved && db.read(|c| month_taken(c, *year, *month))? {
+                return Err(taken(*year, *month));
             }
+            after.year = *year;
             after.month = *month;
             crate::tr!(
                 "Move Payslip {title} to {}",
                 "Lohnzettel {title} auf {} verschieben",
-                month_name(*month)
+                month_title(*year, *month)
             )
         }
     };

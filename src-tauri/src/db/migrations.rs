@@ -271,6 +271,16 @@ pub const MIGRATIONS: &[&str] = &[
         created_at INTEGER NOT NULL,
         UNIQUE (year, month)
     );",
+    // 19: any other PDF the owner keeps, with a title, an optional date and a note (ADR 0056).
+    "CREATE TABLE others (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        date TEXT,
+        note TEXT NOT NULL DEFAULT '',
+        file TEXT NOT NULL,
+        file_hash TEXT NOT NULL UNIQUE,
+        created_at INTEGER NOT NULL
+    );",
 ];
 
 pub fn version(conn: &Connection) -> AppResult<usize> {
@@ -334,6 +344,7 @@ mod tests {
             "entries",
             "hidden_items",
             "journal",
+            "others",
             "payslips",
             "plans",
             "rules",
@@ -347,6 +358,52 @@ mod tests {
         ]
         .map(String::from)
         .to_vec()
+    }
+
+    #[test]
+    fn a_file_at_version_eighteen_gains_the_others_table_and_keeps_its_payslips() {
+        let dir = temp_config_dir();
+        let mut conn = Connection::open(dir.path().join("v18.sqlite")).unwrap();
+        for sql in &MIGRATIONS[..18] {
+            conn.execute_batch(sql).unwrap();
+        }
+        conn.pragma_update(None, "user_version", 18i64).unwrap();
+        conn.execute(
+            "INSERT INTO payslips (id, year, month, created_at) VALUES ('payslip-1', 2026, 7, 1)",
+            [],
+        )
+        .unwrap();
+        assert!(!tables(&conn).contains(&"others".to_string()));
+
+        migrate(&mut conn).unwrap();
+
+        assert_eq!(version(&conn).unwrap(), MIGRATIONS.len());
+        assert_eq!(tables(&conn), all_tables());
+        let payslips: i64 = conn
+            .query_row("SELECT COUNT(*) FROM payslips", [], |r| r.get(0))
+            .unwrap();
+        let others: i64 = conn
+            .query_row("SELECT COUNT(*) FROM others", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!((payslips, others), (1, 0));
+    }
+
+    #[test]
+    fn two_other_documents_cannot_share_a_file_hash() {
+        let dir = temp_config_dir();
+        let mut conn = Connection::open(dir.path().join("fresh.sqlite")).unwrap();
+        migrate(&mut conn).unwrap();
+        let insert = |id: &str| {
+            conn.execute(
+                "INSERT INTO others (id, title, file, file_hash, created_at) \
+                 VALUES (?1, 'Policy', 'docs/other/policy.pdf', 'hash-1', 1)",
+                [id],
+            )
+        };
+
+        insert("other-1").unwrap();
+
+        assert!(insert("other-2").is_err());
     }
 
     #[test]

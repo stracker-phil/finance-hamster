@@ -18,9 +18,6 @@
 .choice__amount { font-weight: 600; font-variant-numeric: tabular-nums; }
 .add-doc__gwg { margin-top: 10px; }
 .add-doc__summary { font-size: 12px; color: var(--text-muted); line-height: 1.5; margin: 8px 0 4px; }
-.doc-page { display: flex; gap: 28px; align-items: flex-start; padding: 24px 28px 40px; }
-.doc-page__file { width: 280px; flex: none; display: flex; flex-direction: column; gap: 10px; }
-.doc-page__preview { height: 380px; display: flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
 .doc-form { flex: 1; min-width: 0; max-width: 520px; }
 .doc-form__fields { margin: 0; padding: 0; border: 0; min-width: 0; }
 .doc-form__status { font-size: 12px; color: var(--text-muted); margin-bottom: 18px; }
@@ -75,14 +72,7 @@
 .history__text { display: flex; flex-direction: column; gap: 2px; color: var(--text); }
 .history__doc { font-weight: 600; text-align: left; }
 .history__when { font-size: 12px; color: var(--text-muted); }
-.doc-history { width: 300px; flex: none; align-self: stretch; padding: 0 0 0 16px; border-left: 1px solid var(--hairline); }
-.doc-history__title { margin: 0 0 14px; font-size: 14px; font-weight: 700; }
 .doc-history__note { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--hairline); font-size: 12px; color: var(--text-muted); line-height: 1.5; }
-@media (max-width: 1250px) {
-  .doc-page { flex-wrap: wrap; }
-  .doc-form { flex-basis: 340px; }
-  .doc-history { width: 100%; padding: 16px 0 0; border-left: 0; border-top: 1px solid var(--hairline); }
-}
 .doc-banner { display: flex; align-items: center; gap: 10px; margin: 16px 28px 0; padding: 10px 14px; border-radius: 10px; font-size: 13px; border: 1px solid var(--banner-info-border); background: var(--banner-info-bg); color: var(--banner-info-text); }
 .doc-banner--excluded { border-color: var(--border); background: var(--fill-subtle); color: var(--text-secondary); }
 .doc-banner .link-btn { margin-left: auto; }
@@ -102,10 +92,32 @@
 .slice__year { color: var(--text-muted); }
 .slice__amount { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text); }
 
-/* A payslip: its PDF beside the numbers typed from it. */
-.payslip-page__title { margin: 0 0 18px; font-size: 17px; font-weight: 700; }
-.payslip-page__empty { align-items: center; justify-content: center; padding: 20px; text-align: center; border-style: dashed; }
+/* The payslip form in its sidebar. */
 .payslip-form { margin: 0; padding: 0; border: 0; min-width: 0; }
 .payslip-form__grid { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 16px; row-gap: 2px; align-items: start; }
 .payslip-form__label { display: flex; flex-direction: column; gap: 2px; padding-top: 5px; font-size: 13px; }
 .add-doc__kind { margin: 14px 0 4px; }
+
+/* One detail layout for every kind of document (ADR 0056): the PDF over most of the page, a sidebar beside it. */
+.detail { position: absolute; inset: 0; display: flex; flex-direction: column; }
+.detail__body { flex: 1; min-height: 0; display: flex; }
+.detail__pdf { flex: 1; min-width: 420px; display: flex; padding: 16px 0 16px 20px; }
+.detail__pdf .pdf-preview { border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.detail__empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; border: 1px dashed var(--border-strong); border-radius: 6px; text-align: center; }
+.detail__side { width: 360px; flex: none; overflow-y: auto; padding: 18px 22px 28px; border-left: 1px solid var(--hairline); }
+.detail__side .doc-form { max-width: none; }
+.detail__title { margin: 0 0 14px; font-size: 16px; font-weight: 700; }
+.detail__actions { display: flex; gap: 16px; margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--hairline); font-size: 13px; }
+.detail__history { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--hairline); font-size: 13px; }
+.detail__history summary { margin-bottom: 10px; font-weight: 600; cursor: default; }
+.detail__facts { margin: 0 0 16px; }
+.detail__fact { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--row-hairline); font-size: 13px; }
+.detail__fact dt { color: var(--text-secondary); }
+.detail__fact dd { margin: 0; font-variant-numeric: tabular-nums; text-align: right; }
+.payslip-period { display: flex; gap: 8px; margin-bottom: 14px; }
+.other-form { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+@media (max-width: 1250px) { .detail__side { width: 340px; } }
+.docs-tabs { display: flex; margin: 0 0 8px; }
+.docs-row--missing { cursor: default; }
+.docs-row--missing:hover { background: transparent; }
+.docs-row--missing .docs-row__title { color: var(--text-muted); }

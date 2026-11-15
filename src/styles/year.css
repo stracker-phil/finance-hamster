@@ -65,28 +65,16 @@
 .year-hidden { margin: 18px 0 0; }
 .year-hidden__list { animation: fade-in var(--motion-base) var(--ease-out); }
 
-/* Payslip panel beside the tax year page (ADR 0055): it opens on request, so the page beside it narrows. */
-.year-layout--panel { display: flex; align-items: flex-start; }
-.year-layout--panel .year-page { flex: 1; min-width: 0; }
-.year-panel-toggle[aria-pressed="true"] { background: var(--fill-hover); color: var(--text); }
-.payslip-panel {
-  width: 280px; flex: none; position: sticky; top: 0; margin: 24px 24px 24px 0; padding: 14px 16px;
-  border-radius: 12px; background: var(--fill-subtle); font-size: 13px; animation: fade-in var(--motion-base) var(--ease-out);
+/* The tax year's sidebar (ADR 0056): a full-height column beside the page, like a macOS inspector. */
+.year-layout { position: absolute; inset: 0; display: flex; }
+.year-layout__main { position: relative; flex: 1; min-width: 0; overflow-y: auto; }
+.year-inspector {
+  width: 280px; flex: none; overflow-y: auto; padding: 22px 20px; border-left: 1px solid var(--hairline);
+  background: var(--fill-subtle); font-size: 13px; animation: fade-in var(--motion-base) var(--ease-out);
 }
-.payslip-panel__title { margin: 0 0 8px; font-size: 13px; font-weight: 600; }
-.payslip-panel__months { display: flex; flex-direction: column; }
-.payslip-month {
-  width: calc(100% + 12px); box-sizing: border-box;
-  display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 0 6px; margin: 0 -6px; border: 0; border-radius: 6px;
-  background: transparent; font: inherit; color: var(--text); text-align: left;
-}
-button.payslip-month:hover { background: var(--fill-hover); }
-.payslip-month__name { flex: 1; min-width: 0; }
-.payslip-month--missing .payslip-month__name { color: var(--text-muted); }
-.payslip-month__amount { font-variant-numeric: tabular-nums; }
-.payslip-month__icon { flex: none; color: var(--text-muted); }
-.payslip-month__actions { display: flex; gap: 10px; font-size: 12px; }
-.payslip-panel__totals { margin: 12px 0 0; padding-top: 10px; border-top: 1px solid var(--row-hairline); }
-.payslip-total { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; }
+.year-inspector__title { margin: 0 0 12px; font-size: 13px; font-weight: 600; }
+.year-inspector__totals { margin: 0 0 12px; }
+.payslip-total { display: flex; justify-content: space-between; gap: 10px; padding: 5px 0; border-bottom: 1px solid var(--row-hairline); }
 .payslip-total dt { color: var(--text-secondary); }
-.payslip-total dd { margin: 0; font-variant-numeric: tabular-nums; text-align: right; }
+.payslip-total dd { margin: 0; flex: none; white-space: nowrap; font-variant-numeric: tabular-nums; text-align: right; }
+.payslip-month__actions { display: flex; gap: 10px; font-size: 12px; }

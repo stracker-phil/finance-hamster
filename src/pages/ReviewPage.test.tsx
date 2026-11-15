@@ -857,10 +857,10 @@ describe("ReviewPage", () => {
       expect(await screen.findByText("1 decided · 0 new rules")).toBeTruthy();
     });
 
-    it("goes back to Statements", async () => {
+    it("goes back to Accounts", async () => {
       render();
 
-      await userEvent.click(await screen.findByRole("button", { name: "Back to Statements" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Back to Accounts" }));
 
       expect(useStore.getState().route).toEqual({ page: "statements" });
     });

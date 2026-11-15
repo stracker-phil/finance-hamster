@@ -1,18 +1,22 @@
 import { useEffect } from "react";
 import { api, toAppError } from "../api";
-import { useStore } from "../state/store";
+import { useStore, type AddKind } from "../state/store";
 
 const showError = (e: unknown) => useStore.getState().showToast("error", toAppError(e).message);
 
-/** Asks for an invoice PDF; a new one opens the Add document sheet. */
-export function startAddDocument() {
+/** Asks for a PDF; a new one opens the Add sheet on `kind`. */
+function startAdd(kind: AddKind) {
   api
     .documentAddChoose()
     .then((preview) => {
-      if (preview) useStore.getState().setAddPreview(preview);
+      if (preview) useStore.getState().setAddPreview(preview, undefined, kind);
     })
     .catch(showError);
 }
+
+export const startAddDocument = () => startAdd("invoice");
+export const startAddPayslip = () => startAdd("payslip");
+export const startAddOther = () => startAdd("other");
 
 /** Asks for the invoice of one bank line; the sheet starts on that line instead of its own best guess. */
 export async function attachInvoiceTo(lineId: string) {

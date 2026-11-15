@@ -1,82 +1,56 @@
-import { FileText, Search } from "lucide-react";
-import type { DocState } from "../api";
+import { Search } from "lucide-react";
+import type { DocumentsTab } from "../api";
 import { startAddDocument } from "../documents/addFlow";
-import { useDocuments } from "../queries/documents";
+import { InvoiceList } from "../documents/lists/InvoiceList";
+import { OtherList } from "../documents/lists/OtherList";
+import { PayslipList } from "../documents/lists/PayslipList";
+import { StatementList } from "../documents/lists/StatementList";
+import { addOtherPdf } from "../payslips/flow";
+import { Segmented } from "../settings/controls";
+import { startImport } from "../statements/importFlow";
 import { useStore } from "../state/store";
 import { EmptyPage } from "./EmptyPage";
 import { useT } from "../i18n";
 
-const STATE_PILL: Record<DocState, string> = {
-  draft: "pill pill--dashed",
-  finished: "pill pill--blue",
-  excluded: "pill",
-};
+const TABS: DocumentsTab[] = ["invoices", "statements", "payslips", "other"];
 
-/** Documents: "Is it already here?", then every document by tax year, the undated ones in the Inbox. The big field
- *  and the header's filter are one search. */
-export function DocumentsPage() {
+/** Dokumente (ADR 0056): every PDF Hamster keeps, one tab per kind. "Is it already here?" filters the open tab and
+ *  is the same search as the header's filter. */
+export function DocumentsPage({ tab: asked }: { tab?: DocumentsTab }) {
   const query = useStore((s) => s.filter);
   const setQuery = useStore((s) => s.setFilter);
-  const { data: groups } = useDocuments(query);
-  const navigate = useStore((s) => s.navigate);
+  const remembered = useStore((s) => s.documentsTab);
+  const tab = asked ?? remembered;
   const text = useT().pages.documents;
+  const choose = (next: DocumentsTab) => {
+    useStore.getState().setDocumentsTab(next);
+    useStore.getState().navigate({ page: "documents", tab: next });
+  };
+  const noMatch = <p className="docs-page__none">{text.noMatch(query.trim())}</p>;
+  const empty = (title: string, body: string, action: string, run: () => void) =>
+    query.trim() ? (
+      noMatch
+    ) : (
+      <EmptyPage title={title} text={body}>
+        <button className="btn btn--primary" onClick={run}>
+          {action}
+        </button>
+      </EmptyPage>
+    );
   return (
     <div className="page-scroll">
       <div className="docs-page">
         <label className="big-search">
           <Search size={17} />
-          <input placeholder={text.searchPlaceholder} aria-label={text.searchLabel} value={query} onChange={(e) => setQuery(e.target.value)} />
+          <input placeholder={tab === "invoices" ? text.searchPlaceholder : text.searchOther} aria-label={text.searchLabel} value={query} onChange={(e) => setQuery(e.target.value)} />
         </label>
-        {groups?.length === 0 &&
-          (query.trim() ? (
-            <p className="docs-page__none">{text.noMatch(query.trim())}</p>
-          ) : (
-            <EmptyPage title={text.emptyTitle} text={text.emptyText}>
-              <button className="btn btn--primary" onClick={startAddDocument}>
-                {text.chooseFile}
-              </button>
-            </EmptyPage>
-          ))}
-        {groups?.map((group) => (
-          <section key={group.title} className="docs-group" aria-label={group.title}>
-            <div className="docs-group__head">
-              {group.year ? (
-                <button className="link-btn docs-group__title" onClick={() => group.year && navigate({ page: "year", year: group.year })}>
-                  {group.title}
-                </button>
-              ) : (
-                <span className="docs-group__title">{group.title}</span>
-              )}
-              <span className="add-doc__hint">{group.count}</span>
-              {group.year && (
-                <>
-                  <button className="link-btn docs-group__link" onClick={() => group.year && navigate({ page: "log", year: group.year })}>
-                    {text.log}
-                  </button>
-                  <button className="link-btn docs-group__link" onClick={() => group.year && navigate({ page: "archive", year: group.year })}>
-                    {text.archive}
-                  </button>
-                </>
-              )}
-              {group.total && (
-                <span className="docs-group__total" title={text.totalTip}>
-                  {group.total}
-                </span>
-              )}
-            </div>
-            {group.documents.map((doc) => (
-              <button key={doc.id} className="docs-row" onClick={() => navigate({ page: "document", documentId: doc.id, year: null })}>
-                <FileText size={17} strokeWidth={1.8} className="docs-row__icon" />
-                <span className="docs-row__text">
-                  <span className="docs-row__title">{doc.title}</span>
-                  <span className="add-doc__hint">{doc.sub}</span>
-                </span>
-                <span className={STATE_PILL[doc.state]}>{text[doc.state]}</span>
-                <span className="docs-row__anv">{doc.anv}</span>
-              </button>
-            ))}
-          </section>
-        ))}
+        <div className="docs-tabs">
+          <Segmented label={text.tabs} options={TABS.map((t) => ({ value: t, label: text[t] }))} value={tab} onChange={choose} />
+        </div>
+        {tab === "invoices" && <InvoiceList query={query} empty={empty(text.emptyTitle, text.emptyText, text.chooseFile, startAddDocument)} />}
+        {tab === "statements" && <StatementList query={query} empty={empty(text.statements, text.emptyStatements, text.importStatement, startImport)} />}
+        {tab === "payslips" && <PayslipList />}
+        {tab === "other" && <OtherList query={query} empty={empty(text.other, text.emptyOther, text.addOther, addOtherPdf)} />}
       </div>
     </div>
   );

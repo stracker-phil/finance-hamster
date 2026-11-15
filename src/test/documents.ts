@@ -1,4 +1,4 @@
-import type { AddPreview, ArchivedDocument, DeletionView, DepreciationView, DocumentGroup, HistoryEntry, DocumentRowView, DocumentView, Estimate, LineChoice, VendorView, VendorsView } from "../api";
+import type { AccountStatements, AddPreview, ArchivedDocument, DeletionView, DepreciationView, DocumentGroup, HistoryEntry, DocumentRowView, DocumentView, Estimate, LineChoice, OtherGroup, OtherListRow, OtherView, StatementFact, StatementListRow, StatementView, VendorView, VendorsView } from "../api";
 
 /** A demo draft document with a payment date, one linked bank line and an estimate, with `patch` applied. */
 export function documentView(patch: Partial<DocumentView> = {}): DocumentView {
@@ -60,6 +60,47 @@ export function documentRow(patch: Partial<DocumentRowView> = {}): DocumentRowVi
 /** A demo group of the Documents list (Tax year 2026), with `patch` applied. */
 export function documentGroup(patch: Partial<DocumentGroup> = {}): DocumentGroup {
   return { title: "Tax year 2026", year: 2026, count: "1 document", total: "€121.23", documents: [documentRow()], ...patch };
+}
+
+/** A demo row of the Statements tab, with `patch` applied. */
+export function statementListRow(patch: Partial<StatementListRow> = {}): StatementListRow {
+  return { id: "st-10", title: "Nr. 010/2026", period: "1 Nov 2026 – 10 Nov 2026", closing: "€1,675.86", lines: "42 lines", ...patch };
+}
+
+/** A demo account of the Statements tab with one statement, with `patch` applied. */
+export function accountStatements(patch: Partial<AccountStatements> = {}): AccountStatements {
+  return { accountId: "acc-1", name: "Private", statements: [statementListRow()], ...patch };
+}
+
+/** A demo fact of a statement, with `patch` applied. */
+export function statementFact(patch: Partial<StatementFact> = {}): StatementFact {
+  return { label: "Closing balance", value: "€1,675.86", ...patch };
+}
+
+/** A demo statement of the Private account with its facts, with `patch` applied. */
+export function statementView(patch: Partial<StatementView> = {}): StatementView {
+  return {
+    id: "st-10",
+    accountId: "acc-1",
+    title: "Private · Nr. 010/2026",
+    facts: [statementFact({ label: "Account", value: "Private" }), statementFact({ label: "Period", value: "1 Nov 2026 – 10 Nov 2026" }), statementFact()],
+    ...patch,
+  };
+}
+
+/** A demo row of the Other tab, with `patch` applied. */
+export function otherListRow(patch: Partial<OtherListRow> = {}): OtherListRow {
+  return { id: "other-1", title: "Demo Lease", date: "10 Nov 2026", ...patch };
+}
+
+/** A demo group of the Other tab (2026), with `patch` applied. */
+export function otherGroup(patch: Partial<OtherGroup> = {}): OtherGroup {
+  return { title: "2026", year: 2026, documents: [otherListRow()], ...patch };
+}
+
+/** A demo other document with a date and a note, with `patch` applied. */
+export function otherView(patch: Partial<OtherView> = {}): OtherView {
+  return { id: "other-1", title: "Demo Lease", date: "2026-11-10", note: "Signed copy", ...patch };
 }
 
 /** A demo vendor of Settings → Vendors, with `patch` applied. */

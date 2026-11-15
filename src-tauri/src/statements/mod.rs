@@ -2,6 +2,7 @@
 
 pub mod check;
 pub mod commands;
+pub mod documents;
 pub mod import;
 pub mod lines;
 pub mod parse;
@@ -10,6 +11,8 @@ pub mod view;
 
 #[cfg(test)]
 mod check_tests;
+#[cfg(test)]
+mod documents_tests;
 #[cfg(test)]
 pub(crate) mod import_tests;
 #[cfg(test)]

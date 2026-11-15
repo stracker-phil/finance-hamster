@@ -22,14 +22,14 @@ beforeEach(() => {
 });
 
 describe("Sidebar", () => {
-  it("badges Statements with the lines to review summed over all accounts", async () => {
+  it("badges Accounts with the lines to review summed over all accounts", async () => {
     mocked.statementsCoverage.mockResolvedValue(coverage({ accounts: [accountCoverage({ toReview: 3 }), accountCoverage({ id: "acc-2", toReview: 4 })] }));
 
     render(<Sidebar years={[]} />);
 
     const badge = await screen.findByLabelText("7 to review");
     expect(badge.textContent).toBe("7");
-    expect(screen.getByRole("button", { name: /Statements/ }).contains(badge)).toBe(true);
+    expect(screen.getByRole("button", { name: /Accounts/ }).contains(badge)).toBe(true);
   });
 
   it("counts the lines to review regardless of the header filter", async () => {
@@ -37,7 +37,7 @@ describe("Sidebar", () => {
 
     render(<Sidebar years={[]} />);
 
-    await screen.findByRole("button", { name: "Statements" });
+    await screen.findByRole("button", { name: "Accounts" });
     expect(mocked.statementsCoverage).toHaveBeenCalledWith("");
     expect(mocked.statementsCoverage).not.toHaveBeenCalledWith("market");
   });
@@ -45,7 +45,7 @@ describe("Sidebar", () => {
   it("shows no badge when no line waits for review", async () => {
     render(<Sidebar years={[]} />);
 
-    await screen.findByRole("button", { name: "Statements" });
+    await screen.findByRole("button", { name: "Accounts" });
     expect(screen.queryByLabelText(/to review/)).toBeNull();
   });
 
@@ -64,11 +64,11 @@ describe("Sidebar", () => {
   describe("in German", () => {
     beforeEach(() => setLanguage("de"));
 
-    it.each(["Heute", "Abos", "Kontoauszüge", "Belege"])("names the %s page in German", async (name) => {
+    it.each(["Heute", "Abos", "Konten", "Dokumente"])("names the %s page in German", async (name) => {
       render(<Sidebar years={[]} />);
 
       expect(await screen.findByRole("button", { name })).toBeTruthy();
-      expect(screen.queryByRole("button", { name: "Statements" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Accounts" })).toBeNull();
     });
 
     it("writes the badge, the tax years and the drop zone in German", async () => {
@@ -78,7 +78,8 @@ describe("Sidebar", () => {
 
       expect(await screen.findByLabelText("3 zu prüfen")).toBeTruthy();
       expect(screen.getByRole("button", { name: /Steuerjahr 2026/ })).toBeTruthy();
-      expect(screen.getByText("Rechnungs-PDF hier ablegen")).toBeTruthy();
+      expect(screen.getByText("PDF hier ablegen")).toBeTruthy();
+      expect(screen.getByText("Kontoauszüge erkennt Hamster; sonst fragt es, was es ist")).toBeTruthy();
       expect(screen.getByRole("button", { name: "Datei auswählen …" })).toBeTruthy();
     });
   });

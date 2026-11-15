@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { api, toAppError } from "../api";
 import { isTypingTarget } from "./pageKeys";
 import { FILTER_FIELD_ID } from "../shell/Header";
-import { startAddDocument } from "../documents/addFlow";
+import { startAddDocument, startAddOther, startAddPayslip } from "../documents/addFlow";
 import { startImport } from "../statements/importFlow";
 import { newSubscription } from "../subscriptions/flow";
 import { togglePayslipPanel } from "../payslips/flow";
@@ -45,6 +45,8 @@ const HANDLERS: Record<string, Handler> = {
   "palette:open": () => useStore.getState().setPaletteOpen(true),
   "statement:import": startImport,
   "document:add": startAddDocument,
+  "payslip:add": startAddPayslip,
+  "other:add": startAddOther,
   "subscription:new": newSubscription,
   "filter:focus": () => document.getElementById(FILTER_FIELD_ID)?.focus(),
   "view:payslips": togglePayslipPanel,

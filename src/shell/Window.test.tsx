@@ -6,11 +6,12 @@ vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await impo
 
 import { api } from "../api";
 import { useEvents } from "../queries/useEvents";
-import { HOME } from "../state/route";
+import { HOME, type Route } from "../state/route";
 import { useStore } from "../state/store";
 import { account } from "../test/accounts";
 import { renderWithQuery as render } from "../test/renderWithQuery";
-import { addPreview, documentView } from "../test/documents";
+import { addPreview, documentView, otherView, statementView } from "../test/documents";
+import { settings } from "../test/settings";
 import { accountLines, importPreview } from "../test/statements";
 import { Window } from "./Window";
 
@@ -30,15 +31,15 @@ const row = (name: string) => screen.getByRole("button", { name });
 const title = () => screen.getByRole("heading", { level: 1 }).textContent;
 
 describe("sidebar", () => {
-  it("lists Today, Subscriptions, Statements and Documents with Today current", () => {
+  it("lists Today, Subscriptions, Accounts and Documents with Today current", () => {
     render(<Window />);
 
-    for (const name of ["Today", "Subscriptions", "Statements", "Documents"]) expect(row(name)).toBeTruthy();
+    for (const name of ["Today", "Subscriptions", "Accounts", "Documents"]) expect(row(name)).toBeTruthy();
     expect(row("Today").getAttribute("aria-current")).toBe("page");
     expect(row("Documents").getAttribute("aria-current")).toBeNull();
   });
 
-  it.each(["Subscriptions", "Statements", "Documents"])("marks %s current and shows it as the header title when clicked", async (name) => {
+  it.each(["Subscriptions", "Accounts", "Documents"])("marks %s current and shows it as the header title when clicked", async (name) => {
     render(<Window />);
 
     await userEvent.click(row(name));
@@ -48,30 +49,44 @@ describe("sidebar", () => {
     expect(title()).toBe(name);
   });
 
-  it("keeps Statements current on a page nested under it", () => {
+  it("keeps Accounts current on a page nested under it", () => {
     useStore.setState({ route: { page: "review" } });
 
     render(<Window />);
 
     expect(title()).toBe("Review");
-    expect(row("Statements").getAttribute("aria-current")).toBe("page");
+    expect(row("Accounts").getAttribute("aria-current")).toBe("page");
   });
 
-  it("shows the invoice dropzone and switches its text while files are dragged over", () => {
-    render(<Window />);
-    const zone = screen.getByText("Drop an invoice PDF");
+  it.each<[string, Route]>([
+    ["a statement", { page: "statement", statementId: "st-1" }],
+    ["an other document", { page: "other", otherId: "other-1" }],
+    ["a payslip", { page: "payslip", payslipId: "ps-7", year: 2026 }],
+  ])("keeps Documents current on the page of %s", (_name, route) => {
+    useStore.setState({ route });
 
+    render(<Window />);
+
+    expect(row("Documents").getAttribute("aria-current")).toBe("page");
+    expect(row("Accounts").getAttribute("aria-current")).toBeNull();
+  });
+
+  it("shows the PDF dropzone and switches its text while files are dragged over", () => {
+    render(<Window />);
+    const zone = screen.getByText("Drop a PDF");
+
+    expect(screen.getByText("Statements are recognized; for anything else Hamster asks what it is")).toBeTruthy();
     fireEvent.dragOver(zone, { dataTransfer: { types: ["Files"] } });
     expect(screen.getByText("Release to add")).toBeTruthy();
 
     fireEvent.dragLeave(screen.getByText("Release to add"));
-    expect(screen.getByText("Drop an invoice PDF")).toBeTruthy();
+    expect(screen.getByText("Drop a PDF")).toBeTruthy();
   });
 
   it("ignores a drag that carries no files", () => {
     render(<Window />);
 
-    fireEvent.dragOver(screen.getByText("Drop an invoice PDF"), { dataTransfer: { types: ["text/plain"] } });
+    fireEvent.dragOver(screen.getByText("Drop a PDF"), { dataTransfer: { types: ["text/plain"] } });
 
     expect(screen.queryByText("Release to add")).toBeNull();
   });
@@ -265,11 +280,11 @@ describe("account page", () => {
     mocked.accountLines.mockResolvedValue(accountLines({ id: "acc-2", name: "Savings" }));
   });
 
-  it("titles the header with the account's name and offers the crumb back to Statements", async () => {
+  it("titles the header with the account's name and offers the crumb back to Accounts", async () => {
     render(<Window />);
 
     await waitFor(() => expect(title()).toBe("Savings"));
-    expect(screen.getByRole("button", { name: "Back to Statements" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Back to Accounts" })).toBeTruthy();
   });
 
   it("shows the account's statements", async () => {
@@ -296,6 +311,35 @@ describe("document page", () => {
     render(<Window />);
 
     expect(await screen.findByText("Every required fact is set")).toBeTruthy();
+  });
+});
+
+describe("statement and other document pages", () => {
+  it("titles the header with the loaded statement's title and a crumb back to the Statements tab", async () => {
+    useStore.setState({ route: { page: "statement", statementId: "st-10" } });
+    mocked.statementView.mockResolvedValue(statementView());
+
+    render(<Window />);
+
+    await waitFor(() => expect(title()).toBe("Private · Nr. 010/2026"));
+    expect(screen.getByRole("button", { name: "Back to Documents" })).toBeTruthy();
+  });
+
+  it("titles the header with the loaded other document's title", async () => {
+    useStore.setState({ route: { page: "other", otherId: "other-1" } });
+    mocked.otherView.mockResolvedValue(otherView());
+
+    render(<Window />);
+
+    await waitFor(() => expect(title()).toBe("Demo Lease"));
+  });
+
+  it("titles the header with the generic name until the page loads", () => {
+    useStore.setState({ route: { page: "statement", statementId: "st-10" } });
+
+    render(<Window />);
+
+    expect(title()).toBe("Statement");
   });
 });
 
@@ -400,6 +444,57 @@ describe("back and forward", () => {
   });
 });
 
+describe("year sidebar toggle", () => {
+  const toggle = () => screen.getByRole("button", { name: "Show or hide payslips" });
+
+  beforeEach(() => {
+    mocked.listTaxYears.mockResolvedValue([{ year: 2026, state: "open", ruleset: "2026 v1" }]);
+    mocked.updateSettings.mockResolvedValue(settings());
+  });
+
+  it("is in the header on the tax year page, pressed while the sidebar is shown", async () => {
+    useStore.setState({ route: { page: "year", year: 2026 } });
+    mocked.getSettings.mockResolvedValue(settings({ payslipPanel: true }));
+
+    render(<Window />);
+
+    await waitFor(() => expect(toggle().getAttribute("aria-pressed")).toBe("true"));
+  });
+
+  it("is not pressed while the sidebar is hidden", async () => {
+    useStore.setState({ route: { page: "year", year: 2026 } });
+    mocked.getSettings.mockResolvedValue(settings({ payslipPanel: false }));
+
+    render(<Window />);
+
+    await waitFor(() => expect(mocked.getSettings).toHaveBeenCalled());
+    expect(toggle().getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("saves the opposite setting when clicked", async () => {
+    useStore.setState({ route: { page: "year", year: 2026 } });
+    mocked.getSettings.mockResolvedValue(settings({ payslipPanel: false }));
+    render(<Window />);
+
+    await userEvent.click(toggle());
+
+    await waitFor(() => expect(mocked.updateSettings).toHaveBeenCalledWith({ payslipPanel: true }));
+  });
+
+  it.each<[string, Route]>([
+    ["Today", { page: "today" }],
+    ["Documents", { page: "documents" }],
+    ["a payslip", { page: "payslip", payslipId: "ps-7", year: 2026 }],
+  ])("is not offered on %s", async (_name, route) => {
+    useStore.setState({ route });
+
+    render(<Window />);
+
+    await screen.findByRole("complementary", { name: "Sidebar" });
+    expect(screen.queryByRole("button", { name: "Show or hide payslips" })).toBeNull();
+  });
+});
+
 describe("filter field", () => {
   it("searches everywhere with ⌘K on Today", () => {
     render(<Window />);
@@ -445,7 +540,7 @@ describe("filter field", () => {
     render(<Window />);
     await userEvent.type(screen.getByPlaceholderText("Search everywhere"), "rent");
 
-    await userEvent.click(row("Statements"));
+    await userEvent.click(row("Accounts"));
 
     expect(screen.getByPlaceholderText<HTMLInputElement>("Filter accounts").value).toBe("");
   });
@@ -461,6 +556,8 @@ describe("New menu", () => {
     mocked.listCommands.mockResolvedValue([
       { id: "statement:import", title: "Import Statement…", shortcut: "⌘I", custom: false },
       { id: "document:add", title: "Add Invoice PDF…", shortcut: "⌥⌘O", custom: true },
+      { id: "payslip:add", title: "Add Payslip…", shortcut: null, custom: false },
+      { id: "other:add", title: "Add Other Document…", shortcut: null, custom: false },
       { id: "subscription:new", title: "New Subscription", shortcut: null, custom: false },
     ]);
   });
@@ -472,7 +569,7 @@ describe("New menu", () => {
 
     const menu = screen.getByRole("menu", { name: "New" });
     const items = within(menu).getAllByRole("menuitem").map((i) => i.textContent);
-    expect(items).toEqual(["Import Statement…⌘I", "Add Invoice PDF…⌥⌘O", "New Subscription"]);
+    expect(items).toEqual(["Import Statement…⌘I", "Add Invoice…⌥⌘O", "Add Payslip…", "Add Other Document…", "New Subscription"]);
   });
 
   it("covers the PDF preview while open and uncovers it once closed", async () => {
@@ -501,19 +598,24 @@ describe("New menu", () => {
     expect(useStore.getState().importPreview).toEqual(preview);
   });
 
-  it("starts adding an invoice when Add Invoice PDF… is chosen, and closes the menu", async () => {
+  it.each([
+    ["Add Invoice…", "invoice"],
+    ["Add Payslip…", "payslip"],
+    ["Add Other Document…", "other"],
+  ])("starts adding a PDF on the %s kind when it is chosen, and closes the menu", async (name, kind) => {
     const preview = addPreview();
     mocked.documentAddChoose.mockResolvedValue(preview);
     render(<Window />);
     await openMenu();
 
-    const item = screen.getByRole("menuitem", { name: /Add Invoice PDF…/ });
+    const item = screen.getByRole("menuitem", { name: new RegExp(name) });
     expect(item).toBeEnabled();
     await userEvent.click(item);
 
     expect(screen.queryByRole("menu")).toBeNull();
     expect(await screen.findByRole("dialog", { name: "Add document" })).toBeTruthy();
     expect(useStore.getState().addPreview).toEqual(preview);
+    expect(useStore.getState().addKind).toBe(kind);
   });
 
   it("opens the New Subscription sheet when New Subscription is chosen, and closes the menu", async () => {

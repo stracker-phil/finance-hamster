@@ -13,7 +13,7 @@ const mocked = vi.mocked(api, true);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useStore.setState({ route: HOME, back: [], forward: [], toasts: [], addPreview: null });
+  useStore.setState({ route: HOME, back: [], forward: [], toasts: [], addPreview: null, addKind: "invoice" });
   mocked.updateSettings.mockResolvedValue(settings());
 });
 
@@ -31,6 +31,40 @@ describe("runPageCommand", () => {
     runPageCommand("document:add");
 
     await vi.waitFor(() => expect(useStore.getState().addPreview).toEqual(preview));
+  });
+
+  it("opens the Add document sheet on the invoice kind for document:add", async () => {
+    const preview = addPreview();
+    mocked.documentAddChoose.mockResolvedValue(preview);
+    useStore.setState({ addKind: "other" });
+
+    runPageCommand("document:add");
+
+    await vi.waitFor(() => expect(useStore.getState().addPreview).toEqual(preview));
+    expect(useStore.getState().addKind).toBe("invoice");
+  });
+
+  it.each([
+    ["payslip:add", "payslip"],
+    ["other:add", "other"],
+  ] as const)("opens the Add document sheet on the %s kind for the PDF the owner chose", async (id, kind) => {
+    const preview = addPreview();
+    mocked.documentAddChoose.mockResolvedValue(preview);
+
+    runPageCommand(id);
+
+    await vi.waitFor(() => expect(useStore.getState().addPreview).toEqual(preview));
+    expect(useStore.getState().addKind).toBe(kind);
+  });
+
+  it.each(["payslip:add", "other:add"])("opens no sheet for %s when the file dialog is cancelled", async (id) => {
+    mocked.documentAddChoose.mockResolvedValue(null);
+
+    runPageCommand(id);
+
+    await vi.waitFor(() => expect(mocked.documentAddChoose).toHaveBeenCalled());
+    await Promise.resolve();
+    expect(useStore.getState().addPreview).toBeNull();
   });
 
   describe("view:payslips", () => {

@@ -6,13 +6,13 @@ vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await impo
 import { api, type AddReady } from "../api";
 import { useStore } from "../state/store";
 import { addPreview, lineChoice } from "../test/documents";
-import { attachInvoiceTo, startAddDocument, useDroppedDocuments } from "./addFlow";
+import { attachInvoiceTo, startAddDocument, startAddOther, startAddPayslip, useDroppedDocuments } from "./addFlow";
 
 const mocked = vi.mocked(api, true);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useStore.setState({ addPreview: null, toasts: [] });
+  useStore.setState({ addPreview: null, addKind: "invoice", toasts: [] });
   mocked.listen.mockResolvedValue(() => {});
 });
 
@@ -24,6 +24,7 @@ describe("startAddDocument", () => {
     startAddDocument();
 
     await waitFor(() => expect(useStore.getState().addPreview).toEqual(preview));
+    expect(useStore.getState().addKind).toBe("invoice");
   });
 
   it("does nothing when the file dialog is cancelled", async () => {
@@ -44,6 +45,40 @@ describe("startAddDocument", () => {
 
     await waitFor(() => expect(useStore.getState().toasts.map((t) => [t.kind, t.message])).toEqual([["error", "Not a text PDF"]]));
     expect(useStore.getState().addPreview).toBeNull();
+  });
+});
+
+describe.each([
+  ["startAddPayslip", startAddPayslip, "payslip"],
+  ["startAddOther", startAddOther, "other"],
+] as const)("%s", (_name, start, kind) => {
+  it(`opens the Add document sheet on the ${kind} kind with the PDF the owner chose`, async () => {
+    const preview = addPreview();
+    mocked.documentAddChoose.mockResolvedValue(preview);
+
+    start();
+
+    await waitFor(() => expect(useStore.getState().addPreview).toEqual(preview));
+    expect(useStore.getState().addKind).toBe(kind);
+  });
+
+  it("does nothing when the file dialog is cancelled", async () => {
+    mocked.documentAddChoose.mockResolvedValue(null);
+
+    start();
+
+    await waitFor(() => expect(mocked.documentAddChoose).toHaveBeenCalled());
+    await Promise.resolve();
+    expect(useStore.getState().addPreview).toBeNull();
+    expect(useStore.getState().toasts).toEqual([]);
+  });
+
+  it("shows an error toast when the PDF cannot be read", async () => {
+    mocked.documentAddChoose.mockRejectedValue({ kind: "invalid_input", message: "Not a text PDF", code: null });
+
+    start();
+
+    await waitFor(() => expect(useStore.getState().toasts.map((t) => [t.kind, t.message])).toEqual([["error", "Not a text PDF"]]));
   });
 });
 

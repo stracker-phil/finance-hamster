@@ -65,3 +65,4 @@ Why Hamster is built the way it is. One record per decision, in Nygard format, a
 | [0053](0053-hide-unused-categories-per-year.md) | Hide unused categories per year; FinanzOnline lists every Kennzahl | Accepted (2026-11-15) |
 | [0054](0054-import-a-rules-file-for-any-year.md) | Import a rules file for any year | Accepted (2026-11-15) |
 | [0055](0055-payslips-as-their-own-record.md) | Payslips as their own record; home office days from the latest one | Accepted (2026-11-15) |
+| [0056](0056-dokumente-holds-every-pdf.md) | Dokumente holds every PDF; one detail layout; a real tax-year sidebar | Accepted (2026-11-15) |

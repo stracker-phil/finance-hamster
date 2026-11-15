@@ -104,6 +104,33 @@ pub fn statement_import_cancel(state: State<'_, AppState>, token: String) {
     state.imports.take(&token);
 }
 
+/// Dokumente → Kontoauszüge: every imported statement by account.
+#[tauri::command]
+pub fn statements_list(
+    state: State<'_, AppState>,
+    query: String,
+) -> AppResult<Vec<super::documents::AccountStatements>> {
+    super::documents::list(
+        &state.db,
+        &query,
+        state.settings.get().number_format,
+        DateOrder::system(),
+    )
+}
+
+#[tauri::command]
+pub fn statement_view(
+    state: State<'_, AppState>,
+    id: String,
+) -> AppResult<super::documents::StatementView> {
+    super::documents::view(
+        &state.db,
+        &id,
+        state.settings.get().number_format,
+        DateOrder::system(),
+    )
+}
+
 #[tauri::command]
 pub fn statements_coverage(state: State<'_, AppState>, query: String) -> AppResult<Coverage> {
     view::coverage(

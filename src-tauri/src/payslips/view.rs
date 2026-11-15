@@ -4,7 +4,7 @@ use serde::Serialize;
 use ts_rs::TS;
 
 use super::edit::PayslipAmount;
-use super::{PayslipRow, payslip, payslips, telework_days};
+use super::{PAYSLIPS, PayslipRow, payslip, payslips, telework_days};
 use crate::date::month_name;
 use crate::db::Db;
 use crate::error::{AppError, AppResult};
@@ -46,6 +46,8 @@ pub struct PayslipsYear {
     pub totals: Vec<PayslipTotal>,
     /// `122 days · as of July`; None while no payslip prints them.
     pub telework: Option<String>,
+    /// `10 of 12 payslips`.
+    pub count: String,
 }
 
 /// One amount field of the payslip form.
@@ -75,6 +77,8 @@ pub struct PayslipView {
     pub amounts: Vec<PayslipField>,
     pub telework_days: String,
     pub note: String,
+    /// January to December, for the month picker.
+    pub month_names: Vec<String>,
 }
 
 const AMOUNTS: [PayslipAmount; 6] = [
@@ -163,13 +167,36 @@ pub fn year_view(db: &Db, year: i32, format: NumberFormat) -> AppResult<Payslips
             month_name(month)
         )
     });
+    let filled = rows.len();
     Ok(PayslipsYear {
         year,
         open: is_open(db, year)?,
         months,
         totals,
         telework,
+        count: crate::tr!("{filled} of 12 payslips", "{filled} von 12 Lohnzetteln"),
     })
+}
+
+/// Every year with a payslip or an open tax year, newest first, for Dokumente → Lohnzettel.
+pub fn list(db: &Db, format: NumberFormat) -> AppResult<Vec<PayslipsYear>> {
+    let mut years: Vec<i32> = db.read(|c| {
+        let mut query = c.prepare(&format!("SELECT DISTINCT year FROM {PAYSLIPS}"))?;
+        let rows = query.query_map([], |r| r.get(0))?;
+        Ok(rows.collect::<Result<Vec<i32>, _>>()?)
+    })?;
+    years.extend(
+        db.read(taxyears::rows)?
+            .into_iter()
+            .filter(|r| r.state == YearState::Open)
+            .map(|r| r.year),
+    );
+    years.sort_unstable_by(|a, b| b.cmp(a));
+    years.dedup();
+    years
+        .into_iter()
+        .map(|y| year_view(db, y, format))
+        .collect()
 }
 
 pub fn payslip_view(db: &Db, id: &str, format: NumberFormat) -> AppResult<PayslipView> {
@@ -205,5 +232,6 @@ pub fn payslip_view(db: &Db, id: &str, format: NumberFormat) -> AppResult<Paysli
         amounts,
         telework_days: row.telework_days.map(|d| d.to_string()).unwrap_or_default(),
         note: row.note,
+        month_names: (1..=12).map(|m| month_name(m).to_string()).collect(),
     })
 }

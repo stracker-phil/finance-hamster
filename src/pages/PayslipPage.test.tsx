@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -7,6 +7,7 @@ vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await impo
 import { api } from "../api";
 import { useStore } from "../state/store";
 import { payslipField, payslipView } from "../test/payslips";
+import { choose, popUpOptions, popUpValue, withMenus } from "../test/popup";
 import { renderWithQuery } from "../test/renderWithQuery";
 import { PayslipPage } from "./PayslipPage";
 
@@ -14,7 +15,7 @@ const mocked = vi.mocked(api, true);
 
 const show = async (patch: Parameters<typeof payslipView>[0] = {}) => {
   mocked.payslipView.mockResolvedValue(payslipView(patch));
-  renderWithQuery(<PayslipPage payslipId="ps-7" />);
+  renderWithQuery(withMenus(<PayslipPage payslipId="ps-7" />));
   await screen.findByRole("heading", { name: "Payslip July 2026" });
 };
 
@@ -27,9 +28,75 @@ beforeEach(() => {
   mocked.payslipEdit.mockResolvedValue(null);
   mocked.payslipAttach.mockResolvedValue(null);
   mocked.payslipDelete.mockResolvedValue("Delete Payslip July 2026");
+  mocked.listTaxYears.mockResolvedValue([
+    { year: 2027, state: "open", ruleset: "2027 v1" },
+    { year: 2026, state: "open", ruleset: "2026 v1" },
+    { year: 2025, state: "closed", ruleset: "2025 v1" },
+  ]);
 });
 
 describe("PayslipPage", () => {
+  it("shows its title and form in a sidebar named after the payslip, beside the PDF", async () => {
+    await show();
+
+    const side = screen.getByRole("complementary", { name: "Payslip July 2026" });
+    expect(within(side).getByRole("heading", { name: "Payslip July 2026" })).toBeTruthy();
+    expect(within(side).getByLabelText(/^Gross pay/)).toBeTruthy();
+    await vi.waitFor(() => expect(mocked.pdfViewShow).toHaveBeenCalledWith({ kind: "payslip", id: "ps-7" }, expect.anything()));
+  });
+
+  describe("the period", () => {
+    it("shows the payslip's tax year and month", async () => {
+      await show();
+
+      expect(popUpValue("Tax year")).toBe("2026");
+      expect(popUpValue("Month")).toBe("July");
+    });
+
+    it("offers the open tax years and the twelve months by name", async () => {
+      await show();
+
+      expect(await popUpOptions(userEvent, "Tax year")).toEqual(["2027", "2026"]);
+      expect(await popUpOptions(userEvent, "Month")).toEqual(["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]);
+    });
+
+    it("moves the payslip to the month chosen, within its year, with Undo", async () => {
+      mocked.payslipEdit.mockResolvedValue("Move Payslip July 2026");
+      await show();
+
+      await choose(userEvent, "Month", "March");
+
+      expect(mocked.payslipEdit).toHaveBeenCalledWith("ps-7", { field: "period", year: 2026, month: 3 });
+      await vi.waitFor(() => expect(toastMessages()).toEqual(["Move Payslip July 2026"]));
+      expect(useStore.getState().toasts[0].action?.label).toBe("Undo");
+    });
+
+    it("moves the payslip to the year chosen, within its month", async () => {
+      await show();
+
+      await choose(userEvent, "Tax year", "2027");
+
+      expect(mocked.payslipEdit).toHaveBeenCalledWith("ps-7", { field: "period", year: 2027, month: 7 });
+    });
+
+    it("reports a refused move as an error toast", async () => {
+      mocked.payslipEdit.mockRejectedValue({ kind: "conflict", message: "August already has a payslip", code: null });
+      await show();
+
+      await choose(userEvent, "Month", "August");
+
+      await vi.waitFor(() => expect(toastMessages()).toEqual(["August already has a payslip"]));
+    });
+
+    it("keeps a closed year in the list of the payslip that is in it, and is disabled", async () => {
+      await show({ year: 2025, open: false });
+
+      expect(popUpValue("Tax year")).toBe("2025");
+      expect(screen.getByRole("button", { name: "Tax year" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Month" })).toBeDisabled();
+    });
+  });
+
   describe("the form", () => {
     it("shows the title and each amount under its label with the hint and the value", async () => {
       await show({ amounts: [payslipField({ label: "Gross pay", hint: "Line 210", value: "3.200,00" }), payslipField({ name: "tax", label: "Income tax", hint: "Line 260", value: "480,00" })] });
@@ -152,6 +219,13 @@ describe("PayslipPage", () => {
       expect(screen.queryByRole("button", { name: "Replace PDF…" })).toBeNull();
     });
 
+    it("offers no Attach PDF… for a payslip without a PDF", async () => {
+      await show({ open: false, hasPdf: false });
+
+      expect(screen.getByText("No PDF yet. The numbers count without it.")).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "Attach PDF…" })).toBeNull();
+    });
+
     it("shows no banner and enabled fields in an open year", async () => {
       await show();
 
@@ -208,13 +282,13 @@ describe("PayslipPage", () => {
   });
 
   describe("Delete Payslip", () => {
-    it("deletes the payslip, says so with Undo and goes back to its tax year", async () => {
+    it("deletes the payslip, says so with Undo and goes back to the payslips in Documents", async () => {
       await show();
 
       await userEvent.click(screen.getByRole("button", { name: "Delete Payslip" }));
 
       expect(mocked.payslipDelete).toHaveBeenCalledWith("ps-7");
-      await vi.waitFor(() => expect(useStore.getState().route).toEqual({ page: "year", year: 2026 }));
+      await vi.waitFor(() => expect(useStore.getState().route).toEqual({ page: "documents", tab: "payslips" }));
       expect(toastMessages()).toEqual(["Delete Payslip July 2026"]);
       expect(useStore.getState().toasts[0].action?.label).toBe("Undo");
     });

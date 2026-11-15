@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
 
@@ -67,6 +67,53 @@ describe("AccountPage", () => {
 
     const group = await screen.findByRole("region", { name: "Nr. 010/2026" });
     expect(within(group).getByRole("note").textContent).toBe("No statement for 11–31 Oct");
+  });
+
+  it("opens the statement's page when its label is clicked", async () => {
+    mocked.accountLines.mockResolvedValue(accountLines({ groups: [statementGroup({ id: "st-2", label: "Nr. 010/2026" }), statementGroup({ id: "st-1", label: "Nr. 009/2026" })] }));
+    render(<AccountPage accountId="acc-1" />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Nr. 009/2026" }));
+
+    expect(useStore.getState().route).toEqual({ page: "statement", statementId: "st-1" });
+  });
+
+  describe("opened from a statement", () => {
+    let scrolled: Element[];
+
+    beforeEach(() => {
+      scrolled = [];
+      Element.prototype.scrollIntoView = function (this: Element) {
+        scrolled.push(this);
+      };
+    });
+
+    afterEach(() => {
+      delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+    });
+
+    it("scrolls that statement's lines into view once they are shown", async () => {
+      mocked.accountLines.mockResolvedValue(accountLines({ groups: [statementGroup({ id: "st-2", label: "Nr. 010/2026" }), statementGroup({ id: "st-1", label: "Nr. 009/2026" })] }));
+
+      render(<AccountPage accountId="acc-1" statementId="st-1" />);
+
+      const older = await screen.findByRole("region", { name: "Nr. 009/2026" });
+      await waitFor(() => expect(scrolled).toEqual([older]));
+    });
+
+    it("scrolls nowhere when no statement was asked for", async () => {
+      render(<AccountPage accountId="acc-1" />);
+
+      await screen.findByRole("region", { name: "Nr. 010/2026" });
+      expect(scrolled).toEqual([]);
+    });
+
+    it("scrolls nowhere when the statement is not among the lines", async () => {
+      render(<AccountPage accountId="acc-1" statementId="st-gone" />);
+
+      await screen.findByRole("region", { name: "Nr. 010/2026" });
+      expect(scrolled).toEqual([]);
+    });
   });
 
   it("shows no note when nothing is missing before a statement", async () => {

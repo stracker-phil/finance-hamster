@@ -1,7 +1,7 @@
 import { getName, getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { CategoryChoice, Account, AccountEdit, AccountLines, Action, Elsewhere, YearPage, NewEntry, TodayView, RulePreview, FileCheck, StatusGroup, CloseCheck, SubscriptionsView, SubscriptionDetail, SubscriptionForm, PlanForm, MatchCount, AddInput, AddPreview, ArchivedDocument, DeletionView, DocumentEdit, DocumentGroup, DocumentStep, DocumentView, HistoryEntry, VendorChange, VendorsView, Estimate, LineChoice, Coverage, ReviewQueue, RuleForm, RulesView, Frame, ImportPreview, PdfSource, AppError, AppInfo, CommandInfo, KeyConflict, ErrorKind, EventName, EventPayloads, JsonPreview, LaunchEvent, NewAccount, PayslipAdded, PayslipEdit, PayslipView, PayslipsYear, RulesImport, RulesOverview, RulesYearView, Settings, SettingsPatch, TaxYear } from "./types";
+import type { CategoryChoice, Account, AccountEdit, AccountLines, Action, Elsewhere, YearPage, NewEntry, TodayView, RulePreview, FileCheck, StatusGroup, CloseCheck, SubscriptionsView, SubscriptionDetail, SubscriptionForm, PlanForm, MatchCount, AddInput, AddPreview, ArchivedDocument, DeletionView, DocumentEdit, DocumentGroup, DocumentStep, DocumentView, HistoryEntry, VendorChange, VendorsView, Estimate, LineChoice, Coverage, ReviewQueue, RuleForm, RulesView, Frame, ImportPreview, PdfSource, AppError, AppInfo, CommandInfo, KeyConflict, ErrorKind, EventName, EventPayloads, JsonPreview, LaunchEvent, NewAccount, AccountStatements, OtherEdit, OtherGroup, OtherView, StatementView, PayslipAdded, PayslipEdit, PayslipView, PayslipsYear, RulesImport, RulesOverview, RulesYearView, Settings, SettingsPatch, TaxYear } from "./types";
 
 export * from "./types";
 
@@ -44,6 +44,15 @@ export const api = {
   rulesImportChoose: () => invoke<RulesImport | null>("rules_import_choose"),
   rulesImport: (text: string) => invoke<string>("rules_import", { text }),
   payslipsYear: (year: number) => invoke<PayslipsYear>("payslips_year", { year }),
+  payslipsList: () => invoke<PayslipsYear[]>("payslips_list"),
+  statementsList: (query: string) => invoke<AccountStatements[]>("statements_list", { query }),
+  statementView: (id: string) => invoke<StatementView>("statement_view", { id }),
+  othersList: (query: string) => invoke<OtherGroup[]>("others_list", { query }),
+  otherView: (id: string) => invoke<OtherView>("other_view", { id }),
+  otherAddPdf: () => invoke<PayslipAdded | null>("other_add_pdf"),
+  otherAddWaiting: (token: string) => invoke<PayslipAdded>("other_add_waiting", { token }),
+  otherEdit: (id: string, change: OtherEdit) => invoke<string | null>("other_edit", { id, change }),
+  otherDelete: (id: string) => invoke<string>("other_delete", { id }),
   payslipView: (id: string) => invoke<PayslipView>("payslip_view", { id }),
   payslipAdd: (year: number, month: number) => invoke<PayslipAdded>("payslip_add", { year, month }),
   payslipAddPdf: (year: number, month: number) => invoke<PayslipAdded | null>("payslip_add_pdf", { year, month }),

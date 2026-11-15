@@ -4,9 +4,9 @@ import { Check, FileText, TriangleAlert } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api, toAppError, type AddPreview, type LineChoice } from "../api";
 import { Modal } from "../components/Modal";
-import { useStore } from "../state/store";
+import { useStore, type AddKind } from "../state/store";
 import { useT } from "../i18n";
-import { AddPayslipFields } from "../payslips/AddPayslipFields";
+import { AddOtherFields, AddPayslipFields } from "../payslips/AddPayslipFields";
 import { Segmented } from "../settings/controls";
 
 function AddDocumentFile({ preview }: { preview: AddPreview }) {
@@ -65,7 +65,7 @@ export function AddDocumentSheet({ preview }: { preview: AddPreview }) {
   const [lineId, setLineId] = useState<string | null>(preview.lines[0]?.id ?? null);
   const [error, setError] = useState<{ path?: string; message: string } | null>(null);
   const [busy, setBusy] = useState(false);
-  const [kind, setKind] = useState<"invoice" | "payslip">("invoice");
+  const [kind, setKind] = useState<AddKind>(useStore.getState().addKind);
   const text = useT().documents.add;
   const payslipText = useT().payslips;
   const { data: estimate } = useQuery({
@@ -105,70 +105,71 @@ export function AddDocumentSheet({ preview }: { preview: AddPreview }) {
           options={[
             { value: "invoice", label: payslipText.invoice },
             { value: "payslip", label: payslipText.payslip },
+            { value: "other", label: payslipText.otherKind },
           ]}
           value={kind}
           onChange={setKind}
         />
       </div>
-      {kind === "payslip" ? (
-        <AddPayslipFields token={preview.token} onCancel={close} />
-      ) : (
+      {kind === "payslip" && <AddPayslipFields token={preview.token} onCancel={close} />}
+      {kind === "other" && <AddOtherFields token={preview.token} onCancel={close} />}
+      {kind === "invoice" && (
         <>
-      <div className="add-doc__grid">
-        <label htmlFor={`${id}-vendor`}>{text.vendor}</label>
-        <div className="add-doc__field">
-          <input id={`${id}-vendor`} className="field" value={vendor} placeholder={text.vendorPlaceholder} aria-invalid={!!fieldError("document.vendor")} onChange={(e) => setVendor(e.target.value)} />
-          {preview.vendorFromPdf && vendor === preview.vendor && <span className="add-doc__hint">{text.fromPdf}</span>}
-        </div>
-        {(preview.invoice || preview.invoiceAmount) && (
-          <>
-            <span>{text.invoice}</span>
-            <div className="add-doc__invoice">
-              {preview.invoice && <span>{preview.invoice}</span>}
-              {preview.invoiceAmount && <span className="add-doc__amount">{preview.invoiceAmount}</span>}
+          <div className="add-doc__grid">
+            <label htmlFor={`${id}-vendor`}>{text.vendor}</label>
+            <div className="add-doc__field">
+              <input id={`${id}-vendor`} className="field" value={vendor} placeholder={text.vendorPlaceholder} aria-invalid={!!fieldError("document.vendor")} onChange={(e) => setVendor(e.target.value)} />
+              {preview.vendorFromPdf && vendor === preview.vendor && <span className="add-doc__hint">{text.fromPdf}</span>}
             </div>
-          </>
-        )}
-        <label htmlFor={`${id}-item`}>{text.item}</label>
-        <div className="add-doc__field">
-          <PopUpButton
-            id={`${id}-item`}
-            aria-invalid={!!fieldError("document.item")}
-            value={itemKey}
-            options={[{ value: "", label: text.chooseLater }, ...preview.items.map((i) => ({ value: i.key, label: i.label }))]}
-            onChange={setItemKey}
-          />
-          {preview.itemWhy && itemKey === preview.itemKey && <span className="add-doc__hint">{preview.itemWhy}</span>}
-        </div>
-        {estimate && (
-          <>
-            <span>{text.workShare}</span>
-            <span className="add-doc__hint">
-              {estimate.workShare} %{estimate.shareHint ? ` · ${estimate.shareHint}` : ""}
-            </span>
-          </>
-        )}
-      </div>
-      <h3 className="add-doc__heading">{text.paidWith}</h3>
-      <PaidWithPicker lines={preview.lines} value={lineId} onChange={setLineId} />
-      {estimate?.gwg && (
-        <div className="add-doc__hint add-doc__gwg">{estimate.gwg}</div>
-      )}
-      <p className="add-doc__summary">
-        {estimate ? text.countsAs(estimate.anv, estimate.formula) : ""}
-        {text.savedAsDraft}
-      </p>
-      <div className="form-field__error" role={error ? "alert" : undefined}>
-        {error?.message ?? ""}
-      </div>
-      <div className="actions">
-        <button type="button" className="btn" onClick={close}>
-          {text.cancel}
-        </button>
-        <button type="button" className="btn btn--primary" disabled={busy || !vendor.trim()} onClick={add}>
-          {text.add}
-        </button>
-      </div>
+            {(preview.invoice || preview.invoiceAmount) && (
+              <>
+                <span>{text.invoice}</span>
+                <div className="add-doc__invoice">
+                  {preview.invoice && <span>{preview.invoice}</span>}
+                  {preview.invoiceAmount && <span className="add-doc__amount">{preview.invoiceAmount}</span>}
+                </div>
+              </>
+            )}
+            <label htmlFor={`${id}-item`}>{text.item}</label>
+            <div className="add-doc__field">
+              <PopUpButton
+                id={`${id}-item`}
+                aria-invalid={!!fieldError("document.item")}
+                value={itemKey}
+                options={[{ value: "", label: text.chooseLater }, ...preview.items.map((i) => ({ value: i.key, label: i.label }))]}
+                onChange={setItemKey}
+              />
+              {preview.itemWhy && itemKey === preview.itemKey && <span className="add-doc__hint">{preview.itemWhy}</span>}
+            </div>
+            {estimate && (
+              <>
+                <span>{text.workShare}</span>
+                <span className="add-doc__hint">
+                  {estimate.workShare} %{estimate.shareHint ? ` · ${estimate.shareHint}` : ""}
+                </span>
+              </>
+            )}
+          </div>
+          <h3 className="add-doc__heading">{text.paidWith}</h3>
+          <PaidWithPicker lines={preview.lines} value={lineId} onChange={setLineId} />
+          {estimate?.gwg && (
+            <div className="add-doc__hint add-doc__gwg">{estimate.gwg}</div>
+          )}
+          <p className="add-doc__summary">
+            {estimate ? text.countsAs(estimate.anv, estimate.formula) : ""}
+            {text.savedAsDraft}
+          </p>
+          <div className="form-field__error" role={error ? "alert" : undefined}>
+            {error?.message ?? ""}
+          </div>
+          <div className="actions">
+            <button type="button" className="btn" onClick={close}>
+              {text.cancel}
+            </button>
+            <button type="button" className="btn btn--primary" disabled={busy || !vendor.trim()} onClick={add}>
+              {text.add}
+            </button>
+          </div>
         </>
       )}
     </Modal>

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Lock } from "lucide-react";
-import { PdfPreview } from "../components/PdfPreview";
+import { DetailLayout } from "../documents/DetailLayout";
 import { DocumentForm } from "../documents/DocumentForm";
 import { ExcludeSheet } from "../documents/ExcludeSheet";
 import { HistoryList } from "../documents/HistoryList";
@@ -9,15 +9,16 @@ import { useDocument, useDocumentHistory } from "../queries/documents";
 import { EmptyPage } from "./EmptyPage";
 import { useT } from "../i18n";
 
-/** A document: its PDF beside the payment-first form, its History on the right. */
+/** An invoice: its PDF over most of the page, the payment-first form and its History in the sidebar. */
 export function DocumentPage({ documentId }: { documentId: string }) {
   const { data: doc, isError } = useDocument(documentId);
   const { data: history = [] } = useDocumentHistory(documentId);
   const [excluding, setExcluding] = useState(false);
   const text = useT().pages.document;
+  const titles = useT().shell.titles;
   if (isError) return <EmptyPage title={text.missingTitle} text={text.missingText} />;
-  return (
-    <div className="page-scroll">
+  const banners = (
+    <>
       {doc?.finishedOn && (
         <div className="doc-banner" role="status">
           <Lock size={15} />
@@ -35,21 +36,20 @@ export function DocumentPage({ documentId }: { documentId: string }) {
           </button>
         </div>
       )}
-      <div className="doc-page">
-        <div className="doc-page__file">
-          <div className="doc-page__preview" title={doc?.file}>
-            <PdfPreview source={{ kind: "document", id: documentId }} />
-          </div>
-          <div className="add-doc__hint">{text.selectHint}</div>
-        </div>
+    </>
+  );
+  return (
+    <>
+      <DetailLayout source={{ kind: "document", id: documentId }} banners={banners} label={doc?.title ?? titles.document} fileTitle={doc?.file}>
         {doc && <DocumentForm doc={doc} onExclude={() => setExcluding(true)} />}
-        <aside className="doc-history" aria-label={text.history}>
-          <h3 className="doc-history__title">{text.history}</h3>
+        <details className="detail__history">
+          <summary>{text.history}</summary>
           <HistoryList entries={history} />
           <div className="doc-history__note">{text.historyNote}</div>
-        </aside>
-      </div>
+        </details>
+        <p className="add-doc__hint">{text.selectHint}</p>
+      </DetailLayout>
       {excluding && doc && <ExcludeSheet documentId={doc.id} title={doc.title} onClose={() => setExcluding(false)} />}
-    </div>
+    </>
   );
 }

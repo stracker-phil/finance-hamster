@@ -6,7 +6,7 @@ vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await impo
 import { api } from "../api";
 import { account } from "../test/accounts";
 import { renderWithQuery } from "../test/renderWithQuery";
-import { archivedDocument, deletionView, documentGroup, documentRow, documentView, historyEntry, lineChoice, vendorView, vendorsView } from "../test/documents";
+import { accountStatements, archivedDocument, deletionView, documentGroup, documentRow, documentView, historyEntry, lineChoice, otherGroup, otherListRow, otherView, statementListRow, statementView, vendorView, vendorsView } from "../test/documents";
 import { fileCheck, fileProblem, statusGroup } from "../test/integrity";
 import { payslipView, payslipsYear } from "../test/payslips";
 import { ruleView, rulesView } from "../test/lineRules";
@@ -22,7 +22,8 @@ import { useLastFileCheck, useStatus } from "./integrity";
 import { useLineRules } from "./lineRules";
 import { usePayslip, usePayslipsYear } from "./payslips";
 import { useReviewQueue } from "./review";
-import { useAccountLines, useCoverage } from "./statements";
+import { useOther, useOthers } from "./others";
+import { useAccountLines, useCoverage, useStatement, useStatementsList } from "./statements";
 import { useMatchCount, useSubscription, useSubscriptions } from "./subscriptions";
 import { useTaxYears } from "./taxYears";
 import { useToday } from "./today";
@@ -129,6 +130,60 @@ describe("useEvents", () => {
 
       expect(await screen.findByText("Lines: Nr. 010/2026, Nr. 009/2026")).toBeTruthy();
       expect(await screen.findByText("Coverage: Nr. 010 · until 10 Nov")).toBeTruthy();
+    });
+  });
+
+  describe("statements and other documents as documents", () => {
+    function DocumentKindsProbe() {
+      useEvents();
+      const { data: list } = useStatementsList("");
+      const { data: statement } = useStatement("st-10");
+      const { data: groups } = useOthers("");
+      const { data: other } = useOther("other-1");
+      return (
+        <>
+          <p>Statements: {list?.flatMap((a) => a.statements.map((s) => s.title)).join(", ")}</p>
+          <p>Statement: {statement?.title}</p>
+          <p>Others: {groups?.flatMap((g) => g.documents.map((d) => d.title)).join(", ")}</p>
+          <p>Other: {other?.title}</p>
+        </>
+      );
+    }
+
+    const shown = {
+      statements: ["Statements: Nr. 009/2026", "Statements: Nr. 010/2026"],
+      statement: ["Statement: Private · Nr. 009/2026", "Statement: Private · Nr. 010/2026"],
+      others: ["Others: Old Lease", "Others: New Lease"],
+      other: ["Other: Old Lease", "Other: New Lease"],
+    } as const;
+
+    beforeEach(() => {
+      mocked.statementsList.mockResolvedValue([accountStatements({ statements: [statementListRow({ title: "Nr. 009/2026" })] })]);
+      mocked.statementView.mockResolvedValue(statementView({ title: "Private · Nr. 009/2026" }));
+      mocked.othersList.mockResolvedValue([otherGroup({ documents: [otherListRow({ title: "Old Lease" })] })]);
+      mocked.otherView.mockResolvedValue(otherView({ title: "Old Lease" }));
+    });
+
+    it.each([
+      ["statements", ["statements", "statement"]],
+      ["accounts", ["statements", "statement"]],
+      ["transactions", ["statements", "statement"]],
+      ["others", ["others", "other"]],
+      ["documents", []],
+    ] as const)("when data_changed names the %s table, refetches %j and keeps the rest", async (table, refreshed) => {
+      renderWithQuery(<DocumentKindsProbe />);
+      for (const [old] of Object.values(shown)) await screen.findByText(old);
+      mocked.statementsList.mockResolvedValue([accountStatements({ statements: [statementListRow({ title: "Nr. 010/2026" })] })]);
+      mocked.statementView.mockResolvedValue(statementView({ title: "Private · Nr. 010/2026" }));
+      mocked.othersList.mockResolvedValue([otherGroup({ documents: [otherListRow({ title: "New Lease" })] })]);
+      mocked.otherView.mockResolvedValue(otherView({ title: "New Lease" }));
+
+      await emitDataChanged([table]);
+
+      for (const key of refreshed) expect(await screen.findByText(shown[key][1])).toBeTruthy();
+      for (const key of Object.keys(shown) as (keyof typeof shown)[]) {
+        if (!(refreshed as readonly string[]).includes(key)) expect(screen.getByText(shown[key][0])).toBeTruthy();
+      }
     });
   });
 

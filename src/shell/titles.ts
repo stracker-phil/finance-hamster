@@ -29,7 +29,11 @@ export function titleFor(route: Route): HeaderTitle {
             : { label: text.taxYear(route.year), to: { page: "year", year: route.year } },
       };
     case "payslip":
-      return { title: text.payslip, crumb: { label: text.taxYear(route.year), to: { page: "year", year: route.year } } };
+      return { title: text.payslip, crumb: { label: text.documents, to: { page: "documents", tab: "payslips" } } };
+    case "statement":
+      return { title: text.statement, crumb: { label: text.documents, to: { page: "documents", tab: "statements" } } };
+    case "other":
+      return { title: text.other, crumb: { label: text.documents, to: { page: "documents", tab: "other" } } };
     case "log":
       return { title: text.log, sub: text.logSub, crumb: { label: text.taxYear(route.year), to: { page: "year", year: route.year } } };
     case "archive":

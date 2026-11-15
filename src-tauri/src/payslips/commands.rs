@@ -65,6 +65,12 @@ pub fn payslips_year(state: State<'_, AppState>, year: i32) -> AppResult<Payslip
     view::year_view(&state.db, year, state.settings.get().number_format)
 }
 
+/// Dokumente → Lohnzettel: every year with a payslip or an open tax year, twelve months each.
+#[tauri::command]
+pub fn payslips_list(state: State<'_, AppState>) -> AppResult<Vec<PayslipsYear>> {
+    view::list(&state.db, state.settings.get().number_format)
+}
+
 #[tauri::command]
 pub fn payslip_view(state: State<'_, AppState>, id: String) -> AppResult<PayslipView> {
     view::payslip_view(&state.db, &id, state.settings.get().number_format)

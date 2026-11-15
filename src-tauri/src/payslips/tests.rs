@@ -53,6 +53,10 @@ fn days(value: &str) -> PayslipEdit {
     }
 }
 
+fn period(year: i32, month: u32) -> PayslipEdit {
+    PayslipEdit::Period { year, month }
+}
+
 fn change(db: &Db, id: &str, change: PayslipEdit) {
     edit::edit(db, id, &change).unwrap().unwrap();
 }
@@ -65,10 +69,14 @@ fn invalid_field(err: AppError) -> String {
 }
 
 fn year_2026(db: &Db, state: YearState) {
+    year_state(db, 2026, state);
+}
+
+fn year_state(db: &Db, year: i32, state: YearState) {
     let row = TaxYearRow {
         state,
         closed_at: (state == YearState::Closed).then_some(2),
-        ..TaxYearRow::new(2026, "2026 v1".into(), "{}".into(), 1)
+        ..TaxYearRow::new(year, format!("{year} v1"), "{}".into(), 1)
     };
     db.write(
         Op::new(
@@ -482,7 +490,7 @@ mod editing {
                     text: " Bonus ".into(),
                 },
             ),
-            ("same month", PayslipEdit::Month { month: 7 }),
+            ("same period", period(2026, 7)),
         ] {
             assert_eq!(edit::edit(&db, &id, &unchanged).unwrap(), None, "{name}");
         }
@@ -511,18 +519,16 @@ mod editing {
                 PayslipEdit::Note { text: "x".into() },
                 "Change Note of Payslip July 2026",
             ),
-            (
-                PayslipEdit::Month { month: 8 },
-                "Move Payslip July 2026 to August",
-            ),
+            (period(2026, 8), "Move Payslip July 2026 to August 2026"),
+            (period(2027, 8), "Move Payslip July 2026 to August 2027"),
         ] {
             let written = edit::edit(&db, &id, &edit_to_make).unwrap().unwrap();
 
             assert_eq!(written.label, expected);
             assert_eq!(written.tables, vec!["payslips".to_string()]);
-            let month = stored(&db, &id).month;
-            if month != 7 {
-                change(&db, &id, PayslipEdit::Month { month: 7 });
+            let row = stored(&db, &id);
+            if (row.year, row.month) != (2026, 7) {
+                change(&db, &id, period(2026, 7));
             }
         }
     }
@@ -537,7 +543,7 @@ mod editing {
                 amount(PayslipAmount::Gross, "1"),
                 days("3"),
                 PayslipEdit::Note { text: "x".into() },
-                PayslipEdit::Month { month: 8 },
+                period(2027, 8),
             ]
             .iter()
             .map(|c| edit::edit(&db, &id, c).unwrap().unwrap().label)
@@ -550,7 +556,7 @@ mod editing {
                 "Brutto im Lohnzettel Juli 2026 ändern",
                 "Homeoffice-Tage im Lohnzettel Juli 2026 ändern",
                 "Notiz im Lohnzettel Juli 2026 ändern",
-                "Lohnzettel Juli 2026 auf August verschieben",
+                "Lohnzettel Juli 2026 auf August 2027 verschieben",
             ]
         );
     }
@@ -561,11 +567,27 @@ mod editing {
         let id = add(&db, &dir, 7);
         change(&db, &id, amount(PayslipAmount::Gross, "100"));
 
-        change(&db, &id, PayslipEdit::Month { month: 8 });
+        change(&db, &id, period(2026, 8));
 
         let row = stored(&db, &id);
-        assert_eq!((row.month, row.gross), (8, Some(10_000)));
+        assert_eq!((row.year, row.month, row.gross), (2026, 8, Some(10_000)));
         assert_eq!(months_of(&db, 2026), [8]);
+    }
+
+    #[test]
+    fn a_payslip_moves_to_another_year_in_the_same_month_or_another() {
+        let (dir, db) = open();
+        let july = add(&db, &dir, 7);
+        let august = add(&db, &dir, 8);
+
+        change(&db, &july, period(2027, 7));
+        change(&db, &august, period(2025, 12));
+
+        assert_eq!(months_of(&db, 2026), Vec::<u32>::new());
+        assert_eq!(months_of(&db, 2027), [7]);
+        assert_eq!(months_of(&db, 2025), [12]);
+        let row = stored(&db, &august);
+        assert_eq!((row.year, row.month), (2025, 12));
     }
 
     #[test]
@@ -574,7 +596,7 @@ mod editing {
         let july = add(&db, &dir, 7);
         add(&db, &dir, 8);
 
-        let err = edit::edit(&db, &july, &PayslipEdit::Month { month: 8 }).unwrap_err();
+        let err = edit::edit(&db, &july, &period(2026, 8)).unwrap_err();
 
         assert!(
             matches!(&err, AppError::InvalidInput(m) if m == "There already is a payslip for August 2026"),
@@ -584,16 +606,61 @@ mod editing {
     }
 
     #[test]
+    fn a_move_onto_a_taken_month_of_another_year_is_refused() {
+        let (dir, db) = open();
+        let july = add(&db, &dir, 7);
+        edit::add(&db, dir.path(), 2027, 8, None, NOW).unwrap();
+
+        let err = edit::edit(&db, &july, &period(2027, 8)).unwrap_err();
+
+        assert!(
+            matches!(&err, AppError::InvalidInput(m) if m == "There already is a payslip for August 2027"),
+            "{err:?}"
+        );
+        assert_eq!(
+            (stored(&db, &july).year, stored(&db, &july).month),
+            (2026, 7)
+        );
+    }
+
+    #[test]
     fn a_move_to_a_month_outside_one_to_twelve_is_refused() {
         let (dir, db) = open();
         let id = add(&db, &dir, 7);
 
         for month in [0, 13] {
-            let err = edit::edit(&db, &id, &PayslipEdit::Month { month }).unwrap_err();
+            let err = edit::edit(&db, &id, &period(2027, month)).unwrap_err();
 
             assert!(matches!(err, AppError::InvalidInput(_)), "{month}: {err:?}");
         }
-        assert_eq!(stored(&db, &id).month, 7);
+        let row = stored(&db, &id);
+        assert_eq!((row.year, row.month), (2026, 7));
+    }
+
+    #[test]
+    fn a_move_into_a_closed_year_is_refused() {
+        let (dir, db) = open();
+        let id = add(&db, &dir, 7);
+        year_state(&db, 2027, YearState::Closed);
+
+        let err = edit::edit(&db, &id, &period(2027, 7)).unwrap_err();
+
+        assert!(matches!(err, AppError::InvalidInput(_)), "{err:?}");
+        assert_eq!(months_of(&db, 2026), [7]);
+        assert_eq!(months_of(&db, 2027), Vec::<u32>::new());
+    }
+
+    #[test]
+    fn a_move_out_of_a_closed_year_is_refused() {
+        let (dir, db) = open();
+        let id = add(&db, &dir, 7);
+        year_2026(&db, YearState::Closed);
+
+        let err = edit::edit(&db, &id, &period(2027, 7)).unwrap_err();
+
+        assert!(matches!(err, AppError::InvalidInput(_)), "{err:?}");
+        assert_eq!(months_of(&db, 2026), [7]);
+        assert_eq!(months_of(&db, 2027), Vec::<u32>::new());
     }
 
     #[test]
@@ -615,7 +682,7 @@ mod editing {
             ("amount", amount(PayslipAmount::Gross, "1")),
             ("days", days("3")),
             ("note", PayslipEdit::Note { text: "x".into() }),
-            ("month", PayslipEdit::Month { month: 8 }),
+            ("period", period(2026, 8)),
         ] {
             let err = edit::edit(&db, &id, &refused).unwrap_err();
 
@@ -639,14 +706,15 @@ mod editing {
     }
 
     #[test]
-    fn undoing_a_month_move_puts_the_payslip_back() {
+    fn undoing_a_move_puts_the_payslip_back_in_its_month_and_year() {
         let (dir, db) = open();
         let id = add(&db, &dir, 7);
-        change(&db, &id, PayslipEdit::Month { month: 9 });
+        change(&db, &id, period(2027, 9));
 
         db.undo().unwrap().unwrap();
 
-        assert_eq!(stored(&db, &id).month, 7);
+        let row = stored(&db, &id);
+        assert_eq!((row.year, row.month), (2026, 7));
     }
 
     #[test]
@@ -666,8 +734,8 @@ mod editing {
                 PayslipEdit::Note { text: "x".into() },
             ),
             (
-                json!({ "field": "month", "month": 5 }),
-                PayslipEdit::Month { month: 5 },
+                json!({ "field": "period", "year": 2027, "month": 5 }),
+                period(2027, 5),
             ),
         ] {
             assert_eq!(
@@ -1052,6 +1120,101 @@ mod views {
     }
 
     #[test]
+    fn the_count_says_how_many_of_twelve_months_have_a_payslip() {
+        let (dir, db) = open();
+        let empty = view::year_view(&db, 2026, DOT).unwrap().count;
+        for month in 1..=10 {
+            add(&db, &dir, month);
+        }
+
+        let english = view::year_view(&db, 2026, DOT).unwrap().count;
+        let german = with_lang(Language::De, || view::year_view(&db, 2026, DOT))
+            .unwrap()
+            .count;
+
+        assert_eq!(empty, "0 of 12 payslips");
+        assert_eq!(english, "10 of 12 payslips");
+        assert_eq!(german, "10 von 12 Lohnzetteln");
+    }
+
+    #[test]
+    fn the_list_holds_every_year_with_a_payslip_or_an_open_tax_year_newest_first() {
+        let (dir, db) = open();
+        add(&db, &dir, 3);
+        edit::add(&db, dir.path(), 2024, 5, None, NOW).unwrap();
+        edit::add(&db, dir.path(), 2026, 4, None, NOW).unwrap();
+        year_state(&db, 2027, YearState::Open);
+        year_state(&db, 2025, YearState::Closed);
+        year_state(&db, 2026, YearState::Open);
+
+        let years = view::list(&db, DOT).unwrap();
+
+        assert_eq!(
+            years
+                .iter()
+                .map(|y| (y.year, y.open, y.count.as_str()))
+                .collect::<Vec<_>>(),
+            [
+                (2027, true, "0 of 12 payslips"),
+                (2026, true, "2 of 12 payslips"),
+                (2024, false, "1 of 12 payslips"),
+            ]
+        );
+    }
+
+    #[test]
+    fn each_year_in_the_list_is_the_full_year_view() {
+        let (dir, db) = open();
+        let id = add(&db, &dir, 7);
+        fill(&db, &id, ["1000", "", "", "", "800", ""]);
+        year_2026(&db, YearState::Open);
+
+        let years = view::list(&db, COMMA).unwrap();
+
+        assert_eq!(years, vec![view::year_view(&db, 2026, COMMA).unwrap()]);
+    }
+
+    #[test]
+    fn without_payslips_or_open_years_the_list_is_empty() {
+        let (_dir, db) = open();
+        year_state(&db, 2025, YearState::Closed);
+
+        assert_eq!(view::list(&db, DOT).unwrap(), vec![]);
+    }
+
+    #[test]
+    fn the_form_lists_the_twelve_month_names_for_the_picker() {
+        let (dir, db) = open();
+        let id = add(&db, &dir, 7);
+
+        let english = view::payslip_view(&db, &id, DOT).unwrap().month_names;
+        let german = with_lang(Language::De, || view::payslip_view(&db, &id, DOT))
+            .unwrap()
+            .month_names;
+
+        assert_eq!(
+            english,
+            [
+                "January",
+                "February",
+                "March",
+                "April",
+                "May",
+                "June",
+                "July",
+                "August",
+                "September",
+                "October",
+                "November",
+                "December"
+            ]
+        );
+        assert_eq!(german.len(), 12);
+        assert_eq!(german[0], "Januar");
+        assert_eq!(german[2], "März");
+    }
+
+    #[test]
     fn the_year_is_open_only_with_an_open_tax_year_row() {
         let (_dir, db) = open();
         assert!(!view::year_view(&db, 2026, DOT).unwrap().open);
@@ -1083,8 +1246,9 @@ mod views {
         };
         assert_eq!(
             keys(&value),
-            ["months", "open", "telework", "totals", "year"]
+            ["count", "months", "open", "telework", "totals", "year"]
         );
+        assert_eq!(value["count"], json!("1 of 12 payslips"));
         assert_eq!(
             keys(&value["months"][0]),
             ["hasPdf", "id", "month", "name", "payout"]
@@ -1270,6 +1434,7 @@ mod views {
                 "hasPdf",
                 "id",
                 "month",
+                "monthNames",
                 "note",
                 "open",
                 "teleworkDays",

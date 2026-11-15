@@ -1,4 +1,4 @@
-//! PDF previews by id (ADR 0018, ADR 0037): the page names a document, statement or payslip, Rust finds its file. The
+//! PDF previews by id (ADR 0018, ADR 0037): the page names a document, statement, payslip or other document, Rust finds its file. The
 //! native view shows it over the page; the `pdf-page` URI scheme serves its pages as PNG.
 
 pub mod commands;
@@ -20,6 +20,7 @@ pub enum SourceKind {
     Document,
     Statement,
     Payslip,
+    Other,
 }
 
 impl SourceKind {
@@ -28,6 +29,7 @@ impl SourceKind {
             "document" => Some(SourceKind::Document),
             "statement" => Some(SourceKind::Statement),
             "payslip" => Some(SourceKind::Payslip),
+            "other" => Some(SourceKind::Other),
             _ => None,
         }
     }
@@ -61,6 +63,9 @@ pub fn resolve(db: &Db, config_dir: &Path, source: &PdfSource) -> AppResult<Path
         SourceKind::Payslip => db
             .read(|c| crate::payslips::payslip(c, &source.id))?
             .and_then(|p| p.file),
+        SourceKind::Other => db
+            .read(|c| crate::others::other(c, &source.id))?
+            .map(|o| o.file),
     };
     file.map(|f| config_dir.join(f)).ok_or_else(|| {
         AppError::NotFound(tr!(
@@ -91,6 +96,8 @@ mod tests {
             ("document", Some(SourceKind::Document)),
             ("statement", Some(SourceKind::Statement)),
             ("payslip", Some(SourceKind::Payslip)),
+            ("other", Some(SourceKind::Other)),
+            ("Other", None),
             ("Document", None),
             ("", None),
         ] {
@@ -204,6 +211,38 @@ mod tests {
                 "{id}"
             );
         }
+    }
+
+    #[test]
+    fn an_other_document_resolves_to_its_file_and_an_unknown_id_is_not_found() {
+        use crate::others::edit;
+
+        let dir = temp_config_dir();
+        let db = Db::open(dir.path()).expect("db");
+        let (_, id) = edit::add(&db, dir.path(), "Home Policy.pdf", b"%PDF demo", 1).unwrap();
+
+        assert_eq!(
+            resolve(&db, dir.path(), &source(SourceKind::Other, &id)).unwrap(),
+            dir.path().join("docs/other/home-policy.pdf")
+        );
+        assert!(matches!(
+            resolve(&db, dir.path(), &source(SourceKind::Other, "missing")),
+            Err(AppError::NotFound(_))
+        ));
+    }
+
+    #[test]
+    fn an_other_documents_id_is_not_found_as_a_payslip() {
+        use crate::others::edit;
+
+        let dir = temp_config_dir();
+        let db = Db::open(dir.path()).expect("db");
+        let (_, id) = edit::add(&db, dir.path(), "Home Policy.pdf", b"%PDF demo", 1).unwrap();
+
+        assert!(matches!(
+            resolve(&db, dir.path(), &source(SourceKind::Payslip, &id)),
+            Err(AppError::NotFound(_))
+        ));
     }
 
     #[test]

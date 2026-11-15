@@ -25,6 +25,26 @@ export const addWaitingPayslip = (token: string, year: number, month: number) =>
     opened(year, added);
   });
 
+/** Keeps a PDF waiting in the Add sheet as an other document and opens it. */
+export const addWaitingOther = (token: string) =>
+  api.otherAddWaiting(token).then((added) => {
+    useStore.getState().setAddPreview(null);
+    undoToast(added.label);
+    useStore.getState().navigate({ page: "other", otherId: added.id });
+  });
+
+/** Asks for a PDF, keeps it as an other document and opens it. */
+export const addOtherPdf = () => {
+  api
+    .otherAddPdf()
+    .then((added) => {
+      if (!added) return;
+      undoToast(added.label);
+      useStore.getState().navigate({ page: "other", otherId: added.id });
+    })
+    .catch(showError);
+};
+
 /** Shows or hides the payslip panel beside the tax year page. */
 export const togglePayslipPanel = () => {
   api

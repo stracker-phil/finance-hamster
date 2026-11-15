@@ -4,8 +4,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
 
 import { api } from "../api";
-import { archivedDocument, documentGroup, historyEntry } from "../test/documents";
+import { archivedDocument, documentGroup, historyEntry, otherView, statementView } from "../test/documents";
+import { payslipView } from "../test/payslips";
 import { renderWithQuery } from "../test/renderWithQuery";
+import { accountLines } from "../test/statements";
 import { reviewQueue } from "../test/review";
 import { subscriptionsView } from "../test/subscriptions";
 import { step, todayView } from "../test/today";
@@ -43,6 +45,51 @@ describe("PageBody", () => {
 
     expect(await screen.findByRole("button", { name: /Demo Cloud Ltd/ })).toBeTruthy();
     expect(screen.getByRole("textbox", { name: "Search documents" })).toBeTruthy();
+  });
+
+  it.each([
+    ["statements", "Import Statement…"],
+    ["other", "Add Document…"],
+  ] as const)("shows the %s tab of Documents when the route names it", async (tab, action) => {
+    renderWithQuery(<PageBody route={{ page: "documents", tab }} />);
+
+    expect(await screen.findByRole("button", { name: action })).toBeTruthy();
+  });
+
+  it("shows a statement on the statement route", async () => {
+    mocked.statementView.mockResolvedValue(statementView());
+
+    renderWithQuery(<PageBody route={{ page: "statement", statementId: "st-10" }} />);
+
+    expect(await screen.findByRole("heading", { name: "Private · Nr. 010/2026" })).toBeTruthy();
+    expect(mocked.statementView).toHaveBeenCalledWith("st-10");
+  });
+
+  it("shows an other document on the other route", async () => {
+    mocked.otherView.mockResolvedValue(otherView());
+
+    renderWithQuery(<PageBody route={{ page: "other", otherId: "other-1" }} />);
+
+    expect(await screen.findByLabelText("Title")).toHaveProperty("value", "Demo Lease");
+    expect(mocked.otherView).toHaveBeenCalledWith("other-1");
+  });
+
+  it("shows a payslip on the payslip route", async () => {
+    mocked.payslipView.mockResolvedValue(payslipView());
+
+    renderWithQuery(<PageBody route={{ page: "payslip", payslipId: "ps-7", year: 2026 }} />);
+
+    expect(await screen.findByRole("heading", { name: "Payslip July 2026" })).toBeTruthy();
+    expect(mocked.payslipView).toHaveBeenCalledWith("ps-7");
+  });
+
+  it("shows the lines of an account on the account route", async () => {
+    mocked.accountLines.mockResolvedValue(accountLines({ id: "acc-2" }));
+
+    renderWithQuery(<PageBody route={{ page: "account", accountId: "acc-2", statementId: "st-1" }} />);
+
+    expect(await screen.findByRole("region", { name: "Nr. 010/2026" })).toBeTruthy();
+    expect(mocked.accountLines).toHaveBeenCalledWith("acc-2", "");
   });
 
   it("shows the Subscriptions page on the subscriptions route", async () => {

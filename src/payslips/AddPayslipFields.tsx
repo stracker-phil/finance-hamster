@@ -5,7 +5,7 @@ import { useT } from "../i18n";
 import { showError } from "../lib/undoToast";
 import { usePayslipsYear } from "../queries/payslips";
 import { useTaxYears } from "../queries/taxYears";
-import { addWaitingPayslip } from "./flow";
+import { addWaitingOther, addWaitingPayslip } from "./flow";
 
 /** The Add sheet's payslip side: which open tax year and month the dropped PDF is for, guessed from its top. */
 export function AddPayslipFields({ token, onCancel }: { token: string; onCancel: () => void }) {
@@ -64,5 +64,29 @@ export function AddPayslipFields({ token, onCancel }: { token: string; onCancel:
         </button>
       </div>
     </>
+  );
+}
+
+/** The Add sheet's other-document side: kept as it is, titled after its file name. */
+export function AddOtherFields({ token, onCancel }: { token: string; onCancel: () => void }) {
+  const text = useT().payslips;
+  const cancel = useT().documents.add.cancel;
+  const [busy, setBusy] = useState(false);
+  const add = () => {
+    setBusy(true);
+    addWaitingOther(token).catch((e: unknown) => {
+      showError(e);
+      setBusy(false);
+    });
+  };
+  return (
+    <div className="actions">
+      <button type="button" className="btn" onClick={onCancel}>
+        {cancel}
+      </button>
+      <button type="button" className="btn btn--primary" disabled={busy} onClick={add}>
+        {text.addOtherButton}
+      </button>
+    </div>
   );
 }

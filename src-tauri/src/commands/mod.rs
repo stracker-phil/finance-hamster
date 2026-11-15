@@ -59,12 +59,12 @@ pub const COMMANDS: &[CommandDef] = &[
     ),
     page(
         "go:statements",
-        Text::new("Statements", "Kontoauszüge"),
+        Text::new("Accounts", "Konten"),
         Some("CmdOrCtrl+3"),
     ),
     page(
         "go:documents",
-        Text::new("Documents", "Belege"),
+        Text::new("Documents", "Dokumente"),
         Some("CmdOrCtrl+4"),
     ),
     page(
@@ -90,8 +90,18 @@ pub const COMMANDS: &[CommandDef] = &[
     ),
     page(
         "document:add",
-        Text::new("Add Invoice PDF…", "Rechnungs-PDF hinzufügen …"),
+        Text::new("Add Invoice…", "Beleg hinzufügen …"),
         Some("CmdOrCtrl+O"),
+    ),
+    page(
+        "payslip:add",
+        Text::new("Add Payslip…", "Lohnzettel hinzufügen …"),
+        None,
+    ),
+    page(
+        "other:add",
+        Text::new("Add Other Document…", "Anderes Dokument hinzufügen …"),
+        None,
     ),
     page(
         "subscription:new",
@@ -296,8 +306,43 @@ mod tests {
     fn add_invoice_is_listed_with_its_shortcut() {
         let listed = with_lang(Language::En, list);
         let add = listed.iter().find(|c| c.id == "document:add").unwrap();
-        assert_eq!(add.title, "Add Invoice PDF…");
+        assert_eq!(add.title, "Add Invoice…");
         assert_eq!(add.shortcut.as_deref(), Some("⌘O"));
+    }
+
+    #[test]
+    fn the_documents_pages_and_adders_are_titled_in_both_languages() {
+        for (id, english, german, shortcut) in [
+            ("go:statements", "Accounts", "Konten", Some("⌘3")),
+            ("go:documents", "Documents", "Dokumente", Some("⌘4")),
+            (
+                "document:add",
+                "Add Invoice…",
+                "Beleg hinzufügen …",
+                Some("⌘O"),
+            ),
+            (
+                "payslip:add",
+                "Add Payslip…",
+                "Lohnzettel hinzufügen …",
+                None,
+            ),
+            (
+                "other:add",
+                "Add Other Document…",
+                "Anderes Dokument hinzufügen …",
+                None,
+            ),
+        ] {
+            for (language, expected) in [(Language::En, english), (Language::De, german)] {
+                let listed = with_lang(language, list);
+                let command = listed.iter().find(|c| c.id == id).unwrap();
+
+                assert_eq!(command.title, expected, "{id} {language:?}");
+                assert_eq!(command.shortcut.as_deref(), shortcut, "{id}");
+            }
+            assert!(matches!(find(id).unwrap().runs, Runs::Page), "{id}");
+        }
     }
 
     #[test]

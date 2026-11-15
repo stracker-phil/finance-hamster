@@ -39,6 +39,11 @@ export type AccountLines = { id: string, name: string, ibanMasked: string, group
 export type AccountState = "ok" | "behind" | "gap" | "review";
 
 /**
+ * One account's statements, newest first.
+ */
+export type AccountStatements = { accountId: string, name: string, statements: Array<StatementListRow>, };
+
+/**
  * What a rule or a hand decision does with a line.
  */
 export type Action = "ignore" | "anv" | "subscription";
@@ -286,6 +291,11 @@ excludedOn: string | null, excludeReason: string | null,
  * The schedule of a purchase above the GWG limit.
  */
 depreciation: DepreciationView | null, };
+
+/**
+ * The tabs of Dokumente.
+ */
+export type DocumentsTab = "invoices" | "statements" | "payslips" | "other";
 
 export type Elsewhere = { 
 /**
@@ -543,6 +553,28 @@ evidence: string | null, } | { "kind": "trip", itemKey: string, date: string, km
 export type NumberFormat = "dot_decimal" | "comma_decimal";
 
 /**
+ * One change to an other document; a blank date clears it.
+ */
+export type OtherEdit = { "field": "title", text: string, } | { "field": "date", value: string, } | { "field": "note", text: string, };
+
+/**
+ * The documents of one year, or of none (`year` None) for those without a date.
+ */
+export type OtherGroup = { title: string, year: number | null, documents: Array<OtherListRow>, };
+
+export type OtherListRow = { id: string, title: string, 
+/**
+ * `10 Nov 2026`; empty without a date.
+ */
+date: string, };
+
+export type OtherView = { id: string, title: string, 
+/**
+ * `YYYY-MM-DD` for the date field; empty without one.
+ */
+date: string, note: string, };
+
+/**
  * A new payslip's id and the label of the change.
  */
 export type PayslipAdded = { id: string, label: string, };
@@ -555,7 +587,7 @@ export type PayslipAmount = "gross" | "social" | "tax" | "net" | "payout" | "hom
 /**
  * One change to a payslip; blank text clears a value.
  */
-export type PayslipEdit = { "field": "amount", name: PayslipAmount, value: string, } | { "field": "teleworkDays", value: string, } | { "field": "note", text: string, } | { "field": "month", month: number, };
+export type PayslipEdit = { "field": "amount", name: PayslipAmount, value: string, } | { "field": "teleworkDays", value: string, } | { "field": "note", text: string, } | { "field": "period", year: number, month: number, };
 
 /**
  * One amount field of the payslip form.
@@ -588,7 +620,11 @@ export type PayslipView = { id: string, year: number, month: number,
 /**
  * `Payslip July 2026`.
  */
-title: string, open: boolean, hasPdf: boolean, amounts: Array<PayslipField>, teleworkDays: string, note: string, };
+title: string, open: boolean, hasPdf: boolean, amounts: Array<PayslipField>, teleworkDays: string, note: string, 
+/**
+ * January to December, for the month picker.
+ */
+monthNames: Array<string>, };
 
 export type PayslipsYear = { year: number, open: boolean, 
 /**
@@ -598,7 +634,11 @@ months: Array<PayslipMonth>, totals: Array<PayslipTotal>,
 /**
  * `122 days · as of July`; None while no payslip prints them.
  */
-telework: string | null, };
+telework: string | null, 
+/**
+ * `10 of 12 payslips`.
+ */
+count: string, };
 
 /**
  * A PDF the app keeps, named by what it belongs to; the page never sends paths.
@@ -856,7 +896,9 @@ note: string | null,
  */
 frozen: boolean, };
 
-export type SourceKind = "document" | "statement" | "payslip";
+export type SourceKind = "document" | "statement" | "payslip" | "other";
+
+export type StatementFact = { label: string, value: string, };
 
 export type StatementGroup = { id: string, 
 /**
@@ -876,10 +918,33 @@ count: string, lines: Array<LineView>,
  */
 missingBefore: string | null, };
 
+export type StatementListRow = { id: string, 
+/**
+ * `Nr. 003/2026`.
+ */
+title: string, 
+/**
+ * `7 Sep 2026 – 10 Nov 2026`.
+ */
+period: string, closing: string, 
+/**
+ * `62 lines`.
+ */
+lines: string, };
+
 /**
  * One part of the statements line: `Private and Business until 10 Nov`.
  */
 export type StatementReach = { text: string, behind: boolean, };
+
+/**
+ * A statement's facts as printed and as imported; nothing about it can be edited.
+ */
+export type StatementView = { id: string, accountId: string, 
+/**
+ * `Private · Nr. 003/2026`.
+ */
+title: string, facts: Array<StatementFact>, };
 
 export type StatusGroup = { 
 /**
@@ -1006,7 +1071,7 @@ items: Array<ItemOption>, };
 /**
  * Where a match leads.
  */
-export type Target = { "page": "documents" } | { "page": "document", documentId: string, year: number | null, } | { "page": "account", accountId: string, };
+export type Target = { "page": "documents", tab: DocumentsTab, } | { "page": "document", documentId: string, year: number | null, } | { "page": "account", accountId: string, } | { "page": "statement", statementId: string, } | { "page": "payslip", payslipId: string, year: number, } | { "page": "other", otherId: string, };
 
 /**
  * What the sidebar lists.

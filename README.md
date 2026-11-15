@@ -23,7 +23,7 @@ support. To build it or port it, point a coding agent at [AGENTS.md](AGENTS.md).
 - **Today:** the single most useful next step with one button (review new lines, attach invoices, import an
   overdue or missing statement, answer the year's numbers, finish drafts), the rest as quiet rows, the next charges
   and the tax year so far.
-- **Statements:** drop a PDF anywhere in the window and the account is found by its IBAN. Nothing is stored
+- **Accounts:** drop a statement PDF anywhere in the window and the account is found by its IBAN. Nothing is stored
   until the balances add up. A coverage bar per account shows each month as imported, partly imported or
   missing, and a statement that was never imported is named.
 - **Review:** one line at a time, with only the question Hamster can't answer: a work expense (ANV), a
@@ -33,15 +33,16 @@ support. To build it or port it, point a coding agent at [AGENTS.md](AGENTS.md).
 - **Subscriptions:** found in the statements by their bank text. A charge at the plan's amount is booked. A
   charge at another amount asks: a new price, a one-off, or not this subscription. A subscription takes one
   charge per period, so a second charge the next day isn't mistaken for it.
-- **Documents:** drop an invoice PDF and Hamster reads the vendor, amount and date, and finds the bank line
+- **Invoices:** drop an invoice PDF and Hamster reads the vendor, amount and date, and finds the bank line
   that paid it. Finished documents are locked; deleting one needs a reason and is logged.
 - **The tax year:** expenses recorded in plain categories with examples ("Computer, phone & software"), the
   home office days as one number, and a FinanzOnline view that turns them into one copy value per Kennzahl and
   works out what the tax office makes of them. The rules are built into the app for each year (kept up to date,
   changeable in Settings, frozen with a closed year).
-- **Payslips:** the numbers the salary line doesn't show (gross, social insurance, income tax), typed from each
-  month's payslip with its PDF beside it. A panel next to the tax year shows the months and the year's sums,
-  and the latest payslip's home office days answer the tax year's question.
+- **Documents:** every PDF in one place, under Invoices, Statements, Payslips and Other. Each opens large
+  enough to read, with its details beside it: the invoice form, a statement's balances, a payslip's numbers
+  (gross, social insurance, income tax), or just a title and note for anything else worth keeping. The tax
+  year's sidebar sums the payslips, and the latest payslip's home office days answer the year's question.
 - **Keyboard first:** ⌘K finds anything and runs any command, every action has a menu item and a shortcut, and
   the `hamster` command line drives the running app.
 

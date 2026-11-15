@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { LineStatus, LineView } from "../api";
 import { ChangeLineSheet } from "../statements/ChangeLineSheet";
 import { useAccountLines } from "../queries/statements";
@@ -10,12 +10,17 @@ import { useT } from "../i18n";
 const MUTED: LineStatus[] = ["ignored", "transfer", "review"];
 
 /** One account's lines, grouped by statement, newest first. */
-export function AccountPage({ accountId }: { accountId: string }) {
+export function AccountPage({ accountId, statementId }: { accountId: string; statementId?: string }) {
   const filter = useStore((s) => s.filter);
   const { data, error } = useAccountLines(accountId, filter);
   const navigate = useStore((s) => s.navigate);
   const [changing, setChanging] = useState<LineView | null>(null);
   const text = useT().pages.account;
+  const loaded = data !== undefined;
+  // Opened from a statement: its lines come into view once they're there.
+  useEffect(() => {
+    if (loaded && statementId) document.getElementById(`statement-${statementId}`)?.scrollIntoView?.({ block: "start" });
+  }, [loaded, statementId]);
   // A transfer between own accounts is decided by the app; a line still waiting goes to Review.
   const open = (line: LineView) => (line.status === "review" ? navigate({ page: "review" }) : setChanging(line));
   if (error) return <EmptyPage title={text.missingTitle} text={text.missingText} />;
@@ -23,9 +28,11 @@ export function AccountPage({ accountId }: { accountId: string }) {
   return (
     <div className="page-scroll">
       {data?.groups.map((group) => (
-        <section key={group.id} aria-label={group.label}>
+        <section key={group.id} id={`statement-${group.id}`} aria-label={group.label}>
           <div className="line-head">
-            <span className="line-head__label">{group.label}</span>
+            <button type="button" className="link-btn line-head__label" title={text.openStatement} onClick={() => navigate({ page: "statement", statementId: group.id })}>
+              {group.label}
+            </button>
             <span>{group.range}</span>
             <span className="line-head__ok">{text.balanceChecked}</span>
             <span className="line-head__count">{group.count}</span>

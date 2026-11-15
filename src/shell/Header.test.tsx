@@ -8,6 +8,7 @@ import { api } from "../api";
 import { MenuHost } from "../components/menu";
 import { HOME, type Route } from "../state/route";
 import { useStore } from "../state/store";
+import { addPreview } from "../test/documents";
 import { renderWithQuery } from "../test/renderWithQuery";
 import { elsewhere } from "../test/year";
 import { Header } from "./Header";
@@ -32,6 +33,7 @@ beforeEach(() => {
   useStore.setState({ route: HOME, back: [], forward: [], filter: "", paletteOpen: false, paletteQuery: "", toasts: [], pdfCovers: 0, menu: null, subscriptionSheet: null });
   mocked.searchElsewhere.mockResolvedValue([]);
   mocked.listCommands.mockResolvedValue([]);
+  useStore.setState({ addPreview: null, addKind: "invoice" });
 });
 
 describe("Header New menu", () => {
@@ -45,6 +47,8 @@ describe("Header New menu", () => {
     mocked.listCommands.mockResolvedValue([
       { id: "statement:import", title: "Import Statement…", shortcut: "⌘I", custom: false },
       { id: "document:add", title: "Add Invoice PDF…", shortcut: "⌥⌘O", custom: true },
+      { id: "payslip:add", title: "Add Payslip…", shortcut: "⌥⌘P", custom: true },
+      { id: "other:add", title: "Add Other Document…", shortcut: null, custom: false },
       { id: "subscription:new", title: "New Subscription", shortcut: null, custom: false },
     ]);
     renderHeader();
@@ -52,7 +56,7 @@ describe("Header New menu", () => {
     await openNew();
 
     const menu = screen.getByRole("menu", { name: "New" });
-    expect(within(menu).getAllByRole("menuitem").map((i) => i.textContent)).toEqual(["Import Statement…⌘I", "Add Invoice PDF…⌥⌘O", "New Subscription"]);
+    expect(within(menu).getAllByRole("menuitem").map((i) => i.textContent)).toEqual(["Import Statement…⌘I", "Add Invoice…⌥⌘O", "Add Payslip…⌥⌘P", "Add Other Document…", "New Subscription"]);
     expect(newButton().getAttribute("aria-expanded")).toBe("true");
   });
 
@@ -61,7 +65,24 @@ describe("Header New menu", () => {
 
     await openNew();
 
-    expect(within(screen.getByRole("menu", { name: "New" })).getAllByRole("menuitem").map((i) => i.textContent)).toEqual(["Import Statement…", "Add Invoice PDF…", "New Subscription"]);
+    expect(within(screen.getByRole("menu", { name: "New" })).getAllByRole("menuitem").map((i) => i.textContent)).toEqual(["Import Statement…", "Add Invoice…", "Add Payslip…", "Add Other Document…", "New Subscription"]);
+  });
+
+  it.each([
+    ["Add Invoice…", "invoice"],
+    ["Add Payslip…", "payslip"],
+    ["Add Other Document…", "other"],
+  ] as const)("asks for a PDF and opens the Add sheet on %s's kind when its row is chosen", async (name, kind) => {
+    const preview = addPreview();
+    mocked.documentAddChoose.mockResolvedValue(preview);
+    renderHeader();
+    await openNew();
+
+    await userEvent.click(screen.getByRole("menuitem", { name }));
+
+    expect(screen.queryByRole("menu")).toBeNull();
+    await vi.waitFor(() => expect(useStore.getState().addPreview).toEqual(preview));
+    expect(useStore.getState().addKind).toBe(kind);
   });
 
   it("asks for a new subscription when its row is chosen, and closes the menu", async () => {
@@ -142,7 +163,11 @@ describe("Header filter field", () => {
 
     it.each([
       ["a document", elsewhere({ label: "Pixelforge Ltd. invoice" }), { page: "document", documentId: "doc-9", year: 2026 }],
-      ["the documents list", elsewhere({ label: "3 documents", place: "All documents", target: { page: "documents" } }), { page: "documents" }],
+      ["the invoices tab", elsewhere({ label: "3 documents", place: "All documents", target: { page: "documents", tab: "invoices" } }), { page: "documents", tab: "invoices" }],
+      ["the statements tab", elsewhere({ label: "3 statements", place: "All statements", target: { page: "documents", tab: "statements" } }), { page: "documents", tab: "statements" }],
+      ["a statement", elsewhere({ label: "Nr. 010/2026", place: "Private", target: { page: "statement", statementId: "st-10" } }), { page: "statement", statementId: "st-10" }],
+      ["a payslip", elsewhere({ label: "Payslip July 2026", place: "Payslips", target: { page: "payslip", payslipId: "ps-7", year: 2026 } }), { page: "payslip", payslipId: "ps-7", year: 2026 }],
+      ["an other document", elsewhere({ label: "Demo Lease", place: "Other", target: { page: "other", otherId: "other-1" } }), { page: "other", otherId: "other-1" }],
       ["an account", elsewhere({ label: "4 lines", place: "Private", target: { page: "account", accountId: "acc-1" } }), { page: "account", accountId: "acc-1" }],
     ])("opens %s when its match is clicked", async (_, match, route) => {
       mocked.searchElsewhere.mockResolvedValue([match]);

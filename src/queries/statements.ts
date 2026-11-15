@@ -9,3 +9,10 @@ export const useCoverage = (query = "") => useQuery({ queryKey: [...COVERAGE_KEY
 
 export const useAccountLines = (accountId: string, query = "") =>
   useQuery({ queryKey: [...ACCOUNT_LINES_KEY, accountId, query], queryFn: () => api.accountLines(accountId, query), placeholderData: (previous) => previous });
+
+export const STATEMENTS_LIST_KEY = ["statements-list"] as const;
+export const STATEMENT_KEY = ["statement"] as const;
+
+export const useStatementsList = (query: string) => useQuery({ queryKey: [...STATEMENTS_LIST_KEY, query], queryFn: () => api.statementsList(query), placeholderData: (previous) => previous });
+
+export const useStatement = (id: string, enabled = true) => useQuery({ queryKey: [...STATEMENT_KEY, id], queryFn: () => api.statementView(id), enabled, meta: { quiet: true } });

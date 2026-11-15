@@ -4,7 +4,9 @@ import { ArchivePage } from "./ArchivePage";
 import { DocumentPage } from "./DocumentPage";
 import { DocumentsPage } from "./DocumentsPage";
 import { LogPage } from "./LogPage";
+import { OtherPage } from "./OtherPage";
 import { PayslipPage } from "./PayslipPage";
+import { StatementPage } from "./StatementPage";
 import { ReviewPage } from "./ReviewPage";
 import { StatementsPage } from "./StatementsPage";
 import { SubscriptionsPage } from "./SubscriptionsPage";
@@ -21,15 +23,19 @@ export function PageBody({ route }: { route: Route }) {
     case "statements":
       return <StatementsPage />;
     case "documents":
-      return <DocumentsPage />;
+      return <DocumentsPage tab={route.tab} />;
     case "review":
       return <ReviewPage />;
     case "account":
-      return <AccountPage accountId={route.accountId} />;
+      return <AccountPage accountId={route.accountId} statementId={route.statementId} />;
     case "year":
       return <YearPage year={route.year} attention={route.attention} />;
     case "document":
       return <DocumentPage documentId={route.documentId} />;
+    case "statement":
+      return <StatementPage statementId={route.statementId} />;
+    case "other":
+      return <OtherPage otherId={route.otherId} />;
     case "payslip":
       return <PayslipPage payslipId={route.payslipId} />;
     case "log":

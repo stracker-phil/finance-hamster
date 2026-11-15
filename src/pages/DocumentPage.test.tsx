@@ -20,14 +20,16 @@ beforeEach(() => {
 });
 
 describe("DocumentPage", () => {
-  it("shows the form of the document and the file path only as a tooltip on the preview", async () => {
+  it("shows the PDF preview and the form of the document in a sidebar named after it, with the file path only as a tooltip on the preview", async () => {
     mocked.documentView.mockResolvedValue(documentView({ missing: ["vendor"] }));
     renderWithQuery(<DocumentPage documentId="doc-1" />);
 
-    expect(await screen.findByText("Missing: vendor")).toBeTruthy();
+    const side = await screen.findByRole("complementary", { name: "Demo Cloud Ltd · DEM-2026-1109" });
+    expect(within(side).getByText("Missing: vendor")).toBeTruthy();
     expect(screen.queryByText("Documents/Inbox/demo-cloud-1109.pdf")).toBeNull();
     expect(screen.getByTitle("Documents/Inbox/demo-cloud-1109.pdf")).toBeTruthy();
     expect(mocked.documentView).toHaveBeenCalledWith("doc-1");
+    await waitFor(() => expect(mocked.pdfViewShow).toHaveBeenCalledWith({ kind: "document", id: "doc-1" }, expect.anything()));
   });
 
   it("shows the selection hint and the PDF preview while the document loads", () => {
@@ -35,6 +37,7 @@ describe("DocumentPage", () => {
     renderWithQuery(<DocumentPage documentId="doc-1" />);
 
     expect(screen.getByText("Text in the PDF can be selected and copied")).toBeTruthy();
+    expect(screen.getByRole("complementary", { name: "Document" })).toBeTruthy();
     expect(mocked.pdfViewShow).toHaveBeenCalledWith({ kind: "document", id: "doc-1" }, expect.anything());
     expect(screen.queryByText("Every required fact is set")).toBeNull();
   });
@@ -99,10 +102,24 @@ describe("DocumentPage", () => {
   });
 
   describe("history", () => {
+    const summary = () => screen.getByText("History", { selector: "summary" });
+
+    it("is folded away until its heading is clicked", async () => {
+      mocked.documentView.mockResolvedValue(documentView());
+      renderWithQuery(<DocumentPage documentId="doc-1" />);
+      await screen.findByText("Every required fact is set");
+
+      expect(summary().closest("details")?.open).toBe(false);
+      await userEvent.click(summary());
+
+      expect(summary().closest("details")?.open).toBe(true);
+    });
+
     it("lists the entries of the document with the write-once note", async () => {
       mocked.documentView.mockResolvedValue(documentView());
       mocked.documentHistory.mockResolvedValue([historyEntry({ text: "Finished", when: "13 Nov 2026, 15:00" }), historyEntry({ text: "Added", when: "12 Nov 2026, 09:10" })]);
       renderWithQuery(<DocumentPage documentId="doc-1" />);
+      await userEvent.click(await screen.findByText("History", { selector: "summary" }));
 
       const list = screen.getByRole("list", { name: "Changes" });
       const items = await within(list).findAllByRole("listitem");

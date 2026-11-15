@@ -128,7 +128,7 @@ describe("App", () => {
   describe("page commands from Rust", () => {
     it.each([
       ["go:subscriptions", "Subscriptions"],
-      ["go:statements", "Statements"],
+      ["go:statements", "Accounts"],
       ["go:documents", "Documents"],
     ])("opens the page for %s", async (id, title) => {
       renderApp();

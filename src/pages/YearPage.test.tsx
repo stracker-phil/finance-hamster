@@ -175,48 +175,19 @@ describe("YearPage", () => {
   });
 
   describe("payslip panel", () => {
-    const toggle = () => screen.getByRole("button", { name: "Show or hide payslips" });
-
-    it("is hidden while the setting is off, and the toggle is not pressed", async () => {
+    it("is hidden while the setting is off, and the page has no toggle of its own", async () => {
       await show();
 
-      expect(toggle().getAttribute("aria-pressed")).toBe("false");
-      expect(screen.queryByRole("complementary", { name: "Payslips" })).toBeNull();
+      expect(screen.queryByRole("complementary", { name: "Your year by the payslips" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Show or hide payslips" })).toBeNull();
     });
 
-    it("shows the year's payslips beside the page while the setting is on, and the toggle is pressed", async () => {
+    it("shows the year's payslips summary beside the page while the setting is on", async () => {
       mocked.getSettings.mockResolvedValue(settings({ payslipPanel: true }));
       await show();
 
-      expect(await screen.findByRole("complementary", { name: "Payslips" })).toBeTruthy();
-      await vi.waitFor(() => expect(toggle().getAttribute("aria-pressed")).toBe("true"));
+      expect(await screen.findByRole("complementary", { name: "Your year by the payslips" })).toBeTruthy();
       expect(mocked.payslipsYear).toHaveBeenCalledWith(2026);
-    });
-
-    it("turns the setting on when the toggle is clicked while it is off", async () => {
-      await show();
-
-      await userEvent.click(toggle());
-
-      await vi.waitFor(() => expect(mocked.updateSettings).toHaveBeenCalledWith({ payslipPanel: true }));
-    });
-
-    it("turns the setting off when the toggle is clicked while it is on", async () => {
-      mocked.getSettings.mockResolvedValue(settings({ payslipPanel: true }));
-      await show();
-
-      await userEvent.click(toggle());
-
-      await vi.waitFor(() => expect(mocked.updateSettings).toHaveBeenCalledWith({ payslipPanel: false }));
-    });
-
-    it("reports a setting that cannot be saved as an error toast", async () => {
-      mocked.updateSettings.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
-      await show();
-
-      await userEvent.click(toggle());
-
-      await vi.waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toEqual(["Disk full"]));
     });
   });
 

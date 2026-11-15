@@ -21,6 +21,7 @@ pub mod lock;
 mod menu;
 pub mod money;
 pub mod notify;
+pub mod others;
 pub mod payslips;
 pub mod platform;
 pub mod preview;

@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import { openMenu, useMenuOpenOn } from "../components/menu";
 import { useCommands } from "../queries/commands";
 import { ChevronDown, ChevronLeft, Plus, Search, X } from "lucide-react";
-import { startAddDocument } from "../documents/addFlow";
+import { startAddDocument, startAddOther, startAddPayslip } from "../documents/addFlow";
 import { FILTER_PLACEHOLDER } from "../pages/pages";
 import { useT } from "../i18n";
 import type { Route } from "../state/route";
@@ -90,9 +90,11 @@ function FilterField({ page }: { page: Route["page"] }) {
 }
 
 /** The + New menu's commands, with the shortcut each has now. */
-const NEW_ITEMS: { label: "importStatement" | "addInvoice" | "newSubscription"; command: string; run: () => void }[] = [
+const NEW_ITEMS: { label: "importStatement" | "addInvoice" | "addPayslip" | "addOther" | "newSubscription"; command: string; run: () => void }[] = [
   { label: "importStatement", command: "statement:import", run: startImport },
   { label: "addInvoice", command: "document:add", run: startAddDocument },
+  { label: "addPayslip", command: "payslip:add", run: startAddPayslip },
+  { label: "addOther", command: "other:add", run: startAddOther },
   { label: "newSubscription", command: "subscription:new", run: newSubscription },
 ];
 
@@ -132,8 +134,8 @@ function Crumb({ label, to }: { label: string; to: Route }) {
   );
 }
 
-/** The page header: crumb, title, page controls, filter field and New menu. */
-export function Header({ route, title, controls }: { route: Route; title: HeaderTitle; controls?: ReactNode }) {
+/** The page header: crumb, title, page controls, filter field, New menu and the page's trailing toggle. */
+export function Header({ route, title, controls, trailing }: { route: Route; title: HeaderTitle; controls?: ReactNode; trailing?: ReactNode }) {
   return (
     <header className="header" data-tauri-drag-region>
       {title.crumb && <Crumb {...title.crumb} />}
@@ -143,6 +145,7 @@ export function Header({ route, title, controls }: { route: Route; title: Header
       <div className="header__spacer" data-tauri-drag-region />
       <FilterField page={route.page} />
       <NewMenu />
+      {trailing}
     </header>
   );
 }

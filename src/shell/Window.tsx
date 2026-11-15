@@ -10,6 +10,8 @@ import { PageBody } from "../pages/PageBody";
 import { useAccounts } from "../queries/accounts";
 import { useDocument } from "../queries/documents";
 import { usePayslip } from "../queries/payslips";
+import { useOther } from "../queries/others";
+import { useStatement } from "../queries/statements";
 import { useTaxYears } from "../queries/taxYears";
 import { AddDocumentSheet } from "../documents/AddDocumentSheet";
 import { ImportSheet } from "../statements/ImportSheet";
@@ -18,6 +20,7 @@ import { SubscriptionSheetHost } from "../subscriptions/SubscriptionSheet";
 import { useStore } from "../state/store";
 import { FilesBanner } from "./FilesBanner";
 import { Header } from "./Header";
+import { YearSidebarToggle } from "../year/YearSidebarToggle";
 import { Sidebar } from "./Sidebar";
 import { titleFor } from "./titles";
 
@@ -33,6 +36,9 @@ export function Window() {
   const documentTitle = route.page === "document" ? openDocument?.title : undefined;
   const { data: openPayslip } = usePayslip(route.page === "payslip" ? route.payslipId : "", route.page === "payslip");
   const payslipTitle = route.page === "payslip" ? openPayslip?.title : undefined;
+  const { data: openStatement } = useStatement(route.page === "statement" ? route.statementId : "", route.page === "statement");
+  const { data: openOther } = useOther(route.page === "other" ? route.otherId : "", route.page === "other");
+  const detailTitle = payslipTitle ?? (route.page === "statement" ? openStatement?.title : undefined) ?? (route.page === "other" ? openOther?.title : undefined);
   // Tax rules taken on before the window opened (a newer built-in version) are told once.
   useEffect(() => {
     api
@@ -53,14 +59,14 @@ export function Window() {
     );
   }
   const accountName = route.page === "account" ? accounts?.find((a) => a.id === route.accountId)?.name : undefined;
-  const pageName = accountName ?? documentTitle ?? payslipTitle;
+  const pageName = accountName ?? documentTitle ?? detailTitle;
   const title = pageName ? { ...titleFor(route), title: pageName } : titleFor(route);
   return (
     <div className="window">
       <Sidebar years={years.map((y) => ({ year: y.year, closed: y.state === "closed" }))} />
       <main className="main">
         <div className="panel">
-          <Header route={route} title={title} />
+          <Header route={route} title={title} trailing={route.page === "year" ? <YearSidebarToggle /> : undefined} />
           <FilesBanner />
           <section className="page" aria-label={title.title}>
             <PageBody route={route} />

@@ -7,7 +7,7 @@ vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await impo
 import { api } from "../api";
 import { HOME } from "../state/route";
 import { useStore } from "../state/store";
-import { documentGroup, documentRow } from "../test/documents";
+import { accountStatements, documentGroup, documentRow, otherGroup } from "../test/documents";
 import { renderWithQuery } from "../test/renderWithQuery";
 import { DocumentsPage } from "./DocumentsPage";
 
@@ -18,12 +18,139 @@ const inbox = () =>
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useStore.setState({ route: HOME, back: [], forward: [], filter: "" });
+  useStore.setState({ route: HOME, back: [], forward: [], filter: "", toasts: [], documentsTab: "invoices", addPreview: null, importPreview: null });
   mocked.documentsList.mockResolvedValue([]);
+  mocked.statementsList.mockResolvedValue([]);
+  mocked.othersList.mockResolvedValue([]);
+  mocked.payslipsList.mockResolvedValue([]);
   mocked.documentAddChoose.mockResolvedValue(null);
+  mocked.statementImportChoose.mockResolvedValue(null);
+  mocked.otherAddPdf.mockResolvedValue(null);
 });
 
+const tabButton = (name: string) => screen.getByRole("button", { name });
+
 describe("DocumentsPage", () => {
+  describe("tabs", () => {
+    it("offers Invoices, Statements, Payslips and Other as one group with Invoices pressed first", async () => {
+      renderWithQuery(<DocumentsPage />);
+
+      const group = screen.getByRole("group", { name: "Kind of document" });
+      expect(within(group).getAllByRole("button").map((b) => b.textContent)).toEqual(["Invoices", "Statements", "Payslips", "Other"]);
+      expect(tabButton("Invoices").getAttribute("aria-pressed")).toBe("true");
+      await screen.findByText("No documents");
+    });
+
+    it("opens the tab the route asks for", async () => {
+      mocked.othersList.mockResolvedValue([otherGroup()]);
+
+      renderWithQuery(<DocumentsPage tab="other" />);
+
+      expect(await screen.findByRole("button", { name: /Demo Lease/ })).toBeTruthy();
+      expect(tabButton("Other").getAttribute("aria-pressed")).toBe("true");
+      expect(tabButton("Invoices").getAttribute("aria-pressed")).toBe("false");
+    });
+
+    it("opens the tab opened last when the route names none", async () => {
+      useStore.setState({ documentsTab: "statements" });
+      mocked.statementsList.mockResolvedValue([accountStatements()]);
+
+      renderWithQuery(<DocumentsPage />);
+
+      expect(await screen.findByRole("region", { name: "Private" })).toBeTruthy();
+      expect(tabButton("Statements").getAttribute("aria-pressed")).toBe("true");
+    });
+
+    it.each([
+      ["Statements", "statements"],
+      ["Payslips", "payslips"],
+      ["Other", "other"],
+      ["Invoices", "invoices"],
+    ] as const)("remembers %s and navigates to it when its tab is clicked", async (name, tab) => {
+      renderWithQuery(<DocumentsPage tab={tab === "invoices" ? "other" : "invoices"} />);
+
+      await userEvent.click(tabButton(name));
+
+      expect(useStore.getState().documentsTab).toBe(tab);
+      expect(useStore.getState().route).toEqual({ page: "documents", tab });
+    });
+  });
+
+  describe("empty tabs", () => {
+    it("explains how to add a statement and asks for one with Import Statement…", async () => {
+      renderWithQuery(<DocumentsPage tab="statements" />);
+
+      expect(await screen.findByText("No statements yet. Drop a bank statement PDF onto the window, or import one.")).toBeTruthy();
+      await userEvent.click(screen.getByRole("button", { name: "Import Statement…" }));
+
+      await waitFor(() => expect(mocked.statementImportChoose).toHaveBeenCalled());
+    });
+
+    it("explains how to keep another document and asks for a PDF with Add Document…", async () => {
+      renderWithQuery(<DocumentsPage tab="other" />);
+
+      expect(await screen.findByText("Keep any PDF here: a contract, a policy, a tax assessment.")).toBeTruthy();
+      await userEvent.click(screen.getByRole("button", { name: "Add Document…" }));
+
+      await waitFor(() => expect(mocked.otherAddPdf).toHaveBeenCalled());
+    });
+
+    it("opens the kept document, saying so with Undo, once a PDF was chosen with Add Document…", async () => {
+      mocked.otherAddPdf.mockResolvedValue({ id: "other-new", label: "Add Demo Lease" });
+      renderWithQuery(<DocumentsPage tab="other" />);
+
+      await userEvent.click(await screen.findByRole("button", { name: "Add Document…" }));
+
+      await waitFor(() => expect(useStore.getState().route).toEqual({ page: "other", otherId: "other-new" }));
+      expect(useStore.getState().toasts.map((t) => t.message)).toEqual(["Add Demo Lease"]);
+    });
+
+    it("reports a PDF that cannot be kept as an error toast and stays on the tab", async () => {
+      mocked.otherAddPdf.mockRejectedValue({ kind: "invalid_input", message: "This PDF is already kept as Demo Lease", code: null });
+      renderWithQuery(<DocumentsPage tab="other" />);
+
+      await userEvent.click(await screen.findByRole("button", { name: "Add Document…" }));
+
+      await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toEqual(["This PDF is already kept as Demo Lease"]));
+      expect(useStore.getState().route).toEqual(HOME);
+    });
+
+    it.each([
+      ["statements", "Import Statement…"],
+      ["other", "Add Document…"],
+    ] as const)("says nothing matches, without the add button, when a search finds no %s", async (tab, action) => {
+      renderWithQuery(<DocumentsPage tab={tab} />);
+      await screen.findByRole("button", { name: action });
+
+      await userEvent.type(screen.getByRole("textbox", { name: "Search documents" }), "xyz");
+
+      expect(await screen.findByText("Nothing matches “xyz”, so it isn't here yet.")).toBeTruthy();
+      expect(screen.queryByRole("button", { name: action })).toBeNull();
+    });
+  });
+
+  describe("search on the other tabs", () => {
+    it("asks for the statements matching the typed text", async () => {
+      mocked.statementsList.mockResolvedValue([accountStatements()]);
+      renderWithQuery(<DocumentsPage tab="statements" />);
+      await screen.findByRole("region", { name: "Private" });
+
+      await userEvent.type(screen.getByRole("textbox", { name: "Search documents" }), "nov");
+
+      await waitFor(() => expect(mocked.statementsList).toHaveBeenLastCalledWith("nov"));
+    });
+
+    it("asks for the other documents matching the typed text", async () => {
+      mocked.othersList.mockResolvedValue([otherGroup()]);
+      renderWithQuery(<DocumentsPage tab="other" />);
+      await screen.findByRole("region", { name: "2026" });
+
+      await userEvent.type(screen.getByRole("textbox", { name: "Search documents" }), "lease");
+
+      await waitFor(() => expect(mocked.othersList).toHaveBeenLastCalledWith("lease"));
+    });
+  });
+
   describe("groups", () => {
     beforeEach(() => {
       mocked.documentsList.mockResolvedValue([inbox(), documentGroup({ documents: [documentRow(), documentRow({ id: "doc-3", title: "Sample Books", state: "excluded", anv: "€0.00" })], count: "2 documents", total: "€121.23" })]);
