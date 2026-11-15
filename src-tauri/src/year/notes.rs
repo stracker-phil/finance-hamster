@@ -34,7 +34,7 @@ pub fn note(
         questions
             .iter()
             .find(|q| q.id == id)
-            .map_or(id.to_string(), |q| short(&q.label).to_string())
+            .map_or(id.to_string(), |q| short(q.display_label()).to_string())
     };
     let mut rules: Vec<&EstimateRule> = item.estimate.iter().collect();
     rules.sort_by_key(|r| match r {

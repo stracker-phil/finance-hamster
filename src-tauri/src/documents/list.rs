@@ -143,7 +143,7 @@ pub fn documents(
         let item = match (year, &doc.item_key) {
             (Some(y), Some(key)) => rules::ruleset_for_year(db, y)?
                 .and_then(|r| r.items.into_iter().find(|i| &i.key == key))
-                .map(|i| format!("KZ {} {}", i.kz, i.name)),
+                .map(|i| format!("KZ {} {}", i.kz, i.display_name())),
             _ => None,
         };
         let anv = paid.map(|p| anv_cents(p, doc.work_share));

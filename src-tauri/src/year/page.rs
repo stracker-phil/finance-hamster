@@ -162,9 +162,14 @@ pub fn page(
     let needle = query.trim().to_lowercase();
     let shown = |p: &Placed, item: &Item| {
         needle.is_empty()
-            || [p.row.title.as_str(), item.kz.as_str(), item.name.as_str()]
-                .iter()
-                .any(|t| t.to_lowercase().contains(&needle))
+            || [
+                p.row.title.as_str(),
+                item.kz.as_str(),
+                item.name.as_str(),
+                item.display_name(),
+            ]
+            .iter()
+            .any(|t| t.to_lowercase().contains(&needle))
     };
     let total: i64 = facts.placed.iter().map(|p| p.cents).sum();
     let in_view: Vec<&Placed> = facts

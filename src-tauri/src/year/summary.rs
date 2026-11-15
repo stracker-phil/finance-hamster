@@ -29,9 +29,9 @@ pub fn question_views(
             });
             QuestionView {
                 id: q.id.clone(),
-                label: q.label.clone(),
-                help: q.help.clone(),
-                unit: q.unit.clone(),
+                label: q.display_label().to_string(),
+                help: q.display_help().map(str::to_string),
+                unit: q.display_unit().map(str::to_string),
                 answered: value.is_some(),
                 value: value.unwrap_or_default(),
             }
@@ -114,7 +114,7 @@ pub fn kennzahlen(
             KennzahlView {
                 key: item.key.clone(),
                 kz: item.kz.clone(),
-                name: item.name.clone(),
+                name: item.display_name().to_string(),
                 copy: copy_value(own.iter().map(|p| p.cents).sum()),
                 note: if is_countable(item) {
                     (!own.is_empty())

@@ -108,8 +108,8 @@ pub fn questions(
             let base = CheckQuestion {
                 key: String::new(),
                 kz: None,
-                question: ask.question.clone(),
-                hint: ask.hint.clone(),
+                question: ask.display_question().to_string(),
+                hint: ask.display_hint().map(str::to_string),
                 add: None,
                 unit: None,
                 value: String::new(),

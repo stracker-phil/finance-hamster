@@ -121,7 +121,7 @@ pub fn answer(
     };
     db.write(
         Op::new(
-            crate::tr!("Answer {}", "Antwort: {}", question.label),
+            crate::tr!("Answer {}", "Antwort: {}", question.display_label()),
             vec![change],
         ),
         source,

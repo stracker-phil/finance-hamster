@@ -5,6 +5,24 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+use crate::i18n::lang;
+use crate::settings::Language;
+
+/// The German text when the app is German and the file has one, else the English text (ADR 0050).
+fn shown<'a>(en: &'a str, de: Option<&'a String>) -> &'a str {
+    match (lang(), de) {
+        (Language::De, Some(de)) => de,
+        _ => en,
+    }
+}
+
+fn shown_opt<'a>(en: Option<&'a String>, de: Option<&'a String>) -> Option<&'a str> {
+    match (lang(), de) {
+        (Language::De, Some(de)) => Some(de),
+        _ => en.map(String::as_str),
+    }
+}
+
 /// Whole euro cents read from a JSON amount (`1000.00`); negative values and fractions of a cent are refused.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Cents(pub i64);
@@ -130,6 +148,39 @@ pub struct Question {
     pub unit: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ask: Option<Ask>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub de: Option<QuestionDe>,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, Default, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct QuestionDe {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub help: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unit: Option<String>,
+}
+
+impl Question {
+    pub fn display_label(&self) -> &str {
+        shown(&self.label, self.de.as_ref().and_then(|d| d.label.as_ref()))
+    }
+
+    pub fn display_help(&self) -> Option<&str> {
+        shown_opt(
+            self.help.as_ref(),
+            self.de.as_ref().and_then(|d| d.help.as_ref()),
+        )
+    }
+
+    pub fn display_unit(&self) -> Option<&str> {
+        shown_opt(
+            self.unit.as_ref(),
+            self.de.as_ref().and_then(|d| d.unit.as_ref()),
+        )
+    }
 }
 
 /// How the year check asks about an item or question.
@@ -141,6 +192,33 @@ pub struct Ask {
     pub question: String,
     #[serde(default)]
     pub hint: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub de: Option<AskDe>,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, Default, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct AskDe {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub question: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hint: Option<String>,
+}
+
+impl Ask {
+    pub fn display_question(&self) -> &str {
+        shown(
+            &self.question,
+            self.de.as_ref().and_then(|d| d.question.as_ref()),
+        )
+    }
+
+    pub fn display_hint(&self) -> Option<&str> {
+        shown_opt(
+            self.hint.as_ref(),
+            self.de.as_ref().and_then(|d| d.hint.as_ref()),
+        )
+    }
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
@@ -148,6 +226,21 @@ pub struct Ask {
 pub struct Section {
     pub id: String,
     pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub de: Option<SectionDe>,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, Default, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct SectionDe {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+}
+
+impl Section {
+    pub fn display_name(&self) -> &str {
+        shown(&self.name, self.de.as_ref().and_then(|d| d.name.as_ref()))
+    }
 }
 
 #[derive(Deserialize, Serialize, Clone, Copy, Debug, PartialEq, Eq)]
@@ -202,9 +295,24 @@ pub struct Item {
     pub source: Option<SourceRef>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ask: Option<Ask>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub de: Option<ItemDe>,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, Default, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ItemDe {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
 }
 
 impl Item {
+    pub fn display_name(&self) -> &str {
+        shown(&self.name, self.de.as_ref().and_then(|d| d.name.as_ref()))
+    }
+
     /// What the entry needs before it counts; information-only items never need a PDF.
     pub fn evidence(&self) -> Evidence {
         match self.kind {
@@ -265,6 +373,127 @@ mod tests {
             item["evidence"] = json!(evidence);
         }
         serde_json::from_value(item).unwrap()
+    }
+
+    fn german_ruleset() -> Ruleset {
+        let mut rules = minimal_rules(2026);
+        set(&mut rules, "/sections/0/de", json!({ "name": "Hauptteil" }));
+        set(
+            &mut rules,
+            "/questions",
+            json!([
+                {
+                    "id": "days", "label": "Days", "help": "Days at home", "type": "integer",
+                    "unit": "days",
+                    "ask": {
+                        "order": 1, "question": "How many days?", "hint": "See the calendar",
+                        "de": { "question": "Wie viele Tage?", "hint": "Siehe Kalender" }
+                    },
+                    "de": { "label": "Tage", "help": "Tage zu Hause", "unit": "Tage" }
+                },
+                { "id": "plain", "label": "Plain", "help": "Only English", "type": "amount", "unit": "EUR" }
+            ]),
+        );
+        set(
+            &mut rules,
+            "/items/0/de",
+            json!({ "name": "Bücher", "note": "Fachbücher" }),
+        );
+        serde_json::from_value(rules).unwrap()
+    }
+
+    #[test]
+    fn display_texts_are_german_when_the_language_is_german_and_the_file_has_them() {
+        let rules = german_ruleset();
+        let (section, item) = (&rules.sections[0], &rules.items[0]);
+        let (days, ask) = (
+            &rules.questions[0],
+            rules.questions[0].ask.as_ref().unwrap(),
+        );
+
+        crate::i18n::with_lang(Language::De, || {
+            assert_eq!(section.display_name(), "Hauptteil");
+            assert_eq!(item.display_name(), "Bücher");
+            assert_eq!(days.display_label(), "Tage");
+            assert_eq!(days.display_help(), Some("Tage zu Hause"));
+            assert_eq!(days.display_unit(), Some("Tage"));
+            assert_eq!(ask.display_question(), "Wie viele Tage?");
+            assert_eq!(ask.display_hint(), Some("Siehe Kalender"));
+        });
+    }
+
+    #[test]
+    fn display_texts_fall_back_to_english_without_a_german_text() {
+        let rules = german_ruleset();
+        let plain = &rules.questions[1];
+
+        crate::i18n::with_lang(Language::De, || {
+            assert_eq!(plain.display_label(), "Plain");
+            assert_eq!(plain.display_help(), Some("Only English"));
+            assert_eq!(plain.display_unit(), Some("EUR"));
+        });
+
+        let bare: Ruleset = serde_json::from_value(minimal_rules(2026)).unwrap();
+        crate::i18n::with_lang(Language::De, || {
+            assert_eq!(bare.sections[0].display_name(), "Main");
+            assert_eq!(bare.items[0].display_name(), "Books");
+        });
+    }
+
+    #[test]
+    fn a_partial_german_object_shows_german_only_where_it_has_a_text() {
+        let mut rules = minimal_rules(2026);
+        set(
+            &mut rules,
+            "/questions",
+            json!([{
+                "id": "days", "label": "Days", "help": "Days at home", "type": "integer",
+                "de": { "label": "Tage" }
+            }]),
+        );
+        let ruleset: Ruleset = serde_json::from_value(rules).unwrap();
+        let question = &ruleset.questions[0];
+
+        crate::i18n::with_lang(Language::De, || {
+            assert_eq!(question.display_label(), "Tage");
+            assert_eq!(question.display_help(), Some("Days at home"));
+            assert_eq!(question.display_unit(), None);
+        });
+    }
+
+    #[test]
+    fn display_texts_are_english_when_the_language_is_english() {
+        let rules = german_ruleset();
+        let (section, item) = (&rules.sections[0], &rules.items[0]);
+        let (days, ask) = (
+            &rules.questions[0],
+            rules.questions[0].ask.as_ref().unwrap(),
+        );
+
+        crate::i18n::with_lang(Language::En, || {
+            assert_eq!(section.display_name(), "Main");
+            assert_eq!(item.display_name(), "Books");
+            assert_eq!(days.display_label(), "Days");
+            assert_eq!(days.display_help(), Some("Days at home"));
+            assert_eq!(days.display_unit(), Some("days"));
+            assert_eq!(ask.display_question(), "How many days?");
+            assert_eq!(ask.display_hint(), Some("See the calendar"));
+        });
+    }
+
+    #[test]
+    fn german_texts_round_trip_and_are_left_out_when_absent() {
+        let rules = german_ruleset();
+        let value = serde_json::to_value(&rules).unwrap();
+        assert_eq!(
+            value["items"][0]["de"],
+            json!({ "name": "Bücher", "note": "Fachbücher" })
+        );
+        assert_eq!(value["questions"][0]["de"]["label"], json!("Tage"));
+        assert!(value["questions"][1].get("de").is_none());
+
+        let copy: Ruleset = serde_json::from_value(value).unwrap();
+        assert_eq!(copy, rules);
     }
 
     #[test]

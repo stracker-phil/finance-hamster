@@ -128,6 +128,40 @@ fn a_changed_kilometergeld_rate_is_named_by_its_position() {
 }
 
 #[test]
+fn a_change_to_only_a_german_hint_is_reported() {
+    let with_hint = |hint: &str| {
+        let mut rules = minimal_rules(2026);
+        set(
+            &mut rules,
+            "/items/0/ask",
+            json!({
+                "order": 1, "question": "Did you buy books?", "hint": "Receipts",
+                "de": { "question": "Hast du Bücher gekauft?", "hint": hint }
+            }),
+        );
+        rules
+    };
+    let mut new = with_hint("Belege und Rechnungen");
+    set(&mut new, "/ruleset", json!("2026 v2"));
+
+    let mut all = lines(with_hint("Belege"), new);
+
+    assert_eq!(all.remove(0), "ruleset: \"2026 v1\" → \"2026 v2\"");
+    assert_eq!(
+        all,
+        vec!["items.books.ask.de.hint: \"Belege\" → \"Belege und Rechnungen\"".to_string()]
+    );
+}
+
+#[test]
+fn an_added_german_name_is_reported_under_the_item() {
+    assert_eq!(
+        changes(|r| set(r, "/items/0/de", json!({ "name": "Bücher" }))),
+        vec!["items.books.de: none → {\"name\":\"Bücher\"}".to_string()]
+    );
+}
+
+#[test]
 fn an_added_item_is_listed_with_its_kz_and_name() {
     assert_eq!(
         changes(|r| push_item(r, "fees", "724", "Fees")),

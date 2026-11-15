@@ -275,7 +275,7 @@ fn next_year_of_the_seed_moves_the_year_the_ruleset_and_the_kilometergeld_dates(
     let mut expected: Value = serde_json::from_str(SEED).unwrap();
     set(&mut expected, "/year", json!(2027));
     set(&mut expected, "/ruleset", json!("2027 v1"));
-    set(&mut expected, "/basedOn", json!("2026 v2"));
+    set(&mut expected, "/basedOn", json!("2026 v3"));
     set(
         &mut expected,
         "/rates/kilometergeld/0/from",
@@ -317,7 +317,7 @@ fn next_year_of_the_seed_passes_the_checks() {
     let text = next_year_text(SEED).unwrap();
     let ruleset = check::read(&text, &BTreeSet::new()).unwrap();
     assert_eq!(ruleset.year, 2027);
-    assert_eq!(ruleset.based_on.as_deref(), Some("2026 v2"));
+    assert_eq!(ruleset.based_on.as_deref(), Some("2026 v3"));
     assert_eq!(ruleset.items.len(), 12);
 }
 

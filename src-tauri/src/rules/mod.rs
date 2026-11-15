@@ -91,7 +91,7 @@ pub fn item_options(ruleset: &Ruleset) -> Vec<ItemOption> {
         .iter()
         .filter(|i| i.visible)
         .map(|i| ItemOption {
-            label: format!("KZ {} · {}", i.kz, i.name),
+            label: format!("KZ {} · {}", i.kz, i.display_name()),
             key: i.key.clone(),
             kz: i.kz.clone(),
         })

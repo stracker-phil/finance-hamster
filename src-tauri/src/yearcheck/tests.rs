@@ -122,6 +122,45 @@ fn questions_follow_their_order_with_questions_before_items_and_file_order_on_a_
 }
 
 #[test]
+fn the_year_check_asks_in_german_when_the_rules_have_german_texts() {
+    let mut rules = asking();
+    set(
+        &mut rules,
+        "/items/1/ask/de",
+        json!({ "question": "Hast du ein Telefon gekauft?", "hint": "Vertrag oder Gerät" }),
+    );
+    set(
+        &mut rules,
+        "/questions/0/ask/de",
+        json!({ "question": "Wie viele Tage im Homeoffice?" }),
+    );
+    set(&mut rules, "/questions/0/de", json!({ "unit": "Tage" }));
+    let (_dir, db) = open_year_with(&rules);
+    let ruleset: Ruleset = serde_json::from_value(rules).unwrap();
+
+    let german = crate::i18n::with_lang(crate::settings::Language::De, || {
+        questions(&db, &ruleset, NumberFormat::DotDecimal).unwrap()
+    });
+    let pick = |key: &str| german.iter().find(|q| q.key == key).unwrap();
+
+    assert_eq!(pick("phone").question, "Hast du ein Telefon gekauft?");
+    assert_eq!(pick("phone").hint.as_deref(), Some("Vertrag oder Gerät"));
+    assert_eq!(
+        pick("telearbeitstage").question,
+        "Wie viele Tage im Homeoffice?"
+    );
+    assert_eq!(pick("telearbeitstage").unit.as_deref(), Some("Tage"));
+    assert_eq!(pick("books").question, "Did you buy books?");
+
+    let english = crate::i18n::with_lang(crate::settings::Language::En, || {
+        questions(&db, &ruleset, NumberFormat::DotDecimal).unwrap()
+    });
+    let phone = english.iter().find(|q| q.key == "phone").unwrap();
+    assert_eq!(phone.question, "Did you buy a phone?");
+    assert_eq!(phone.hint.as_deref(), Some("Contract or device"));
+}
+
+#[test]
 fn an_item_question_names_its_kennzahl_and_what_yes_adds() {
     let (_dir, db) = asked_year();
     let all = listed(&db, NumberFormat::DotDecimal);

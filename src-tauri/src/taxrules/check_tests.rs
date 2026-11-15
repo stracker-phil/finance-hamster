@@ -50,7 +50,7 @@ fn a_minimal_file_reads_back_as_typed_rules() {
 fn the_shipped_seed_is_valid_with_twelve_items_all_verified() {
     let ruleset = read(SEED, &no_keys()).unwrap();
     assert_eq!(ruleset.year, 2026);
-    assert_eq!(ruleset.ruleset, "2026 v2");
+    assert_eq!(ruleset.ruleset, "2026 v3");
     assert_eq!(ruleset.items.len(), 12);
     assert_eq!(ruleset.unverified_count(), 0);
 }
@@ -59,7 +59,7 @@ fn the_shipped_seed_is_valid_with_twelve_items_all_verified() {
 fn the_shipped_2025_seed_is_valid_with_twelve_items_all_verified() {
     let ruleset = read(SEED_2025, &no_keys()).unwrap();
     assert_eq!(ruleset.year, 2025);
-    assert_eq!(ruleset.ruleset, "2025 v1");
+    assert_eq!(ruleset.ruleset, "2025 v2");
     assert_eq!(ruleset.items.len(), 12);
     assert_eq!(ruleset.unverified_count(), 0);
 }
@@ -181,6 +181,144 @@ fn a_ruleset_with_ask_round_trips_and_one_without_serializes_no_ask_key() {
     let without = read_value(&minimal_rules(2026)).unwrap();
     let value = serde_json::to_value(&without).unwrap();
     assert!(value["items"][0].get("ask").is_none());
+}
+
+#[test]
+fn an_empty_german_text_is_reported_with_the_field_it_is_in() {
+    let questions = json!([{
+        "id": "days", "label": "Days", "type": "integer",
+        "de": { "label": "", "help": "Tage" },
+        "ask": { "order": 1, "question": "How many?", "de": { "question": "Wie viele?", "hint": "  " } }
+    }]);
+    let cases: Vec<(Vec<(&str, Value)>, &str)> = vec![
+        (
+            vec![("/questions", questions)],
+            "questions[0].de.label: the German text is empty; remove it to show the English one",
+        ),
+        (
+            vec![("/sections/0/de", json!({ "name": " " }))],
+            "sections[0].de.name: the German text is empty; remove it to show the English one",
+        ),
+        (
+            vec![("/items/0/de", json!({ "name": "Bücher", "note": "" }))],
+            "items[0].de.note: the German text is empty; remove it to show the English one",
+        ),
+        (
+            vec![(
+                "/items/0/ask",
+                json!({ "order": 1, "question": "Books?", "de": { "question": "" } }),
+            )],
+            "items[0].ask.de.question: the German text is empty; remove it to show the English one",
+        ),
+    ];
+    for (edits, expected) in cases {
+        let problems = problems_of(&edits);
+        assert!(
+            problems.contains(&expected.to_string()),
+            "{expected}: {problems:?}"
+        );
+    }
+    assert_eq!(
+        problems_of(&[(
+            "/questions",
+            json!([{
+                "id": "days", "label": "Days", "type": "integer",
+                "ask": { "order": 1, "question": "How many?", "de": { "hint": "" } }
+            }])
+        )]),
+        vec![
+            "questions[0].ask.de.hint: the German text is empty; remove it to show the English one"
+                .to_string()
+        ]
+    );
+}
+
+#[test]
+fn an_empty_german_text_is_reported_in_german_when_the_language_is_german() {
+    let problems = crate::i18n::with_lang(crate::settings::Language::De, || {
+        problems_of(&[("/items/0/de", json!({ "name": "" }))])
+    });
+    assert_eq!(
+        problems,
+        vec![
+            "items[0].de.name: Der deutsche Text ist leer; entferne ihn, um den englischen zu zeigen"
+                .to_string()
+        ]
+    );
+}
+
+#[test]
+fn german_texts_that_say_something_are_valid() {
+    let ruleset = read_value(&edited(&[
+        ("/sections/0/de", json!({ "name": "Hauptteil" })),
+        (
+            "/items/0/de",
+            json!({ "name": "Bücher", "note": "Fachbücher" }),
+        ),
+        (
+            "/questions",
+            json!([{
+                "id": "days", "label": "Days", "type": "integer",
+                "de": { "label": "Tage", "help": "Tage zu Hause", "unit": "Tage" }
+            }]),
+        ),
+    ]))
+    .unwrap();
+    assert_eq!(
+        ruleset.items[0].de.as_ref().unwrap().name.as_deref(),
+        Some("Bücher")
+    );
+}
+
+#[test]
+fn a_german_object_with_an_unknown_field_fails_to_parse() {
+    let cases = ["/items/0/de", "/sections/0/de", "/items/0/ask"];
+    for pointer in cases {
+        let value = if pointer == "/items/0/ask" {
+            json!({ "order": 1, "question": "Books?", "de": { "colour": "rot" } })
+        } else {
+            json!({ "colour": "rot" })
+        };
+        let problems = problems_of(&[(pointer, value)]);
+        assert_eq!(problems.len(), 1, "{pointer}: {problems:?}");
+        assert!(
+            problems[0].contains("unknown field `colour`"),
+            "{pointer}: {problems:?}"
+        );
+    }
+}
+
+#[test]
+fn every_shipped_seed_has_german_for_each_question_label_and_ask_question() {
+    for (name, text) in [("2025", SEED_2025), ("2026", SEED)] {
+        let ruleset = read(text, &no_keys()).unwrap();
+        for question in &ruleset.questions {
+            let label = question.de.as_ref().and_then(|d| d.label.as_deref());
+            assert!(
+                label.is_some_and(|t| !t.trim().is_empty()),
+                "{name} label of {}",
+                question.id
+            );
+            if let Some(ask) = &question.ask {
+                let text = ask.de.as_ref().and_then(|d| d.question.as_deref());
+                assert!(
+                    text.is_some_and(|t| !t.trim().is_empty()),
+                    "{name} ask of {}",
+                    question.id
+                );
+            }
+        }
+        for item in &ruleset.items {
+            if let Some(ask) = &item.ask {
+                let text = ask.de.as_ref().and_then(|d| d.question.as_deref());
+                assert!(
+                    text.is_some_and(|t| !t.trim().is_empty()),
+                    "{name} ask of {}",
+                    item.key
+                );
+            }
+        }
+    }
 }
 
 #[test]

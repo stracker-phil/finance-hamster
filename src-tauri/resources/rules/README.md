@@ -61,7 +61,13 @@ Reload fails with a clear message if:
 - a `trips` item uses a vehicle with no rate
 - an `ask` sits on a hidden item or an item reported by others, or its `question` is empty
 
-## Notes on 2025 v1 and 2026 v2
+## German texts
+
+Questions, asks, items and sections may carry a `de` object with German versions of their texts (`label`,
+`help`, `unit`; `question`, `hint`; `name`, `note`). Hamster shows them when its language is German and falls
+back to the English field for any that are missing. A `de` text may not be empty: leave it out instead.
+
+## Notes on 2025 v2 and 2026 v3
 
 - Checked on 15 November 2026 against EStG § 16, the BMF L1 field lists and the Kilometergeldverordnung; the sources are in each file.
 - The Kennzahlen and amounts are the same in both years. KZ 159 is Arbeitszimmer (hidden); it can't be filed together with KZ 158.
@@ -69,4 +75,5 @@ Reload fails with a clear message if:
 - KZ 169 is reduced by €3 per Telearbeitstag (at most 100 days): the employer's Telearbeitspauschale plus the difference the tax office grants itself. The question asks for that total.
 - Kilometergeld for a car is €0.50 per km all year in both years.
 - `usefulLife.furniture` is an estimate; Austria has no official table.
+- Both files carry German texts for every question and ask (`de`).
 - From 2027 the Telearbeitspauschale ends and KZ 158 no longer needs Telearbeitstage. A 2027 file needs those changes.

@@ -114,7 +114,15 @@ fn schema_constraints(r: &Ruleset, p: &mut Vec<String>) {
                 q.id
             ));
         }
-        ask_text(q.ask.as_ref(), &format!("questions[{i}]"), p);
+        let at = format!("questions[{i}]");
+        ask_text(q.ask.as_ref(), &at, p);
+        if let Some(de) = &q.de {
+            german(
+                &[("label", &de.label), ("help", &de.help), ("unit", &de.unit)],
+                &at,
+                p,
+            );
+        }
     }
     if r.sections.is_empty() {
         p.push(crate::tr!(
@@ -129,6 +137,9 @@ fn schema_constraints(r: &Ruleset, p: &mut Vec<String>) {
                 "sections[{i}].id: „{}“ ist kein Schlüssel",
                 s.id
             ));
+        }
+        if let Some(de) = &s.de {
+            german(&[("name", &de.name)], &format!("sections[{i}]"), p);
         }
     }
     if r.items.is_empty() {
@@ -174,6 +185,9 @@ fn schema_constraints(r: &Ruleset, p: &mut Vec<String>) {
             ));
         }
         ask_text(item.ask.as_ref(), &at, p);
+        if let Some(de) = &item.de {
+            german(&[("name", &de.name), ("note", &de.note)], &at, p);
+        }
         if item.ask.is_some() {
             if !item.visible {
                 p.push(crate::tr!(
@@ -192,11 +206,33 @@ fn schema_constraints(r: &Ruleset, p: &mut Vec<String>) {
 }
 
 fn ask_text(ask: Option<&Ask>, at: &str, p: &mut Vec<String>) {
-    if ask.is_some_and(|a| a.question.trim().is_empty()) {
+    let Some(ask) = ask else {
+        return;
+    };
+    if ask.question.trim().is_empty() {
         p.push(crate::tr!(
             "{at}.ask.question: the question is empty",
             "{at}.ask.question: Die Frage ist leer"
         ));
+    }
+    if let Some(de) = &ask.de {
+        german(
+            &[("question", &de.question), ("hint", &de.hint)],
+            &format!("{at}.ask"),
+            p,
+        );
+    }
+}
+
+/// A German text that is present must say something; leave it out to show the English one.
+fn german(fields: &[(&str, &Option<String>)], at: &str, p: &mut Vec<String>) {
+    for (field, text) in fields {
+        if text.as_deref().is_some_and(|t| t.trim().is_empty()) {
+            p.push(crate::tr!(
+                "{at}.de.{field}: the German text is empty; remove it to show the English one",
+                "{at}.de.{field}: Der deutsche Text ist leer; entferne ihn, um den englischen zu zeigen"
+            ));
+        }
     }
 }
 

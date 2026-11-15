@@ -476,6 +476,39 @@ fn a_year_that_does_not_exist_is_not_found() {
 }
 
 #[test]
+fn the_year_page_shows_german_question_texts_in_german_and_english_ones_otherwise() {
+    let mut german = rules();
+    set(
+        &mut german,
+        "/questions/0/de",
+        json!({ "label": "Homeoffice-Tage", "help": "Tage im Homeoffice", "unit": "Tage" }),
+    );
+    let (_dir, db) = open_year_with(&german);
+
+    let shown = crate::i18n::with_lang(crate::settings::Language::De, || year_page(&db));
+    let questions: Vec<(&str, Option<&str>, Option<&str>)> = shown
+        .questions
+        .iter()
+        .map(|q| (q.label.as_str(), q.help.as_deref(), q.unit.as_deref()))
+        .collect();
+    assert_eq!(
+        questions,
+        [
+            ("Homeoffice-Tage", Some("Tage im Homeoffice"), Some("Tage")),
+            ("Telearbeitspauschale (from the employer)", None, None)
+        ]
+    );
+
+    let english = crate::i18n::with_lang(crate::settings::Language::En, || year_page(&db));
+    assert_eq!(english.questions[0].label, HOME_DAYS);
+    assert_eq!(
+        english.questions[0].help.as_deref(),
+        Some("Days worked from home")
+    );
+    assert_eq!(english.questions[0].unit.as_deref(), Some("days"));
+}
+
+#[test]
 fn a_year_without_entries_is_all_zero_and_asks_for_its_answers() {
     let (_dir, db) = open_year();
 

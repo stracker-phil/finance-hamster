@@ -1,7 +1,7 @@
 {
   "$schema": "./rules.schema.json",
   "schemaVersion": 1,
-  "ruleset": "2025 v1",
+  "ruleset": "2025 v2",
   "year": 2025,
   "notes": "Checked 2026-11-15 against EStG § 16 (version 01.01.2025 to 23.12.2025), the BMF L1 field list for 2025 and the Kilometergeldverordnung. 2025 renamed Homeoffice to Telearbeit; amounts and Kennzahlen are unchanged. usefulLife.furniture is an estimate: Austria has no official table.",
   "sources": [
@@ -31,8 +31,8 @@
   },
 
   "questions": [
-    { "id": "telearbeitstage", "label": "Telearbeitstage (Homeoffice days)", "help": "From your Lohnzettel", "type": "integer", "unit": "days", "ask": { "order": 10, "question": "How many Telearbeitstage are on your Lohnzettel?", "hint": "Days you worked only from home. Needed for KZ 158." } },
-    { "id": "telearbeitspauschale", "label": "Telearbeitspauschale (€3 per Telearbeitstag)", "help": "€3 × Telearbeitstage, at most 100 days", "type": "amount", "unit": "€", "ask": { "order": 90, "question": "What is €3 times your Telearbeitstage, counting at most 100 days?", "hint": "The tax office subtracts this from KZ 169 whatever your employer paid; it grants any shortfall itself." } }
+    { "id": "telearbeitstage", "label": "Telearbeitstage (Homeoffice days)", "help": "From your Lohnzettel", "type": "integer", "unit": "days", "de": { "label": "Telearbeitstage", "help": "Laut Lohnzettel", "unit": "Tage" }, "ask": { "order": 10, "question": "How many Telearbeitstage are on your Lohnzettel?", "hint": "Days you worked only from home. Needed for KZ 158.", "de": { "question": "Wie viele Telearbeitstage stehen auf deinem Lohnzettel?", "hint": "Tage, an denen du ausschließlich zu Hause gearbeitet hast. Nötig für KZ 158." } } },
+    { "id": "telearbeitspauschale", "label": "Telearbeitspauschale (€3 per Telearbeitstag)", "help": "€3 × Telearbeitstage, at most 100 days", "type": "amount", "unit": "€", "de": { "label": "Telearbeitspauschale (3 € pro Telearbeitstag)", "help": "3 € × Telearbeitstage, höchstens 100 Tage" }, "ask": { "order": 90, "question": "What is €3 times your Telearbeitstage, counting at most 100 days?", "hint": "The tax office subtracts this from KZ 169 whatever your employer paid; it grants any shortfall itself.", "de": { "question": "Wie viel sind 3 € mal deine Telearbeitstage, höchstens 100 Tage?", "hint": "Das Finanzamt zieht das von KZ 169 ab, egal was dein Arbeitgeber gezahlt hat; die Differenz gewährt es selbst." } } }
   ],
 
   "sections": [
@@ -40,34 +40,36 @@
   ],
 
   "items": [
-    { "key": "union-dues", "kz": "717", "name": "Gewerkschaftsbeiträge", "section": "werbungskosten", "kind": "amount", "evidence": "optional", "ask": { "order": 70, "question": "Did you pay union dues?", "hint": "Often already on the Lohnzettel" } },
+    { "key": "union-dues", "kz": "717", "name": "Gewerkschaftsbeiträge", "section": "werbungskosten", "kind": "amount", "evidence": "optional", "ask": { "order": 70, "question": "Did you pay union dues?", "hint": "Often already on the Lohnzettel", "de": { "question": "Hast du Gewerkschaftsbeiträge gezahlt?", "hint": "Stehen oft schon auf dem Lohnzettel" } } },
 
     { "key": "commuting", "kz": "718/916", "name": "Pendlerpauschale", "section": "werbungskosten", "kind": "amount", "visible": false, "evidence": "optional" },
 
     { "key": "work-equipment", "kz": "719", "name": "Arbeitsmittel", "section": "werbungskosten", "kind": "documents",
       "depreciation": { "assetClass": "furniture" },
-      "ask": { "order": 80, "question": "Did you buy other tools or supplies for work?", "hint": "Work clothing, bags, stationery, tools" }
+      "ask": { "order": 80, "question": "Did you buy other tools or supplies for work?", "hint": "Work clothing, bags, stationery, tools", "de": { "question": "Hast du andere Werkzeuge oder Arbeitsmaterial gekauft?", "hint": "Arbeitskleidung, Taschen, Büromaterial, Werkzeug" } }
     },
 
-    { "key": "literature", "kz": "720", "name": "Fachliteratur", "section": "werbungskosten", "kind": "documents", "ask": { "order": 60, "question": "Did you buy books or magazines for work?", "hint": "Technical books, e-books, magazine subscriptions" } },
+    { "key": "literature", "kz": "720", "name": "Fachliteratur", "section": "werbungskosten", "kind": "documents", "ask": { "order": 60, "question": "Did you buy books or magazines for work?", "hint": "Technical books, e-books, magazine subscriptions", "de": { "question": "Hast du beruflich Bücher oder Zeitschriften gekauft?", "hint": "Fachbücher, E-Books, Zeitschriften-Abos" } } },
 
     { "key": "travel", "kz": "721", "name": "Reisekosten", "section": "werbungskosten", "kind": "trips", "vehicle": "car", "evidence": "none",
       "note": "Round trips. Keep date, destination and purpose in case the tax office asks.",
-      "ask": { "order": 20, "question": "Did you travel for work?", "hint": "Conferences, client visits, meetups, team days" }
+      "de": { "note": "Hin und zurück. Heb Datum, Ziel und Zweck auf, falls das Finanzamt fragt." },
+      "ask": { "order": 20, "question": "Did you travel for work?", "hint": "Conferences, client visits, meetups, team days", "de": { "question": "Bist du beruflich gereist?", "hint": "Konferenzen, Kundenbesuche, Meetups, Teamtage" } }
     },
 
-    { "key": "training", "kz": "722", "name": "Fortbildung", "section": "werbungskosten", "kind": "documents", "ask": { "order": 50, "question": "Did you pay for courses, conferences or exams?", "hint": "Conference tickets, online courses, certification fees" } },
+    { "key": "training", "kz": "722", "name": "Fortbildung", "section": "werbungskosten", "kind": "documents", "ask": { "order": 50, "question": "Did you pay for courses, conferences or exams?", "hint": "Conference tickets, online courses, certification fees", "de": { "question": "Hast du für Kurse, Konferenzen oder Prüfungen bezahlt?", "hint": "Konferenztickets, Onlinekurse, Zertifizierungsgebühren" } } },
 
     { "key": "double-household", "kz": "723", "name": "Doppelte Haushaltsführung", "section": "werbungskosten", "kind": "documents", "visible": false },
 
-    { "key": "other", "kz": "724", "name": "Sonstige Werbungskosten", "section": "werbungskosten", "kind": "documents", "ask": { "order": 100, "question": "Any other work costs?", "hint": "Coworking rent, professional memberships, job applications" } },
+    { "key": "other", "kz": "724", "name": "Sonstige Werbungskosten", "section": "werbungskosten", "kind": "documents", "ask": { "order": 100, "question": "Any other work costs?", "hint": "Coworking rent, professional memberships, job applications", "de": { "question": "Hattest du andere berufliche Ausgaben?", "hint": "Coworking-Miete, Berufsverbände, Bewerbungen" } } },
 
     { "key": "digital-equipment", "kz": "169", "name": "Digitale Arbeitsmittel", "section": "werbungskosten", "kind": "documents",
       "privateShare": 40,
       "depreciation": { "assetClass": "computer" },
       "estimate": [ { "type": "reduceBy", "question": "telearbeitspauschale" } ],
       "note": "The tax office subtracts €3 per Telearbeitstag (at most €300): the employer's Telearbeitspauschale plus the difference it grants.",
-      "ask": { "order": 30, "question": "Did you buy hardware or software for work?", "hint": "Laptop, monitor, printer, phone, backup drive, software licences" }
+      "de": { "note": "Das Finanzamt zieht 3 € pro Telearbeitstag ab (höchstens 300 €): die Telearbeitspauschale des Arbeitgebers plus die Differenz, die es selbst gewährt." },
+      "ask": { "order": 30, "question": "Did you buy hardware or software for work?", "hint": "Laptop, monitor, printer, phone, backup drive, software licences", "de": { "question": "Hast du beruflich Hardware oder Software gekauft?", "hint": "Laptop, Monitor, Drucker, Handy, Backup-Festplatte, Softwarelizenzen" } }
     },
 
     { "key": "ergonomic-furniture", "kz": "158", "name": "Ergonomisches Mobiliar", "section": "werbungskosten", "kind": "documents",
@@ -76,7 +78,8 @@
         { "type": "cap", "amount": 300.00, "carryOver": true }
       ],
       "note": "Enter the full amount. The tax office counts up to €300 per year and the rest in later years.",
-      "ask": { "order": 40, "question": "Did you buy furniture for working from home?", "hint": "Desk, office chair, desk lamp, laptop stand" }
+      "de": { "note": "Trag den vollen Betrag ein. Das Finanzamt zählt bis zu 300 € pro Jahr und den Rest in späteren Jahren." },
+      "ask": { "order": 40, "question": "Did you buy furniture for working from home?", "hint": "Desk, office chair, desk lamp, laptop stand", "de": { "question": "Hast du Möbel fürs Arbeiten zu Hause gekauft?", "hint": "Schreibtisch, Bürostuhl, Schreibtischlampe, Laptopständer" } }
     },
 
     { "key": "home-office-room", "kz": "159", "name": "Arbeitszimmer", "section": "werbungskosten", "kind": "documents", "visible": false },

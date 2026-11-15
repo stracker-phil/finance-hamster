@@ -69,7 +69,8 @@
           "help": { "type": "string", "description": "Short hint under the label, e.g. where to find the number." },
           "type": { "type": "string", "enum": ["integer", "amount"] },
           "unit": { "type": "string", "description": "Shown next to the field, e.g. \"days\" or \"€\"." },
-          "ask": { "$ref": "#/$defs/ask" }
+          "ask": { "$ref": "#/$defs/ask" },
+          "de": { "type": "object", "additionalProperties": false, "description": "German texts shown when the app's language is German; missing ones fall back to English.", "properties": { "label": { "type": "string", "minLength": 1 }, "help": { "type": "string", "minLength": 1 }, "unit": { "type": "string", "minLength": 1 } } }
         }
       }
     },
@@ -84,7 +85,8 @@
         "required": ["id", "name"],
         "properties": {
           "id": { "$ref": "#/$defs/key" },
-          "name": { "type": "string" }
+          "name": { "type": "string" },
+          "de": { "type": "object", "additionalProperties": false, "description": "German texts shown when the app's language is German; missing ones fall back to English.", "properties": { "name": { "type": "string", "minLength": 1 } } }
         }
       }
     },
@@ -116,7 +118,8 @@
       "properties": {
         "order": { "type": "integer", "minimum": 0, "description": "Lower comes first; equal orders keep the file's order." },
         "question": { "type": "string", "minLength": 1, "description": "A yes/no question for an item (\"Did you travel for work?\"), or what to type for a question." },
-        "hint": { "type": "string", "description": "One line of examples under the question." }
+        "hint": { "type": "string", "description": "One line of examples under the question." },
+        "de": { "type": "object", "additionalProperties": false, "description": "German texts shown when the app's language is German; missing ones fall back to English.", "properties": { "question": { "type": "string", "minLength": 1 }, "hint": { "type": "string", "minLength": 1 } } }
       }
     },
 
@@ -153,7 +156,8 @@
         "note": { "type": "string", "description": "One line shown under the Kennzahl." },
         "verified": { "$ref": "#/$defs/verified" },
         "source": { "$ref": "#/$defs/source" },
-        "ask": { "$ref": "#/$defs/ask" }
+        "ask": { "$ref": "#/$defs/ask" },
+        "de": { "type": "object", "additionalProperties": false, "description": "German texts shown when the app's language is German; missing ones fall back to English.", "properties": { "name": { "type": "string", "minLength": 1 }, "note": { "type": "string", "minLength": 1 } } }
       },
       "allOf": [
         { "if": { "properties": { "kind": { "const": "trips" } } }, "then": { "required": ["vehicle"] } },
