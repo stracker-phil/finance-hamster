@@ -33,7 +33,7 @@
 .cov-row__name { width: 210px; flex: none; margin-right: 10px; display: flex; align-items: center; gap: 10px; font-size: 14px; }
 .cov-row__last { font-size: 12px; color: var(--text-muted); }
 .cov-row__months { flex: 1; display: flex; gap: 4px; }
-.cov-row__state { width: 128px; flex: none; margin-left: 10px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; color: var(--text-muted); }
+.cov-row__state { min-width: 128px; flex: none; margin-left: 10px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; color: var(--text-muted); }
 .cov-row__note { position: relative; pointer-events: none; display: flex; align-items: center; gap: 6px; margin: 10px 0 0 224px; font-size: 12px; color: var(--text-tertiary); }
 .cov-row__dot { width: 8px; height: 8px; border-radius: 4px; background: var(--warning); }
 

@@ -1,14 +1,12 @@
 /* The tax year page. */
 .year-page { max-width: 880px; margin: 0 auto; padding: 40px 40px 48px; }
-.year-hero { display: flex; align-items: flex-end; gap: 24px; }
-.year-hero__main { min-width: 0; }
-.year-hero__main { flex: 1; }
+.year-hero { display: flex; align-items: flex-start; gap: 24px; }
+.year-hero__main { flex: 1; min-width: 0; }
 .year-hero__total { font-size: 46px; font-weight: 750; letter-spacing: -0.02em; line-height: 1.1; margin-top: 4px; font-variant-numeric: tabular-nums; }
-.year-hero__progress { width: 260px; flex: none; padding-bottom: 8px; display: flex; flex-direction: column; gap: 7px; }
-.year-hero__progress .add-doc__hint { white-space: normal; }
+.year-hero__progress { width: 260px; flex: none; padding-top: 30px; display: flex; flex-direction: column; gap: 7px; }
 .year-bar { height: 5px; border-radius: 3px; background: var(--fill-subtle); overflow: hidden; }
 .year-bar span { display: block; height: 100%; background: var(--accent); }
-.year-menu { position: relative; padding-bottom: 8px; }
+.year-menu { position: relative; padding-top: 24px; }
 .year-heading { margin: 36px 0 8px; font-size: 12px; font-weight: 600; color: var(--text-secondary); }
 .year-heading-row { display: flex; align-items: baseline; gap: 10px; }
 .year-heading__more { font-size: 12px; }

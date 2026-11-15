@@ -72,7 +72,6 @@ button.sub-row:hover { background: var(--fill-hover); }
 .sub-group__row:first-child { border-top: 0; }
 .sub-group__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .sub-group__row .field { width: auto; max-width: 60%; }
-.sub-group__text .add-doc__hint { white-space: normal; }
 .sub-group__row .sub-sheet__match { flex: none; width: 45%; }
 
 .plan-sheet { display: flex; flex-direction: column; gap: 14px; }

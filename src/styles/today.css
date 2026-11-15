@@ -9,7 +9,8 @@
 .today__also { display: flex; flex-direction: column; margin-top: 40px; }
 .today-row { width: 100%; height: 44px; display: flex; align-items: center; gap: 12px; padding: 0 4px; border: 0; border-bottom: 1px solid var(--row-hairline); background: transparent; color: var(--text); font: inherit; font-size: 14px; text-align: left; }
 .today-row:hover { background: var(--fill-hover); }
-.today-row__title { flex: 1; min-width: 0; }
+.today-row__title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.today-row .add-doc__hint { flex: 0 1 auto; min-width: 0; max-width: 50%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .today-dot--review { background: var(--accent-blue); }
 .today-dot--attach { background: var(--warning); }
 .today-dot--import { background: var(--warning-text); }

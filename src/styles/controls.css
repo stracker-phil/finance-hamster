@@ -80,7 +80,8 @@
 .menu-layer { display: contents; }
 .menu--floating { position: fixed; z-index: 60; min-width: 180px; max-width: 420px; max-height: calc(100vh - 8px); overflow-y: auto; outline: none; animation: rise-in var(--motion-slow) var(--ease-out); }
 .menu--floating .menu-row:hover:not(:disabled) { background: transparent; }
-.menu--floating .menu-row[data-active] { background: var(--accent); color: var(--text-on-accent); }
+.menu--floating .menu-row[data-active],
+.menu--floating .menu-row[data-active]:hover:not(:disabled) { background: var(--accent); color: var(--text-on-accent); }
 .menu--floating .menu-row[data-active] .menu-row__key { color: inherit; opacity: 0.85; }
 .menu--floating .menu-row[aria-disabled="true"] { color: var(--text-muted); }
 .menu-row--danger { color: var(--danger-text); }
