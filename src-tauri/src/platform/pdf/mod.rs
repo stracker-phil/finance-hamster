@@ -42,9 +42,12 @@ impl Pdf {
         let data = NSData::with_bytes(bytes);
         // SAFETY: `initWithData` parses the bytes; it returns None when they aren't a PDF.
         let document = unsafe { PDFDocument::initWithData(PDFDocument::alloc(), &data) };
-        document
-            .map(|document| Pdf { document })
-            .ok_or_else(|| AppError::InvalidInput("The data isn't a readable PDF".into()))
+        document.map(|document| Pdf { document }).ok_or_else(|| {
+            AppError::InvalidInput(crate::tr!(
+                "The data isn't a readable PDF",
+                "Die Daten sind kein lesbares PDF"
+            ))
+        })
     }
 
     pub fn page_count(&self) -> usize {
@@ -57,7 +60,13 @@ impl Pdf {
         (index < self.page_count())
             .then(|| unsafe { self.document.pageAtIndex(index) })
             .flatten()
-            .ok_or_else(|| AppError::NotFound(format!("The PDF has no page {}", index + 1)))
+            .ok_or_else(|| {
+                AppError::NotFound(crate::tr!(
+                    "The PDF has no page {}",
+                    "Das PDF hat keine Seite {}",
+                    index + 1
+                ))
+            })
     }
 
     /// Each page's lines, laid out as fixed-width text (`layout::lines`).
@@ -80,7 +89,12 @@ impl Pdf {
             let size = NSSize::new(max_width, (bounds.size.height * scale).round());
             page.thumbnailOfSize_forBox(size, PDFDisplayBox::CropBox)
         };
-        let failed = || AppError::Internal("Couldn't render the PDF page".into());
+        let failed = || {
+            AppError::Internal(crate::tr!(
+                "Couldn't render the PDF page",
+                "Die PDF-Seite ließ sich nicht darstellen"
+            ))
+        };
         let tiff = image.TIFFRepresentation().ok_or_else(failed)?;
         let bitmap = NSBitmapImageRep::imageRepWithData(&tiff).ok_or_else(failed)?;
         // SAFETY: an empty property dictionary is valid for every file type.

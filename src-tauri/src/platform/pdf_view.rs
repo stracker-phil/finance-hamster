@@ -174,8 +174,9 @@ fn on_main(
     window
         .with_webview(move |platform| f(&platform))
         .map_err(|e| {
-            AppError::Internal(format!(
-                "Couldn't reach the window for the PDF preview: {e}"
+            AppError::Internal(crate::tr!(
+                "Couldn't reach the window for the PDF preview: {e}",
+                "Das Fenster für die PDF-Vorschau war nicht erreichbar: {e}"
             ))
         })
 }
@@ -191,7 +192,12 @@ pub fn visible(window: &WebviewWindow) -> AppResult<bool> {
         let _ = tx.send(visible);
     })?;
     rx.recv_timeout(std::time::Duration::from_secs(2))
-        .map_err(|_| AppError::Internal("The window didn't answer about the PDF preview".into()))
+        .map_err(|_| {
+            AppError::Internal(crate::tr!(
+                "The window didn't answer about the PDF preview",
+                "Das Fenster hat zur PDF-Vorschau nicht geantwortet"
+            ))
+        })
 }
 
 /// Applies `change` on the main thread.

@@ -44,6 +44,18 @@ describe("App", () => {
     await waitFor(() => expect(mocked.takeLaunchEvents).toHaveBeenCalled());
   });
 
+  it("retitles the header in the new language when the language is switched", async () => {
+    mocked.getSettings.mockResolvedValue(settings({ language: "en" }));
+    renderApp();
+    await waitFor(() => expect(mocked.getSettings).toHaveBeenCalled());
+    expect(await screen.findByRole("heading", { level: 1, name: "Today" })).toBeTruthy();
+
+    mocked.getSettings.mockResolvedValue(settings({ language: "de" }));
+    await emit("settings_changed");
+
+    expect(await screen.findByRole("heading", { level: 1, name: "Heute" })).toBeTruthy();
+  });
+
   it("shows no alert when no launch event is queued", async () => {
     renderApp();
 

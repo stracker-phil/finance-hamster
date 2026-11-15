@@ -146,7 +146,11 @@ pub(super) fn decided_lines(
         if item.evidence() == Evidence::Required {
             facts.flag_missing_invoice(
                 format!("{title} · {}", eur(line.cents.abs(), format)),
-                format!("{day} · KZ {} needs the invoice before it counts", item.kz),
+                crate::tr!(
+                    "{day} · KZ {} needs the invoice before it counts",
+                    "{day} · KZ {} braucht die Rechnung, bevor sie zählt",
+                    item.kz
+                ),
                 None,
                 Some(line.id.clone()),
             );
@@ -162,7 +166,7 @@ pub(super) fn decided_lines(
                 id: line.id.clone(),
                 kind: RowKind::Line,
                 title,
-                detail: format!("{day} · bank line"),
+                detail: crate::tr!("{day} · bank line", "{day} · Buchung"),
                 amount: eur(counted, format),
                 draft: false,
                 carried_from: None,

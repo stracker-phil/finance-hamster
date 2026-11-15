@@ -175,7 +175,7 @@ export const pages = both(
       documents: "Belege filtern",
       log: "Protokoll filtern",
       statements: "Konten filtern",
-      year: "Dieses Steuerjahr filtern",
+      year: "Jahr filtern",
     },
     parent: {
       statements: "Kontoauszüge",

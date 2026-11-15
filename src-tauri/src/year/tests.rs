@@ -1010,6 +1010,28 @@ fn an_anv_line_on_an_item_that_needs_an_invoice_is_missing_its_invoice_and_does_
 }
 
 #[test]
+fn bank_line_details_read_in_german_when_the_language_is_german() {
+    let (_dir, db) = open_year();
+    add_lines(
+        &db,
+        &[
+            debit("l-m", "2026-01-05", -5_830, "Lastschrift SEITENWEISE"),
+            debit("l-tips", "2026-01-10", -5_000, "Lastschrift COPYSHOP"),
+        ],
+    );
+    decide(&db, "l-m", Action::Anv, Some("books"));
+    decide(&db, "l-tips", Action::Anv, Some("tips"));
+
+    let page = crate::i18n::with_lang(crate::settings::Language::De, || year_page(&db));
+
+    assert_eq!(
+        page.attention[0].detail,
+        "5. Jan. · KZ 720 braucht die Rechnung, bevor sie zählt"
+    );
+    assert_eq!(rows_of(&page, "722")[0].detail, "10. Jan. · Buchung");
+}
+
+#[test]
 fn progress_names_drafts_then_missing_invoices_and_answers_with_the_share_done() {
     let (_dir, db) = open_year();
     for id in ["doc-d1", "doc-d2"] {

@@ -182,7 +182,10 @@ pub fn run(app: &AppHandle, id: &str) -> AppResult<()> {
             window::show_main(app);
             app.emit_to(window::MAIN, RUN_COMMAND_EVENT, command.id)
                 .map_err(|e| {
-                    AppError::Internal(format!("Couldn't send {id} to the window: {e}"))
+                    AppError::Internal(crate::tr!(
+                        "Couldn't send {id} to the window: {e}",
+                        "{id} ließ sich nicht ans Fenster senden: {e}"
+                    ))
                 })?;
         }
     }
