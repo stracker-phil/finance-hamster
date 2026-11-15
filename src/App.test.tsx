@@ -115,9 +115,9 @@ describe("App", () => {
 
   describe("page commands from Rust", () => {
     it.each([
-      ["go.subscriptions", "Subscriptions"],
-      ["go.statements", "Statements"],
-      ["go.documents", "Documents"],
+      ["go:subscriptions", "Subscriptions"],
+      ["go:statements", "Statements"],
+      ["go:documents", "Documents"],
     ])("opens the page for %s", async (id, title) => {
       renderApp();
 
@@ -126,31 +126,31 @@ describe("App", () => {
       expect(screen.getByRole("heading", { level: 1, name: title })).toBeTruthy();
     });
 
-    it("returns to Today for go.today", async () => {
+    it("returns to Today for go:today", async () => {
       renderApp();
-      await emit("run_command", "go.documents");
+      await emit("run_command", "go:documents");
 
-      await emit("run_command", "go.today");
+      await emit("run_command", "go:today");
 
       expect(screen.getByRole("heading", { level: 1, name: "Today" })).toBeTruthy();
     });
 
     it("goes back and forward through the visited pages", async () => {
       renderApp();
-      await emit("run_command", "go.subscriptions");
+      await emit("run_command", "go:subscriptions");
 
-      await emit("run_command", "go.back");
+      await emit("run_command", "go:back");
       expect(screen.getByRole("heading", { level: 1, name: "Today" })).toBeTruthy();
 
-      await emit("run_command", "go.forward");
+      await emit("run_command", "go:forward");
       expect(screen.getByRole("heading", { level: 1, name: "Subscriptions" })).toBeTruthy();
     });
 
-    it("opens the command palette for palette.open", async () => {
-      mocked.listCommands.mockResolvedValue([{ id: "go.today", title: "Go to Today", shortcut: "⌘1", custom: false }]);
+    it("opens the command palette for palette:open", async () => {
+      mocked.listCommands.mockResolvedValue([{ id: "go:today", title: "Go to Today", shortcut: "⌘1", custom: false }]);
       renderApp();
 
-      await emit("run_command", "palette.open");
+      await emit("run_command", "palette:open");
 
       expect(await screen.findByRole("dialog")).toBeTruthy();
       expect(await screen.findByRole("option", { name: /Go to Today/ })).toBeTruthy();
@@ -158,7 +158,7 @@ describe("App", () => {
 
     it("suspends the native PDF preview while the palette is open and resumes it once closed", async () => {
       renderApp();
-      await emit("run_command", "palette.open");
+      await emit("run_command", "palette:open");
       await screen.findByRole("dialog");
       await waitFor(() => expect(mocked.pdfViewSuspend).toHaveBeenCalled());
       expect(mocked.pdfViewResume).not.toHaveBeenCalled();
@@ -168,25 +168,25 @@ describe("App", () => {
       await waitFor(() => expect(mocked.pdfViewResume).toHaveBeenCalled());
     });
 
-    it("focuses the header filter for filter.focus", async () => {
+    it("focuses the header filter for filter:focus", async () => {
       renderApp();
 
-      await emit("run_command", "filter.focus");
+      await emit("run_command", "filter:focus");
 
       expect(screen.getByPlaceholderText("Search everywhere")).toHaveFocus();
     });
 
-    it("opens the New Subscription sheet for subscription.new", async () => {
+    it("opens the New Subscription sheet for subscription:new", async () => {
       renderApp();
 
-      await emit("run_command", "subscription.new");
+      await emit("run_command", "subscription:new");
 
       expect(await screen.findByRole("dialog", { name: "New Subscription" })).toBeTruthy();
     });
 
     describe.each([
-      ["edit.undo", "undo", "Undid", "Nothing to undo"],
-      ["edit.redo", "redo", "Redid", "Nothing to redo"],
+      ["edit:undo", "undo", "Undid", "Nothing to undo"],
+      ["edit:redo", "redo", "Redid", "Nothing to redo"],
     ] as const)("%s", (id, method, past, empty) => {
       it(`shows "${past} <label>" when the api returns the label of the change`, async () => {
         mocked[method].mockResolvedValue("Add subscription");
@@ -219,7 +219,7 @@ describe("App", () => {
         const execCommand = vi.fn().mockReturnValue(true);
         document.execCommand = execCommand;
         renderApp();
-        await emit("run_command", "filter.focus");
+        await emit("run_command", "filter:focus");
 
         await emit("run_command", id);
 
@@ -228,21 +228,21 @@ describe("App", () => {
       });
     });
 
-    it("opens the Import sheet for the statement the owner chose for statement.import", async () => {
+    it("opens the Import sheet for the statement the owner chose for statement:import", async () => {
       mocked.statementImportChoose.mockResolvedValue(importPreview());
       renderApp();
 
-      await emit("run_command", "statement.import");
+      await emit("run_command", "statement:import");
 
       expect(await screen.findByRole("dialog", { name: "Import statement" })).toBeTruthy();
       expect(screen.getByText("statement-010-2026.pdf")).toBeTruthy();
     });
 
-    it("opens no sheet for statement.import when the file dialog is cancelled", async () => {
+    it("opens no sheet for statement:import when the file dialog is cancelled", async () => {
       mocked.statementImportChoose.mockResolvedValue(null);
       renderApp();
 
-      await emit("run_command", "statement.import");
+      await emit("run_command", "statement:import");
 
       await waitFor(() => expect(mocked.statementImportChoose).toHaveBeenCalled());
       expect(screen.queryByRole("dialog")).toBeNull();
@@ -264,11 +264,11 @@ describe("App", () => {
       expect((await screen.findByRole("alert")).textContent).toContain("No account matches this IBAN");
     });
 
-    it("opens the Add document sheet for the invoice the owner chose for document.add", async () => {
+    it("opens the Add document sheet for the invoice the owner chose for document:add", async () => {
       mocked.documentAddChoose.mockResolvedValue(addPreview());
       renderApp();
 
-      await emit("run_command", "document.add");
+      await emit("run_command", "document:add");
 
       expect(await screen.findByRole("dialog", { name: "Add document" })).toBeTruthy();
       expect(screen.getByText("invoice-demo-1109.pdf")).toBeTruthy();
@@ -293,7 +293,7 @@ describe("App", () => {
     it("ignores a command it does not handle", async () => {
       renderApp();
 
-      await emit("run_command", "settings.open");
+      await emit("run_command", "app:settings");
 
       expect(screen.getByRole("heading", { level: 1, name: "Today" })).toBeTruthy();
       expect(screen.queryByRole("dialog")).toBeNull();

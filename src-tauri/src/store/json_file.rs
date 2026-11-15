@@ -96,8 +96,7 @@ impl JsonFile {
         self.path.with_file_name(name)
     }
 
-    /// Writes a 0600 temp file, syncs it and renames it over the target, so a crash leaves
-    /// either the old or the new file, never half of one.
+    /// Saves atomically (`write_private_file`); refuses while a broken file could not be moved aside.
     pub fn save<T: Serialize>(&self, value: &T) -> AppResult<()> {
         if self.poisoned.load(Ordering::Relaxed) {
             return Err(AppError::Io(format!(
@@ -105,18 +104,26 @@ impl JsonFile {
                 self.path.display()
             )));
         }
-        if let Some(dir) = self.path.parent() {
-            create_private_dir(dir)?;
-        }
         let json = serde_json::to_vec_pretty(value).map_err(std::io::Error::other)?;
-        let tmp = self.sibling("tmp");
-        let written = write_synced(&tmp, &json).and_then(|()| fs::rename(&tmp, &self.path));
-        if written.is_err() {
-            let _ = fs::remove_file(&tmp);
-        }
-        written?;
+        write_private_file(&self.path, &json)?;
         Ok(())
     }
+}
+
+/// Writes `bytes` to `path` readable only by the user: a 0600 temp file beside it, synced, then renamed over
+/// it, so a crash leaves either the old file or the whole new one, never half of one. Creates the folder.
+pub fn write_private_file(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    if let Some(dir) = path.parent() {
+        create_private_dir(dir)?;
+    }
+    let mut name = path.file_name().unwrap_or_default().to_os_string();
+    name.push(".tmp");
+    let tmp = path.with_file_name(name);
+    let written = write_synced(&tmp, bytes).and_then(|()| fs::rename(&tmp, path));
+    if written.is_err() {
+        let _ = fs::remove_file(&tmp);
+    }
+    written
 }
 
 fn write_synced(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
@@ -311,6 +318,32 @@ mod tests {
 
         assert_eq!(mode_of(&path), 0o600);
         assert_eq!(mode_of(path.parent().unwrap()), 0o700);
+    }
+
+    #[test]
+    fn a_private_file_is_written_0600_in_a_0700_folder_it_creates() {
+        let dir = temp_config_dir();
+        let path = dir.path().join("docs/inbox/invoice.pdf");
+
+        write_private_file(&path, b"%PDF demo").unwrap();
+
+        assert_eq!(fs::read(&path).unwrap(), b"%PDF demo");
+        assert_eq!(mode_of(&path), 0o600);
+        assert_eq!(mode_of(path.parent().unwrap()), 0o700);
+        assert_eq!(mode_of(&dir.path().join("docs")), 0o700);
+    }
+
+    #[test]
+    fn a_private_file_replaces_an_existing_one_entirely_and_leaves_no_temp_file() {
+        let dir = temp_config_dir();
+        let path = dir.path().join("note.bin");
+        write_private_file(&path, b"a much longer first version").unwrap();
+
+        write_private_file(&path, b"short").unwrap();
+
+        assert_eq!(fs::read(&path).unwrap(), b"short");
+        assert_eq!(mode_of(&path), 0o600);
+        assert!(!dir.path().join("note.bin.tmp").exists());
     }
 
     #[test]

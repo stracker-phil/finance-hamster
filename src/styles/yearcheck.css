@@ -8,7 +8,7 @@
 .check__stack { display: flex; flex-direction: column; gap: 10px; margin-top: 22px; }
 .check__more { margin-top: 14px; text-align: center; font-size: 12px; color: var(--text-muted); }
 
-.check-row { padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--panel-bg); transition: border-color 0.15s, box-shadow 0.15s; }
+.check-row { padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--panel-bg); transition: border-color var(--motion-base) var(--ease-out), box-shadow var(--motion-base) var(--ease-out); }
 .check-row--focused { border-color: var(--focus-ring); }
 .check-row--added { border-color: color-mix(in srgb, var(--positive) 45%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--positive) 8%, transparent); }
 .check-row__main { display: flex; align-items: flex-start; gap: 12px; }

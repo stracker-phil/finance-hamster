@@ -332,6 +332,34 @@ fn committing_copies_the_pdf_unchanged_and_stores_the_statement() {
 }
 
 #[test]
+fn the_copied_statement_pdf_is_private_and_an_existing_copy_is_kept() {
+    use std::os::unix::fs::PermissionsExt;
+    let (dir, db) = open_with_accounts();
+    let path = dir.path().join("statements/2026/private-010.pdf");
+    let mode = |p: &Path| std::fs::metadata(p).unwrap().permissions().mode() & 0o777;
+
+    imported(&db, dir.path(), &october());
+    assert_eq!(mode(&path), 0o600);
+    assert_eq!(mode(path.parent().unwrap()), 0o700);
+}
+
+#[test]
+fn committing_over_a_leftover_file_with_the_same_content_does_not_rewrite_it() {
+    use std::os::unix::fs::PermissionsExt;
+    let (dir, db) = open_with_accounts();
+    let path = dir.path().join("statements/2026/private-010.pdf");
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    std::fs::write(&path, october().pdf()).unwrap();
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o640)).unwrap();
+
+    imported(&db, dir.path(), &october());
+
+    let mode = std::fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+    assert_eq!(mode, 0o640);
+    assert_eq!(std::fs::read(&path).unwrap(), october().pdf());
+}
+
+#[test]
 fn committing_stores_one_transaction_per_line_in_printed_order() {
     let (dir, db) = open_with_accounts();
     let row = imported(&db, dir.path(), &october());

@@ -8,7 +8,7 @@ import { useCommands } from "../queries/commands";
 import { useElsewhere } from "../queries/year";
 import { useStore } from "../state/store";
 
-const withoutPalette = (commands: CommandInfo[]) => commands.filter((c) => c.id !== "palette.open");
+const withoutPalette = (commands: CommandInfo[]) => commands.filter((c) => c.id !== "palette:open");
 
 const close = () => useStore.getState().setPaletteOpen(false);
 

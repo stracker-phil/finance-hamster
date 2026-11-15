@@ -17,7 +17,7 @@ export interface HeaderTitle {
   crumb?: { label: string; to: Route };
 }
 
-/** The filter field's id, so ⌘F (`filter.focus`) can reach it. */
+/** The filter field's id, so ⌘F (`filter:focus`) can reach it. */
 export const FILTER_FIELD_ID = "page-filter";
 
 /** Where else the filter text turns up, under the field; ⌘↩ searches everywhere in the palette. */

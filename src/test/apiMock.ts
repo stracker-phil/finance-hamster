@@ -15,6 +15,8 @@ export function createApiMock(overrides: Partial<Api> = {}): Api {
     runCommand: vi.fn().mockResolvedValue(undefined),
     keybindingSet: vi.fn().mockResolvedValue(undefined),
     keybindingReset: vi.fn().mockResolvedValue(undefined),
+    keybindingConflict: vi.fn().mockResolvedValue(null),
+    keybindingReassign: vi.fn().mockResolvedValue(undefined),
     getSettings: vi.fn().mockResolvedValue(settings()),
     updateSettings: vi.fn().mockResolvedValue(settings()),
     showDataFolder: vi.fn().mockResolvedValue(undefined),

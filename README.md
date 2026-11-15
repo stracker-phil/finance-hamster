@@ -83,7 +83,7 @@ The app binary is also its command line, and talks to the running app.
 | `hamster status` | whether it runs, its version and its window |
 | `hamster show`, `focus`, `hide`, `quit` | shows the window (`focus` also brings it to the front), hides it, quits |
 | `hamster commands` | every command with its id and shortcut |
-| `hamster run <command-id>` | runs a command as its menu item would, e.g. `go.statements`, `settings.open` |
+| `hamster run <command-id>` | runs a command as its menu item would, e.g. `go:statements`, `app:settings` |
 
 `--json` prints any reply as JSON.
 

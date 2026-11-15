@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-11-13). Inherited from the family catalog (app-blueprint: `debug-build-on-demo-data`); reference implementation: Taskboard ADR 0011, TimeTracker ADR 0031.
+Accepted (2026-11-13). Inherited from the family catalog (app-blueprint: `debug-build-on-demo-data`); reference implementation: Taskboard ADR 0011, TimeTracker ADR 0031. Scheme clause superseded by 0047.
 
 ## Context
 

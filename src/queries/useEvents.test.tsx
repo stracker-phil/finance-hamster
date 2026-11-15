@@ -510,10 +510,10 @@ describe("useEvents", () => {
     }
 
     it("refetches the commands when commands_changed arrives", async () => {
-      mocked.listCommands.mockResolvedValue([{ id: "go.today", title: "Go to Today", shortcut: "⌘1", custom: false }]);
+      mocked.listCommands.mockResolvedValue([{ id: "go:today", title: "Go to Today", shortcut: "⌘1", custom: false }]);
       renderWithQuery(<CommandsProbe />);
       await screen.findByText("Shortcuts: ⌘1");
-      mocked.listCommands.mockResolvedValue([{ id: "go.today", title: "Go to Today", shortcut: "⌘⇧T", custom: true }]);
+      mocked.listCommands.mockResolvedValue([{ id: "go:today", title: "Go to Today", shortcut: "⌘⇧T", custom: true }]);
       await waitFor(() => expect(mocked.listen.mock.calls.some(([name]) => name === "commands_changed")).toBe(true));
       const handler = mocked.listen.mock.calls.find(([name]) => name === "commands_changed")![1] as (payload: null) => void;
 

@@ -18,7 +18,8 @@ export const statusRow = (patch: Partial<StatusRow> = {}): StatusRow => ({
   label: "Private",
   detail: "Balances chain from statement to statement",
   value: "OK",
-  ok: true,
+  tone: "ok",
+  copyText: null,
   ...patch,
 });
 

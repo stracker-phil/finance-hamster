@@ -194,6 +194,55 @@ fn copy_in_writes_the_bytes_to_the_inbox_under_the_original_name() {
 }
 
 #[test]
+fn a_copied_invoice_is_private_and_a_second_copy_of_the_same_file_leaves_it_as_it_is() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = crate::test_support::temp_config_dir();
+    let bytes = b"%PDF one";
+    let hash = file_hash(bytes);
+
+    let name = files::copy_in(dir.path(), "invoice.pdf", bytes, &hash).unwrap();
+    let path = dir.path().join(&name);
+    let mode = |p: &Path| std::fs::metadata(p).unwrap().permissions().mode() & 0o777;
+    assert_eq!(mode(&path), 0o600);
+    assert_eq!(mode(path.parent().unwrap()), 0o700);
+
+    assert_eq!(
+        files::copy_in(dir.path(), "invoice.pdf", bytes, &hash).unwrap(),
+        name
+    );
+    assert_eq!(std::fs::read(&path).unwrap(), bytes);
+}
+
+#[test]
+fn copy_to_writes_to_the_asked_path_privately_and_numbers_a_taken_name() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = crate::test_support::temp_config_dir();
+    let copy = |bytes: &[u8]| {
+        files::copy_to(
+            dir.path(),
+            "docs/2026/2026-11-10-shop.pdf",
+            bytes,
+            &file_hash(bytes),
+        )
+        .unwrap()
+    };
+
+    assert_eq!(copy(b"%PDF one"), "docs/2026/2026-11-10-shop.pdf");
+    assert_eq!(copy(b"%PDF two"), "docs/2026/2026-11-10-shop-2.pdf");
+
+    for name in [
+        "docs/2026/2026-11-10-shop.pdf",
+        "docs/2026/2026-11-10-shop-2.pdf",
+    ] {
+        let mode = std::fs::metadata(dir.path().join(name))
+            .unwrap()
+            .permissions()
+            .mode();
+        assert_eq!(mode & 0o777, 0o600, "{name}");
+    }
+}
+
+#[test]
 fn a_different_file_with_the_same_name_gets_a_number_and_the_same_file_keeps_its_name() {
     let dir = crate::test_support::temp_config_dir();
     let copy =

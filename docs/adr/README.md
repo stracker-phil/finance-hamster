@@ -17,7 +17,7 @@ Why Hamster is built the way it is. One record per decision, in Nygard format, a
 | [0005](0005-panics-unwind.md) | Panics unwind | Accepted (2026-11-13) |
 | [0006](0006-small-feature-modules.md) | Small feature modules | Accepted (2026-11-13) |
 | [0007](0007-one-write-path.md) | One write path, mirrored to an append-only journal | Accepted (2026-11-13) |
-| [0008](0008-commands-in-rust.md) | Commands live in a Rust bus | Accepted (2026-11-13) |
+| [0008](0008-commands-in-rust.md) | Commands live in a Rust bus | Accepted (2026-11-13); bus, page-key and links clauses superseded by 0046, 0047 |
 | [0009](0009-cli-asks-the-running-app.md) | The CLI asks the running app | Accepted (2026-11-13) |
 | [0010](0010-rust-formats-dates-and-amounts.md) | Rust formats dates and amounts with the macOS region | Accepted (2026-11-13) |
 | [0011](0011-sibling-apps-talk-through-the-cli.md) | Sibling apps talk through the CLI | Accepted (2026-11-13) |
@@ -31,7 +31,7 @@ Why Hamster is built the way it is. One record per decision, in Nygard format, a
 | [0019](0019-signing.md) | Builds are signed with an Apple Development certificate | Accepted (2026-11-13) |
 | [0020](0020-every-release-gets-a-new-version.md) | Every release build gets a new version | Accepted (2026-11-13) |
 | [0021](0021-test-doubles-behind-test-util.md) | Test doubles live behind test-util | Accepted (2026-11-13) |
-| [0022](0022-debug-build-on-demo-data.md) | The debug build is a separate app on demo data | Accepted (2026-11-13) |
+| [0022](0022-debug-build-on-demo-data.md) | The debug build is a separate app on demo data | Accepted (2026-11-13); scheme clause superseded by 0047 |
 | [0023](0023-debug-hooks.md) | Debug hooks drive the app without focus | Accepted (2026-11-13) |
 | [0024](0024-native-look-following-the-mockup.md) | The native look, with the main window following the mockup | Accepted (2026-11-13) |
 | [0025](0025-color-palettes.md) | Every color is a palette token | Accepted (2026-11-13) |
@@ -55,3 +55,5 @@ Why Hamster is built the way it is. One record per decision, in Nygard format, a
 | [0043](0043-the-year-check-stores-only-its-date.md) | The year check asks from the ruleset and stores only its date | Accepted (2026-11-14) |
 | [0044](0044-subscription-tolerance-is-a-percentage.md) | A subscription's amount tolerance is a percentage | Accepted (2026-11-14); superseded by 0045 |
 | [0045](0045-subscriptions-ask-about-another-amount.md) | Subscriptions ask about another amount and take one charge per period | Accepted (2026-11-14) |
+| [0046](0046-commands-are-a-catalog-with-colon-ids.md) | Commands are a catalog with colon ids; page keys are fixed | Accepted (2026-11-15) |
+| [0047](0047-no-links.md) | No links | Accepted (2026-11-15) |

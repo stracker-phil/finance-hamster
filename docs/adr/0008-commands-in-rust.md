@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-11-13). Inherited from the family catalog (app-blueprint: `commands-in-rust`); reference implementation: Taskboard ADR 0012 (Daybook ADR 0017 is the most complete).
+Accepted (2026-11-13). Inherited from the family catalog (app-blueprint: `commands-in-rust`); reference implementation: Taskboard ADR 0012 (Daybook ADR 0017 is the most complete). Bus, page-key and links clauses superseded by 0046 and 0047.
 
 ## Context
 

@@ -135,9 +135,17 @@ years, accounts, subscriptions, documents); ↑↓ wrap, ↩ runs, Esc closes.
 Own window in System Settings layout: 190px page list with drag strip and search; page title in the strip,
 an optional one-line intro; groups of rows (label and description left, control right). The current page is
 filled with the accent. Pages, Finance: Rules, Vendors, Accounts, Tax Rules; App: Reminders, Privacy & Data,
-Appearance, Shortcuts, Status, About. The search finds every row.
+Appearance, Shortcuts, Status, About. The search finds every row. Status values copy on click ("Copied
+<label>"); only ok, warning and error carry an icon, and a clipboard icon takes its place on hover or focus.
+About has Show Data Folder and Open Log Folder. Shortcuts groups rows by where the key works ("In every
+window", then each page's fixed keys) and asks before taking a key another command holds (Reassign).
 
 ## Keys
-App actions are Rust commands; page keys (Review's A, S, I, J) live in the page registry and never fire in
-text fields. Menus in Mac order; View holds window appearance only; Help holds Open Log Folder and Show Data
+App actions are Rust commands with colon ids (ADR 0046); page keys (Review's A, S, I, J, the Year Check's Y,
+N, L) are fixed, printed on their buttons and never fire in text fields. Menus in Mac order; View holds window appearance only; Help holds Open Log Folder and Show Data
 Folder. One binding per command.
+
+## Palette checks
+`src/styles/colors.test.ts` keeps literals inside `src/styles/palettes/` and the two palettes' token sets
+equal; `src/styles/contrast.test.ts` enforces 4.5:1 for body text and 3:1 for meta and large text;
+`scripts/dev/screenshot-looks.sh` captures the debug window in light and dark for review.

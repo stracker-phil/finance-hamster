@@ -33,7 +33,7 @@ step.
   and table-driven assertions.
 - **Helpers** live in `src-tauri/src/test_support/`: `temp_config_dir`, builders, fakes and the demo seed,
   compiled under `cfg(any(test, feature = "test-util", debug_assertions))` (ADR 0021).
-- **Contracts:** `lib.rs` tests compare `APP_NAME`, `IDENTIFIER` and `LINK_SCHEME` with both Tauri configs and
+- **Contracts:** `lib.rs` tests compare `APP_NAME` and `IDENTIFIER` with both Tauri configs and
   keep the version equal in `Cargo.toml`, `tauri.conf.json` and `package.json`; each `#[ts(export)]` type has
   an `export_bindings_*` test (`bun run types`).
 - **Parsers** are tested against synthetic statements in the bank's layout (`test_support/fixtures/`):
@@ -68,6 +68,7 @@ The dev scripts work without stealing focus. They are macOS-only (zsh, Swift, `s
 | `scripts/dev/launch.sh [args]` | signs and restarts the debug app next to the terminal without focus; refuses a bundle older than the code |
 | `scripts/dev/js.sh '<js>'` | runs JavaScript in the debug app over its socket (`@<label>` on the first line targets another window) |
 | `scripts/dev/screenshot.sh <png> [--overlay]` | captures the debug window, also on another Space or under other windows (the background launch keeps the webview painting, `dev::keep_painting_when_covered`); never the release app |
+| `scripts/dev/screenshot-looks.sh <dir>` | the debug window in light and dark (`light.png`, `dark.png`) for the palette review; the appearance goes back to Automatic |
 | `scripts/dev/screens.sh [dir]` | the README screenshots (`docs/screens/`), dark and light, from the debug build on a fresh demo seed; the debug data folder is moved aside and restored |
 | `hamster dev seed --yes` (debug binary) | quits the debug app and removes its data; the next launch seeds the demo data again |
 | `scripts/dev/e2e.sh` | clicks every sidebar row and + New twice and fails when the panel, header, first sidebar row, filter field or the control moved; then opens the sample document and fails when + New, the palette or a toast leaves the native PDF preview showing |

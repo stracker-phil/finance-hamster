@@ -24,8 +24,8 @@ These rules hold everywhere in the code. Keep them when you change things.
 7. **The look is native and light** (ADR 0024, [ux.md](ux.md)).
 8. **One write path into the data** (ADR 0007). Every change goes through the data layer's one
    write function, which validates, saves and announces it as an event. No other code writes the data.
-9. **Commands live in Rust** (ADR 0008). Menus, shortcuts, the palette, the CLI and links run
-   commands of one bus by id.
+9. **Commands live in Rust** (ADR 0008, ADR 0046). Menus, shortcuts, the palette and the CLI run
+   commands of one catalog by colon id (`go:today`).
 10. **Small feature modules** (ADR 0006): by feature, pure cores, ports only where a
     swap is real, files under ~400 lines.
 11. **Debug is a separate app on demo data** (ADR 0022); nothing in the repo carries
@@ -40,7 +40,7 @@ These rules hold everywhere in the code. Keep them when you change things.
 - Windows are declared `visible: false` and shown by Rust, so `--hidden` never flashes them. Closing hides;
   only Quit ends the app.
 - Launch requests are queued in Rust and pulled by the page (`take_launch_events`).
-- `hamster://` links arrive through `tauri-plugin-deep-link` and run an allowlist of commands.
+- No URL scheme (ADR 0047): outside callers use the CLI.
 - At launch a supervised task checks every referenced PDF (exists, SHA-256 matches) and appends journal rows
   missing from `journal.jsonl`; findings become a banner, nothing is repaired silently.
 - Reminders are (re)scheduled with the macOS notification center at launch and after every change that moves
@@ -87,11 +87,11 @@ Rust (`src-tauri/src/`):
 
 | Path | Holds |
 |---|---|
-| `lib.rs` | identity consts (`IDENTIFIER`, `APP_NAME`, `LINK_SCHEME`), `config_dir`, `run` (CLI or app), the config-contract tests |
+| `lib.rs` | identity consts (`IDENTIFIER`, `APP_NAME`), `config_dir`, `run` (CLI or app), the config-contract tests |
 | `app.rs` | the Tauri builder: plugins, window events, setup, run loop, logging |
 | `cli/` | the `hamster` command line (`parse`) and how replies print (`reply`); `commands` answers without the app |
-| `commands/` | the bus: `COMMANDS` (id, title, accelerator, who runs it), `run`, `list`, `shortcut_label`; page commands go to the main window as `run_command`; `keys.rs` (the owner's shortcuts in `keybindings.json`, conflicts refused; the menu bar is rebuilt and `commands_changed` sent) |
-| `menu/` | the menu bar: macOS's standard items around `MENUS` (command ids); a menu item's id is its command |
+| `commands/` | the catalog (ADR 0046): `COMMANDS` (colon id, title, accelerator, who runs it: the page, Settings or Rust), `run`, `list`, `shortcut_label`; page commands go to the main window as `run_command`; `handlers.rs` (the Tauri commands, Open Log Folder, Show Data Folder); `keys.rs` (the owner's shortcuts in `keybindings.json` through `JsonFile`, old dotted ids carried over, `conflict` and `reassign`; the menu bar is rebuilt and `commands_changed` sent) |
+| `menu/` | the menu bar: macOS's standard items around `MENUS` and `HELP` (command ids); a menu item's id is its command |
 | `db/` | `hamster.sqlite`: `migrations.rs` (numbered, `user_version`), `change.rs` (row changes over JSON rows with inverses and field-level journal entries), `journal.rs` (the `journal` table and its `journal.jsonl` mirror, caught up at launch), `undo.rs`, `Db::write`/`undo`/`redo`, `commands.rs` (`undo`, `redo`, the `data_changed` event) |
 | `money.rs`, `date.rs` | cents plus currency, amount labels by the number format, the FinanzOnline copy value, typed amounts; `YYYY-MM-DD` dates and their labels in the region's order |
 | `accounts/` | bank accounts: IBAN check and mask, the name other statements print for an account (`statement_name`, since real statements often print no counterparty IBAN), `add`/`edit`/`list` and their commands; changing an own account or its statement name decides the lines again in the same op |
@@ -104,7 +104,7 @@ Rust (`src-tauri/src/`):
 | `documents/` | invoices: `store.rs` (`documents`, `vendors`, `document_links`), `add.rs` (`prepare` refuses a hash already added, `preview` for the Add sheet, `commit` copies to `docs/inbox/` and stores the draft, a new vendor and the link as one op; `AddQueue`), `guess.rs` (vendor, total, invoice number and date from the text), `payments.rs` (the bank lines that likely paid an invoice), `amounts.rs` (work share, ANV amount, GWG hint), `files.rs` (`relocate`: drafts move to `docs/<year>/<date>-<vendor>.pdf` after every write, as a non-undoable op of their own), `view.rs` (the Document page, payment first; `line_options` for the bank-line picker), `edit.rs` (`DocumentEdit`: one field of a draft per op, a new vendor created on save), `list.rs` (the Documents page by tax year plus Inbox, with "Is it already here?"), `vendors.rs` (Settings → Vendors: default item, rename, merge, delete when unused), `depreciation.rs` (the AfA schedule above the purchase year's GWG limit: useful life from the asset class or the document's own, half-year rule, yearly slices), `lifecycle.rs` (Finish, Unlock, Exclude, Restore; Delete from the Archive after `archive_days`, removing the file and keeping a `deletions` row; not undoable), `history.rs` (a document's History and a year's Log from the journal), `commands.rs` (add, edit, view, list, vendors; `offer` for dropped PDFs that aren't statements) |
 | `year/` | the tax year page: `page.rs` (the page view; filtered by the header's text), `facts.rs` (what counts in the year: documents by their payments or depreciation slices, needs attention), `rows.rs` (amounts, trips and ANV lines without a document), `summary.rs` (questions, progress, Kennzahlen, months with Whole year, the Pauschale note), `notes.rs` (the one note line from the estimate rules), `answers.rs` (the `answers` table), `close.rs` (Close: drafts and undated documents block, missing invoices and questions warn; a `snapshots` row with the summary PDF in `snapshots/`; Reopen keeps it; the op says "without year check" when none ran after 31 Dec), `report.rs` (the summary PDF), `entries.rs` (the `entries` table: amounts as typed with an evidence PDF under `docs/<year>/evidence/`, trips valued at the rules' Kilometergeld rate on their date), `commands.rs` |
 | `search.rs` | "matches elsewhere": documents and bank lines containing the filter text, for the filter field's menu and the palette |
-| `integrity/` | `verify` (every document and statement PDF against its stored hash, at launch in the background and on Verify Now; the result in `LastCheck` with the `files_checked` event), `status.rs` (Settings → Status: statement chains and balances, checksums, journal against the database, inbox, rules files), `commands.rs` (also `settings_show` to open Settings at a row) |
+| `integrity/` | `verify` (every document and statement PDF against its stored hash, at launch in the background and on Verify Now; the result in `LastCheck` with the `files_checked` event), `status.rs` (Settings → Status: statement chains and balances, checksums, journal against the database, inbox, rules files; each row a value with a `Tone` and an optional `copy_text`), `commands.rs` (also `settings_show` to open Settings at a row) |
 | `reminders/` | `due_today` (renewals, price changes, overdue imports, gaps, filing, the year check), `tell` (each once, keys in `reminders.json` via `sent.rs`); the app runs it at launch and every half hour; `notify::Notifier::deliver` shows them in release builds (ADR 0042) |
 | `yearcheck/` | the year check (ADR 0043): the questions from the ruleset's `ask` blocks in order, the `year_checks` table (the time of the last completed run per year, one undoable op), `close_needs_run` for Close Year, `due_on`/`due_years` for Today and the reminder, `commands.rs` (view, complete); the run itself lives in the page |
 | `today/` | the Today page: `today_view` (the next step by priority: review, invoices to attach (opening the tax year on just those), an overdue statement or else a missing one, the year check (from 1 Nov, in place of the questions), questions, drafts (one opens, several open the tax year on drafts); the next five charges, each opening its subscription, the newest open tax year, how far the statements reach), `steps.rs` (one builder per kind of step), `commands.rs` |
@@ -118,7 +118,7 @@ Rust (`src-tauri/src/`):
 | `launch.rs` | launch events queued for the page (`take_launch_events`) |
 | `window/` | showing and hiding windows; `settings.rs` opens Settings at a page; `navigation.rs` keeps webviews on app pages |
 | `error.rs`, `events.rs`, `lock.rs`, `state.rs`, `handlers.rs` | `AppError`, event names, poison-tolerant locks, managed state, the command list |
-| `store/` | `json_file.rs`: private dir creation, atomic JSON files |
+| `store/` | `json_file.rs`: private dir creation, `write_private_file` (0600, temp + rename; every PDF the app keeps goes through it), `JsonFile` (atomic JSON files, broken ones moved aside as `.corrupt`) |
 | `dev/` | debug-only hooks: window frame, background launches, `eval` |
 | `test_support/` | fixtures for tests; `statements.rs` builds synthetic statements in the Digitales Banking layout (fixtures, demo data, the debug build's sample document); `demo/` seeds the debug build's made-up data on its first launch (`SEEDERS`; the demo rules decide some lines; `demo/documents.rs` adds three invented invoices; `demo/statements.rs` imports a year of statements through the real pipeline, Household missing February) and `reset` backs `hamster dev seed --yes` |
 | `../tests/no_network.rs` | no network crate in `Cargo.toml` or the resolved dependency tree (ADR 0016) |

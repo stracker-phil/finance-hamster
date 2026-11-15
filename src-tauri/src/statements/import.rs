@@ -23,7 +23,7 @@ use crate::money::{Money, format_money, format_plain, format_signed};
 use crate::platform::pdf::Pdf;
 use crate::rules;
 use crate::settings::NumberFormat;
-use crate::store::json_file::create_private_dir;
+use crate::store::json_file::write_private_file;
 
 pub const FOLDER: &str = "statements";
 
@@ -319,11 +319,8 @@ pub fn commit(
     let p = &pending.parsed;
     let path = config_dir.join(&pending.file);
     let created = !path.exists();
-    if let Some(dir) = path.parent() {
-        create_private_dir(dir)?;
-    }
     if created {
-        std::fs::write(&path, &pending.bytes)?;
+        write_private_file(&path, &pending.bytes)?;
     }
     let statement = StatementRow {
         id: uuid::Uuid::new_v4().to_string(),

@@ -37,7 +37,7 @@ function NavArrows() {
 }
 
 const openSettings = () => {
-  api.runCommand("settings.open").catch((e: unknown) => useStore.getState().showToast("error", toAppError(e).message));
+  api.runCommand("app:settings").catch((e: unknown) => useStore.getState().showToast("error", toAppError(e).message));
 };
 
 const hasFiles = (e: DragEvent) => e.dataTransfer.types.includes("Files");

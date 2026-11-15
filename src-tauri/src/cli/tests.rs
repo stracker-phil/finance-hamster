@@ -90,10 +90,10 @@ fn status_hide_and_quit_only_ask_the_running_app() {
 #[test]
 fn run_asks_the_running_app_to_run_the_command_id() {
     assert_eq!(
-        run(&["run", "go.today"]),
+        run(&["run", "go:today"]),
         CliOutcome::Ask(request(
             IpcMessage::Run {
-                id: "go.today".into()
+                id: "go:today".into()
             },
             false
         ))

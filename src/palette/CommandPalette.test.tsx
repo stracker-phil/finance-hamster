@@ -63,15 +63,15 @@ describe("CommandPalette", () => {
   it("finds a command by its id", async () => {
     await openPalette();
 
-    await userEvent.type(search(), "import.statement");
+    await userEvent.type(search(), "statement:import");
 
     expect(optionNames()).toEqual(["Import Statement…"]);
   });
 
   it("puts a title prefix before a later word match", async () => {
     mocked.listCommands.mockResolvedValue([
-      { id: "go.settings", title: "Go to Settings", shortcut: null, custom: false },
-      { id: "settings.open", title: "Settings", shortcut: null, custom: false },
+      { id: "go:settings", title: "Go to Settings", shortcut: null, custom: false },
+      { id: "app:settings", title: "Settings", shortcut: null, custom: false },
     ]);
     useStore.setState({ paletteOpen: true });
     renderWithQuery(<CommandPalette />);
@@ -126,7 +126,7 @@ describe("CommandPalette", () => {
 
     await userEvent.keyboard("{ArrowDown}{Enter}");
 
-    expect(mocked.runCommand).toHaveBeenCalledWith("go.subscriptions");
+    expect(mocked.runCommand).toHaveBeenCalledWith("go:subscriptions");
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(useStore.getState().paletteOpen).toBe(false);
   });
@@ -136,7 +136,7 @@ describe("CommandPalette", () => {
 
     await userEvent.type(search(), "settings{Enter}");
 
-    expect(mocked.runCommand).toHaveBeenCalledWith("settings.open");
+    expect(mocked.runCommand).toHaveBeenCalledWith("app:settings");
   });
 
   it("runs a clicked command and closes", async () => {
@@ -144,7 +144,7 @@ describe("CommandPalette", () => {
 
     await userEvent.click(screen.getByRole("option", { name: /Import Statement/ }));
 
-    expect(mocked.runCommand).toHaveBeenCalledWith("import.statement");
+    expect(mocked.runCommand).toHaveBeenCalledWith("statement:import");
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 

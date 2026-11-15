@@ -84,7 +84,7 @@ describe("settings button", () => {
 
     await userEvent.click(settingsButton());
 
-    expect(mocked.runCommand).toHaveBeenCalledWith("settings.open");
+    expect(mocked.runCommand).toHaveBeenCalledWith("app:settings");
   });
 
   it("shows the error when Settings cannot be opened", async () => {
@@ -327,7 +327,7 @@ describe("command palette", () => {
   });
 
   it("shows over the window once opened", async () => {
-    mocked.listCommands.mockResolvedValue([{ id: "go.today", title: "Go to Today", shortcut: null, custom: false }]);
+    mocked.listCommands.mockResolvedValue([{ id: "go:today", title: "Go to Today", shortcut: null, custom: false }]);
     useStore.setState({ paletteOpen: true });
 
     render(<Window />);

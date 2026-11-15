@@ -439,6 +439,19 @@ rate: string | null,
 reported: boolean, };
 
 /**
+ * The shortcut another command already holds, as the page asks before taking it.
+ */
+export type KeyConflict = { 
+/**
+ * The shortcut as macOS draws it (`⇧⌘K`).
+ */
+shortcut: string, 
+/**
+ * The title of the command holding it.
+ */
+holder: string, };
+
+/**
  * Something the page acts on once it listens: from the launch that started the app or a later one.
  */
 export type LaunchEvent = { "type": "error", message: string, } | { "type": "activate" };
@@ -751,7 +764,11 @@ export type StatusRow = { label: string, detail: string,
 /**
  * `OK`, `Gap`, `41 of 41`.
  */
-value: string, ok: boolean, };
+value: string, tone: Tone, 
+/**
+ * What a click copies when it isn't the value itself, e.g. a file's full path.
+ */
+copyText: string | null, };
 
 export type Step = { 
 /**
@@ -896,6 +913,11 @@ next: Step | null,
  * The other open steps as quiet rows.
  */
 also: Array<Step>, upcoming: Array<UpcomingCharge>, year: YearSummary | null, statements: Array<StatementReach>, };
+
+/**
+ * How a value reads: only ok, warning and error carry an icon; info is a plain fact.
+ */
+export type Tone = "ok" | "warning" | "error" | "info";
 
 export type UpcomingCharge = { id: string, name: string, letter: string, tone: number, anv: boolean, 
 /**

@@ -8,20 +8,22 @@ use crate::commands;
 
 /// The app's own menus, each a list of groups of command ids with a separator between groups.
 const MENUS: &[(&str, &[&[&str]])] = &[
-    ("View", &[&["palette.open", "filter.focus"]]),
+    ("View", &[&["palette:open", "filter:focus"]]),
     (
         "Go",
         &[
             &[
-                "go.today",
-                "go.subscriptions",
-                "go.statements",
-                "go.documents",
+                "go:today",
+                "go:subscriptions",
+                "go:statements",
+                "go:documents",
             ],
-            &["go.back", "go.forward"],
+            &["go:back", "go:forward"],
         ],
     ),
 ];
+
+const HELP: &[&[&str]] = &[&["app:logs", "app:data"]];
 
 type Builder<'a> = SubmenuBuilder<'a, Wry, AppHandle>;
 
@@ -63,7 +65,7 @@ fn app_menu(app: &AppHandle) -> tauri::Result<Submenu<Wry>> {
     let builder = SubmenuBuilder::new(app, crate::APP_NAME)
         .about(Some(about))
         .separator();
-    with_command(app, builder, "settings.open")?
+    with_command(app, builder, "app:settings")?
         .separator()
         .services()
         .separator()
@@ -77,14 +79,14 @@ fn app_menu(app: &AppHandle) -> tauri::Result<Submenu<Wry>> {
 
 pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let app_menu = app_menu(app)?;
-    let file = with_command(app, SubmenuBuilder::new(app, "File"), "statement.import")?;
-    let file = with_command(app, file, "document.add")?;
-    let file = with_command(app, file, "subscription.new")?
+    let file = with_command(app, SubmenuBuilder::new(app, "File"), "statement:import")?;
+    let file = with_command(app, file, "document:add")?;
+    let file = with_command(app, file, "subscription:new")?
         .separator()
         .close_window()
         .build()?;
-    let edit = with_command(app, SubmenuBuilder::new(app, "Edit"), "edit.undo")?;
-    let edit = with_command(app, edit, "edit.redo")?
+    let edit = with_command(app, SubmenuBuilder::new(app, "Edit"), "edit:undo")?;
+    let edit = with_command(app, edit, "edit:redo")?
         .separator()
         .cut()
         .copy()
@@ -102,6 +104,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         menus.push(submenu(app, title, groups)?);
     }
     menus.push(window);
+    menus.push(submenu(app, "Help", HELP)?);
     let refs: Vec<&dyn tauri::menu::IsMenuItem<Wry>> = menus.iter().map(|m| m as _).collect();
     Menu::with_items(app, &refs)
 }

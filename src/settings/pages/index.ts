@@ -116,8 +116,9 @@ export const SETTINGS_PAGES: SettingsPage[] = [
     intro: "Click a shortcut and press the new keys. ⌘Z undoes everything except deleting from the Archive.",
     Body: ShortcutsPage,
     rows: [
-      { id: "commands", title: "Commands", keywords: ["keys", "rebind", "keyboard"] },
-      { id: "review-keys", title: "Review keys", keywords: ["anv", "skip"] },
+      { id: "commands", title: "In every window", keywords: ["commands", "keys", "rebind", "keyboard", "reassign"] },
+      { id: "review-keys", title: "On the Review page", keywords: ["review keys", "anv", "skip"] },
+      { id: "year-check-keys", title: "On the Year Check page", keywords: ["yes", "no", "later"] },
     ],
   },
   { id: "status", group: "App", label: "Status", icon: "status", intro: "A quick health check. Everything is computed on this Mac.", Body: StatusPage, rows: [
@@ -125,5 +126,9 @@ export const SETTINGS_PAGES: SettingsPage[] = [
       { id: "status-files", title: "Files and journal", keywords: ["checksum", "journal", "inbox"] },
       { id: "status-rules", title: "Rules files", keywords: ["json", "unverified"] },
     ] },
-  { id: "about", group: "App", label: "About", icon: "about", Body: AboutPage, rows: [{ id: "version", title: "Version" }] },
+  { id: "about", group: "App", label: "About", icon: "about", Body: AboutPage, rows: [
+      { id: "version", title: "Version" },
+      { id: "about-data-folder", title: "Data folder", keywords: ["finder", "show"] },
+      { id: "about-log-folder", title: "Log folder", keywords: ["logs", "diagnostics"] },
+    ] },
 ];

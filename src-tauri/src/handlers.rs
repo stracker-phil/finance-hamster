@@ -7,6 +7,8 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static
         crate::commands::handlers::list_commands,
         crate::commands::handlers::keybinding_set,
         crate::commands::handlers::keybinding_reset,
+        crate::commands::handlers::keybinding_conflict,
+        crate::commands::handlers::keybinding_reassign,
         crate::commands::handlers::run_command,
         crate::settings::commands::get_settings,
         crate::settings::commands::update_settings,
@@ -106,10 +108,8 @@ fn data_folder() -> String {
 
 /// Reveals the data folder in Finder (Settings → Privacy & Data).
 #[tauri::command]
-fn show_data_folder() -> crate::error::AppResult<()> {
-    tauri_plugin_opener::reveal_item_in_dir(crate::config_dir()).map_err(|e| {
-        crate::error::AppError::Internal(format!("Couldn't show the data folder: {e}"))
-    })
+fn show_data_folder(app: tauri::AppHandle) -> crate::error::AppResult<()> {
+    crate::commands::handlers::show_data_folder(&app)
 }
 
 /// Whether Time Machine backs up the data folder; None when `tmutil` can't say (no backup set up).

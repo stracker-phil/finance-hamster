@@ -13,11 +13,13 @@ pub mod handlers;
 pub mod keys;
 
 /// Who carries a command out.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy)]
 pub enum Runs {
     /// The main window: it is shown, then handles the id.
     Page,
     Settings,
+    /// Rust alone, with the window left as it is.
+    Rust(fn(&AppHandle) -> AppResult<()>),
 }
 
 pub struct CommandDef {
@@ -42,25 +44,37 @@ const fn page(
 }
 
 pub const COMMANDS: &[CommandDef] = &[
-    page("edit.undo", "Undo", Some("CmdOrCtrl+Z")),
-    page("edit.redo", "Redo", Some("CmdOrCtrl+Shift+Z")),
-    page("go.today", "Today", Some("CmdOrCtrl+1")),
-    page("go.subscriptions", "Subscriptions", Some("CmdOrCtrl+2")),
-    page("go.statements", "Statements", Some("CmdOrCtrl+3")),
-    page("go.documents", "Documents", Some("CmdOrCtrl+4")),
-    page("go.review", "Review Lines", None),
-    page("go.back", "Back", Some("CmdOrCtrl+[")),
-    page("go.forward", "Forward", Some("CmdOrCtrl+]")),
-    page("palette.open", "Command Palette…", Some("CmdOrCtrl+K")),
-    page("statement.import", "Import Statement…", Some("CmdOrCtrl+I")),
-    page("document.add", "Add Invoice PDF…", Some("CmdOrCtrl+O")),
-    page("subscription.new", "New Subscription", Some("CmdOrCtrl+N")),
-    page("filter.focus", "Filter This Page", Some("CmdOrCtrl+F")),
+    page("edit:undo", "Undo", Some("CmdOrCtrl+Z")),
+    page("edit:redo", "Redo", Some("CmdOrCtrl+Shift+Z")),
+    page("go:today", "Today", Some("CmdOrCtrl+1")),
+    page("go:subscriptions", "Subscriptions", Some("CmdOrCtrl+2")),
+    page("go:statements", "Statements", Some("CmdOrCtrl+3")),
+    page("go:documents", "Documents", Some("CmdOrCtrl+4")),
+    page("go:review", "Review Lines", None),
+    page("go:back", "Back", Some("CmdOrCtrl+[")),
+    page("go:forward", "Forward", Some("CmdOrCtrl+]")),
+    page("palette:open", "Command Palette…", Some("CmdOrCtrl+K")),
+    page("statement:import", "Import Statement…", Some("CmdOrCtrl+I")),
+    page("document:add", "Add Invoice PDF…", Some("CmdOrCtrl+O")),
+    page("subscription:new", "New Subscription", Some("CmdOrCtrl+N")),
+    page("filter:focus", "Filter This Page", Some("CmdOrCtrl+F")),
     CommandDef {
-        id: "settings.open",
+        id: "app:settings",
         title: "Settings…",
         accelerator: Some("CmdOrCtrl+,"),
         runs: Runs::Settings,
+    },
+    CommandDef {
+        id: "app:logs",
+        title: "Open Log Folder",
+        accelerator: None,
+        runs: Runs::Rust(handlers::open_log_folder),
+    },
+    CommandDef {
+        id: "app:data",
+        title: "Show Data Folder",
+        accelerator: None,
+        runs: Runs::Rust(handlers::show_data_folder),
     },
 ];
 
@@ -118,6 +132,7 @@ pub fn run(app: &AppHandle, id: &str) -> AppResult<()> {
     let command = find(id).ok_or_else(|| AppError::NotFound(format!("No command {id}")))?;
     match command.runs {
         Runs::Settings => window::settings::open(app, None),
+        Runs::Rust(handler) => handler(app)?,
         Runs::Page => {
             window::show_main(app);
             app.emit_to(window::MAIN, RUN_COMMAND_EVENT, command.id)
@@ -150,7 +165,7 @@ mod tests {
     #[test]
     fn find_returns_the_command_by_id_and_none_for_an_unknown_id() {
         assert_eq!(
-            find("palette.open").map(|c| c.title),
+            find("palette:open").map(|c| c.title),
             Some("Command Palette…")
         );
         assert!(find("no.such.command").is_none());
@@ -170,7 +185,7 @@ mod tests {
                 command.id
             );
         }
-        let palette = listed.iter().find(|c| c.id == "palette.open").unwrap();
+        let palette = listed.iter().find(|c| c.id == "palette:open").unwrap();
         assert_eq!(palette.shortcut.as_deref(), Some("⌘K"));
     }
 
@@ -183,14 +198,14 @@ mod tests {
                 .find(|c| c.id == id)
                 .map(|c| (c.title.as_str(), c.shortcut.as_deref()))
         };
-        assert_eq!(shortcut("edit.undo"), Some(("Undo", Some("⌘Z"))));
-        assert_eq!(shortcut("edit.redo"), Some(("Redo", Some("⇧⌘Z"))));
+        assert_eq!(shortcut("edit:undo"), Some(("Undo", Some("⌘Z"))));
+        assert_eq!(shortcut("edit:redo"), Some(("Redo", Some("⇧⌘Z"))));
     }
 
     #[test]
     fn import_statement_is_listed_with_its_shortcut() {
         let listed = list();
-        let import = listed.iter().find(|c| c.id == "statement.import").unwrap();
+        let import = listed.iter().find(|c| c.id == "statement:import").unwrap();
         assert_eq!(import.title, "Import Statement…");
         assert_eq!(import.shortcut.as_deref(), Some("⌘I"));
     }
@@ -198,7 +213,7 @@ mod tests {
     #[test]
     fn add_invoice_is_listed_with_its_shortcut() {
         let listed = list();
-        let add = listed.iter().find(|c| c.id == "document.add").unwrap();
+        let add = listed.iter().find(|c| c.id == "document:add").unwrap();
         assert_eq!(add.title, "Add Invoice PDF…");
         assert_eq!(add.shortcut.as_deref(), Some("⌘O"));
     }
@@ -206,9 +221,44 @@ mod tests {
     #[test]
     fn review_lines_is_a_page_command_without_a_shortcut() {
         let listed = list();
-        let review = listed.iter().find(|c| c.id == "go.review").unwrap();
+        let review = listed.iter().find(|c| c.id == "go:review").unwrap();
         assert_eq!(review.title, "Review Lines");
         assert_eq!(review.shortcut, None);
+    }
+
+    #[test]
+    fn the_folder_commands_are_listed_without_a_shortcut() {
+        let listed = list();
+        for (id, title) in [
+            ("app:logs", "Open Log Folder"),
+            ("app:data", "Show Data Folder"),
+        ] {
+            let command = listed.iter().find(|c| c.id == id).unwrap();
+            assert_eq!(command.title, title, "{id}");
+            assert_eq!(command.shortcut, None, "{id}");
+        }
+    }
+
+    #[test]
+    fn each_kind_of_command_is_run_by_its_own_runner() {
+        for id in ["app:logs", "app:data"] {
+            assert!(matches!(find(id).unwrap().runs, Runs::Rust(_)), "{id}");
+        }
+        assert!(matches!(find("app:settings").unwrap().runs, Runs::Settings));
+        assert!(matches!(find("go:today").unwrap().runs, Runs::Page));
+    }
+
+    #[test]
+    fn every_command_id_is_lower_case_words_joined_by_colons() {
+        let word = |w: &str| !w.is_empty() && w.chars().all(|c| c.is_ascii_lowercase() || c == '-');
+        for command in COMMANDS {
+            let (head, rest) = command.id.split_once(':').unwrap_or((command.id, ""));
+            assert!(
+                word(head) && head.chars().all(|c| c != '-') && rest.split(':').all(word),
+                "{}",
+                command.id
+            );
+        }
     }
 
     #[test]

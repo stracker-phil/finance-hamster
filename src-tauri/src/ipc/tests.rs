@@ -135,9 +135,9 @@ fn messages_have_their_wire_shape() {
         (IpcMessage::Status, serde_json::json!({ "type": "status" })),
         (
             IpcMessage::Run {
-                id: "go.today".into(),
+                id: "go:today".into(),
             },
-            serde_json::json!({ "type": "run", "id": "go.today" }),
+            serde_json::json!({ "type": "run", "id": "go:today" }),
         ),
     ];
     #[cfg(debug_assertions)]
@@ -269,7 +269,7 @@ async fn messages_round_trip_through_the_socket() {
         IpcMessage::Hide,
         IpcMessage::Activate { hidden: true },
         IpcMessage::Run {
-            id: "go.today".into(),
+            id: "go:today".into(),
         },
         activate(),
     ] {
@@ -334,7 +334,7 @@ fn message_kinds_name_the_variant_without_its_payload() {
         (IpcMessage::Status, "Status"),
         (
             IpcMessage::Run {
-                id: "go.today".into(),
+                id: "go:today".into(),
             },
             "Run",
         ),

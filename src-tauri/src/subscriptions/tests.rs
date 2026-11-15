@@ -1848,7 +1848,11 @@ fn the_detail_shows_amount_next_charge_timeline_plans_rule_charges_and_the_edit_
             detail.reminder.as_str(),
             detail.rule.as_str()
         ),
-        ("No", "Off", "text contains STREAMFLIX · another amount asks")
+        (
+            "No",
+            "Off",
+            "text contains STREAMFLIX · another amount asks"
+        )
     );
     let charge = |id: String, date: &str| ChargeView {
         id,

@@ -69,10 +69,18 @@
 .reload-list--problems { color: var(--danger-text); }
 .settings-number { width: 72px; text-align: right; }
 .settings-value--problem { color: var(--danger-text); font-weight: 600; }
-.status-value { border: 0; background: transparent; padding: 0; font: inherit; font-size: 13px; font-variant-numeric: tabular-nums; color: var(--text-secondary); }
-.status-value--ok { color: var(--positive-text); }
-.status-value:hover { text-decoration: underline; }
 .shortcuts-search { width: 100%; margin-bottom: 14px; }
 .shortcut-btn { min-width: 76px; height: 26px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--panel-bg); color: var(--text); font: inherit; font-size: 12px; font-variant-numeric: tabular-nums; }
 .shortcut-btn--recording { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent-text); }
 .settings-row__error { color: var(--danger-text); }
+/* A Status value copies on click; the clipboard icon takes the tone icon's place on hover or focus. The value is
+   right-aligned, so an icon appearing on its left moves nothing. */
+.status-value { display: inline-flex; align-items: center; gap: 6px; min-width: 0; padding: 0; border: 0; background: none; font: inherit; font-size: 13px; font-variant-numeric: tabular-nums; color: var(--text-secondary); cursor: pointer; text-align: right; }
+.status-value .settings-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.status-value svg { flex: none; }
+.status-value[data-tone="ok"] svg { color: var(--positive-text); }
+.status-value[data-tone="warning"] svg { color: var(--warning-text); }
+.status-value[data-tone="error"] svg { color: var(--danger-text); }
+.status-value .status-value__copy { display: none; color: var(--text-tertiary); }
+.status-value:is(:hover, :focus-visible) .status-value__copy { display: block; }
+.status-value:is(:hover, :focus-visible) .status-value__tone { display: none; }

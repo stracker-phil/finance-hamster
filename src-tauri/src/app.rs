@@ -31,7 +31,6 @@ pub fn start(
             crate::preview::scheme::handle,
         )
         .plugin(window::navigation::guard())
-        .plugin(tauri_plugin_deep_link::init())
         .menu(crate::menu::build)
         .on_menu_event(crate::menu::on_event)
         .on_window_event(|window, event| match event {

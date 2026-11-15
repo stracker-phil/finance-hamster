@@ -10,10 +10,10 @@ describe("fold", () => {
 describe("rankMatch", () => {
   it("ranks a label prefix before a word start, all words and scattered letters", () => {
     const ranks = [
-      rankMatch("Toggle Sidebar", "view.sidebar", "tog"),
-      rankMatch("Show Sidebar", "view.sidebar", "sid"),
-      rankMatch("Show Sidebar", "view.sidebar", "view sid"),
-      rankMatch("Toggle Sidebar", "view.sidebar", "tsb"),
+      rankMatch("Toggle Sidebar", "view:sidebar", "tog"),
+      rankMatch("Show Sidebar", "view:sidebar", "sid"),
+      rankMatch("Show Sidebar", "view:sidebar", "view sid"),
+      rankMatch("Toggle Sidebar", "view:sidebar", "tsb"),
     ];
 
     expect(ranks).toEqual([0, 1, 2, 3]);
@@ -24,11 +24,11 @@ describe("rankMatch", () => {
   });
 
   it("does not match when the letters are not in order", () => {
-    expect(rankMatch("Toggle Sidebar", "view.sidebar", "zq")).toBeNull();
+    expect(rankMatch("Toggle Sidebar", "view:sidebar", "zq")).toBeNull();
   });
 
   it("finds a word through the detail text", () => {
-    expect(rankMatch("Open Settings", "settings.open", "settings open")).toBe(2);
+    expect(rankMatch("Open Settings", "app:settings", "settings open")).toBe(2);
   });
 
   it("ignores accents and case in the label", () => {

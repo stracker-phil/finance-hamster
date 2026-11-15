@@ -25,7 +25,26 @@ pub struct StatusRow {
     pub detail: String,
     /// `OK`, `Gap`, `41 of 41`.
     pub value: String,
-    pub ok: bool,
+    pub tone: Tone,
+    /// What a click copies when it isn't the value itself, e.g. a file's full path.
+    pub copy_text: Option<String>,
+}
+
+/// How a value reads: only ok, warning and error carry an icon; info is a plain fact.
+#[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "src/api/types.gen.ts")]
+pub enum Tone {
+    Ok,
+    Warning,
+    Error,
+    Info,
+}
+
+impl Tone {
+    fn ok_or(good: bool, otherwise: Tone) -> Tone {
+        if good { Tone::Ok } else { otherwise }
+    }
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
@@ -40,13 +59,23 @@ fn row(
     label: impl Into<String>,
     detail: impl Into<String>,
     value: impl Into<String>,
-    ok: bool,
+    tone: Tone,
 ) -> StatusRow {
     StatusRow {
         label: label.into(),
         detail: detail.into(),
         value: value.into(),
-        ok,
+        tone,
+        copy_text: None,
+    }
+}
+
+impl StatusRow {
+    fn copying(self, text: impl Into<String>) -> StatusRow {
+        StatusRow {
+            copy_text: Some(text.into()),
+            ..self
+        }
     }
 }
 
@@ -66,14 +95,14 @@ fn statement_row(db: &Db, account: &AccountCoverage, order: DateOrder) -> AppRes
         .map(|d| format!("until {}", date::day_month(d, order)));
     let name = account.name.clone();
     Ok(match (until, &account.note) {
-        (None, _) => row(name, "No statement imported yet", "None", false),
+        (None, _) => row(name, "No statement imported yet", "None", Tone::Info),
         // The chain's note names its first break: a missing number or balances that don't connect.
-        (Some(until), Some(note)) => row(name, format!("{note} · {until}"), "Gap", false),
+        (Some(until), Some(note)) => row(name, format!("{note} · {until}"), "Gap", Tone::Error),
         (Some(until), None) => row(
             name,
             format!("Chain complete · balances check out · {until}"),
             "OK",
-            true,
+            Tone::Ok,
         ),
     })
 }
@@ -93,7 +122,7 @@ fn journal_row(db: &Db, config_dir: &Path) -> AppResult<StatusRow> {
     let in_file = std::fs::read_to_string(config_dir.join(journal::FILE_NAME))
         .map(|text| text.lines().filter(|l| !l.trim().is_empty()).count() as i64)
         .unwrap_or(0);
-    Ok(if in_db == in_file {
+    let checked = if in_db == in_file {
         row(
             "Journal",
             format!(
@@ -101,7 +130,7 @@ fn journal_row(db: &Db, config_dir: &Path) -> AppResult<StatusRow> {
                 journal::FILE_NAME
             ),
             "OK",
-            true,
+            Tone::Ok,
         )
     } else {
         row(
@@ -111,9 +140,10 @@ fn journal_row(db: &Db, config_dir: &Path) -> AppResult<StatusRow> {
                 journal::FILE_NAME
             ),
             "Behind",
-            false,
+            Tone::Warning,
         )
-    })
+    };
+    Ok(checked.copying(config_dir.join(journal::FILE_NAME).display().to_string()))
 }
 
 fn checksum_row(check: Option<&FileCheck>, order: DateOrder) -> StatusRow {
@@ -124,14 +154,14 @@ fn checksum_row(check: Option<&FileCheck>, order: DateOrder) -> StatusRow {
                 "PDF checksums",
                 format!("Last verified {}", local_day(check.at, order)),
                 format!("{good} of {}", check.checked),
-                check.problems.is_empty(),
+                Tone::ok_or(check.problems.is_empty(), Tone::Error),
             )
         }
         None => row(
             "PDF checksums",
             "Not verified since launch",
             "Not run",
-            false,
+            Tone::Info,
         ),
     }
 }
@@ -151,7 +181,7 @@ fn inbox_row(db: &Db) -> AppResult<StatusRow> {
         "Inbox",
         "docs/inbox/ · documents without a payment date",
         files,
-        inbox == 0,
+        Tone::ok_or(inbox == 0, Tone::Info),
     ))
 }
 
@@ -180,16 +210,16 @@ fn rules_rows(db: &Db, config_dir: &Path, order: DateOrder) -> AppResult<Vec<Sta
                     .as_ref()
                     .map(|d| format!(" · loaded {d}"))
                     .unwrap_or_default();
-                row(&f.file_name, format!("Valid{when}"), "OK", true)
+                row(&f.file_name, format!("Valid{when}"), "OK", Tone::Ok)
             } else if f.missing {
                 row(
                     &f.file_name,
                     "The file is gone; the year keeps what it applied",
                     "Missing",
-                    false,
+                    Tone::Warning,
                 )
             } else {
-                row(&f.file_name, f.problems.join(" · "), "Invalid", false)
+                row(&f.file_name, f.problems.join(" · "), "Invalid", Tone::Error)
             }
         })
         .collect();
@@ -198,7 +228,7 @@ fn rules_rows(db: &Db, config_dir: &Path, order: DateOrder) -> AppResult<Vec<Sta
         "Unverified values",
         "Marked \"verified\": false in the files",
         unverified.to_string(),
-        unverified == 0,
+        Tone::ok_or(unverified == 0, Tone::Warning),
     ));
     Ok(rows)
 }
@@ -352,7 +382,7 @@ mod tests {
             "Unverified values",
             "Marked \"verified\": false in the files",
             count.to_string(),
-            count == 0,
+            if count == 0 { Tone::Ok } else { Tone::Warning },
         )
     }
 
@@ -381,7 +411,7 @@ mod tests {
                 "Private",
                 "Chain complete · balances check out · until 21 Oct",
                 "OK",
-                true
+                Tone::Ok
             )
         );
     }
@@ -399,7 +429,7 @@ mod tests {
                 "Private",
                 "Statement Nr. 002/2026 was never imported: no lines between 21 Aug and 1 Oct. · until 21 Oct",
                 "Gap",
-                false
+                Tone::Error
             )
         );
     }
@@ -417,7 +447,7 @@ mod tests {
                 "Private",
                 "The balances of Nr. 001/2026 and Nr. 002/2026 don't connect. · until 21 Oct",
                 "Gap",
-                false
+                Tone::Error
             )
         );
     }
@@ -432,7 +462,7 @@ mod tests {
                 name,
                 "No statement imported yet",
                 "None",
-                false
+                Tone::Info
             ))
         );
     }
@@ -447,7 +477,7 @@ mod tests {
                 "PDF checksums",
                 "Not verified since launch",
                 "Not run",
-                false
+                Tone::Info
             )
         );
     }
@@ -466,7 +496,7 @@ mod tests {
                 "PDF checksums",
                 format!("Last verified {}", label(NOW)),
                 "2 of 2",
-                true
+                Tone::Ok
             )
         );
     }
@@ -494,7 +524,7 @@ mod tests {
                 "PDF checksums",
                 format!("Last verified {}", label(NOW)),
                 "3 of 4",
-                false
+                Tone::Error
             )
         );
     }
@@ -516,8 +546,9 @@ mod tests {
                     journal_entries(&db)
                 ),
                 "OK",
-                true
+                Tone::Ok
             )
+            .copying(dir.path().join("journal.jsonl").display().to_string())
         );
     }
 
@@ -535,8 +566,9 @@ mod tests {
                     journal_entries(&db)
                 ),
                 "Behind",
-                false
+                Tone::Warning
             )
+            .copying(dir.path().join("journal.jsonl").display().to_string())
         );
     }
 
@@ -548,7 +580,11 @@ mod tests {
                 "Inbox",
                 "docs/inbox/ · documents without a payment date",
                 label,
-                label == "0 files",
+                if label == "0 files" {
+                    Tone::Ok
+                } else {
+                    Tone::Info
+                },
             )
         };
         assert_eq!(
@@ -595,7 +631,7 @@ mod tests {
                     "rules-2026.json",
                     format!("Valid · loaded {}", label(NOW)),
                     "OK",
-                    true
+                    Tone::Ok
                 ),
                 unverified_row(0)
             ]
@@ -616,7 +652,7 @@ mod tests {
                 "rules-2026.json",
                 "schemaVersion: this Hamster reads version 1, not 2",
                 "Invalid",
-                false
+                Tone::Error
             )
         );
     }
@@ -632,9 +668,63 @@ mod tests {
                 "rules-2026.json",
                 "The file is gone; the year keeps what it applied",
                 "Missing",
-                false
+                Tone::Warning
             )
         );
+    }
+
+    #[test]
+    fn a_row_serializes_with_a_lower_case_tone_and_a_camel_case_copy_text() {
+        let plain = row("Inbox", "detail", "0 files", Tone::Ok);
+        let copying = row("Journal", "detail", "OK", Tone::Info).copying("/data/journal.jsonl");
+
+        assert_eq!(
+            serde_json::to_value(&plain).unwrap(),
+            json!({
+                "label": "Inbox",
+                "detail": "detail",
+                "value": "0 files",
+                "tone": "ok",
+                "copyText": null
+            })
+        );
+        assert_eq!(
+            serde_json::to_value(&copying).unwrap(),
+            json!({
+                "label": "Journal",
+                "detail": "detail",
+                "value": "OK",
+                "tone": "info",
+                "copyText": "/data/journal.jsonl"
+            })
+        );
+    }
+
+    #[test]
+    fn tones_serialize_as_lower_case_words() {
+        for (tone, expected) in [
+            (Tone::Ok, "ok"),
+            (Tone::Warning, "warning"),
+            (Tone::Error, "error"),
+            (Tone::Info, "info"),
+        ] {
+            assert_eq!(serde_json::to_value(tone).unwrap(), json!(expected));
+        }
+    }
+
+    #[test]
+    fn only_the_journal_row_offers_text_to_copy() {
+        let (dir, db) = open_with_accounts_and_year();
+        let all = groups(&db, dir.path(), None);
+
+        let copying: Vec<String> = all
+            .iter()
+            .flat_map(|g| g.rows.iter())
+            .filter(|r| r.copy_text.is_some())
+            .map(|r| r.label.clone())
+            .collect();
+
+        assert_eq!(copying, ["Journal"]);
     }
 
     #[test]

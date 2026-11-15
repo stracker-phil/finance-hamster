@@ -31,20 +31,20 @@ function undoOrRedo(which: keyof typeof UNDO_WORDS) {
 
 /** What the main window does for each page command (`commands::COMMANDS` in Rust). */
 const HANDLERS: Record<string, Handler> = {
-  "edit.undo": () => undoOrRedo("undo"),
-  "edit.redo": () => undoOrRedo("redo"),
-  "go.today": () => useStore.getState().navigate({ page: "today" }),
-  "go.subscriptions": () => useStore.getState().navigate({ page: "subscriptions" }),
-  "go.statements": () => useStore.getState().navigate({ page: "statements" }),
-  "go.documents": () => useStore.getState().navigate({ page: "documents" }),
-  "go.review": () => useStore.getState().navigate({ page: "review" }),
-  "go.back": () => useStore.getState().goBack(),
-  "go.forward": () => useStore.getState().goForward(),
-  "palette.open": () => useStore.getState().setPaletteOpen(true),
-  "statement.import": startImport,
-  "document.add": startAddDocument,
-  "subscription.new": newSubscription,
-  "filter.focus": () => document.getElementById(FILTER_FIELD_ID)?.focus(),
+  "edit:undo": () => undoOrRedo("undo"),
+  "edit:redo": () => undoOrRedo("redo"),
+  "go:today": () => useStore.getState().navigate({ page: "today" }),
+  "go:subscriptions": () => useStore.getState().navigate({ page: "subscriptions" }),
+  "go:statements": () => useStore.getState().navigate({ page: "statements" }),
+  "go:documents": () => useStore.getState().navigate({ page: "documents" }),
+  "go:review": () => useStore.getState().navigate({ page: "review" }),
+  "go:back": () => useStore.getState().goBack(),
+  "go:forward": () => useStore.getState().goForward(),
+  "palette:open": () => useStore.getState().setPaletteOpen(true),
+  "statement:import": startImport,
+  "document:add": startAddDocument,
+  "subscription:new": newSubscription,
+  "filter:focus": () => document.getElementById(FILTER_FIELD_ID)?.focus(),
 };
 
 export function runPageCommand(id: string) {

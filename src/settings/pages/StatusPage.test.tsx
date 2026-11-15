@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -30,9 +30,9 @@ describe("StatusPage", () => {
     expect(screen.getByText("Files")).toBeTruthy();
     expect(screen.getByText("Private")).toBeTruthy();
     expect(screen.getByText("Balances chain from statement to statement")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "OK" })).toBeTruthy();
     expect(screen.getByText("Stored PDFs")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "41 of 41" })).toBeTruthy();
+    expect(screen.getByText("Checked against their checksums")).toBeTruthy();
+    expect(screen.getByText("41 of 41")).toBeTruthy();
   });
 
   it("says a group has nothing to check when it has no rows", async () => {
@@ -43,23 +43,61 @@ describe("StatusPage", () => {
     expect(screen.getByText("Nothing to check yet")).toBeTruthy();
   });
 
-  it("copies a value on click and confirms it with a toast", async () => {
-    mocked.statusView.mockResolvedValue([statusGroup({ rows: [statusRow({ value: "1 gap", ok: false })] })]);
-    renderWithQuery(<StatusPage />);
+  describe("tone", () => {
+    it.each([
+      ["ok", "OK"],
+      ["warning", "Warning"],
+      ["error", "Error"],
+    ] as const)("marks a %s row with the %s icon", async (tone, name) => {
+      mocked.statusView.mockResolvedValue([statusGroup({ rows: [statusRow({ tone, value: "Some value" })] })]);
+      renderWithQuery(<StatusPage />);
 
-    await userEvent.click(await screen.findByRole("button", { name: "1 gap" }));
+      const button = await screen.findByRole("button", { name: /Some value/ });
 
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith("1 gap");
-    await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toEqual(["Copied 1 gap"]));
+      expect(within(button).getByRole("img", { name })).toBeTruthy();
+    });
+
+    it("shows no icon for an info row", async () => {
+      mocked.statusView.mockResolvedValue([statusGroup({ rows: [statusRow({ tone: "info", value: "41 PDFs" })] })]);
+      renderWithQuery(<StatusPage />);
+
+      expect(await screen.findByRole("button", { name: "41 PDFs" })).toBeTruthy();
+      expect(screen.queryByRole("img")).toBeNull();
+    });
   });
 
-  it("shows no toast when the clipboard refuses the value", async () => {
-    mocked.statusView.mockResolvedValue([statusGroup()]);
-    vi.mocked(navigator.clipboard.writeText).mockRejectedValueOnce(new Error("denied"));
-    renderWithQuery(<StatusPage />);
+  describe("copying", () => {
+    it("copies the value on click and confirms the row's label with a toast", async () => {
+      mocked.statusView.mockResolvedValue([statusGroup({ rows: [statusRow({ label: "Statement chains", value: "1 gap", tone: "warning" })] })]);
+      renderWithQuery(<StatusPage />);
 
-    await userEvent.click(await screen.findByRole("button", { name: "OK" }));
+      await userEvent.click(await screen.findByRole("button", { name: /1 gap/ }));
 
-    expect(useStore.getState().toasts).toEqual([]);
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith("1 gap");
+      await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toEqual(["Copied Statement chains"]));
+    });
+
+    it("copies the row's copy text instead of the shown value when it has one", async () => {
+      mocked.statusView.mockResolvedValue([
+        statusGroup({ rows: [statusRow({ label: "Data folder", value: "…/Hamster", tone: "info", copyText: "/Users/demo/Library/Hamster" })] }),
+      ]);
+      renderWithQuery(<StatusPage />);
+
+      await userEvent.click(await screen.findByRole("button", { name: "…/Hamster" }));
+
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith("/Users/demo/Library/Hamster");
+      await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toEqual(["Copied Data folder"]));
+    });
+
+    it("shows no toast when the clipboard refuses the value", async () => {
+      mocked.statusView.mockResolvedValue([statusGroup({ rows: [statusRow({ value: "Fine" })] })]);
+      vi.mocked(navigator.clipboard.writeText).mockRejectedValueOnce(new Error("denied"));
+      renderWithQuery(<StatusPage />);
+
+      await userEvent.click(await screen.findByRole("button", { name: /Fine/ }));
+
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith("Fine");
+      expect(useStore.getState().toasts).toEqual([]);
+    });
   });
 });

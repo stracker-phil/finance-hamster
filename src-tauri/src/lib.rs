@@ -61,12 +61,6 @@ pub const APP_NAME: &str = if cfg!(debug_assertions) {
     "Hamster"
 };
 const SOCKET_NAME: &str = "hamster.sock";
-/// Debug builds claim their own scheme (`tauri.debug.conf.json`), so links reach the installed app.
-pub const LINK_SCHEME: &str = if cfg!(debug_assertions) {
-    "hamster-debug"
-} else {
-    "hamster"
-};
 
 /// Tauri's `app_config_dir`, resolvable before the app starts; it holds all data (ADR 0012).
 pub fn config_dir() -> PathBuf {
@@ -177,12 +171,6 @@ mod tests {
         }
     }
 
-    fn scheme_of(config: &Value) -> &str {
-        config["plugins"]["deep-link"]["desktop"]["schemes"][0]
-            .as_str()
-            .expect("a deep-link scheme")
-    }
-
     #[test]
     fn identifier_matches_the_tauri_config_of_this_build() {
         assert_eq!(IDENTIFIER, active_config()["identifier"].as_str().unwrap());
@@ -194,20 +182,21 @@ mod tests {
     }
 
     #[test]
-    fn link_scheme_matches_the_tauri_config_of_this_build() {
-        assert_eq!(LINK_SCHEME, scheme_of(&active_config()));
-    }
-
-    #[test]
     fn the_release_config_uses_the_plain_names() {
         let config = release_config();
         assert_eq!(config["productName"], "Hamster");
         assert_eq!(config["identifier"], "com.philippstracker.hamster");
-        assert_eq!(scheme_of(&config), "hamster");
     }
 
     #[test]
-    fn the_debug_config_keeps_its_name_identifier_and_scheme_apart_from_release() {
+    fn neither_config_registers_a_url_scheme() {
+        for config in [release_config(), debug_config()] {
+            assert!(config.get("plugins").is_none());
+        }
+    }
+
+    #[test]
+    fn the_debug_config_keeps_its_name_and_identifier_apart_from_release() {
         let release = release_config();
         let debug = debug_config();
         assert_eq!(debug["productName"], "Hamster (Debug)");
@@ -215,11 +204,10 @@ mod tests {
             debug["identifier"].as_str().unwrap(),
             format!("{}.debug", release["identifier"].as_str().unwrap())
         );
-        assert_eq!(scheme_of(&debug), "hamster-debug");
     }
 
     #[test]
-    fn the_debug_config_overrides_nothing_but_name_identifier_and_plugins() {
+    fn the_debug_config_overrides_nothing_but_name_and_identifier() {
         let debug = debug_config();
         let mut keys: Vec<&str> = debug
             .as_object()
@@ -228,7 +216,7 @@ mod tests {
             .map(String::as_str)
             .collect();
         keys.sort_unstable();
-        assert_eq!(keys, ["identifier", "plugins", "productName"]);
+        assert_eq!(keys, ["identifier", "productName"]);
     }
 
     #[test]

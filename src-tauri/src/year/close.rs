@@ -15,7 +15,7 @@ use crate::db::{Change, Db, Op, Source, Written};
 use crate::documents::store as documents;
 use crate::error::{AppError, AppResult};
 use crate::settings::NumberFormat;
-use crate::store::json_file::create_private_dir;
+use crate::store::json_file::write_private_file;
 use crate::taxyears::{self, TaxYearRow, YearState};
 
 pub const SNAPSHOTS: &str = "snapshots";
@@ -119,10 +119,7 @@ fn free_name(config_dir: &Path, year: i32) -> String {
 fn write_summary(config_dir: &Path, page: &YearPage, stamp: &str) -> AppResult<String> {
     let file = free_name(config_dir, page.year);
     let path = config_dir.join(&file);
-    if let Some(dir) = path.parent() {
-        create_private_dir(dir)?;
-    }
-    std::fs::write(&path, report::summary_pdf(page, stamp))?;
+    write_private_file(&path, &report::summary_pdf(page, stamp))?;
     Ok(file)
 }
 
@@ -530,6 +527,19 @@ mod tests {
         let bytes = std::fs::read(dir.path().join("snapshots/2026-summary.pdf")).unwrap();
         assert_eq!(bytes, report::summary_pdf(&page, STAMP));
         assert_eq!(Pdf::from_bytes(&bytes).unwrap().page_count(), 1);
+    }
+
+    #[test]
+    fn the_summary_pdf_is_private() {
+        use std::os::unix::fs::PermissionsExt;
+        let (dir, db) = two_documents_year();
+
+        close_2026(&db, dir.path(), 500).unwrap();
+
+        let path = dir.path().join("snapshots/2026-summary.pdf");
+        let mode = |p: &Path| std::fs::metadata(p).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode(&path), 0o600);
+        assert_eq!(mode(path.parent().unwrap()), 0o700);
     }
 
     #[test]

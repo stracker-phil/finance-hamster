@@ -16,17 +16,17 @@ beforeEach(() => {
 });
 
 describe("runPageCommand", () => {
-  it("opens the Review page for go.review", () => {
-    runPageCommand("go.review");
+  it("opens the Review page for go:review", () => {
+    runPageCommand("go:review");
 
     expect(useStore.getState().route).toEqual({ page: "review" });
   });
 
-  it("opens the Add document sheet for the invoice the owner chose for document.add", async () => {
+  it("opens the Add document sheet for the invoice the owner chose for document:add", async () => {
     const preview = addPreview();
     mocked.documentAddChoose.mockResolvedValue(preview);
 
-    runPageCommand("document.add");
+    runPageCommand("document:add");
 
     await vi.waitFor(() => expect(useStore.getState().addPreview).toEqual(preview));
   });

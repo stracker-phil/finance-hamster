@@ -11,7 +11,7 @@ use super::store::{self, DocState, DocumentRow, VendorRow};
 use crate::db::{Change, Db, Op, Source, Written};
 use crate::error::AppResult;
 use crate::statements::import::slug;
-use crate::store::json_file::create_private_dir;
+use crate::store::json_file::{create_private_dir, write_private_file};
 
 pub const FOLDER: &str = "docs";
 const INBOX: &str = "docs/inbox";
@@ -79,9 +79,8 @@ pub fn copy_in(
 pub fn copy_to(config_dir: &Path, base: &str, bytes: &[u8], hash: &str) -> AppResult<String> {
     let name = free_name(config_dir, base, hash);
     let path = config_dir.join(&name);
-    ensure_parent(&path)?;
     if !path.exists() {
-        std::fs::write(&path, bytes)?;
+        write_private_file(&path, bytes)?;
     }
     Ok(name)
 }

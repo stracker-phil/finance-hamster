@@ -78,7 +78,7 @@ mod tests {
             IpcMessage::Show { focus: false },
             IpcMessage::Activate { hidden: false },
             IpcMessage::Run {
-                id: "go.today".into(),
+                id: "go:today".into(),
             },
         ] {
             assert_eq!(
@@ -101,19 +101,19 @@ mod tests {
     #[test]
     fn commands_text_lists_id_shortcut_and_title_tab_separated_per_line() {
         let commands = [
-            info("go.today", Some("⌘1"), "Today"),
+            info("go:today", Some("⌘1"), "Today"),
             info("demo.noshortcut", None, "No Shortcut"),
         ];
         assert_eq!(
             commands_text(&commands, false),
-            "go.today\t⌘1\tToday\ndemo.noshortcut\t\tNo Shortcut\n"
+            "go:today\t⌘1\tToday\ndemo.noshortcut\t\tNo Shortcut\n"
         );
     }
 
     #[test]
     fn commands_text_as_json_is_an_array_of_id_title_shortcut_and_custom() {
         let commands = [
-            info("go.today", Some("⌘1"), "Today"),
+            info("go:today", Some("⌘1"), "Today"),
             info("demo.noshortcut", None, "No Shortcut"),
         ];
         let text = commands_text(&commands, true);
@@ -121,7 +121,7 @@ mod tests {
         assert_eq!(
             serde_json::from_str::<Value>(&text).unwrap(),
             json!([
-                { "id": "go.today", "title": "Today", "shortcut": "⌘1", "custom": false },
+                { "id": "go:today", "title": "Today", "shortcut": "⌘1", "custom": false },
                 { "id": "demo.noshortcut", "title": "No Shortcut", "shortcut": null, "custom": false }
             ])
         );

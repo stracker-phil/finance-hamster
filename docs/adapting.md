@@ -12,7 +12,6 @@ the subagents for tests, suites and reviews. Every new name-, path- or platform-
 | Bundle identifier | `com.philippstracker.hamster` | `com.philippstracker.hamster.debug` | both configs and `lib.rs` `IDENTIFIER` (tested); names the config dir (all data and PDFs) and logs |
 | Binary and CLI | `hamster` | the same, called by path | Cargo package name (also the self dev-dependency), `cli/` |
 | Installed links | `~/Applications/Hamster.app`, `~/.local/bin/hamster` | never installed | `scripts/install.sh` |
-| URL scheme | `hamster://` | `hamster-debug://` | both configs and `lib.rs` `LINK_SCHEME` (tested) |
 | Socket and lock | `hamster.sock`, `hamster.lock` in the config dir | its own | `lib.rs`, `instance.rs`, `scripts/dev/js.sh` |
 | Config dir | `~/Library/Application Support/<identifier>/` | its own | `lib.rs` `config_dir()` |
 | Logs | `~/Library/Logs/<identifier>/` | its own | Tauri `app_log_dir` |
