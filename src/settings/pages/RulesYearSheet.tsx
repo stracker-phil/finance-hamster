@@ -4,6 +4,7 @@ import { Modal } from "../../components/Modal";
 import { useT } from "../../i18n";
 import { showError, undoToast } from "../../lib/undoToast";
 import { useRulesOverview, useRulesYear } from "../../queries/taxYears";
+import { CategorySwitches } from "../../year/CategorySwitches";
 
 /** One value; saved when it loses focus or on Return, only when it changed. */
 function FieldRow({ year, field, editable }: { year: number; field: RulesField; editable: boolean }) {
@@ -150,6 +151,7 @@ export function RulesYearSheet({ year, onClose }: { year: number; onClose: () =>
             </div>
           </section>
         ))}
+        <CategorySwitches year={year} />
         {data && data.sources.length > 0 && (
           <section className="settings-group" aria-label={text.sources}>
             <h3>{text.sources}</h3>

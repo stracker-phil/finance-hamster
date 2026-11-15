@@ -224,14 +224,38 @@ function MonthList({ year, months, open }: { year: number; months: MonthView[]; 
   );
 }
 
-/** The Kennzahlen with something to enter, in number order. */
-function FinanzOnline({ year, items, pauschaleNote }: { year: number; items: KennzahlView[]; pauschaleNote: string | null }) {
+/** The categories the owner records; hidden ones without entries wait behind "Show". */
+function Categories({ year, items, open }: { year: number; items: KennzahlView[]; open: boolean }) {
+  const [all, setAll] = useState(false);
   const text = useT().pages.year;
-  const shown = items.filter((i) => i.rows.length > 0).sort((a, b) => parseInt(a.kz, 10) - parseInt(b.kz, 10));
+  const hidden = items.filter((i) => !i.shown && i.rows.length === 0);
+  const shown = all ? items : items.filter((i) => !hidden.includes(i));
+  return (
+    <>
+      {shown.map((item) => (
+        <Category key={item.key} item={item} year={year} open={open} />
+      ))}
+      {hidden.length > 0 && (
+        <p className="add-doc__hint year-hidden">
+          {text.hiddenCount(hidden.length)} ·{" "}
+          <button className="link-btn" onClick={() => setAll((a) => !a)}>
+            {all ? text.hideHidden : text.showHidden}
+          </button>
+        </p>
+      )}
+    </>
+  );
+}
+
+/** Every Kennzahl in number order, as the form lists them, with 0,00 where nothing counts. */
+function FinanzOnline({ year, items, pauschaleNote }: { year: number; items: KennzahlView[]; pauschaleNote: string | null }) {
+  const sorted = [...items].sort((a, b) => parseInt(a.kz, 10) - parseInt(b.kz, 10));
   return (
     <>
       {pauschaleNote && <p className="add-doc__hint year-pauschale">{pauschaleNote}</p>}
-      {shown.length === 0 ? <p className="add-doc__hint">{text.nothingToEnter(year)}</p> : shown.map((item) => <Kennzahl key={item.key} item={item} year={year} />)}
+      {sorted.map((item) => (
+        <Kennzahl key={item.key} item={item} year={year} />
+      ))}
     </>
   );
 }
@@ -291,7 +315,7 @@ export function YearPage({ year, attention }: { year: number; attention?: Attent
           ))}
         </div>
 
-        {view === "categories" && data.kennzahlen.map((item) => <Category key={item.key} item={item} year={data.year} open={open} />)}
+        {view === "categories" && <Categories year={data.year} items={data.kennzahlen} open={open} />}
         {view === "months" && <MonthList year={data.year} months={data.months} open={open} />}
         {view === "finanzonline" && <FinanzOnline year={data.year} items={data.kennzahlen} pauschaleNote={data.pauschaleNote} />}
       </div>

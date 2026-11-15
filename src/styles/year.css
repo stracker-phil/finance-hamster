@@ -62,3 +62,4 @@
 .category__text { display: flex; flex-direction: column; gap: 2px; }
 .category__examples { font-weight: 400; }
 .year-pauschale { margin: 18px 0 0; }
+.year-hidden { margin: 18px 0 0; }

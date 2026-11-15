@@ -154,6 +154,7 @@ pub fn kennzahlen(
                     .flatten()
                     .map(|cents| format!("× {} / km", eur(cents, format))),
                 reported: !is_countable(item),
+                shown: true,
             }
         })
         .filter(|k| !filtering || !k.rows.is_empty())

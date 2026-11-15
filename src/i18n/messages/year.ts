@@ -30,7 +30,14 @@ export const year = both(
       finishFirst: "Finish these first, then close the year.",
       close: "Close Year",
     },
+    categories: {
+      title: (year: number) => `Categories for ${year}`,
+      heading: "Categories",
+      intro: "Hide the categories you never use; they stay out of the way while recording. FinanzOnline always shows every Kennzahl, and a hidden category with an entry shows anyway.",
+      done: "Done",
+    },
     menu: {
+      categories: "Choose Categories…",
       reopenTitle: (year: number) => `Reopen Tax Year ${year}?`,
       reopenText: "Its documents and answers can change again. The snapshot taken when it was closed stays.",
       reopenAction: "Reopen",
@@ -75,7 +82,14 @@ export const year = both(
       finishFirst: "Erledige zuerst diese Punkte, dann schließ das Jahr ab.",
       close: "Steuerjahr abschließen",
     },
+    categories: {
+      title: (year: number) => `Kategorien für ${year}`,
+      heading: "Kategorien",
+      intro: "Blende die Kategorien aus, die du nie brauchst; beim Erfassen stören sie dann nicht. FinanzOnline zeigt immer jede Kennzahl, und eine ausgeblendete Kategorie mit Eintrag erscheint trotzdem.",
+      done: "Fertig",
+    },
     menu: {
+      categories: "Kategorien wählen …",
       reopenTitle: (year: number) => `Steuerjahr ${year} wieder öffnen?`,
       reopenText: "Seine Belege und Antworten können sich wieder ändern. Der beim Abschließen erstellte Schnappschuss bleibt.",
       reopenAction: "Wieder öffnen",

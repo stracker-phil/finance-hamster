@@ -1,4 +1,4 @@
-import type { AttentionView, Elsewhere, KennzahlView, MonthView, QuestionView, YearPage, YearRow } from "../api";
+import type { AttentionView, CategoryChoice, Elsewhere, KennzahlView, MonthView, QuestionView, YearPage, YearRow } from "../api";
 
 /** A demo document row of the tax year page, with `patch` applied. */
 export function yearRow(patch: Partial<YearRow> = {}): YearRow {
@@ -32,8 +32,14 @@ export function kennzahlView(patch: Partial<KennzahlView> = {}): KennzahlView {
     add: null,
     rate: null,
     reported: false,
+    shown: true,
     ...patch,
   };
+}
+
+/** A demo category choice of a year, with `patch` applied. */
+export function categoryChoice(patch: Partial<CategoryChoice> = {}): CategoryChoice {
+  return { key: "720", label: "Work books", examples: "Books, journals", shown: true, ...patch };
 }
 
 /** A demo question of an open year, with `patch` applied. */

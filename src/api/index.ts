@@ -1,7 +1,7 @@
 import { getName, getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { Account, AccountEdit, AccountLines, Action, Elsewhere, YearPage, NewEntry, TodayView, RulePreview, FileCheck, StatusGroup, CloseCheck, SubscriptionsView, SubscriptionDetail, SubscriptionForm, PlanForm, MatchCount, AddInput, AddPreview, ArchivedDocument, DeletionView, DocumentEdit, DocumentGroup, DocumentStep, DocumentView, HistoryEntry, VendorChange, VendorsView, Estimate, LineChoice, Coverage, ReviewQueue, RuleForm, RulesView, Frame, ImportPreview, PdfSource, AppError, AppInfo, CommandInfo, KeyConflict, ErrorKind, EventName, EventPayloads, JsonPreview, LaunchEvent, NewAccount, RulesOverview, RulesYearView, Settings, SettingsPatch, TaxYear } from "./types";
+import type { CategoryChoice, Account, AccountEdit, AccountLines, Action, Elsewhere, YearPage, NewEntry, TodayView, RulePreview, FileCheck, StatusGroup, CloseCheck, SubscriptionsView, SubscriptionDetail, SubscriptionForm, PlanForm, MatchCount, AddInput, AddPreview, ArchivedDocument, DeletionView, DocumentEdit, DocumentGroup, DocumentStep, DocumentView, HistoryEntry, VendorChange, VendorsView, Estimate, LineChoice, Coverage, ReviewQueue, RuleForm, RulesView, Frame, ImportPreview, PdfSource, AppError, AppInfo, CommandInfo, KeyConflict, ErrorKind, EventName, EventPayloads, JsonPreview, LaunchEvent, NewAccount, RulesOverview, RulesYearView, Settings, SettingsPatch, TaxYear } from "./types";
 
 export * from "./types";
 
@@ -56,6 +56,9 @@ export const api = {
   yearPage: (year: number, query: string) => invoke<YearPage>("year_page", { year, query }),
   /** The label of the change, or null when nothing changed. */
   yearAnswer: (year: number, question: string, value: string) => invoke<string | null>("year_answer", { year, question, value }),
+  yearCategories: (year: number) => invoke<CategoryChoice[]>("year_categories", { year }),
+  /** The label of the change, or null when nothing changed. */
+  yearSetCategoryShown: (year: number, key: string, shown: boolean) => invoke<string | null>("year_set_category_shown", { year, key, shown }),
   /** Adds an amount or a trip; the label of the change. */
   yearEntryAdd: (year: number, entry: NewEntry) => invoke<string>("year_entry_add", { year, entry }),
   yearEntryDelete: (year: number, id: string) => invoke<string>("year_entry_delete", { year, id }),

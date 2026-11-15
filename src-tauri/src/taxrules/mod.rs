@@ -295,10 +295,12 @@ pub fn start_next(db: &Db, now: i64) -> AppResult<Written> {
         rules_source: source,
         ..TaxYearRow::new(year, ruleset.ruleset, text, now)
     };
+    let mut changes = vec![Change::insert(taxyears::TABLE, &row)?];
+    changes.extend(db.read(|c| crate::year::hidden::carried_over(c, newest.year, year))?);
     db.write(
         Op::new(
             crate::tr!("Start Tax Year {year}", "Steuerjahr {year} beginnen"),
-            vec![Change::insert(taxyears::TABLE, &row)?],
+            changes,
         ),
         Source::Ui,
     )

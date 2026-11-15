@@ -162,7 +162,9 @@ export const pages = both(
       categories: "Categories",
       months: "Months",
       finanzOnline: "FinanzOnline",
-      nothingToEnter: (year: number) => `Nothing to enter for ${year} yet.`,
+      hiddenCount: (count: number) => `${count} ${count === 1 ? "category" : "categories"} hidden`,
+      showHidden: "Show",
+      hideHidden: "Hide again",
     },
   },
   {
@@ -326,7 +328,9 @@ export const pages = both(
       categories: "Kategorien",
       months: "Monate",
       finanzOnline: "FinanzOnline",
-      nothingToEnter: (year: number) => `Für ${year} gibt es noch nichts einzutragen.`,
+      hiddenCount: (count: number) => `${count} ${count === 1 ? "Kategorie" : "Kategorien"} ausgeblendet`,
+      showHidden: "Zeigen",
+      hideHidden: "Wieder ausblenden",
     },
   },
 );

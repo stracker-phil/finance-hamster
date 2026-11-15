@@ -10,7 +10,7 @@ import { HOME } from "../state/route";
 import { useStore } from "../state/store";
 import { addPreview } from "../test/documents";
 import { renderWithQuery } from "../test/renderWithQuery";
-import { attentionView, kennzahlView, monthView, questionView, yearPage, yearRow } from "../test/year";
+import { attentionView, categoryChoice, kennzahlView, monthView, questionView, yearPage, yearRow } from "../test/year";
 import { YearPage } from "./YearPage";
 
 const mocked = vi.mocked(api, true);
@@ -41,6 +41,7 @@ beforeEach(() => {
   mocked.yearEntryAttach.mockResolvedValue("Attach PDF");
   mocked.yearExportSummary.mockResolvedValue(false);
   mocked.yearCloseCheck.mockResolvedValue({ blockers: [], warnings: [] });
+  mocked.yearCategories.mockResolvedValue([]);
 });
 
 describe("YearPage", () => {
@@ -346,11 +347,58 @@ describe("YearPage", () => {
     });
   });
 
+  describe("hidden categories", () => {
+    const union = () => kennzahlView({ key: "union", kz: "300", name: "Gewerkschaftsbeiträge", label: "Union dues", examples: null, rows: [], total: "€0.00", shown: false });
+    const hiddenNote = (text: RegExp) => screen.queryByText(text);
+
+    it("leaves out a hidden category without entries and says how many are hidden", async () => {
+      await show({ kennzahlen: [kennzahlView(), union()] });
+
+      expect(screen.getByRole("region", { name: "Work books" })).toBeTruthy();
+      expect(screen.queryByRole("region", { name: "Union dues" })).toBeNull();
+      expect(hiddenNote(/1 category hidden/)).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Show" })).toBeTruthy();
+    });
+
+    it("counts several hidden categories in the plural", async () => {
+      await show({ kennzahlen: [kennzahlView(), union(), { ...union(), key: "other", label: "Other costs" }] });
+
+      expect(hiddenNote(/2 categories hidden/)).toBeTruthy();
+    });
+
+    it("lists the hidden categories after Show and hides them again after Hide again", async () => {
+      await show({ kennzahlen: [kennzahlView(), union()] });
+
+      await userEvent.click(screen.getByRole("button", { name: "Show" }));
+      expect(screen.getByRole("region", { name: "Union dues" })).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "Show" })).toBeNull();
+
+      await userEvent.click(screen.getByRole("button", { name: "Hide again" }));
+      expect(screen.queryByRole("region", { name: "Union dues" })).toBeNull();
+      expect(screen.getByRole("button", { name: "Show" })).toBeTruthy();
+    });
+
+    it("keeps a hidden category that has entries in the list and counts it as not hidden", async () => {
+      await show({ kennzahlen: [kennzahlView({ shown: false })] });
+
+      expect(screen.getByRole("region", { name: "Work books" })).toBeTruthy();
+      expect(hiddenNote(/hidden/)).toBeNull();
+      expect(screen.queryByRole("button", { name: "Show" })).toBeNull();
+    });
+
+    it("shows no hidden note when every category is shown", async () => {
+      await show({ kennzahlen: [kennzahlView({ rows: [], shown: true })] });
+
+      expect(screen.getByRole("region", { name: "Work books" })).toBeTruthy();
+      expect(hiddenNote(/hidden/)).toBeNull();
+    });
+  });
+
   describe("FinanzOnline", () => {
     const pauschale = "Below the Werbungskostenpauschale of €132";
     const names = () => screen.getAllByRole("region", { name: /^KZ / }).map((r) => r.getAttribute("aria-label"));
 
-    it("lists only items with entries, in Kennzahl number order, with KZ and legal name", async () => {
+    it("lists every item, also those without entries, in Kennzahl number order, with KZ and legal name", async () => {
       await show({
         state: "closed",
         kennzahlen: [
@@ -361,9 +409,22 @@ describe("YearPage", () => {
         ],
       });
 
-      expect(names()).toEqual(["KZ 169 Arbeitsmittel", "KZ 720 Fachliteratur", "KZ 724 Sonstige Werbungskosten"]);
+      expect(names()).toEqual(["KZ 169 Arbeitsmittel", "KZ 300 Leere Position", "KZ 720 Fachliteratur", "KZ 724 Sonstige Werbungskosten"]);
       expect(screen.getByText("KZ 720")).toBeTruthy();
-      expect(screen.queryByText("Leere Position")).toBeNull();
+    });
+
+    it("shows an item without entries with its zero value to copy and no rows", async () => {
+      await show({ state: "closed", kennzahlen: [kennzahlView({ key: "empty", kz: "300", name: "Leere Position", copy: "0,00", total: "€0.00", rows: [] })] });
+
+      const item = within(screen.getByRole("region", { name: "KZ 300 Leere Position" }));
+      expect(item.getByRole("button", { name: "Copy 0,00 for KZ 300" })).toBeTruthy();
+      expect(item.queryByRole("button", { name: /Demo Books Ltd/ })).toBeNull();
+    });
+
+    it("lists every item, also hidden ones without entries", async () => {
+      await show({ state: "closed", kennzahlen: [kennzahlView({ key: "union", kz: "300", name: "Gewerkschaftsbeiträge", rows: [], shown: false })] });
+
+      expect(names()).toEqual(["KZ 300 Gewerkschaftsbeiträge"]);
     });
 
     it("sorts numerically, not as text", async () => {
@@ -401,19 +462,12 @@ describe("YearPage", () => {
       expect(screen.queryByRole("button", { name: /^Copy / })).toBeNull();
     });
 
-    it("says there is nothing to enter when no item has entries", async () => {
-      await show({ state: "closed", kennzahlen: [kennzahlView({ rows: [] })] });
-
-      expect(screen.getByText("Nothing to enter for 2026 yet.")).toBeTruthy();
-      expect(screen.queryByRole("region", { name: /^KZ / })).toBeNull();
-    });
-
-    it("is reachable in an open year with the same filter and order", async () => {
+    it("is reachable in an open year with the same list and order", async () => {
       await show({ kennzahlen: [kennzahlView({ key: "b", kz: "724", name: "Sonstige" }), kennzahlView({ key: "a", kz: "720", name: "Fachliteratur", rows: [] })] });
 
       await showView("FinanzOnline");
 
-      expect(names()).toEqual(["KZ 724 Sonstige"]);
+      expect(names()).toEqual(["KZ 720 Fachliteratur", "KZ 724 Sonstige"]);
     });
 
     it("puts the Pauschale note above the items and shows it in no other view", async () => {
@@ -427,13 +481,6 @@ describe("YearPage", () => {
       expect(screen.queryByText(pauschale)).toBeNull();
       await showView("Months");
       expect(screen.queryByText(pauschale)).toBeNull();
-    });
-
-    it("shows the Pauschale note above the empty message", async () => {
-      await show({ state: "closed", pauschaleNote: pauschale, kennzahlen: [] });
-
-      expect(screen.getByText(pauschale)).toBeTruthy();
-      expect(screen.getByText("Nothing to enter for 2026 yet.")).toBeTruthy();
     });
 
     it("shows no Pauschale note when the year has none", async () => {
@@ -939,7 +986,24 @@ describe("YearPage", () => {
         await show({ archived: 3 });
         await openMenu();
 
-        expect(itemNames()).toEqual(["Log", "Archive", "Export Summary PDF…", "Tax Rules…", "Close Year…"]);
+        expect(itemNames()).toEqual(["Choose Categories…", "Log", "Archive", "Export Summary PDF…", "Tax Rules…", "Close Year…"]);
+      });
+
+      it("opens the Categories sheet of the year with a switch per category and closes it with Done", async () => {
+        mocked.yearCategories.mockResolvedValue([categoryChoice(), categoryChoice({ key: "union", label: "Union dues", examples: null, shown: false })]);
+        await show();
+        await openMenu();
+
+        await userEvent.click(screen.getByRole("menuitem", { name: "Choose Categories…" }));
+
+        const sheet = within(await screen.findByRole("dialog", { name: "Categories for 2026" }));
+        expect(mocked.yearCategories).toHaveBeenCalledWith(2026);
+        expect((await sheet.findByRole<HTMLInputElement>("switch", { name: "Work books" })).checked).toBe(true);
+        expect(sheet.getByRole<HTMLInputElement>("switch", { name: "Union dues" }).checked).toBe(false);
+        expect(screen.queryByRole("menu")).toBeNull();
+
+        await userEvent.click(sheet.getByRole("button", { name: "Done" }));
+        expect(screen.queryByRole("dialog")).toBeNull();
       });
 
       it("offers neither Reopen Year nor Open Snapshot PDF", async () => {
@@ -966,7 +1030,7 @@ describe("YearPage", () => {
       it("lists Open Snapshot PDF and Reopen Year but no Close Year", async () => {
         await showClosed();
 
-        expect(itemNames()).toEqual(["Log", "Archive", "Export Summary PDF…", "Tax Rules…", "Open Snapshot PDF", "Reopen Year…"]);
+        expect(itemNames()).toEqual(["Choose Categories…", "Log", "Archive", "Export Summary PDF…", "Tax Rules…", "Open Snapshot PDF", "Reopen Year…"]);
       });
 
       it("opens the snapshot PDF of the year", async () => {

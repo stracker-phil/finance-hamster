@@ -8,6 +8,7 @@ import { api } from "../../api";
 import { useStore } from "../../state/store";
 import { renderWithQuery } from "../../test/renderWithQuery";
 import { rulesField, rulesOverview, rulesYear, rulesYearView } from "../../test/rules";
+import { categoryChoice } from "../../test/year";
 import { RulesYearSheet } from "./RulesYearSheet";
 
 const mocked = vi.mocked(api, true);
@@ -33,6 +34,8 @@ beforeEach(() => {
   mocked.rulesJson.mockResolvedValue("demo-json");
   mocked.rulesPreviewJson.mockResolvedValue({ problems: [], changes: [] });
   mocked.rulesSetJson.mockResolvedValue("Edit rules JSON");
+  mocked.yearCategories.mockResolvedValue([]);
+  mocked.yearSetCategoryShown.mockResolvedValue(null);
 });
 
 describe("RulesYearSheet", () => {
@@ -55,6 +58,20 @@ describe("RulesYearSheet", () => {
       await renderSheet();
 
       expect(await screen.findByText("Your version, based on 2026 v1")).toBeTruthy();
+    });
+
+    it("lists a switch per category of the year and saves a toggle for that year", async () => {
+      mocked.yearCategories.mockResolvedValue([categoryChoice(), categoryChoice({ key: "union", label: "Union dues", examples: null, shown: false })]);
+      await renderSheet();
+
+      const group = within(await screen.findByRole("region", { name: "Categories" }));
+      expect((await group.findByRole<HTMLInputElement>("switch", { name: "Work books" })).checked).toBe(true);
+      expect(group.getByRole<HTMLInputElement>("switch", { name: "Union dues" }).checked).toBe(false);
+      expect(mocked.yearCategories).toHaveBeenCalledWith(2026);
+
+      await userEvent.click(group.getByRole("switch", { name: "Union dues" }));
+
+      expect(mocked.yearSetCategoryShown).toHaveBeenCalledWith(2026, "union", true);
     });
 
     it("shows each field's unit", async () => {

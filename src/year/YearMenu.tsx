@@ -4,6 +4,7 @@ import { api } from "../api";
 import { openMenu, useMenuOpenOn, type MenuEntry } from "../components/menu";
 import { showError, undoToast } from "../lib/undoToast";
 import { useStore } from "../state/store";
+import { CategoriesSheet } from "./CategorySwitches";
 import { CloseYearSheet } from "./CloseYearSheet";
 import { t, useT } from "../i18n";
 
@@ -23,12 +24,14 @@ function exportSummary(year: number) {
 export function YearMenu({ year, archived, closed }: { year: number; archived: number; closed: boolean }) {
   const [button, setButton] = useState<HTMLButtonElement | null>(null);
   const [closing, setClosing] = useState(false);
+  const [choosing, setChoosing] = useState(false);
   const open = useMenuOpenOn(button);
   const navigate = useStore((s) => s.navigate);
   const text = useT().year.menu;
   const show = () => {
     if (!button) return;
     const entries: MenuEntry[] = [
+      { text: text.categories, run: () => setChoosing(true) },
       { text: text.log, run: () => navigate({ page: "log", year }) },
       { text: text.archive, hint: String(archived), run: () => navigate({ page: "archive", year }) },
       { text: text.export, run: () => exportSummary(year) },
@@ -49,6 +52,7 @@ export function YearMenu({ year, archived, closed }: { year: number; archived: n
         <MoreHorizontal size={16} />
       </button>
       {closing && <CloseYearSheet year={year} onClose={() => setClosing(false)} />}
+      {choosing && <CategoriesSheet year={year} onClose={() => setChoosing(false)} />}
     </div>
   );
 }

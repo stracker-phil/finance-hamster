@@ -916,7 +916,8 @@ mod tests {
                 "hint": null,
                 "add": "trip",
                 "rate": "× €0.60 / km",
-                "reported": false
+                "reported": false,
+                "shown": true
             })
         );
     }

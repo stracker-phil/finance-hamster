@@ -5,7 +5,7 @@ use serde::Serialize;
 use ts_rs::TS;
 
 use super::facts::{self, Placed, eur};
-use super::{answers, drift, summary};
+use super::{answers, drift, hidden, summary};
 use crate::date::DateOrder;
 use crate::db::Db;
 use crate::error::{AppError, AppResult};
@@ -120,6 +120,8 @@ pub struct KennzahlView {
     pub rate: Option<String>,
     /// Reported by others: shown for reference, never counted.
     pub reported: bool,
+    /// Shown in the Categories view; the owner hides categories they never use (ADR 0053).
+    pub shown: bool,
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
@@ -200,6 +202,10 @@ pub fn page(
         &shown,
         format,
     );
+    let hidden = db.read(|c| hidden::hidden(c, year))?;
+    for k in &mut kennzahlen {
+        k.shown = !hidden.contains(&k.key);
+    }
     let mut attention = facts.attention;
     if row.state == YearState::Closed && needle.is_empty() {
         attention.extend(drift::restore_filed(db, year, &mut kennzahlen)?);

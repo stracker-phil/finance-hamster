@@ -191,6 +191,7 @@ pub fn start_builtin(db: &Db, current_year: i32, now: i64) -> AppResult<Option<W
             Ok(ruleset) if ruleset.year == year => {
                 let row = TaxYearRow::new(year, ruleset.ruleset, text.to_string(), now);
                 changes.push(Change::insert(TABLE, &row)?);
+                changes.extend(db.read(|c| crate::year::hidden::carried_over(c, year - 1, year))?);
             }
             Ok(_) => log::warn!("The built-in rules for {year} name another year"),
             Err(problems) => log::warn!(
@@ -306,6 +307,53 @@ mod tests {
 
         assert_eq!(start_builtin(&db, 2030, 2000).unwrap(), None);
         assert_eq!(db.read(rows).unwrap(), before);
+    }
+
+    fn hide_category(db: &Db, year: i32, key: &str) {
+        let row = crate::year::hidden::HiddenRow::new(year, key);
+        let change = Change::insert(crate::year::hidden::HIDDEN, &row).unwrap();
+        db.write(Op::new("Hide", vec![change]), Source::Ui).unwrap();
+    }
+
+    fn hidden_in(db: &Db, year: i32) -> Vec<String> {
+        db.read(|c| crate::year::hidden::hidden(c, year))
+            .unwrap()
+            .into_iter()
+            .collect()
+    }
+
+    #[test]
+    fn a_started_year_takes_over_the_hidden_categories_of_the_year_before() {
+        let (_dir, db) = setup();
+        start_builtin(&db, 2025, 1000).unwrap();
+        hide_category(&db, 2025, "books");
+        hide_category(&db, 2025, "union-dues");
+
+        start_builtin(&db, 2026, 2000).unwrap().unwrap();
+
+        assert_eq!(hidden_in(&db, 2026), ["books", "union-dues"]);
+        assert_eq!(hidden_in(&db, 2025), ["books", "union-dues"]);
+    }
+
+    #[test]
+    fn a_started_year_hides_nothing_when_the_year_before_hid_nothing() {
+        let (_dir, db) = setup();
+        start_builtin(&db, 2025, 1000).unwrap();
+
+        start_builtin(&db, 2026, 2000).unwrap().unwrap();
+
+        assert!(hidden_in(&db, 2026).is_empty());
+    }
+
+    #[test]
+    fn a_year_that_already_exists_keeps_its_own_hidden_categories() {
+        let (_dir, db) = setup();
+        start_builtin(&db, 2026, 1000).unwrap();
+        hide_category(&db, 2025, "books");
+
+        assert_eq!(start_builtin(&db, 2026, 2000).unwrap(), None);
+
+        assert!(hidden_in(&db, 2026).is_empty());
     }
 
     #[test]

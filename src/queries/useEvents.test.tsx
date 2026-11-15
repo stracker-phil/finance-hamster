@@ -13,7 +13,7 @@ import { reviewLine, reviewQueue } from "../test/review";
 import { accountCoverage, accountLines, coverage, lineView, statementGroup } from "../test/statements";
 import { subscriptionDetail, subscriptionForm, subscriptionsView } from "../test/subscriptions";
 import { step, todayView } from "../test/today";
-import { elsewhere, yearPage } from "../test/year";
+import { categoryChoice, elsewhere, yearPage } from "../test/year";
 import { useAccounts } from "./accounts";
 import { useCommands } from "./commands";
 import { useArchive, useDeletions, useDocument, useDocumentHistory, useDocumentLineOptions, useDocuments, useVendors, useYearLog } from "./documents";
@@ -24,7 +24,7 @@ import { useAccountLines, useCoverage } from "./statements";
 import { useMatchCount, useSubscription, useSubscriptions } from "./subscriptions";
 import { useTaxYears } from "./taxYears";
 import { useToday } from "./today";
-import { useElsewhere, useYearPage } from "./year";
+import { useElsewhere, useYearCategories, useYearPage } from "./year";
 import { useEvents } from "./useEvents";
 
 const mocked = vi.mocked(api, true);
@@ -363,6 +363,49 @@ describe("useEvents", () => {
       for (const [old] of Object.values(shown)) await screen.findByText(old);
       mocked.yearPage.mockResolvedValue(yearPage({ total: "€200.00" }));
       mocked.searchElsewhere.mockResolvedValue([elsewhere({ label: "New match" })]);
+
+      await emitDataChanged([table]);
+
+      for (const key of refreshed) expect(await screen.findByText(shown[key][1])).toBeTruthy();
+      for (const key of Object.keys(shown) as (keyof typeof shown)[]) {
+        if (!(refreshed as readonly string[]).includes(key)) expect(screen.getByText(shown[key][0])).toBeTruthy();
+      }
+    });
+  });
+
+  describe("year categories", () => {
+    function CategoriesProbe() {
+      useEvents();
+      const { data: page } = useYearPage(2026, "");
+      const { data: categories } = useYearCategories(2026);
+      return (
+        <>
+          <p>Year: {page?.total}</p>
+          <p>Categories: {categories?.map((c) => c.label).join(", ")}</p>
+        </>
+      );
+    }
+
+    const shown = {
+      year: ["Year: €100.00", "Year: €200.00"],
+      categories: ["Categories: Old category", "Categories: New category"],
+    } as const;
+
+    beforeEach(() => {
+      mocked.yearPage.mockResolvedValue(yearPage({ total: "€100.00" }));
+      mocked.yearCategories.mockResolvedValue([categoryChoice({ label: "Old category" })]);
+    });
+
+    it.each([
+      ["hidden_items", ["year", "categories"]],
+      ["tax_years", ["year", "categories"]],
+      ["entries", ["year"]],
+      ["accounts", []],
+    ] as const)("when data_changed names the %s table, refetches %j and keeps the rest", async (table, refreshed) => {
+      renderWithQuery(<CategoriesProbe />);
+      for (const [old] of Object.values(shown)) await screen.findByText(old);
+      mocked.yearPage.mockResolvedValue(yearPage({ total: "€200.00" }));
+      mocked.yearCategories.mockResolvedValue([categoryChoice({ label: "New category" })]);
 
       await emitDataChanged([table]);
 

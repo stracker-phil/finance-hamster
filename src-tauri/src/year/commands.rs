@@ -52,6 +52,34 @@ pub fn year_answer(
     Ok(written.map(|w| w.label))
 }
 
+/// The year's categories with whether each shows while recording.
+#[tauri::command]
+pub fn year_categories(
+    state: State<'_, AppState>,
+    year: i32,
+) -> AppResult<Vec<super::hidden::CategoryChoice>> {
+    let ruleset: Ruleset = serde_json::from_str(&year_row(&state, year)?.rules)?;
+    let hidden = state.db.read(|c| super::hidden::hidden(c, year))?;
+    Ok(super::hidden::choices(&ruleset, &hidden))
+}
+
+/// Shows or hides a category while recording; the label of the change, or null when nothing changed.
+#[tauri::command]
+pub fn year_set_category_shown(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    year: i32,
+    key: String,
+    shown: bool,
+) -> AppResult<Option<String>> {
+    let ruleset: Ruleset = serde_json::from_str(&year_row(&state, year)?.rules)?;
+    let written = super::hidden::set_shown(&state.db, &ruleset, year, &key, shown)?;
+    if let Some(written) = &written {
+        announce(&app, written);
+    }
+    Ok(written.map(|w| w.label))
+}
+
 fn year_row(state: &AppState, year: i32) -> AppResult<taxyears::TaxYearRow> {
     state.db.read(|c| taxyears::row(c, year))?.ok_or_else(|| {
         AppError::NotFound(crate::tr!("No tax year {year}", "Kein Steuerjahr {year}"))

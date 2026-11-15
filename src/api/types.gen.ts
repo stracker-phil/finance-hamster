@@ -128,6 +128,11 @@ entryId: string | null,
  */
 lineId: string | null, };
 
+/**
+ * One category of the year with its switch, for the Categories sheet.
+ */
+export type CategoryChoice = { key: string, label: string, examples: string | null, shown: boolean, };
+
 export type ChainKind = "first" | "continues" | "gap";
 
 export type ChargeView = { id: string, 
@@ -435,7 +440,11 @@ rate: string | null,
 /**
  * Reported by others: shown for reference, never counted.
  */
-reported: boolean, };
+reported: boolean, 
+/**
+ * Shown in the Categories view; the owner hides categories they never use (ADR 0053).
+ */
+shown: boolean, };
 
 /**
  * A shortcut another command already holds.

@@ -617,6 +617,60 @@ fn start_next_continues_from_the_newest_year_only() {
     );
 }
 
+fn hide_category(db: &Db, year: i32, key: &str) {
+    let row = crate::year::hidden::HiddenRow::new(year, key);
+    let change = Change::insert(crate::year::hidden::HIDDEN, &row).unwrap();
+    db.write(Op::new("Hide", vec![change]), Source::Ui).unwrap();
+}
+
+fn hidden_in(db: &Db, year: i32) -> Vec<String> {
+    db.read(|c| crate::year::hidden::hidden(c, year))
+        .unwrap()
+        .into_iter()
+        .collect()
+}
+
+#[test]
+fn start_next_carries_the_newest_years_hidden_categories_over() {
+    let (_dir, db) = setup();
+    insert(&db, builtin_row(2025, 1));
+    hide_category(&db, 2025, "union-dues");
+    hide_category(&db, 2025, "books");
+    hide_category(&db, 2024, "other");
+
+    let written = start_next(&db, 99).unwrap();
+
+    let mut tables = written.tables;
+    tables.sort();
+    assert_eq!(tables, ["hidden_items", "tax_years"]);
+    assert_eq!(hidden_in(&db, 2026), ["books", "union-dues"]);
+    assert_eq!(hidden_in(&db, 2025), ["books", "union-dues"]);
+}
+
+#[test]
+fn start_next_hides_nothing_when_the_newest_year_hid_nothing() {
+    let (_dir, db) = setup();
+    insert(&db, builtin_row(2025, 1));
+
+    let written = start_next(&db, 99).unwrap();
+
+    assert_eq!(written, tax_years_written("Start Tax Year 2026"));
+    assert!(hidden_in(&db, 2026).is_empty());
+}
+
+#[test]
+fn undoing_start_next_takes_the_carried_categories_back_too() {
+    let (_dir, db) = setup();
+    insert(&db, builtin_row(2025, 1));
+    hide_category(&db, 2025, "books");
+    start_next(&db, 99).unwrap();
+
+    db.undo().unwrap().unwrap();
+
+    assert!(hidden_in(&db, 2026).is_empty());
+    assert_eq!(hidden_in(&db, 2025), ["books"]);
+}
+
 #[test]
 fn start_next_can_be_undone() {
     let (_dir, db) = setup();

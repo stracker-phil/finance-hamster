@@ -246,6 +246,13 @@ pub const MIGRATIONS: &[&str] = &[
     "ALTER TABLE subscriptions ADD COLUMN exact_only INTEGER NOT NULL DEFAULT 0;",
     // 16: whether a tax year follows the built-in rules or keeps the owner's version (ADR 0051).
     "ALTER TABLE tax_years ADD COLUMN rules_source TEXT NOT NULL DEFAULT 'builtin';",
+    // 17: categories the owner hides while recording a tax year (ADR 0053).
+    "CREATE TABLE hidden_items (
+        id TEXT PRIMARY KEY,
+        year INTEGER NOT NULL,
+        item_key TEXT NOT NULL,
+        UNIQUE (year, item_key)
+    );",
 ];
 
 pub fn version(conn: &Connection) -> AppResult<usize> {
@@ -307,6 +314,7 @@ mod tests {
             "document_links",
             "documents",
             "entries",
+            "hidden_items",
             "journal",
             "plans",
             "rules",
@@ -320,6 +328,35 @@ mod tests {
         ]
         .map(String::from)
         .to_vec()
+    }
+
+    #[test]
+    fn a_file_at_version_sixteen_gains_the_hidden_categories_table_and_keeps_its_tax_years() {
+        let dir = temp_config_dir();
+        let mut conn = Connection::open(dir.path().join("v16.sqlite")).unwrap();
+        for sql in &MIGRATIONS[..16] {
+            conn.execute_batch(sql).unwrap();
+        }
+        conn.pragma_update(None, "user_version", 16i64).unwrap();
+        conn.execute(
+            "INSERT INTO tax_years (id, year, state, ruleset, rules, rules_loaded_at) \
+             VALUES (2026, 2026, 'open', '2026 v1', '{}', 1)",
+            [],
+        )
+        .unwrap();
+        assert!(!tables(&conn).contains(&"hidden_items".to_string()));
+
+        migrate(&mut conn).unwrap();
+
+        assert_eq!(version(&conn).unwrap(), MIGRATIONS.len());
+        assert_eq!(tables(&conn), all_tables());
+        let years: i64 = conn
+            .query_row("SELECT COUNT(*) FROM tax_years", [], |r| r.get(0))
+            .unwrap();
+        let hidden: i64 = conn
+            .query_row("SELECT COUNT(*) FROM hidden_items", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!((years, hidden), (1, 0));
     }
 
     #[test]

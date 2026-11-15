@@ -6,6 +6,7 @@ pub mod commands;
 mod drift;
 pub mod entries;
 pub mod facts;
+pub mod hidden;
 pub mod notes;
 pub mod page;
 pub mod report;

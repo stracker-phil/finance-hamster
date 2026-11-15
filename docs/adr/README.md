@@ -62,3 +62,4 @@ Why Hamster is built the way it is. One record per decision, in Nygard format, a
 | [0050](0050-german-as-a-second-ui-language.md) | German as a second UI language | Accepted (2026-11-15) |
 | [0051](0051-tax-rules-are-built-in-and-edited-in-the-app.md) | Tax rules are built into the app and edited in the app | Accepted (2026-11-15) |
 | [0052](0052-record-in-plain-words-file-in-finanzonline-terms.md) | Record in plain words, file in FinanzOnline terms; no year check | Accepted (2026-11-15) |
+| [0053](0053-hide-unused-categories-per-year.md) | Hide unused categories per year; FinanzOnline lists every Kennzahl | Accepted (2026-11-15) |

@@ -163,6 +163,7 @@ mod tests {
             add: None,
             rate: None,
             reported: false,
+            shown: true,
         }
     }
 
