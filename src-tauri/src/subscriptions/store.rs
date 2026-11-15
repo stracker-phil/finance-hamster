@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use crate::error::AppResult;
+use crate::i18n::Text;
 
 pub const SUBSCRIPTIONS: &str = "subscriptions";
 pub const PLANS: &str = "plans";
@@ -37,10 +38,11 @@ impl Interval {
 
     pub fn label(self) -> &'static str {
         match self {
-            Interval::Monthly => "Monthly",
-            Interval::Quarterly => "Quarterly",
-            Interval::Yearly => "Yearly",
+            Interval::Monthly => Text::new("Monthly", "Monatlich"),
+            Interval::Quarterly => Text::new("Quarterly", "Vierteljährlich"),
+            Interval::Yearly => Text::new("Yearly", "Jährlich"),
         }
+        .get()
     }
 }
 
@@ -67,11 +69,12 @@ impl Reminder {
 
     pub fn label(self) -> &'static str {
         match self {
-            Reminder::Off => "Off",
-            Reminder::OneDay => "1 day before",
-            Reminder::ThreeDays => "3 days before",
-            Reminder::OneWeek => "1 week before",
+            Reminder::Off => Text::new("Off", "Aus"),
+            Reminder::OneDay => Text::new("1 day before", "1 Tag vorher"),
+            Reminder::ThreeDays => Text::new("3 days before", "3 Tage vorher"),
+            Reminder::OneWeek => Text::new("1 week before", "1 Woche vorher"),
         }
+        .get()
     }
 }
 

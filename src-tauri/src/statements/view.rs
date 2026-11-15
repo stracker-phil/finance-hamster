@@ -9,6 +9,7 @@ use crate::accounts::{self, AccountRow};
 use crate::date::{self, DateOrder};
 use crate::db::Db;
 use crate::error::AppResult;
+use crate::tr;
 
 const MONTHS_SHOWN: u32 = 12;
 
@@ -132,15 +133,25 @@ fn month_cover(first: NaiveDate, today: NaiveDate, statements: &[StatementRow]) 
     if first_statement.is_none_or(|start| last < start) {
         return MonthCover {
             cover: Cover::Before,
-            tip: format!("{heading} · before the first statement"),
+            tip: tr!(
+                "{heading} · before the first statement",
+                "{heading} · vor dem ersten Kontoauszug"
+            ),
         };
     }
     let (cover, tip) = match covered {
-        0 => (Cover::Missing, format!("{heading} · no statement")),
+        0 => (
+            Cover::Missing,
+            tr!("{heading} · no statement", "{heading} · kein Kontoauszug"),
+        ),
         n if n == days => (Cover::Full, format!("{heading} · {}", names.join(", "))),
         _ => (
             Cover::Part,
-            format!("{heading} · partly, {}", names.join(", ")),
+            tr!(
+                "{heading} · partly, {}",
+                "{heading} · teilweise, {}",
+                names.join(", ")
+            ),
         ),
     };
     MonthCover { cover, tip }
@@ -160,17 +171,25 @@ fn chain_note(statements: &[StatementRow], order: DateOrder) -> Option<String> {
             };
             let day = |text: &str| date::parse(text).map(|d| date::day_month(d, order));
             let between = match (day(&a.to_date), day(&b.from_date)) {
-                (Some(end), Some(start)) => format!(": no lines between {end} and {start}"),
+                (Some(end), Some(start)) => tr!(
+                    ": no lines between {end} and {start}",
+                    ": keine Buchungen zwischen {end} und {start}"
+                ),
                 _ => String::new(),
             };
-            return Some(format!(
-                "Statement Nr. {number:03}/{year} was never imported{between}."
+            return Some(tr!(
+                "Statement Nr. {number:03}/{year} was never imported{between}.",
+                "Kontoauszug Nr. {number:03}/{year} wurde nie importiert{between}."
             ));
         }
         if b.old_balance != a.new_balance {
-            return Some(format!(
+            return Some(tr!(
                 "The balances of Nr. {:03}/{} and Nr. {:03}/{} don't connect.",
-                a.number, a.year, b.number, b.year
+                "Die Salden von Nr. {:03}/{} und Nr. {:03}/{} schließen nicht aneinander an.",
+                a.number,
+                a.year,
+                b.number,
+                b.year
             ));
         }
     }
@@ -190,25 +209,29 @@ fn account_coverage(
     let (last, state, state_label) =
         match newest.and_then(|s| date::parse(&s.to_date).map(|end| (s, end))) {
             None => (
-                "No statement yet".to_string(),
+                tr!("No statement yet", "Noch kein Kontoauszug"),
                 AccountState::Behind,
-                "No statements".to_string(),
+                tr!("No statements", "Keine Kontoauszüge"),
             ),
             Some((s, end)) => {
                 let behind = (today - end).num_days();
-                let last = format!(
+                let last = tr!(
                     "Nr. {:03} · until {}",
+                    "Nr. {:03} · bis {}",
                     s.number,
                     date::day_month(end, order)
                 );
                 if behind > i64::from(import_after_days) {
-                    (last, AccountState::Behind, format!("{behind} days behind"))
+                    let label = tr!("{behind} days behind", "{behind} Tage im Rückstand");
+                    (last, AccountState::Behind, label)
                 } else if note.is_some() {
-                    (last, AccountState::Gap, "Statement missing".to_string())
+                    let label = tr!("Statement missing", "Kontoauszug fehlt");
+                    (last, AccountState::Gap, label)
                 } else if to_review > 0 {
-                    (last, AccountState::Review, format!("{to_review} to review"))
+                    let label = tr!("{to_review} to review", "{to_review} zu prüfen");
+                    (last, AccountState::Review, label)
                 } else {
-                    (last, AccountState::Ok, "Up to date".to_string())
+                    (last, AccountState::Ok, tr!("Up to date", "Aktuell"))
                 }
             }
         };

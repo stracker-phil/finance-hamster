@@ -10,6 +10,7 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 
 use crate::error::{AppError, AppResult};
+use crate::tr;
 
 /// Creates `dir` (and its parents) readable only by the user, and tightens an existing one:
 /// the config dir holds the IPC socket and all data.
@@ -99,8 +100,9 @@ impl JsonFile {
     /// Saves atomically (`write_private_file`); refuses while a broken file could not be moved aside.
     pub fn save<T: Serialize>(&self, value: &T) -> AppResult<()> {
         if self.poisoned.load(Ordering::Relaxed) {
-            return Err(AppError::Io(format!(
+            return Err(AppError::Io(tr!(
                 "{} could not be read or moved aside, so it is not overwritten",
+                "{} konnte weder gelesen noch beiseitegelegt werden und wird daher nicht überschrieben",
                 self.path.display()
             )));
         }

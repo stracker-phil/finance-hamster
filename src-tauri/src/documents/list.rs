@@ -15,6 +15,7 @@ use crate::error::AppResult;
 use crate::money::{Money, format_money, format_plain};
 use crate::rules;
 use crate::settings::NumberFormat;
+use crate::{tr, tr_plural};
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
 #[serde(rename_all = "camelCase")]
@@ -74,7 +75,7 @@ fn sub_line(doc: &DocumentRow, item: Option<String>, order: DateOrder) -> String
         .as_deref()
         .and_then(date::parse)
         .map(|d| date::day_month(d, order))
-        .unwrap_or_else(|| "Not dated".into());
+        .unwrap_or_else(|| tr!("Not dated", "Ohne Datum"));
     std::iter::once(when)
         .chain(item)
         .collect::<Vec<_>>()
@@ -93,12 +94,24 @@ fn group_of(listed: &[Listed], format: NumberFormat) -> DocumentGroup {
     let year = listed.first().and_then(|l| l.year);
     let n = listed.len();
     DocumentGroup {
-        title: year.map_or_else(|| "Inbox".into(), |y| format!("Tax year {y}")),
+        title: year.map_or_else(
+            || tr!("Inbox", "Eingang"),
+            |y| tr!("Tax year {y}", "Steuerjahr {y}"),
+        ),
         year,
-        count: format!("{n} {}", if n == 1 { "document" } else { "documents" }),
+        count: tr_plural!(
+            n,
+            "{n} document",
+            "{n} documents",
+            "{n} Beleg",
+            "{n} Belege"
+        ),
         total: year.map(|_| {
-            let paid = listed.iter().map(|l| l.anv_cents).sum();
-            format!("{} paid", format_money(&Money::eur(paid), format))
+            let paid = format_money(
+                &Money::eur(listed.iter().map(|l| l.anv_cents).sum()),
+                format,
+            );
+            tr!("{paid} paid", "{paid} bezahlt")
         }),
         documents: listed.iter().map(|l| l.row.clone()).collect(),
     }

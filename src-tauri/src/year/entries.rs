@@ -150,10 +150,26 @@ pub fn add(
         .items
         .iter()
         .find(|i| &i.key == item_key && i.visible)
-        .ok_or_else(|| invalid("item", "Choose one of the year's items"))?;
-    let day = date::parse(day_text).ok_or_else(|| invalid("date", "This isn't a date"))?;
+        .ok_or_else(|| {
+            invalid(
+                "item",
+                &crate::tr!(
+                    "Choose one of the year's items",
+                    "Wähl einen Posten des Jahres"
+                ),
+            )
+        })?;
+    let day = date::parse(day_text).ok_or_else(|| {
+        invalid(
+            "date",
+            &crate::tr!("This isn't a date", "Das ist kein Datum"),
+        )
+    })?;
     if day.year() != year {
-        return Err(invalid("date", &format!("A date in {year}")));
+        return Err(invalid(
+            "date",
+            &crate::tr!("A date in {year}", "Ein Datum in {year}"),
+        ));
     }
     let (kind, cents, km, evidence) = match entry {
         NewEntry::Amount {
@@ -162,13 +178,21 @@ pub fn add(
             if item.kind != ItemKind::Amount {
                 return Err(invalid(
                     "item",
-                    "This item takes documents or trips, not amounts",
+                    &crate::tr!(
+                        "This item takes documents or trips, not amounts",
+                        "Dieser Posten nimmt Belege oder Fahrten, keine Beträge"
+                    ),
                 ));
             }
             let cents = parse_cents(amount)
                 .map(i64::abs)
                 .filter(|c| *c > 0)
-                .ok_or_else(|| invalid("amount", "This isn't an amount"))?;
+                .ok_or_else(|| {
+                    invalid(
+                        "amount",
+                        &crate::tr!("This isn't an amount", "Das ist kein Betrag"),
+                    )
+                })?;
             let evidence = match evidence {
                 Some(from) => Some(copy_evidence(
                     config_dir,
@@ -184,7 +208,10 @@ pub fn add(
             if item.kind != ItemKind::Trips {
                 return Err(invalid(
                     "item",
-                    "This item takes documents or amounts, not trips",
+                    &crate::tr!(
+                        "This item takes documents or amounts, not trips",
+                        "Dieser Posten nimmt Belege oder Beträge, keine Fahrten"
+                    ),
                 ));
             }
             let km = km
@@ -192,12 +219,21 @@ pub fn add(
                 .parse::<i64>()
                 .ok()
                 .filter(|k| *k > 0)
-                .ok_or_else(|| invalid("km", "Whole kilometres"))?;
+                .ok_or_else(|| invalid("km", &crate::tr!("Whole kilometres", "Ganze Kilometer")))?;
             if rate_on(ruleset, item_key, &date::iso(day)).is_none() {
-                return Err(invalid("date", "The rules give no rate for this date"));
+                return Err(invalid(
+                    "date",
+                    &crate::tr!(
+                        "The rules give no rate for this date",
+                        "Die Regeln nennen für dieses Datum keinen Satz"
+                    ),
+                ));
             }
             if text.trim().is_empty() {
-                return Err(invalid("text", "Say where and why"));
+                return Err(invalid(
+                    "text",
+                    &crate::tr!("Say where and why", "Sag, wohin und warum"),
+                ));
             }
             (EntryKind::Trip, None, Some(km), None)
         }
@@ -215,8 +251,10 @@ pub fn add(
         created_at: now,
     };
     let label = match kind {
-        EntryKind::Amount => format!("Add Amount to KZ {}", item.kz),
-        EntryKind::Trip => format!("Add Trip to KZ {}", item.kz),
+        EntryKind::Amount => {
+            crate::tr!("Add Amount to KZ {}", "Betrag zu KZ {} hinzufügen", item.kz)
+        }
+        EntryKind::Trip => crate::tr!("Add Trip to KZ {}", "Fahrt zu KZ {} hinzufügen", item.kz),
     };
     db.write(Op::new(label, vec![Change::insert(ENTRIES, &row)?]), source)
 }
@@ -225,7 +263,7 @@ fn entry(db: &Db, year: i32, id: &str) -> AppResult<EntryRow> {
     entries(db, year)?
         .into_iter()
         .find(|e| e.id == id)
-        .ok_or_else(|| AppError::NotFound(format!("No entry {id}")))
+        .ok_or_else(|| AppError::NotFound(crate::tr!("No entry {id}", "Kein Eintrag {id}")))
 }
 
 /// Copies an evidence PDF to `docs/<year>/evidence/<date>-<text>.pdf`; returns its relative path.
@@ -257,9 +295,10 @@ pub fn attach(
 ) -> AppResult<Written> {
     let before = entry(db, year, id)?;
     if before.kind != EntryKind::Amount {
-        return Err(AppError::InvalidInput(
-            "Only an amount takes evidence".into(),
-        ));
+        return Err(AppError::InvalidInput(crate::tr!(
+            "Only an amount takes evidence",
+            "Nur ein Betrag nimmt einen Nachweis"
+        )));
     }
     let after = EntryRow {
         evidence: Some(copy_evidence(config_dir, &before.date, &before.text, from)?),
@@ -267,7 +306,7 @@ pub fn attach(
     };
     db.write(
         Op::new(
-            "Attach Evidence",
+            crate::tr!("Attach Evidence", "Nachweis anhängen"),
             vec![Change::update(ENTRIES, &before, &after)?],
         ),
         source,
@@ -277,17 +316,20 @@ pub fn attach(
 /// An amount's evidence file, to open.
 pub fn evidence_path(db: &Db, config_dir: &Path, year: i32, id: &str) -> AppResult<PathBuf> {
     let row = entry(db, year, id)?;
-    let file = row
-        .evidence
-        .ok_or_else(|| AppError::NotFound("This amount has no evidence".into()))?;
+    let file = row.evidence.ok_or_else(|| {
+        AppError::NotFound(crate::tr!(
+            "This amount has no evidence",
+            "Dieser Betrag hat keinen Nachweis"
+        ))
+    })?;
     Ok(config_dir.join(file))
 }
 
 pub fn delete(db: &Db, year: i32, id: &str, source: Source) -> AppResult<Written> {
     let row = entry(db, year, id)?;
     let label = match row.kind {
-        EntryKind::Amount => "Delete Amount",
-        EntryKind::Trip => "Delete Trip",
+        EntryKind::Amount => crate::tr!("Delete Amount", "Betrag löschen"),
+        EntryKind::Trip => crate::tr!("Delete Trip", "Fahrt löschen"),
     };
     db.write(Op::new(label, vec![Change::delete(ENTRIES, &row)?]), source)
 }

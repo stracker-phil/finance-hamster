@@ -25,6 +25,7 @@ use crate::subscriptions::{
     self,
     matcher::{self, Assignment, Matchers, charged_in},
 };
+use crate::tr;
 
 /// A line waiting for a decision, as the Review card shows it.
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
@@ -185,9 +186,10 @@ pub fn queue(db: &Db, format: NumberFormat, order: DateOrder) -> AppResult<Revie
                 raw: raw_text(t),
                 suggestion: before.map(|b| b.action),
                 item_key: before.and_then(|b| b.item_key.clone()),
-                item_why: before
-                    .filter(|b| b.item_key.is_some())
-                    .map(|b| format!("last used for {}", b.title)),
+                item_why: before.filter(|b| b.item_key.is_some()).map(|b| {
+                    let title = &b.title;
+                    tr!("last used for {title}", "zuletzt verwendet für {title}")
+                }),
                 plan_changed: plan_changed(&asked, t, format),
                 title,
                 key,
@@ -219,13 +221,19 @@ fn plan_changed(
     };
     let charged = charged_in(t, &plan.currency);
     let text = match charged {
-        Some(cents) => format!(
+        Some(cents) => tr!(
             "{} usually charges {}; this charge is {}.",
+            "{} bucht normalerweise {} ab; diese Abbuchung ist {}.",
             sub.name,
             money(plan.cents),
             money(cents)
         ),
-        None => format!("{} usually charges {}.", sub.name, money(plan.cents)),
+        None => tr!(
+            "{} usually charges {}.",
+            "{} bucht normalerweise {} ab.",
+            sub.name,
+            money(plan.cents)
+        ),
     };
     Some(PlanChanged {
         subscription_id: sub.id.clone(),
@@ -251,11 +259,11 @@ fn subscription_options(db: &Db) -> AppResult<Vec<SubscriptionOption>> {
         .collect())
 }
 
-fn verb(action: Action) -> &'static str {
+fn verb(action: Action) -> String {
     match action {
-        Action::Anv => "ANV",
-        Action::Subscription => "Subscription",
-        Action::Ignore => "Ignore",
+        Action::Anv => "ANV".into(),
+        Action::Subscription => tr!("Subscription", "Abo"),
+        Action::Ignore => tr!("Ignore", "Ignorieren"),
     }
 }
 
@@ -276,7 +284,10 @@ fn checked_subscription(
     {
         return Err(AppError::InvalidField {
             field: "review.subscription".into(),
-            message: "Choose the subscription it belongs to".into(),
+            message: tr!(
+                "Choose the subscription it belongs to",
+                "Wähle das Abo, zu dem sie gehört"
+            ),
         });
     }
     Ok(Some(id))
@@ -295,7 +306,10 @@ fn checked_item_key(
     if !rules::items(db)?.iter().any(|i| i.key == key) {
         return Err(AppError::InvalidField {
             field: "review.item".into(),
-            message: "Choose the item it counts as".into(),
+            message: tr!(
+                "Choose the item it counts as",
+                "Wähle den Posten, für den sie zählt"
+            ),
         });
     }
     Ok(Some(key))
@@ -338,13 +352,19 @@ pub fn rule_term(line: &TransactionRow, term: Option<&str>) -> AppResult<String>
     if term.chars().count() < MIN_TERM {
         return Err(AppError::InvalidField {
             field: "review.term".into(),
-            message: format!("Select at least {MIN_TERM} characters"),
+            message: tr!(
+                "Select at least {MIN_TERM} characters",
+                "Markiere mindestens {MIN_TERM} Zeichen"
+            ),
         });
     }
     if !crate::rules::engine::line_text(line).contains(&term) {
         return Err(AppError::InvalidField {
             field: "review.term".into(),
-            message: format!("“{term}” isn't in this line"),
+            message: tr!(
+                "“{term}” isn't in this line",
+                "„{term}“ steht nicht in dieser Buchung"
+            ),
         });
     }
     Ok(term)
@@ -366,7 +386,7 @@ pub fn decide_as(
 ) -> AppResult<Written> {
     let line = db
         .read(|c| statements::transaction_by_id(c, line_id))?
-        .ok_or_else(|| AppError::NotFound(format!("No line {line_id}")))?;
+        .ok_or_else(|| AppError::NotFound(tr!("No line {line_id}", "Keine Buchung {line_id}")))?;
     let item_key = checked_item_key(db, action, item_key)?;
     let subscription_id = checked_subscription(db, action, subscription_id)?;
     let always = always && action != Action::Subscription;
@@ -396,7 +416,7 @@ pub fn decide_as(
         changes.push(Change::insert(rules_store::RULES, &rule)?);
         all.push(rule);
         changes.extend(db.read(|c| rules::apply::changes_except(c, &all, now, Some(&line.id)))?);
-        label.push_str(" · rule created");
+        label.push_str(&tr!(" · rule created", " · Regel erstellt"));
     }
     db.write(Op::new(label, changes), source)
 }

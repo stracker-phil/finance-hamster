@@ -8,6 +8,7 @@ use super::store::{self, VendorRow};
 use crate::db::{Change, Db, Op, Source, Written};
 use crate::error::{AppError, AppResult};
 use crate::rules::{self, ItemOption};
+use crate::{tr, tr_plural};
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
 #[serde(rename_all = "camelCase")]
@@ -51,14 +52,13 @@ pub fn view(db: &Db) -> AppResult<VendorsView> {
                         .find(|i| i.key == key)
                         .map_or(key, |i| format!("KZ {}", i.kz))
                 });
-            let count = format!(
-                "{} {}",
-                own.len(),
-                if own.len() == 1 {
-                    "document"
-                } else {
-                    "documents"
-                }
+            let n = own.len();
+            let count = tr_plural!(
+                n,
+                "{n} document",
+                "{n} documents",
+                "{n} Beleg",
+                "{n} Belege"
             );
             VendorView {
                 detail: std::iter::once(count)
@@ -79,13 +79,13 @@ fn vendor(db: &Db, id: &str) -> AppResult<VendorRow> {
     db.read(store::vendors)?
         .into_iter()
         .find(|v| v.id == id)
-        .ok_or_else(|| AppError::NotFound(format!("No vendor {id}")))
+        .ok_or_else(|| AppError::NotFound(tr!("No vendor {id}", "Kein Händler {id}")))
 }
 
-fn invalid(message: &str) -> AppError {
+fn invalid(message: String) -> AppError {
     AppError::InvalidField {
         field: "vendor.name".into(),
-        message: message.into(),
+        message,
     }
 }
 
@@ -94,21 +94,27 @@ pub fn rename(db: &Db, id: &str, name: &str, source: Source) -> AppResult<Writte
     let before = vendor(db, id)?;
     let name = name.trim();
     if name.is_empty() {
-        return Err(invalid("The name can't be empty"));
+        return Err(invalid(tr!(
+            "The name can't be empty",
+            "Der Name darf nicht leer sein"
+        )));
     }
     if db
         .read(store::vendors)?
         .iter()
         .any(|v| v.id != id && v.name.eq_ignore_ascii_case(name))
     {
-        return Err(invalid("Another vendor has this name; merge them instead"));
+        return Err(invalid(tr!(
+            "Another vendor has this name; merge them instead",
+            "Ein anderer Händler hat diesen Namen; führe sie stattdessen zusammen"
+        )));
     }
     let after = VendorRow {
         name: name.to_string(),
         ..before.clone()
     };
     let op = Op::new(
-        format!("Rename Vendor {}", before.name),
+        tr!("Rename Vendor {}", "Händler umbenennen: {}", before.name),
         vec![Change::update(store::VENDORS, &before, &after)?],
     );
     db.write(op, source)
@@ -126,7 +132,10 @@ pub fn set_default_item(
     {
         return Err(AppError::InvalidField {
             field: "vendor.item".into(),
-            message: "Choose one of the year's items".into(),
+            message: tr!(
+                "Choose one of the year's items",
+                "Wähle einen der Posten des Jahres"
+            ),
         });
     }
     let after = VendorRow {
@@ -134,7 +143,11 @@ pub fn set_default_item(
         ..before.clone()
     };
     let op = Op::new(
-        format!("Set Default Item of {}", before.name),
+        tr!(
+            "Set Default Item of {}",
+            "Standardposten festlegen: {}",
+            before.name
+        ),
         vec![Change::update(store::VENDORS, &before, &after)?],
     );
     db.write(op, source)
@@ -143,9 +156,10 @@ pub fn set_default_item(
 /// Moves every document of `from` to `into` and removes `from`.
 pub fn merge(db: &Db, from: &str, into: &str, source: Source) -> AppResult<Written> {
     if from == into {
-        return Err(AppError::InvalidInput(
-            "A vendor can't merge into itself".into(),
-        ));
+        return Err(AppError::InvalidInput(tr!(
+            "A vendor can't merge into itself",
+            "Ein Händler kann nicht mit sich selbst zusammengeführt werden"
+        )));
     }
     let gone = vendor(db, from)?;
     let kept = vendor(db, into)?;
@@ -160,7 +174,15 @@ pub fn merge(db: &Db, from: &str, into: &str, source: Source) -> AppResult<Writt
         }
     }
     changes.push(Change::delete(store::VENDORS, &gone)?);
-    let op = Op::new(format!("Merge {} into {}", gone.name, kept.name), changes);
+    let op = Op::new(
+        tr!(
+            "Merge {} into {}",
+            "{} in {} zusammenführen",
+            gone.name,
+            kept.name
+        ),
+        changes,
+    );
     db.write(op, source)
 }
 
@@ -171,13 +193,14 @@ pub fn delete(db: &Db, id: &str, source: Source) -> AppResult<Written> {
         .iter()
         .any(|d| d.vendor_id.as_deref() == Some(id))
     {
-        return Err(AppError::InvalidInput(format!(
+        return Err(AppError::InvalidInput(tr!(
             "{} has documents; merge it into another vendor instead",
+            "{} hat Belege; führe ihn stattdessen mit einem anderen Händler zusammen",
             gone.name
         )));
     }
     let op = Op::new(
-        format!("Delete Vendor {}", gone.name),
+        tr!("Delete Vendor {}", "Händler löschen: {}", gone.name),
         vec![Change::delete(store::VENDORS, &gone)?],
     );
     db.write(op, source)

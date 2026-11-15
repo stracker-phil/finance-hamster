@@ -153,9 +153,9 @@ pub fn page(
     format: NumberFormat,
     order: DateOrder,
 ) -> AppResult<YearPage> {
-    let row = db
-        .read(|c| taxyears::row(c, year))?
-        .ok_or_else(|| AppError::NotFound(format!("No tax year {year}")))?;
+    let row = db.read(|c| taxyears::row(c, year))?.ok_or_else(|| {
+        AppError::NotFound(crate::tr!("No tax year {year}", "Kein Steuerjahr {year}"))
+    })?;
     let ruleset: Ruleset = serde_json::from_str(&row.rules)?;
     let given = answers::answers(db, year)?;
     let facts = facts::gather(db, year, &ruleset, format, order)?;
@@ -194,7 +194,7 @@ pub fn page(
         state: row.state,
         total: eur(total, format),
         progress: if row.state == YearState::Closed {
-            "Closed".into()
+            crate::tr!("Closed", "Abgeschlossen")
         } else {
             progress
         },

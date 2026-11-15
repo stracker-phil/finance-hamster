@@ -2995,6 +2995,49 @@ fn finishing_names_every_missing_fact_in_order_and_changes_nothing() {
 }
 
 #[test]
+fn finishing_speaks_german_in_its_refusal_and_its_op_label() {
+    use crate::i18n::with_lang;
+    use crate::settings::Language;
+    let (_dir, db) = setup_with_vendor();
+    draft(&db, "doc-b", |_| {});
+    complete_draft(&db, "doc-a");
+
+    let refusal = with_lang(Language::De, || {
+        refused(lifecycle::finish(&db, "doc-b", 1, Source::Ui))
+    });
+    let written = with_lang(Language::De, || {
+        lifecycle::finish(&db, "doc-a", 1, Source::Ui).unwrap()
+    });
+
+    assert_eq!(
+        refusal,
+        "Setze zuerst: Zahlungsdatum, bezahlten Betrag, Händler, Posten"
+    );
+    assert_eq!(written.label, "Abschließen: Rechnung Pixelforge Ltd.");
+}
+
+#[test]
+fn a_field_error_reads_in_german_when_the_language_is_german() {
+    let (_dir, db) = setup();
+    draft(&db, "typed", |_| {});
+
+    let error = crate::i18n::with_lang(crate::settings::Language::De, || {
+        rejected(apply(
+            &db,
+            "typed",
+            DocumentEdit::Paid {
+                value: Some("abc".into()),
+            },
+        ))
+    });
+
+    assert_eq!(
+        error,
+        ("document.paid".into(), "Das ist kein Betrag".into())
+    );
+}
+
+#[test]
 fn a_linked_line_counts_as_the_amount_paid_when_finishing() {
     let (_dir, db) = setup_with_vendor();
     two_october_lines(&db);
@@ -4188,6 +4231,7 @@ fn slice_view(year: i32, amount: &str, note: Option<&str>) -> SliceView {
         year,
         amount: amount.into(),
         note: note.map(String::from),
+        frozen: false,
     }
 }
 
@@ -4247,6 +4291,34 @@ fn slices_in_closed_tax_years_are_frozen_even_when_they_are_half_slices() {
         notes,
         [Some("half year"), Some("frozen"), None, Some("frozen")]
     );
+    let frozen: Vec<bool> = view.slices.iter().map(|s| s.frozen).collect();
+    assert_eq!(frozen, [false, true, false, true]);
+}
+
+#[test]
+fn slices_flag_frozen_by_field_and_name_their_notes_in_german() {
+    let (_dir, db) = depreciation_setup(&[2027]);
+    computer_draft(&db, "2026-09-01", 150_000, |_| {});
+
+    let view = crate::i18n::with_lang(crate::settings::Language::De, || {
+        page(&db, "pc").depreciation.unwrap()
+    });
+
+    let slices: Vec<(Option<&str>, bool)> = view
+        .slices
+        .iter()
+        .map(|s| (s.note.as_deref(), s.frozen))
+        .collect();
+    assert_eq!(
+        slices,
+        [
+            (Some("halbes Jahr"), false),
+            (Some("eingefroren"), true),
+            (None, false),
+            (Some("halbes Jahr"), false)
+        ]
+    );
+    assert_eq!(view.rule, "3 Jahre für computer im Regelwerk 2026 v1");
 }
 
 #[test]
@@ -4363,8 +4435,8 @@ fn a_depreciation_view_travels_in_camel_case() {
             "own": true,
             "why": "€1,500.00 is above the GWG limit of €1,000.00, so it counts over 1 year; bought on or after 07-01, the first and the last year count half.",
             "slices": [
-                { "year": 2026, "amount": "€750.00", "note": "half year" },
-                { "year": 2027, "amount": "€750.00", "note": "frozen" }
+                { "year": 2026, "amount": "€750.00", "note": "half year", "frozen": false },
+                { "year": 2027, "amount": "€750.00", "note": "frozen", "frozen": true }
             ]
         })
     );

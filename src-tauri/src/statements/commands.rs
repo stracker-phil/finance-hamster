@@ -16,6 +16,7 @@ use crate::db::commands::announce;
 use crate::error::{AppError, AppResult};
 use crate::events::IMPORT_READY_EVENT;
 use crate::state::AppState;
+use crate::tr;
 
 fn today() -> chrono::NaiveDate {
     chrono::Local::now().date_naive()
@@ -47,20 +48,26 @@ pub async fn statement_import_choose(app: AppHandle) -> AppResult<Option<ImportP
     let (tx, rx) = tokio::sync::oneshot::channel();
     app.dialog()
         .file()
-        .set_title("Import a Statement")
-        .add_filter("Statement PDF", &["pdf"])
+        .set_title(tr!("Import a Statement", "Kontoauszug importieren"))
+        .add_filter(tr!("Statement PDF", "Kontoauszug-PDF"), &["pdf"])
         .pick_file(move |path| {
             let _ = tx.send(path);
         });
-    let chosen = rx
-        .await
-        .map_err(|_| AppError::Io("The file panel closed without an answer".into()))?;
+    let chosen = rx.await.map_err(|_| {
+        AppError::Io(tr!(
+            "The file panel closed without an answer",
+            "Das Dateifenster wurde ohne Antwort geschlossen"
+        ))
+    })?;
     let Some(path) = chosen else {
         return Ok(None);
     };
-    let path = path
-        .into_path()
-        .map_err(|e| AppError::Io(format!("The chosen file isn't a file path: {e}")))?;
+    let path = path.into_path().map_err(|e| {
+        AppError::Io(tr!(
+            "The chosen file isn't a file path: {e}",
+            "Die gewählte Datei ist kein Dateipfad: {e}"
+        ))
+    })?;
     tauri::async_runtime::spawn_blocking(move || prepare(&app, &path))
         .await
         .map_err(|e| AppError::Internal(e.to_string()))?
@@ -75,7 +82,10 @@ pub fn statement_import_commit(
     token: String,
 ) -> AppResult<String> {
     let pending = state.imports.take(&token).ok_or_else(|| {
-        AppError::NotFound("This statement is no longer waiting to be imported".into())
+        AppError::NotFound(tr!(
+            "This statement is no longer waiting to be imported",
+            "Dieser Kontoauszug wartet nicht mehr auf den Import"
+        ))
     })?;
     let now = chrono::Utc::now().timestamp_millis();
     let (written, _) = import::commit(

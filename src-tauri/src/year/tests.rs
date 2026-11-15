@@ -1025,6 +1025,42 @@ fn progress_uses_the_singular_for_one_draft_and_one_answer() {
 }
 
 #[test]
+fn progress_reads_in_german_with_the_verb_agreeing_in_number() {
+    use crate::i18n::with_lang;
+    use crate::settings::Language;
+    let progress = |answered: bool| {
+        let (_dir, db) = open_year();
+        add_document(&db, "doc-d1", |d| {
+            d.state = DocState::Draft;
+            d.item_key = Some("books".into());
+            d.pay_date = Some("2026-03-03".into());
+        });
+        if answered {
+            answer_with(&db, "telearbeitstage", "28");
+        }
+        with_lang(Language::De, || year_page(&db).progress)
+    };
+
+    assert_eq!(progress(true), "1 Entwurf abzuschließen · 1 Antwort fehlt");
+    assert_eq!(
+        progress(false),
+        "1 Entwurf abzuschließen · 2 Antworten fehlen"
+    );
+}
+
+#[test]
+fn a_finished_year_is_ready_to_close_in_german() {
+    let (_dir, db) = open_year();
+    finished(&db, "doc-a", "books", "2026-10-14", 4_690, 100);
+    answer_with(&db, "telearbeitstage", "28");
+    answer_with(&db, "pauschale", "120");
+
+    let page = crate::i18n::with_lang(crate::settings::Language::De, || year_page(&db));
+
+    assert_eq!(page.progress, "Bereit zum Abschließen");
+}
+
+#[test]
 fn a_year_with_everything_finished_and_answered_is_ready_to_close() {
     let (_dir, db) = open_year();
     finished(&db, "doc-a", "books", "2026-10-14", 4_690, 100);

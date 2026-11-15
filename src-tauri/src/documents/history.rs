@@ -14,10 +14,12 @@ use super::title_of;
 use crate::date::{self, DateOrder};
 use crate::db::Db;
 use crate::error::AppResult;
+use crate::i18n::Text;
 use crate::money::{Money, format_money};
 use crate::review::title_of as transaction_title;
 use crate::settings::NumberFormat;
 use crate::statements::store as statements;
+use crate::tr;
 
 #[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq, TS)]
 #[serde(rename_all = "snake_case")]
@@ -104,7 +106,7 @@ impl Context {
                 .vendors
                 .get(id)
                 .cloned()
-                .unwrap_or_else(|| "a vendor".into()),
+                .unwrap_or_else(|| tr!("a vendor", "ein Händler")),
             ("pay_date" | "invoice_date", Value::String(text)) => date::parse(text)
                 .map(|d| date::day_month_year(d, self.order))
                 .unwrap_or_else(|| text.clone()),
@@ -119,16 +121,22 @@ impl Context {
     }
 }
 
-const FIELD_NAMES: [(&str, &str); 9] = [
-    ("pay_date", "Payment date"),
-    ("paid_cents", "Paid"),
-    ("vendor_id", "Vendor"),
-    ("item_key", "Item"),
-    ("work_share", "Work share"),
-    ("note", "Note"),
-    ("invoice_cents", "Invoice amount"),
-    ("invoice_currency", "Invoice currency"),
-    ("invoice_date", "Invoice date"),
+const FIELD_NAMES: [(&str, Text); 9] = [
+    ("pay_date", Text::new("Payment date", "Zahlungsdatum")),
+    ("paid_cents", Text::new("Paid", "Bezahlt")),
+    ("vendor_id", Text::new("Vendor", "Händler")),
+    ("item_key", Text::new("Item", "Posten")),
+    ("work_share", Text::new("Work share", "Beruflicher Anteil")),
+    ("note", Text::new("Note", "Notiz")),
+    (
+        "invoice_cents",
+        Text::new("Invoice amount", "Rechnungsbetrag"),
+    ),
+    (
+        "invoice_currency",
+        Text::new("Invoice currency", "Rechnungswährung"),
+    ),
+    ("invoice_date", Text::new("Invoice date", "Rechnungsdatum")),
 ];
 
 fn document_entries(
@@ -139,10 +147,13 @@ fn document_entries(
     let field = |name: &str| rows.iter().copied().find(|r| r.field == name);
     if let Some(id) = field("id") {
         return match (&id.old, &id.new) {
-            (None, _) => vec![(HistoryKind::Added, "Added".into())],
+            (None, _) => vec![(HistoryKind::Added, tr!("Added", "Hinzugefügt"))],
             (_, None) => vec![(
                 HistoryKind::Deleted,
-                deleted_reason.map_or_else(|| "Deleted".into(), |r| format!("Deleted: {r}")),
+                deleted_reason.map_or_else(
+                    || tr!("Deleted", "Gelöscht"),
+                    |r| tr!("Deleted: {r}", "Gelöscht: {r}"),
+                ),
             )],
             _ => Vec::new(),
         };
@@ -161,11 +172,17 @@ fn document_entries(
             .map(|r| format!(": {r}"))
             .unwrap_or_default();
         out.push(match (from.as_str(), to.as_str()) {
-            (_, "finished") => (HistoryKind::Finished, "Finished".into()),
-            ("finished", "draft") => (HistoryKind::Unlocked, "Unlocked".into()),
-            (_, "excluded") => (HistoryKind::Excluded, format!("Excluded{reason}")),
-            ("excluded", _) => (HistoryKind::Restored, "Restored".into()),
-            _ => (HistoryKind::Changed, format!("State: {from} → {to}")),
+            (_, "finished") => (HistoryKind::Finished, tr!("Finished", "Abgeschlossen")),
+            ("finished", "draft") => (HistoryKind::Unlocked, tr!("Unlocked", "Entsperrt")),
+            (_, "excluded") => (
+                HistoryKind::Excluded,
+                tr!("Excluded{reason}", "Ausgeschlossen{reason}"),
+            ),
+            ("excluded", _) => (HistoryKind::Restored, tr!("Restored", "Wiederhergestellt")),
+            _ => (
+                HistoryKind::Changed,
+                tr!("State: {from} → {to}", "Status: {from} → {to}"),
+            ),
         });
     }
     for (name, label) in FIELD_NAMES {
@@ -173,7 +190,8 @@ fn document_entries(
             out.push((
                 HistoryKind::Changed,
                 format!(
-                    "{label}: {} → {}",
+                    "{}: {} → {}",
+                    label.get(),
                     cx.value(name, r.old.as_ref()),
                     cx.value(name, r.new.as_ref())
                 ),
@@ -188,15 +206,18 @@ fn link_entries(rows: &[&Row], cx: &Context) -> Vec<(HistoryKind, String)> {
         v.as_ref()
             .and_then(Value::as_str)
             .and_then(|id| cx.lines.get(id).cloned())
-            .unwrap_or_else(|| "a bank line".into())
+            .unwrap_or_else(|| tr!("a bank line", "eine Buchung"))
     };
     rows.iter()
         .filter(|r| r.field == "transaction_id")
         .filter_map(|link| match (&link.old, &link.new) {
-            (None, Some(_)) => Some((HistoryKind::Linked, format!("Linked {}", line(&link.new)))),
+            (None, Some(_)) => Some((
+                HistoryKind::Linked,
+                tr!("Linked {}", "Verknüpft: {}", line(&link.new)),
+            )),
             (Some(_), None) => Some((
                 HistoryKind::Unlinked,
-                format!("Unlinked {}", line(&link.old)),
+                tr!("Unlinked {}", "Verknüpfung gelöst: {}", line(&link.old)),
             )),
             _ => None,
         })

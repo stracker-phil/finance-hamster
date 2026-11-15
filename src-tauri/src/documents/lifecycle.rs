@@ -11,6 +11,7 @@ use super::title_of;
 use super::view::{linked_lines, paid_cents};
 use crate::db::{Change, Db, Op, Source, Written};
 use crate::error::{AppError, AppResult};
+use crate::tr;
 
 pub const DELETIONS: &str = "deletions";
 
@@ -33,24 +34,24 @@ pub struct DeletionRow {
 
 fn load(db: &Db, id: &str) -> AppResult<DocumentRow> {
     db.read(|c| store::document_by_id(c, id))?
-        .ok_or_else(|| AppError::NotFound(format!("No document {id}")))
+        .ok_or_else(|| AppError::NotFound(tr!("No document {id}", "Kein Beleg {id}")))
 }
 
 fn title(db: &Db, doc: &DocumentRow) -> AppResult<String> {
     Ok(title_of(doc, &db.read(store::vendors)?))
 }
 
-/// Writes the document after `edit` as one op labelled "<verb> <title>".
+/// Writes the document after `edit` as one op labelled by `label` from the document's title.
 fn transition(
     db: &Db,
     doc: DocumentRow,
-    verb: &str,
+    label: impl FnOnce(&str) -> String,
     source: Source,
     edit: impl FnOnce(&mut DocumentRow),
 ) -> AppResult<Written> {
     let mut after = doc.clone();
     edit(&mut after);
-    let label = format!("{verb} {}", title(db, &doc)?);
+    let label = label(&title(db, &doc)?);
     db.write(
         Op::new(label, vec![Change::update(store::DOCUMENTS, &doc, &after)?]),
         source,
@@ -58,13 +59,16 @@ fn transition(
 }
 
 /// The required facts a draft still lacks before it can be finished.
-pub fn missing(db: &Db, doc: &DocumentRow) -> AppResult<Vec<&'static str>> {
+pub fn missing(db: &Db, doc: &DocumentRow) -> AppResult<Vec<String>> {
     let lines = linked_lines(db, &doc.id)?;
     Ok([
-        (doc.pay_date.is_none(), "payment date"),
-        (paid_cents(doc, &lines).is_none(), "amount paid"),
-        (doc.vendor_id.is_none(), "vendor"),
-        (doc.item_key.is_none(), "item"),
+        (doc.pay_date.is_none(), tr!("payment date", "Zahlungsdatum")),
+        (
+            paid_cents(doc, &lines).is_none(),
+            tr!("amount paid", "bezahlten Betrag"),
+        ),
+        (doc.vendor_id.is_none(), tr!("vendor", "Händler")),
+        (doc.item_key.is_none(), tr!("item", "Posten")),
     ]
     .into_iter()
     .filter(|(gone, _)| *gone)
@@ -76,18 +80,21 @@ pub fn missing(db: &Db, doc: &DocumentRow) -> AppResult<Vec<&'static str>> {
 pub fn finish(db: &Db, id: &str, now: i64, source: Source) -> AppResult<Written> {
     let doc = load(db, id)?;
     if doc.state != DocState::Draft {
-        return Err(AppError::InvalidInput(
-            "Only a draft can be finished".into(),
-        ));
+        return Err(AppError::InvalidInput(tr!(
+            "Only a draft can be finished",
+            "Nur ein Entwurf kann abgeschlossen werden"
+        )));
     }
     let gaps = missing(db, &doc)?;
     if !gaps.is_empty() {
-        return Err(AppError::InvalidInput(format!(
-            "Set the {} first",
-            gaps.join(", ")
+        let gaps = gaps.join(", ");
+        return Err(AppError::InvalidInput(tr!(
+            "Set the {gaps} first",
+            "Setze zuerst: {gaps}"
         )));
     }
-    transition(db, doc, "Finish", source, |d| {
+    let label = |title: &str| tr!("Finish {title}", "Abschließen: {title}");
+    transition(db, doc, label, source, |d| {
         d.state = DocState::Finished;
         d.finished_at = Some(now);
     })
@@ -97,12 +104,14 @@ pub fn finish(db: &Db, id: &str, now: i64, source: Source) -> AppResult<Written>
 pub fn unlock(db: &Db, id: &str, source: Source) -> AppResult<Written> {
     let doc = load(db, id)?;
     if doc.state != DocState::Finished {
-        return Err(AppError::InvalidInput(
-            "Only a finished document can be unlocked".into(),
-        ));
+        return Err(AppError::InvalidInput(tr!(
+            "Only a finished document can be unlocked",
+            "Nur ein abgeschlossener Beleg kann entsperrt werden"
+        )));
     }
     crate::taxyears::refuse_closed(db, &[doc.pay_date.as_deref()])?;
-    transition(db, doc, "Unlock", source, |d| {
+    let label = |title: &str| tr!("Unlock {title}", "Entsperren: {title}");
+    transition(db, doc, label, source, |d| {
         d.state = DocState::Draft;
         d.finished_at = None;
     })
@@ -112,18 +121,23 @@ pub fn unlock(db: &Db, id: &str, source: Source) -> AppResult<Written> {
 pub fn exclude(db: &Db, id: &str, reason: &str, now: i64, source: Source) -> AppResult<Written> {
     let doc = load(db, id)?;
     if doc.state == DocState::Excluded {
-        return Err(AppError::InvalidInput(
-            "This document is excluded already".into(),
-        ));
+        return Err(AppError::InvalidInput(tr!(
+            "This document is excluded already",
+            "Dieser Beleg ist schon ausgeschlossen"
+        )));
     }
     let reason = reason.trim();
     if reason.is_empty() {
         return Err(AppError::InvalidField {
             field: "document.reason".into(),
-            message: "Say why it is excluded".into(),
+            message: tr!(
+                "Say why it is excluded",
+                "Sag, warum er ausgeschlossen wird"
+            ),
         });
     }
-    transition(db, doc, "Exclude", source, |d| {
+    let label = |title: &str| tr!("Exclude {title}", "Ausschließen: {title}");
+    transition(db, doc, label, source, |d| {
         d.state = DocState::Excluded;
         d.excluded_at = Some(now);
         d.exclude_reason = Some(reason.to_string());
@@ -135,9 +149,10 @@ pub fn exclude(db: &Db, id: &str, reason: &str, now: i64, source: Source) -> App
 pub fn restore(db: &Db, id: &str, source: Source) -> AppResult<Written> {
     let doc = load(db, id)?;
     if doc.state != DocState::Excluded {
-        return Err(AppError::InvalidInput(
-            "Only an excluded document can be restored".into(),
-        ));
+        return Err(AppError::InvalidInput(tr!(
+            "Only an excluded document can be restored",
+            "Nur ein ausgeschlossener Beleg kann wiederhergestellt werden"
+        )));
     }
     for link in db
         .read(super::store::links)?
@@ -146,7 +161,8 @@ pub fn restore(db: &Db, id: &str, source: Source) -> AppResult<Written> {
     {
         super::refuse_paid_elsewhere(db, &link.transaction_id, &doc.id)?;
     }
-    transition(db, doc, "Restore", source, |d| {
+    let label = |title: &str| tr!("Restore {title}", "Wiederherstellen: {title}");
+    transition(db, doc, label, source, |d| {
         d.state = DocState::Draft;
         d.excluded_at = None;
         d.exclude_reason = None;
@@ -177,26 +193,31 @@ pub fn delete(
 ) -> AppResult<Written> {
     let doc = load(db, id)?;
     if doc.state != DocState::Excluded {
-        return Err(AppError::InvalidInput(
-            "Only an excluded document can be deleted".into(),
-        ));
+        return Err(AppError::InvalidInput(tr!(
+            "Only an excluded document can be deleted",
+            "Nur ein ausgeschlossener Beleg kann gelöscht werden"
+        )));
     }
     if !deletable_at(&doc, archive_days, now) {
-        return Err(AppError::InvalidInput(format!(
-            "An excluded document can be deleted after {archive_days} days in the Archive"
+        return Err(AppError::InvalidInput(tr!(
+            "An excluded document can be deleted after {archive_days} days in the Archive",
+            "Ein ausgeschlossener Beleg kann nach {archive_days} Tagen im Archiv gelöscht werden"
         )));
     }
     let reason = reason.trim();
     if reason.is_empty() {
         return Err(AppError::InvalidField {
             field: "deletion.reason".into(),
-            message: "Say why it is deleted".into(),
+            message: tr!("Say why it is deleted", "Sag, warum er gelöscht wird"),
         });
     }
     if !understood {
         return Err(AppError::InvalidField {
             field: "deletion.understood".into(),
-            message: "Confirm that this can't be undone".into(),
+            message: tr!(
+                "Confirm that this can't be undone",
+                "Bestätige, dass das nicht widerrufen werden kann"
+            ),
         });
     }
     let title = title(db, &doc)?;
@@ -223,7 +244,10 @@ pub fn delete(
         },
     )?);
     // Written as the app's own op, which is never undoable: a deleted file can't come back.
-    let written = db.write(Op::new(format!("Delete {title}"), changes), Source::App)?;
+    let written = db.write(
+        Op::new(tr!("Delete {title}", "Löschen: {title}"), changes),
+        Source::App,
+    )?;
     let path = config_dir.join(&doc.file);
     if path.exists() {
         std::fs::remove_file(&path)?;
@@ -323,14 +347,19 @@ pub fn archive(
             ArchivedDocument {
                 title: title_of(&d, &vendors),
                 reason: d.exclude_reason.clone().unwrap_or_default(),
-                excluded: format!(
+                excluded: tr!(
                     "Excluded {}",
+                    "Ausgeschlossen am {}",
                     d.excluded_at.map(|a| day_of(a, order)).unwrap_or_default()
                 ),
                 deletable: deletable_at(&d, archive_days, now),
-                deletable_note: from
-                    .filter(|f| now < *f)
-                    .map(|f| format!("Can be deleted from {}", day_of(f, order))),
+                deletable_note: from.filter(|f| now < *f).map(|f| {
+                    tr!(
+                        "Can be deleted from {}",
+                        "Kann ab {} gelöscht werden",
+                        day_of(f, order)
+                    )
+                }),
                 file: d.file,
                 id: d.id,
             }
@@ -342,8 +371,9 @@ pub fn deletion_log(db: &Db, order: crate::date::DateOrder) -> AppResult<Vec<Del
     Ok(deletions(db)?
         .into_iter()
         .map(|d| DeletionView {
-            dates: format!(
+            dates: tr!(
                 "Added {} · deleted {}",
+                "Hinzugefügt {} · gelöscht {}",
                 day_of(d.created_at, order),
                 day_of(d.deleted_at, order)
             ),

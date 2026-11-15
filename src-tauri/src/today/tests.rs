@@ -554,6 +554,51 @@ fn a_draft_opens_its_document_in_the_year() {
 }
 
 #[test]
+fn steps_read_in_german_with_singular_and_plural() {
+    use crate::i18n::with_lang;
+    use crate::settings::Language;
+    let (_dir, db) = quiet();
+    add_line(&db, 1, "account-1", "2026-11-09", "Lastschrift A");
+    let review = with_lang(Language::De, || view(&db).next.unwrap());
+    decide(&db, 1, Action::Ignore, None);
+    for id in ["doc-d1", "doc-d2"] {
+        add_document(&db, id, |d| {
+            d.state = DocState::Draft;
+            d.item_key = Some("books".into());
+            d.pay_date = Some("2026-03-03".into());
+        });
+    }
+
+    let drafts = with_lang(Language::De, || view(&db).next.unwrap());
+
+    assert_eq!(
+        review,
+        Step {
+            key: "review".into(),
+            title: "1 Buchung zu prüfen".into(),
+            detail: "etwa 1 Minute".into(),
+            line: "Von Private. Den Rest haben Regeln entschieden.".into(),
+            button: "Prüfen starten".into(),
+            target: StepTarget::Review,
+        }
+    );
+    assert_eq!(
+        drafts,
+        Step {
+            key: "draft".into(),
+            title: "2 Entwürfe abzuschließen".into(),
+            detail: "doc-d1 und doc-d2".into(),
+            line: "Schließe sie ab, um ihre Werte für das Steuerjahr festzuschreiben.".into(),
+            button: "Entwürfe zeigen".into(),
+            target: StepTarget::Year {
+                year: 2026,
+                attention: Some(AttentionKind::Draft)
+            },
+        }
+    );
+}
+
+#[test]
 fn several_drafts_are_counted_and_shown_together_in_the_year() {
     let (_dir, db) = quiet();
     for id in ["doc-d1", "doc-d2"] {

@@ -25,6 +25,7 @@ use crate::events::ADD_READY_EVENT;
 use crate::rules;
 use crate::state::AppState;
 use crate::statements::store as statements;
+use crate::tr;
 
 /// Reads the file, keeps it under a token and describes it for the Add document sheet.
 fn read(app: &AppHandle, path: &Path) -> AppResult<AddPreview> {
@@ -51,20 +52,26 @@ pub async fn document_add_choose(app: AppHandle) -> AppResult<Option<AddPreview>
     let (tx, rx) = tokio::sync::oneshot::channel();
     app.dialog()
         .file()
-        .set_title("Add an Invoice PDF")
-        .add_filter("Invoice PDF", &["pdf"])
+        .set_title(tr!("Add an Invoice PDF", "Rechnungs-PDF hinzufügen"))
+        .add_filter(tr!("Invoice PDF", "Rechnungs-PDF"), &["pdf"])
         .pick_file(move |path| {
             let _ = tx.send(path);
         });
-    let chosen = rx
-        .await
-        .map_err(|_| AppError::Io("The file panel closed without an answer".into()))?;
+    let chosen = rx.await.map_err(|_| {
+        AppError::Io(tr!(
+            "The file panel closed without an answer",
+            "Das Dateifenster wurde ohne Antwort geschlossen"
+        ))
+    })?;
     let Some(path) = chosen else {
         return Ok(None);
     };
-    let path = path
-        .into_path()
-        .map_err(|e| AppError::Io(format!("The chosen file isn't a file path: {e}")))?;
+    let path = path.into_path().map_err(|e| {
+        AppError::Io(tr!(
+            "The chosen file isn't a file path: {e}",
+            "Die gewählte Datei ist kein Dateipfad: {e}"
+        ))
+    })?;
     tauri::async_runtime::spawn_blocking(move || read(&app, &path))
         .await
         .map_err(|e| AppError::Internal(e.to_string()))?
@@ -79,7 +86,10 @@ pub fn document_add_commit(
     input: AddInput,
 ) -> AppResult<String> {
     let pending = state.adds.get(&input.token).ok_or_else(|| {
-        AppError::NotFound("This document is no longer waiting to be added".into())
+        AppError::NotFound(tr!(
+            "This document is no longer waiting to be added",
+            "Dieser Beleg wartet nicht mehr aufs Hinzufügen"
+        ))
     })?;
     let written = add::commit(
         &state.db,

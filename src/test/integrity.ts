@@ -24,6 +24,7 @@ export const statusRow = (patch: Partial<StatusRow> = {}): StatusRow => ({
 });
 
 export const statusGroup = (patch: Partial<StatusGroup> = {}): StatusGroup => ({
+  id: "statements",
   title: "Statements",
   rows: [statusRow()],
   ...patch,

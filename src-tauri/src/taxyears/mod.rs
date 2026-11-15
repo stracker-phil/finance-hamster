@@ -126,7 +126,10 @@ pub fn refuse_closed(db: &Db, dates: &[Option<&str>]) -> AppResult<()> {
         {
             return Err(AppError::InvalidField {
                 field: "document.payDate".into(),
-                message: format!("Tax year {year} is closed; reopen it to change its documents"),
+                message: crate::tr!(
+                    "Tax year {year} is closed; reopen it to change its documents",
+                    "Das Steuerjahr {year} ist abgeschlossen; öffne es wieder, um seine Belege zu ändern"
+                ),
             });
         }
     }
@@ -189,9 +192,10 @@ pub fn start_from_rules(
     if changes.is_empty() {
         return Ok(None);
     }
-    Ok(Some(
-        db.write(Op::new("Start tax year", changes), Source::App)?,
-    ))
+    Ok(Some(db.write(
+        Op::new(crate::tr!("Start tax year", "Steuerjahr beginnen"), changes),
+        Source::App,
+    )?))
 }
 
 #[cfg(test)]

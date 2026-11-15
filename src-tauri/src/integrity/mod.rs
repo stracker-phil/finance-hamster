@@ -17,6 +17,7 @@ use crate::documents::title_of;
 use crate::error::AppResult;
 use crate::lock::MutexExt;
 use crate::statements::store as statements;
+use crate::tr;
 
 #[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq, TS)]
 #[serde(rename_all = "snake_case")]
@@ -85,7 +86,10 @@ pub fn verify(db: &Db, config_dir: &Path, now: i64) -> AppResult<FileCheck> {
             problems.push(FileProblem {
                 trouble,
                 file: doc.file.clone(),
-                what: format!("Document · {}", title_of(&doc, &vendors)),
+                what: {
+                    let title = title_of(&doc, &vendors);
+                    tr!("Document · {title}", "Beleg · {title}")
+                },
             });
         }
     }
@@ -97,9 +101,12 @@ pub fn verify(db: &Db, config_dir: &Path, now: i64) -> AppResult<FileCheck> {
                 problems.push(FileProblem {
                     trouble,
                     file: statement.file.clone(),
-                    what: format!(
+                    what: tr!(
                         "Statement · {} Nr. {:03}/{}",
-                        account.name, statement.number, statement.year
+                        "Kontoauszug · {} Nr. {:03}/{}",
+                        account.name,
+                        statement.number,
+                        statement.year
                     ),
                 });
             }

@@ -3,31 +3,61 @@
 use super::parse::model::ParsedStatement;
 use crate::money::{Money, format_signed};
 use crate::settings::NumberFormat;
+use crate::tr;
 
 fn euros(cents: i64) -> String {
     format_signed(&Money::eur(cents), NumberFormat::default())
 }
 
 /// Why a statement can't be imported, naming the page and the difference.
-#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum CheckError {
-    #[error(
-        "Page {page}: the old balance plus the sums isn't the new balance; it is off by {difference}"
-    )]
-    Balance { page: usize, difference: String },
-    #[error("Page {page}: the credits add up to {lines}, the statement prints {printed}")]
+    Balance {
+        page: usize,
+        difference: String,
+    },
     Credits {
         page: usize,
         lines: String,
         printed: String,
     },
-    #[error("Page {page}: the debits add up to {lines}, the statement prints {printed}")]
     Debits {
         page: usize,
         lines: String,
         printed: String,
     },
 }
+
+/// In the UI language when the message is shown.
+impl std::fmt::Display for CheckError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let text = match self {
+            CheckError::Balance { page, difference } => tr!(
+                "Page {page}: the old balance plus the sums isn't the new balance; it is off by {difference}",
+                "Seite {page}: Alter Saldo plus Summen ergibt nicht den neuen Saldo; Differenz {difference}"
+            ),
+            CheckError::Credits {
+                page,
+                lines,
+                printed,
+            } => tr!(
+                "Page {page}: the credits add up to {lines}, the statement prints {printed}",
+                "Seite {page}: Die Gutschriften ergeben {lines}, der Kontoauszug zeigt {printed}"
+            ),
+            CheckError::Debits {
+                page,
+                lines,
+                printed,
+            } => tr!(
+                "Page {page}: the debits add up to {lines}, the statement prints {printed}",
+                "Seite {page}: Die Lastschriften ergeben {lines}, der Kontoauszug zeigt {printed}"
+            ),
+        };
+        f.write_str(&text)
+    }
+}
+
+impl std::error::Error for CheckError {}
 
 /// Old balance + credits + debits = new balance, and the lines sum to the printed credits and debits.
 pub fn check(s: &ParsedStatement) -> Result<(), CheckError> {

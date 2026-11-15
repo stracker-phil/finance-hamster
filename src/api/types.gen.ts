@@ -736,7 +736,11 @@ export type SliceView = { year: number, amount: string,
 /**
  * `half year`, `frozen`.
  */
-note: string | null, };
+note: string | null, 
+/**
+ * The slice's year is closed, so it can no longer change.
+ */
+frozen: boolean, };
 
 export type SourceKind = "document" | "statement";
 
@@ -763,7 +767,11 @@ missingBefore: string | null, };
  */
 export type StatementReach = { text: string, behind: boolean, };
 
-export type StatusGroup = { title: string, rows: Array<StatusRow>, };
+export type StatusGroup = { 
+/**
+ * Stable across languages: the page anchors the group by it (`status-<id>`).
+ */
+id: string, title: string, rows: Array<StatusRow>, };
 
 export type StatusRow = { label: string, detail: string, 
 /**

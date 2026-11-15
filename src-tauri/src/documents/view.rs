@@ -16,6 +16,7 @@ use crate::money::{Money, format_money, format_plain};
 use crate::rules::{self, ItemOption};
 use crate::settings::NumberFormat;
 use crate::statements::store::{self as statements, TransactionRow};
+use crate::{tr, tr_plural};
 
 /// A vendor the combo box suggests.
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
@@ -76,6 +77,8 @@ pub struct SliceView {
     pub amount: String,
     /// `half year`, `frozen`.
     pub note: Option<String>,
+    /// The slice's year is closed, so it can no longer change.
+    pub frozen: bool,
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
@@ -100,7 +103,7 @@ fn year_of(date: &str) -> Option<i32> {
 
 fn load_document(db: &Db, id: &str) -> AppResult<DocumentRow> {
     db.read(|c| store::document_by_id(c, id))?
-        .ok_or_else(|| AppError::NotFound(format!("No document {id}")))
+        .ok_or_else(|| AppError::NotFound(tr!("No document {id}", "Kein Beleg {id}")))
 }
 
 fn vendor_name(doc: &DocumentRow, vendors: &[VendorRow]) -> Option<String> {
@@ -148,9 +151,12 @@ fn vendor_options(vendors: &[VendorRow], documents: &[DocumentRow]) -> Vec<Vendo
                 .count();
             VendorOption {
                 name: v.name.clone(),
-                detail: format!(
-                    "{count} {}",
-                    if count == 1 { "document" } else { "documents" }
+                detail: tr_plural!(
+                    count,
+                    "{count} document",
+                    "{count} documents",
+                    "{count} Beleg",
+                    "{count} Belege"
                 ),
             }
         })
@@ -197,10 +203,7 @@ pub fn document(
     };
     let paid = paid_cents(&doc, &lines);
     let vendor = vendor_name(&doc, &vendors);
-    let missing = super::lifecycle::missing(db, &doc)?
-        .into_iter()
-        .map(String::from)
-        .collect();
+    let missing = super::lifecycle::missing(db, &doc)?;
     let on = |at: Option<i64>| {
         at.and_then(chrono::DateTime::from_timestamp_millis)
             .map(|t| {
@@ -222,7 +225,12 @@ pub fn document(
     if let (Some(estimate), Some(spread)) = (estimate.as_mut(), depreciation.as_ref())
         && let Some(first) = spread.slices.first()
     {
-        estimate.formula = format!("year 1 of {} · {} in total", spread.years, spread.cost);
+        estimate.formula = tr!(
+            "year 1 of {} · {} in total",
+            "Jahr 1 von {} · {} insgesamt",
+            spread.years,
+            spread.cost
+        );
         estimate.anv = first.amount.clone();
     }
     Ok(DocumentView {
@@ -278,12 +286,14 @@ pub fn line_options(
 pub fn editable(doc: &DocumentRow) -> AppResult<()> {
     match doc.state {
         DocState::Draft => Ok(()),
-        DocState::Finished => Err(AppError::InvalidInput(
-            "This document is finished; unlock it to change it".into(),
-        )),
-        DocState::Excluded => Err(AppError::InvalidInput(
-            "This document is excluded; restore it to change it".into(),
-        )),
+        DocState::Finished => Err(AppError::InvalidInput(tr!(
+            "This document is finished; unlock it to change it",
+            "Dieser Beleg ist abgeschlossen; entsperre ihn, um ihn zu ändern"
+        ))),
+        DocState::Excluded => Err(AppError::InvalidInput(tr!(
+            "This document is excluded; restore it to change it",
+            "Dieser Beleg ist ausgeschlossen; stelle ihn wieder her, um ihn zu ändern"
+        ))),
     }
 }
 
@@ -327,24 +337,28 @@ fn depreciation_view(
         .filter(|y| y.state == crate::taxyears::YearState::Closed)
         .map(|y| y.year)
         .collect();
-    let mut why = format!(
-        "{} is above the GWG limit of {}, so it counts over {years} {}",
-        eur(cost),
-        eur(ruleset.settings.gwg_limit.0),
-        if years == 1 { "year" } else { "years" }
+    let (cost_text, limit) = (eur(cost), eur(ruleset.settings.gwg_limit.0));
+    let mut why = tr_plural!(
+        years,
+        "{cost_text} is above the GWG limit of {limit}, so it counts over {years} year",
+        "{cost_text} is above the GWG limit of {limit}, so it counts over {years} years",
+        "{cost_text} liegt über der GWG-Grenze von {limit} und zählt daher über {years} Jahr",
+        "{cost_text} liegt über der GWG-Grenze von {limit} und zählt daher über {years} Jahre"
     );
     if half_year {
-        why.push_str(&format!(
-            "; bought on or after {}, the first and the last year count half",
-            ruleset.settings.half_year_from
+        let from = &ruleset.settings.half_year_from;
+        why.push_str(&tr!(
+            "; bought on or after {from}, the first and the last year count half",
+            "; gekauft am oder nach dem {from}, zählen das erste und das letzte Jahr halb"
         ));
     }
     why.push('.');
     Ok(Some(DepreciationView {
         cost: eur(cost),
         years,
-        rule: format!(
+        rule: tr!(
             "{rule_years} years for {asset_class} in ruleset {}",
+            "{rule_years} Jahre für {asset_class} im Regelwerk {}",
             ruleset.ruleset
         ),
         own: doc.useful_life.is_some_and(|y| y != rule_years),
@@ -355,12 +369,13 @@ fn depreciation_view(
                 year: s.year,
                 amount: eur(s.cents),
                 note: if closed.contains(&s.year) {
-                    Some("frozen".into())
+                    Some(tr!("frozen", "eingefroren"))
                 } else if s.half {
-                    Some("half year".into())
+                    Some(tr!("half year", "halbes Jahr"))
                 } else {
                     None
                 },
+                frozen: closed.contains(&s.year),
             })
             .collect(),
     }))

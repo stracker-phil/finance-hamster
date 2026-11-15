@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 use crate::error::{AppError, AppResult};
+use crate::tr;
 
 /// A row by column name; every table has a text `id` primary key.
 pub type Row = Map<String, Value>;
@@ -221,7 +222,10 @@ fn expect_one(count: usize, table: &str, id: &str) -> AppResult<()> {
     if count == 1 {
         Ok(())
     } else {
-        Err(AppError::NotFound(format!("No {table} row {id}")))
+        Err(AppError::NotFound(tr!(
+            "No {table} row {id}",
+            "Keine Zeile {id} in {table}"
+        )))
     }
 }
 

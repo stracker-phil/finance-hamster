@@ -12,6 +12,7 @@ use crate::money::{Money, format_signed, parse_cents};
 use crate::review::title_of;
 use crate::settings::NumberFormat;
 use crate::statements::store as statements;
+use crate::{tr, tr_plural};
 
 const EXAMPLES: usize = 3;
 
@@ -54,7 +55,10 @@ pub fn preview(
     {
         return Ok(RulePreview {
             count: 0,
-            text: "Add a condition to see which lines the rule matches.".into(),
+            text: tr!(
+                "Add a condition to see which lines the rule matches.",
+                "Füge eine Bedingung hinzu, um zu sehen, zu welchen Buchungen die Regel passt."
+            ),
             examples: Vec::new(),
         });
     }
@@ -79,14 +83,26 @@ pub fn preview(
         .filter(|t| decided.get(&t.id).is_some_and(store::DecisionRow::by_hand))
         .count();
     let count = lines.len();
-    let lines_word = if count == 1 { "line" } else { "lines" };
+    let matching = tr_plural!(
+        count,
+        "Matches {count} line",
+        "Matches {count} lines",
+        "Passt zu {count} Buchung",
+        "Passt zu {count} Buchungen"
+    );
     let text = match (count, by_hand) {
-        (0, _) => "Matches no line yet.".to_string(),
-        (n, 0) => format!("Matches {n} {lines_word}."),
-        (n, h) => format!(
-            "Matches {n} {lines_word}; {h} decided by hand keep{} your choice.",
-            if h == 1 { "s" } else { "" }
-        ),
+        (0, _) => tr!("Matches no line yet.", "Passt noch zu keiner Buchung."),
+        (_, 0) => format!("{matching}."),
+        (_, h) => {
+            let kept = tr_plural!(
+                h,
+                "{h} decided by hand keeps your choice.",
+                "{h} decided by hand keep your choice.",
+                "{h} von Hand entschiedene behält deine Wahl.",
+                "{h} von Hand entschiedene behalten deine Wahl."
+            );
+            format!("{matching}; {kept}")
+        }
     };
     let examples = lines
         .iter()
@@ -141,7 +157,10 @@ mod tests {
         let (_dir, db) = october_db();
         let waiting = RulePreview {
             count: 0,
-            text: "Add a condition to see which lines the rule matches.".into(),
+            text: tr!(
+                "Add a condition to see which lines the rule matches.",
+                "Füge eine Bedingung hinzu, um zu sehen, zu welchen Buchungen die Regel passt."
+            ),
             examples: Vec::new(),
         };
         let blank_conditions = RuleForm {

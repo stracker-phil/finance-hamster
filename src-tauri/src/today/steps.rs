@@ -10,17 +10,17 @@ use crate::error::AppResult;
 use crate::settings::NumberFormat;
 use crate::statements::view::{AccountState, Coverage};
 use crate::year::page::{AttentionKind, YearPage};
-
-fn plural(n: usize, one: &str, many: &str) -> String {
-    format!("{n} {}", if n == 1 { one } else { many })
-}
+use crate::{tr, tr_plural};
 
 /// `A`, `A and B`, `A, B and C`.
 pub(super) fn joined(names: &[String]) -> String {
     match names {
         [] => String::new(),
         [one] => one.clone(),
-        [rest @ .., last] => format!("{} and {last}", rest.join(", ")),
+        [rest @ .., last] => {
+            let rest = rest.join(", ");
+            tr!("{rest} and {last}", "{rest} und {last}")
+        }
     }
 }
 
@@ -37,12 +37,28 @@ pub(super) fn review_step(db: &Db) -> AppResult<Option<Step>> {
         .map(|a| a.name)
         .collect();
     let minutes = (count as usize).div_ceil(6).max(1);
+    let from = joined(&names);
     Ok(Some(Step {
         key: "review".into(),
-        title: plural(count as usize, "line to review", "lines to review"),
-        detail: format!("about {}", plural(minutes, "minute", "minutes")),
-        line: format!("From {}. Rules decided the rest.", joined(&names)),
-        button: "Start Review".into(),
+        title: tr_plural!(
+            count,
+            "{count} line to review",
+            "{count} lines to review",
+            "{count} Buchung zu prüfen",
+            "{count} Buchungen zu prüfen"
+        ),
+        detail: tr_plural!(
+            minutes,
+            "about {minutes} minute",
+            "about {minutes} minutes",
+            "etwa {minutes} Minute",
+            "etwa {minutes} Minuten"
+        ),
+        line: tr!(
+            "From {from}. Rules decided the rest.",
+            "Von {from}. Den Rest haben Regeln entschieden."
+        ),
+        button: tr!("Start Review", "Prüfen starten"),
         target: StepTarget::Review,
     }))
 }
@@ -54,12 +70,19 @@ fn gap_step(view: &Coverage) -> Option<Step> {
         .iter()
         .find(|a| a.state == AccountState::Gap)?;
     let note = account.note.clone()?;
+    let name = &account.name;
     Some(Step {
         key: "gap".into(),
-        title: format!("A {} statement is missing", account.name),
-        detail: "import it to close the gap".into(),
+        title: tr!(
+            "A {name} statement is missing",
+            "Ein Kontoauszug von {name} fehlt"
+        ),
+        detail: tr!(
+            "import it to close the gap",
+            "importiere ihn, um die Lücke zu schließen"
+        ),
         line: note,
-        button: "Import Statement…".into(),
+        button: tr!("Import Statement…", "Kontoauszug importieren …"),
         target: StepTarget::Import,
     })
 }
@@ -72,23 +95,34 @@ pub(super) fn import_step(db: &Db, view: &Coverage, order: DateOrder) -> AppResu
     else {
         return Ok(gap_step(view));
     };
+    let name = &behind.name;
     let (title, detail, line) = match last_statement_end(db, &behind.id)? {
         Some(end) => {
             let ends = date::day_month(end, order);
+            let state = &behind.state_label;
+            let lower = state.to_lowercase();
             (
-                format!(
-                    "{} statement is {}",
-                    behind.name,
-                    behind.state_label.to_lowercase()
+                tr!(
+                    "{name} statement is {lower}",
+                    "Kontoauszug von {name}: {state}"
                 ),
-                format!("last one ends {ends}"),
-                format!("Its last statement ends on {ends}."),
+                tr!("last one ends {ends}", "der letzte endet am {ends}"),
+                tr!(
+                    "Its last statement ends on {ends}.",
+                    "Sein letzter Kontoauszug endet am {ends}."
+                ),
             )
         }
         None => (
-            format!("{} has no statement yet", behind.name),
-            "import its first one".to_string(),
-            "Import its first statement to see its lines.".to_string(),
+            tr!(
+                "{name} has no statement yet",
+                "{name} hat noch keinen Kontoauszug"
+            ),
+            tr!("import its first one", "importiere den ersten"),
+            tr!(
+                "Import its first statement to see its lines.",
+                "Importiere den ersten Kontoauszug, um seine Buchungen zu sehen."
+            ),
         ),
     };
     Ok(Some(Step {
@@ -96,7 +130,7 @@ pub(super) fn import_step(db: &Db, view: &Coverage, order: DateOrder) -> AppResu
         title,
         detail,
         line,
-        button: "Import Statement…".into(),
+        button: tr!("Import Statement…", "Kontoauszug importieren …"),
         target: StepTarget::Import,
     }))
 }
@@ -122,17 +156,27 @@ pub(super) fn attach_step(page: &YearPage) -> Option<Step> {
         .iter()
         .filter(|a| a.kind == AttentionKind::MissingInvoice)
         .collect();
+    let count = missing.len();
     (!missing.is_empty()).then(|| Step {
         key: "attach".into(),
-        title: plural(missing.len(), "invoice to attach", "invoices to attach"),
+        title: tr_plural!(
+            count,
+            "{count} invoice to attach",
+            "{count} invoices to attach",
+            "{count} Rechnung anzuhängen",
+            "{count} Rechnungen anzuhängen"
+        ),
         // An attention title reads `<payee> · <amount>`.
         detail: first_names(
             missing
                 .iter()
                 .map(|a| a.title.split(" · ").next().unwrap_or(&a.title).to_string()),
         ),
-        line: "They count once their PDF is attached.".into(),
-        button: format!("Show in Tax Year {year}"),
+        line: tr!(
+            "They count once their PDF is attached.",
+            "Sie zählen, sobald ihr PDF angehängt ist."
+        ),
+        button: tr!("Show in Tax Year {year}", "Im Steuerjahr {year} zeigen"),
         target: StepTarget::Year {
             year,
             attention: Some(AttentionKind::MissingInvoice),
@@ -148,12 +192,22 @@ pub(super) fn questions_step(page: &YearPage) -> Option<Step> {
         .filter(|q| !q.answered)
         .map(|q| q.label.as_str())
         .collect();
+    let count = open.len();
     (!open.is_empty()).then(|| Step {
         key: "questions".into(),
-        title: format!("{} for Tax year {year}", plural(open.len(), "question", "questions")),
+        title: tr_plural!(
+            count,
+            "{count} question for Tax year {year}",
+            "{count} questions for Tax year {year}",
+            "{count} Frage zum Steuerjahr {year}",
+            "{count} Fragen zum Steuerjahr {year}"
+        ),
         detail: open.join(" · "),
-        line: "Numbers from your year, such as the Lohnzettel. They decide what the tax office accepts.".into(),
-        button: format!("Answer in Tax Year {year}"),
+        line: tr!(
+            "Numbers from your year, such as the Lohnzettel. They decide what the tax office accepts.",
+            "Zahlen aus deinem Jahr, etwa vom Lohnzettel. Sie entscheiden, was das Finanzamt anerkennt."
+        ),
+        button: tr!("Answer in Tax Year {year}", "Im Steuerjahr {year} beantworten"),
         target: StepTarget::Year {
             year,
             attention: None,
@@ -172,18 +226,26 @@ pub(super) fn year_check_step(
     };
     let view = crate::yearcheck::view(db, year, today, number, order)?;
     let count = view.questions.len();
-    let run = view
-        .last_run
-        .map_or("Not run yet".to_string(), |d| format!("Last run {d}"));
+    let run = view.last_run.map_or_else(
+        || tr!("Not run yet", "Noch nicht gelaufen"),
+        |d| tr!("Last run {d}", "Zuletzt am {d}"),
+    );
+    let questions = tr_plural!(
+        count,
+        "{count} quick question",
+        "{count} quick questions",
+        "{count} kurze Frage",
+        "{count} kurze Fragen"
+    );
     Ok(Some(Step {
         key: "check".into(),
-        title: format!("Year check for {year}"),
-        detail: format!(
-            "{run} · {}",
-            plural(count, "quick question", "quick questions")
+        title: tr!("Year check for {year}", "Jahrescheck für {year}"),
+        detail: format!("{run} · {questions}"),
+        line: tr!(
+            "Things you might forget to claim. Most are a quick No.",
+            "Dinge, die du vielleicht vergisst. Meist ein schnelles Nein."
         ),
-        line: "Things you might forget to claim. Most are a quick No.".into(),
-        button: "Start Year Check".into(),
+        button: tr!("Start Year Check", "Jahrescheck starten"),
         target: StepTarget::YearCheck { year },
     }))
 }
@@ -196,23 +258,34 @@ pub(super) fn draft_step(page: &YearPage) -> Option<Step> {
         .filter(|a| a.kind == AttentionKind::Draft)
         .collect();
     let first = drafts.first()?;
-    let single = drafts.len() == 1;
+    let count = drafts.len();
+    let single = count == 1;
     Some(Step {
         key: "draft".into(),
-        title: plural(drafts.len(), "draft to finish", "drafts to finish"),
+        title: tr_plural!(
+            count,
+            "{count} draft to finish",
+            "{count} drafts to finish",
+            "{count} Entwurf abzuschließen",
+            "{count} Entwürfe abzuschließen"
+        ),
         detail: first_names(drafts.iter().map(|d| d.title.clone())),
         line: if single {
-            "Finish it to lock its values for the tax year."
+            tr!(
+                "Finish it to lock its values for the tax year.",
+                "Schließe ihn ab, um seine Werte für das Steuerjahr festzuschreiben."
+            )
         } else {
-            "Finish them to lock their values for the tax year."
-        }
-        .into(),
-        button: if drafts.len() == 1 {
-            "Open Draft"
+            tr!(
+                "Finish them to lock their values for the tax year.",
+                "Schließe sie ab, um ihre Werte für das Steuerjahr festzuschreiben."
+            )
+        },
+        button: if single {
+            tr!("Open Draft", "Entwurf öffnen")
         } else {
-            "Show Drafts"
-        }
-        .into(),
+            tr!("Show Drafts", "Entwürfe zeigen")
+        },
         target: match (&first.document_id, single) {
             (Some(id), true) => StepTarget::Document {
                 id: id.clone(),

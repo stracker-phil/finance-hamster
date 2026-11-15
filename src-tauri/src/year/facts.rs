@@ -126,7 +126,10 @@ fn document_rows(
         let Some(pay_date) = doc.pay_date.clone() else {
             facts.attention.push(AttentionView {
                 kind: AttentionKind::Undated,
-                detail: "Set its payment date to place it in a tax year".into(),
+                detail: crate::tr!(
+                    "Set its payment date to place it in a tax year",
+                    "Setz das Zahlungsdatum, damit er in ein Steuerjahr fällt"
+                ),
                 title,
                 document_id: Some(doc.id.clone()),
                 entry_id: None,
@@ -191,7 +194,10 @@ fn count_state(doc: &DocumentRow, title: &str, facts: &mut Facts) {
         facts.drafts += 1;
         facts.attention.push(AttentionView {
             kind: AttentionKind::Draft,
-            detail: "Finish it to lock its values for the tax year".into(),
+            detail: crate::tr!(
+                "Finish it to lock its values for the tax year",
+                "Schließ ihn ab, damit seine Werte für das Steuerjahr feststehen"
+            ),
             title: title.to_string(),
             document_id: Some(doc.id.clone()),
             entry_id: None,
@@ -282,16 +288,18 @@ fn place_slice(
         count_state(doc, &title, facts);
     }
     let when = if carried {
-        format!("From {}", spread.purchase_year)
+        crate::tr!("From {}", "Aus {}", spread.purchase_year)
     } else {
         day_text(pay_date, order)
     };
     let year_no = year - spread.purchase_year + 1;
-    let detail = format!(
-        "{when} · year {year_no} of depreciating {} over {} {}",
-        eur(spread.cost, format),
-        spread.years,
-        if spread.years == 1 { "year" } else { "years" }
+    let (cost, years) = (eur(spread.cost, format), spread.years);
+    let detail = crate::tr_plural!(
+        years,
+        "{when} · year {year_no} of depreciating {cost} over {years} year",
+        "{when} · year {year_no} of depreciating {cost} over {years} years",
+        "{when} · Jahr {year_no} der Abschreibung von {cost} über {years} Jahr",
+        "{when} · Jahr {year_no} der Abschreibung von {cost} über {years} Jahre"
     );
     // Slices of earlier purchases belong to the whole year, not to a month.
     let date = (!carried).then(|| pay_date.to_string());
@@ -349,10 +357,18 @@ fn placed_document(
     let shown = day_text(&day, order);
     let detail = match paid {
         Some(p) if doc.work_share != 100 => {
-            format!("{shown} · {} % of {}", doc.work_share, eur(p, format))
+            crate::tr!(
+                "{shown} · {} % of {}",
+                "{shown} · {} % von {}",
+                doc.work_share,
+                eur(p, format)
+            )
         }
         Some(_) => shown,
-        None => format!("{shown} · amount paid missing"),
+        None => crate::tr!(
+            "{shown} · amount paid missing",
+            "{shown} · bezahlter Betrag fehlt"
+        ),
     };
     document_placed(doc, item, title, Some(day), detail, counted, None, format)
 }

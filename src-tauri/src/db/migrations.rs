@@ -4,6 +4,7 @@
 use rusqlite::Connection;
 
 use crate::error::{AppError, AppResult};
+use crate::tr;
 
 /// `MIGRATIONS[n]` brings the schema from version `n` to `n + 1`.
 pub const MIGRATIONS: &[&str] = &[
@@ -254,8 +255,9 @@ pub fn version(conn: &Connection) -> AppResult<usize> {
 pub fn migrate(conn: &mut Connection) -> AppResult<()> {
     let current = version(conn)?;
     if current > MIGRATIONS.len() {
-        return Err(AppError::InvalidInput(format!(
+        return Err(AppError::InvalidInput(tr!(
             "The data file is from a newer Hamster (schema {current}, this version knows {})",
+            "Die Datendatei stammt von einem neueren Hamster (Schema {current}, diese Version kennt {})",
             MIGRATIONS.len()
         )));
     }

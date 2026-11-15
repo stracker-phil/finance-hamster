@@ -24,6 +24,7 @@ use crate::platform::pdf::Pdf;
 use crate::rules;
 use crate::settings::NumberFormat;
 use crate::store::json_file::write_private_file;
+use crate::tr;
 
 pub const FOLDER: &str = "statements";
 
@@ -114,15 +115,23 @@ pub fn prepare(db: &Db, config_dir: &Path, bytes: Vec<u8>) -> AppResult<Pending>
     let pdf = Pdf::from_bytes(&bytes)?;
     let pages = pdf.text_pages()?;
     let parsed = parse::parse(&pages).map_err(|e| {
-        AppError::InvalidInput(format!("This isn't a statement Hamster can read: {e}"))
+        AppError::InvalidInput(tr!(
+            "This isn't a statement Hamster can read: {e}",
+            "Das ist kein Kontoauszug, den Hamster lesen kann: {e}"
+        ))
     })?;
-    check::check(&parsed)
-        .map_err(|e| AppError::InvalidInput(format!("The statement doesn't add up. {e}")))?;
+    check::check(&parsed).map_err(|e| {
+        AppError::InvalidInput(tr!(
+            "The statement doesn't add up. {e}",
+            "Der Kontoauszug geht nicht auf. {e}"
+        ))
+    })?;
     let hash = super::file_hash(&bytes);
     if let Some(existing) = db.read(|c| store::statement_by_hash(c, &hash))? {
-        return Err(AppError::InvalidInput(format!(
-            "This file was already imported as {}",
-            number_label(existing.number, existing.year)
+        let label = number_label(existing.number, existing.year);
+        return Err(AppError::InvalidInput(tr!(
+            "This file was already imported as {label}",
+            "Diese Datei wurde schon als {label} importiert"
         )));
     }
     let account = db
@@ -130,9 +139,10 @@ pub fn prepare(db: &Db, config_dir: &Path, bytes: Vec<u8>) -> AppResult<Pending>
         .into_iter()
         .find(|a| a.iban == parsed.iban)
         .ok_or_else(|| {
-            AppError::InvalidInput(format!(
-                "No account has the IBAN {}; add it in Settings → Accounts first",
-                accounts::mask_iban(&parsed.iban)
+            let iban = accounts::mask_iban(&parsed.iban);
+            AppError::InvalidInput(tr!(
+                "No account has the IBAN {iban}; add it in Settings → Accounts first",
+                "Kein Konto hat die IBAN {iban}; lege es zuerst unter Einstellungen → Konten an"
             ))
         })?;
     let existing = db.read(|c| store::statements_of(c, &account.id))?;
@@ -140,10 +150,10 @@ pub fn prepare(db: &Db, config_dir: &Path, bytes: Vec<u8>) -> AppResult<Pending>
         .iter()
         .any(|s| s.year == parsed.year && s.number == parsed.number)
     {
-        return Err(AppError::InvalidInput(format!(
-            "{} of {} is already imported",
-            number_label(parsed.number, parsed.year),
-            account.name
+        let (label, name) = (number_label(parsed.number, parsed.year), &account.name);
+        return Err(AppError::InvalidInput(tr!(
+            "{label} of {name} is already imported",
+            "{label} von {name} ist schon importiert"
         )));
     }
     let file = free_file(config_dir, &account, &parsed, &hash);
@@ -217,8 +227,14 @@ pub fn preview(
     let (chain, chain_title, chain_detail) = match check::chain(previous.as_ref(), p) {
         Chain::First => (
             ChainKind::First,
-            "The account's first statement".to_string(),
-            "Later statements are checked against it.".to_string(),
+            tr!(
+                "The account's first statement",
+                "Der erste Kontoauszug des Kontos"
+            ),
+            tr!(
+                "Later statements are checked against it.",
+                "Spätere Kontoauszüge werden daran geprüft."
+            ),
         ),
         Chain::Continues => {
             let prev = previous
@@ -227,26 +243,38 @@ pub fn preview(
                 .unwrap_or_default();
             (
                 ChainKind::Continues,
-                format!("Continues {prev} without a gap"),
-                format!(
+                tr!(
+                    "Continues {prev} without a gap",
+                    "Schließt lückenlos an {prev} an"
+                ),
+                tr!(
                     "Old balance {} equals the last new balance.",
+                    "Der alte Saldo {} entspricht dem letzten neuen Saldo.",
                     format_money(&Money::eur(p.old_balance), format)
                 ),
             )
         }
         Chain::MissingNumbers { expected } => (
             ChainKind::Gap,
-            "Statements are missing before this one".to_string(),
-            format!(
+            tr!(
+                "Statements are missing before this one",
+                "Vor diesem fehlen Kontoauszüge"
+            ),
+            tr!(
                 "Expected {} next; it imports, and the account shows the gap.",
+                "Erwartet war {}; er wird importiert, und das Konto zeigt die Lücke.",
                 number_label(expected, p.year)
             ),
         ),
         Chain::BalanceGap { previous } => (
             ChainKind::Gap,
-            "The old balance doesn't continue the last statement".to_string(),
-            format!(
+            tr!(
+                "The old balance doesn't continue the last statement",
+                "Der alte Saldo schließt nicht an den letzten Kontoauszug an"
+            ),
+            tr!(
                 "The last new balance was {}; it imports, and the account shows the gap.",
+                "Der letzte neue Saldo war {}; er wird importiert, und das Konto zeigt die Lücke.",
                 format_signed(&Money::eur(previous), format)
             ),
         ),
@@ -258,7 +286,11 @@ pub fn preview(
             "Kontoauszug {} · {} {} · {} – {}",
             number_label(p.number, p.year),
             pending.pages,
-            if pending.pages == 1 { "page" } else { "pages" },
+            if pending.pages == 1 {
+                tr!("page", "Seite")
+            } else {
+                tr!("pages", "Seiten")
+            },
             date::day_month(p.from, order),
             date::day_month_year(p.to, order)
         ),
@@ -356,7 +388,11 @@ pub fn commit(
     }
     changes.extend(decisions);
     let op = Op::new(
-        format!("Import Statement {}", number_label(p.number, p.year)),
+        tr!(
+            "Import Statement {}",
+            "Kontoauszug importieren {}",
+            number_label(p.number, p.year)
+        ),
         changes,
     );
     match db.write(op, source) {

@@ -39,28 +39,47 @@ pub fn question_views(
         .collect()
 }
 
-fn plural(n: usize, one: &str, many: &str) -> String {
-    format!("{n} {}", if n == 1 { one } else { many })
-}
-
 /// `2 drafts to finish · 1 invoice and 2 answers missing`, with the share of done facts in percent.
 pub fn progress_text(facts: &Facts, unanswered: usize, questions: usize) -> (String, u32) {
     let mut missing = Vec::new();
-    if facts.missing_invoices > 0 {
-        missing.push(plural(facts.missing_invoices, "invoice", "invoices"));
+    let invoices = facts.missing_invoices;
+    if invoices > 0 {
+        missing.push(crate::tr_plural!(
+            invoices,
+            "{invoices} invoice",
+            "{invoices} invoices",
+            "{invoices} Rechnung",
+            "{invoices} Rechnungen"
+        ));
     }
     if unanswered > 0 {
-        missing.push(plural(unanswered, "answer", "answers"));
+        missing.push(crate::tr_plural!(
+            unanswered,
+            "{unanswered} answer",
+            "{unanswered} answers",
+            "{unanswered} Antwort",
+            "{unanswered} Antworten"
+        ));
     }
     let mut parts = Vec::new();
-    if facts.drafts > 0 {
-        parts.push(format!(
-            "{} to finish",
-            plural(facts.drafts, "draft", "drafts")
+    let drafts = facts.drafts;
+    if drafts > 0 {
+        parts.push(crate::tr_plural!(
+            drafts,
+            "{drafts} draft to finish",
+            "{drafts} drafts to finish",
+            "{drafts} Entwurf abzuschließen",
+            "{drafts} Entwürfe abzuschließen"
         ));
     }
     if !missing.is_empty() {
-        parts.push(format!("{} missing", missing.join(" and ")));
+        let only_one = invoices + unanswered == 1;
+        let list = missing.join(&crate::tr!(" and ", " und "));
+        parts.push(if only_one {
+            crate::tr!("{list} missing", "{list} fehlt")
+        } else {
+            crate::tr!("{list} missing", "{list} fehlen")
+        });
     }
     let open = facts.drafts + facts.missing_invoices + unanswered;
     let done = facts.finished + (questions - unanswered);
@@ -68,7 +87,7 @@ pub fn progress_text(facts: &Facts, unanswered: usize, questions: usize) -> (Str
         .checked_div(open + done)
         .map_or(100, |p| p as u32);
     let text = if parts.is_empty() {
-        "Ready to close".to_string()
+        crate::tr!("Ready to close", "Bereit zum Abschließen")
     } else {
         parts.join(" · ")
     };
@@ -102,7 +121,10 @@ pub fn kennzahlen(
                         .then(|| notes::note(item, &ruleset.questions, given, format))
                         .flatten()
                 } else {
-                    Some("Reported by others; shown for reference, never counted here".into())
+                    Some(crate::tr!(
+                        "Reported by others; shown for reference, never counted here",
+                        "Von anderen gemeldet; nur zur Information, hier nie gezählt"
+                    ))
                 },
                 rows: own
                     .into_iter()
@@ -142,7 +164,7 @@ pub fn months(placed: &[&Placed], format: NumberFormat) -> Vec<MonthView> {
         .into_iter()
         .map(|(month, rows)| MonthView {
             label: if month == 0 {
-                "Whole year".to_string()
+                crate::tr!("Whole year", "Ganzes Jahr")
             } else {
                 date::month_name(month).to_string()
             },
@@ -159,8 +181,9 @@ pub fn pauschale_note(ruleset: &Ruleset, total: i64, format: NumberFormat) -> Op
         .as_ref()
         .filter(|p| total < p.0)
         .map(|p| {
-            format!(
+            crate::tr!(
                 "Below the {} Werbungskostenpauschale, which the tax office applies anyway.",
+                "Unter der Werbungskostenpauschale von {}, die das Finanzamt ohnehin anrechnet.",
                 eur(p.0, format)
             )
         })

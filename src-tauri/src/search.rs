@@ -12,6 +12,7 @@ use crate::error::AppResult;
 use crate::review::title_of;
 use crate::settings::NumberFormat;
 use crate::statements::store as statements;
+use crate::{tr, tr_plural};
 
 /// Where a match leads.
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
@@ -38,10 +39,6 @@ pub struct Elsewhere {
     /// `Tax year 2026`, `All documents`, `Private`.
     pub place: String,
     pub target: Target,
-}
-
-fn plural(n: usize, one: &str, many: &str) -> String {
-    format!("{n} {}", if n == 1 { one } else { many })
 }
 
 /// The documents and each account's bank lines that contain `query`.
@@ -72,8 +69,17 @@ pub fn elsewhere(
             },
         }),
         many => out.push(Elsewhere {
-            label: plural(many.len(), "document", "documents"),
-            place: "All documents".into(),
+            label: {
+                let count = many.len();
+                tr_plural!(
+                    count,
+                    "{count} document",
+                    "{count} documents",
+                    "{count} Beleg",
+                    "{count} Belege"
+                )
+            },
+            place: tr!("All documents", "Alle Belege"),
             target: Target::Documents,
         }),
     }
@@ -90,7 +96,13 @@ pub fn elsewhere(
             .count();
         if count > 0 {
             out.push(Elsewhere {
-                label: plural(count, "line", "lines"),
+                label: tr_plural!(
+                    count,
+                    "{count} line",
+                    "{count} lines",
+                    "{count} Buchung",
+                    "{count} Buchungen"
+                ),
                 place: account.name.clone(),
                 target: Target::Account {
                     account_id: account.id.clone(),

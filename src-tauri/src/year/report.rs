@@ -57,17 +57,30 @@ pub fn summary_pdf(page: &YearPage, stamp: &str) -> Vec<u8> {
         LEFT,
         18.0,
         Font::HelveticaBold,
-        &format!("Tax year {} · Werbungskosten", page.year),
+        &crate::tr!(
+            "Tax year {} · Werbungskosten",
+            "Steuerjahr {} · Werbungskosten",
+            page.year
+        ),
     );
     w.line(18.0);
     w.text(
         LEFT,
         10.0,
         Font::Helvetica,
-        &format!("Ruleset {} · {stamp}", page.ruleset),
+        &crate::tr!(
+            "Ruleset {} · {stamp}",
+            "Regelwerk {} · {stamp}",
+            page.ruleset
+        ),
     );
     w.line(28.0);
-    w.text(LEFT, 12.0, Font::HelveticaBold, "Total to enter");
+    w.text(
+        LEFT,
+        12.0,
+        Font::HelveticaBold,
+        &crate::tr!("Total to enter", "Einzutragende Summe"),
+    );
     w.amount(12.0, &page.total);
     for kz in page.kennzahlen.iter().filter(|k| !k.rows.is_empty()) {
         w.line(26.0);
@@ -96,7 +109,12 @@ pub fn summary_pdf(page: &YearPage, stamp: &str) -> Vec<u8> {
     let answered: Vec<_> = page.questions.iter().filter(|q| q.answered).collect();
     if !answered.is_empty() {
         w.line(28.0);
-        w.text(LEFT, 11.0, Font::HelveticaBold, "Answers");
+        w.text(
+            LEFT,
+            11.0,
+            Font::HelveticaBold,
+            &crate::tr!("Answers", "Antworten"),
+        );
         for q in answered {
             w.line(15.0);
             w.text(LEFT + 16.0, 9.0, Font::Helvetica, &q.label);

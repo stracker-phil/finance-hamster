@@ -37,7 +37,11 @@ pub(super) fn entry_rows(
                 if item.evidence() == Evidence::Required && entry.evidence.is_none() {
                     facts.flag_missing_invoice(
                         format!("{} · {}", entry.text, eur(cents, format)),
-                        format!("KZ {} needs evidence before it counts", item.kz),
+                        crate::tr!(
+                            "KZ {} needs evidence before it counts",
+                            "KZ {} zählt erst mit Nachweis",
+                            item.kz
+                        ),
                         Some(entry.id.clone()),
                         None,
                     );
@@ -45,14 +49,18 @@ pub(super) fn entry_rows(
                         RowKind::Amount,
                         0,
                         None,
-                        format!("{} · not counted without evidence", eur(cents, format)),
+                        crate::tr!(
+                            "{} · not counted without evidence",
+                            "{} · zählt nicht ohne Nachweis",
+                            eur(cents, format)
+                        ),
                     )
                 } else {
                     (
                         RowKind::Amount,
                         cents,
                         None,
-                        "Amount for the year".to_string(),
+                        crate::tr!("Amount for the year", "Betrag für das Jahr"),
                     )
                 }
             }
@@ -69,7 +77,7 @@ pub(super) fn entry_rows(
         };
         let attach = entry.kind == EntryKind::Amount && entry.evidence.is_none();
         let title = if entry.text.is_empty() {
-            "Amount".to_string()
+            crate::tr!("Amount", "Betrag")
         } else {
             entry.text.clone()
         };

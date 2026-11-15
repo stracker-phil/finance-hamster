@@ -23,8 +23,9 @@ type Props = {
   onCloseInput: () => void;
 };
 
-/** `Add Trip to KZ 721` reads `Trip to KZ 721` after "Added 1 ·". */
-const shortLabel = (label: string) => label.replace(/^Add /, "");
+/** The op label without its verb, which "Added 1 ·" already says: `Add Trip to KZ 721` → `Trip to KZ 721`,
+ * `Fahrt zu KZ 721 hinzufügen` → `Fahrt zu KZ 721`. */
+const shortLabel = (label: string) => label.replace(/^Add /, "").replace(/ hinzufügen$/, "");
 
 /** One question of the year check. */
 export function CheckRow(p: Props) {

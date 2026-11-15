@@ -61,93 +61,130 @@ fn is_month_day(s: &str) -> bool {
 
 fn schema_constraints(r: &Ruleset, p: &mut Vec<String>) {
     if r.schema_version != SCHEMA_VERSION {
-        p.push(format!(
+        p.push(crate::tr!(
             "schemaVersion: this Hamster reads version {SCHEMA_VERSION}, not {}",
+            "schemaVersion: Dieser Hamster liest Version {SCHEMA_VERSION}, nicht {}",
             r.schema_version
         ));
     }
     if !is_ruleset_name(&r.ruleset) {
-        p.push(format!(
+        p.push(crate::tr!(
             "ruleset: \"{}\" should read like \"2026 v1\"",
+            "ruleset: „{}“ sollte wie „2026 v1“ aussehen",
             r.ruleset
         ));
     }
     if !(2000..=2100).contains(&r.year) {
-        p.push(format!("year: {} is outside 2000 to 2100", r.year));
+        p.push(crate::tr!(
+            "year: {} is outside 2000 to 2100",
+            "year: {} liegt nicht zwischen 2000 und 2100",
+            r.year
+        ));
     }
     if !is_month_day(&r.settings.half_year_from) {
-        p.push(format!(
+        p.push(crate::tr!(
             "settings.halfYearFrom: \"{}\" isn't a MM-DD day",
+            "settings.halfYearFrom: „{}“ ist kein Tag im Format MM-DD",
             r.settings.half_year_from
         ));
     }
     for (class, years) in &r.useful_life {
         if !(1..=50).contains(years) {
-            p.push(format!(
-                "usefulLife.{class}: {years} is outside 1 to 50 years"
+            p.push(crate::tr!(
+                "usefulLife.{class}: {years} is outside 1 to 50 years",
+                "usefulLife.{class}: {years} liegt nicht zwischen 1 und 50 Jahren"
             ));
         }
     }
     for (i, rate) in r.rates.kilometergeld.iter().enumerate() {
         for (field, value) in [("from", &rate.from), ("to", &rate.to)] {
             if date(value).is_none() {
-                p.push(format!(
-                    "rates.kilometergeld[{i}].{field}: \"{value}\" isn't a YYYY-MM-DD date"
+                p.push(crate::tr!(
+                    "rates.kilometergeld[{i}].{field}: \"{value}\" isn't a YYYY-MM-DD date",
+                    "rates.kilometergeld[{i}].{field}: „{value}“ ist kein Datum im Format YYYY-MM-DD"
                 ));
             }
         }
     }
     for (i, q) in r.questions.iter().enumerate() {
         if !is_key(&q.id) {
-            p.push(format!("questions[{i}].id: \"{}\" isn't a key", q.id));
+            p.push(crate::tr!(
+                "questions[{i}].id: \"{}\" isn't a key",
+                "questions[{i}].id: „{}“ ist kein Schlüssel",
+                q.id
+            ));
         }
         ask_text(q.ask.as_ref(), &format!("questions[{i}]"), p);
     }
     if r.sections.is_empty() {
-        p.push("sections: at least one section is needed".into());
+        p.push(crate::tr!(
+            "sections: at least one section is needed",
+            "sections: Mindestens ein Abschnitt ist nötig"
+        ));
     }
     for (i, s) in r.sections.iter().enumerate() {
         if !is_key(&s.id) {
-            p.push(format!("sections[{i}].id: \"{}\" isn't a key", s.id));
+            p.push(crate::tr!(
+                "sections[{i}].id: \"{}\" isn't a key",
+                "sections[{i}].id: „{}“ ist kein Schlüssel",
+                s.id
+            ));
         }
     }
     if r.items.is_empty() {
-        p.push("items: at least one item is needed".into());
+        p.push(crate::tr!(
+            "items: at least one item is needed",
+            "items: Mindestens ein Posten ist nötig"
+        ));
     }
     for (i, item) in r.items.iter().enumerate() {
         let at = format!("items[{i}]");
         if !is_key(&item.key) {
-            p.push(format!("{at}.key: \"{}\" isn't a key", item.key));
+            p.push(crate::tr!(
+                "{at}.key: \"{}\" isn't a key",
+                "{at}.key: „{}“ ist kein Schlüssel",
+                item.key
+            ));
         }
         if !is_kz(&item.kz) {
-            p.push(format!(
+            p.push(crate::tr!(
                 "{at}.kz: \"{}\" should read like \"717\" or \"718/916\"",
+                "{at}.kz: „{}“ sollte wie „717“ oder „718/916“ aussehen",
                 item.kz
             ));
         }
         if item.private_share.is_some_and(|share| share > 100) {
-            p.push(format!("{at}.privateShare: more than 100 percent"));
+            p.push(crate::tr!(
+                "{at}.privateShare: more than 100 percent",
+                "{at}.privateShare: mehr als 100 Prozent"
+            ));
         }
         if item.kind == ItemKind::Trips && item.vehicle.is_none() {
-            p.push(format!("{at}.vehicle: a trips item needs a vehicle"));
+            p.push(crate::tr!(
+                "{at}.vehicle: a trips item needs a vehicle",
+                "{at}.vehicle: Ein Fahrten-Posten braucht ein Fahrzeug"
+            ));
         }
         if item.kind == ItemKind::ReportedByOthers
             && item.evidence.is_some_and(|e| e != Evidence::None)
         {
-            p.push(format!(
-                "{at}.evidence: an item reported by others takes no evidence"
+            p.push(crate::tr!(
+                "{at}.evidence: an item reported by others takes no evidence",
+                "{at}.evidence: Ein von anderen gemeldeter Posten nimmt keinen Nachweis"
             ));
         }
         ask_text(item.ask.as_ref(), &at, p);
         if item.ask.is_some() {
             if !item.visible {
-                p.push(format!(
-                    "{at}.ask: a hidden item can't be asked about; show it or remove ask"
+                p.push(crate::tr!(
+                    "{at}.ask: a hidden item can't be asked about; show it or remove ask",
+                    "{at}.ask: Nach einem verborgenen Posten kann nicht gefragt werden; zeig ihn oder entferne ask"
                 ));
             }
             if item.kind == ItemKind::ReportedByOthers {
-                p.push(format!(
-                    "{at}.ask: an item reported by others has nothing to add"
+                p.push(crate::tr!(
+                    "{at}.ask: an item reported by others has nothing to add",
+                    "{at}.ask: Zu einem von anderen gemeldeten Posten gibt es nichts hinzuzufügen"
                 ));
             }
         }
@@ -156,21 +193,36 @@ fn schema_constraints(r: &Ruleset, p: &mut Vec<String>) {
 
 fn ask_text(ask: Option<&Ask>, at: &str, p: &mut Vec<String>) {
     if ask.is_some_and(|a| a.question.trim().is_empty()) {
-        p.push(format!("{at}.ask.question: the question is empty"));
+        p.push(crate::tr!(
+            "{at}.ask.question: the question is empty",
+            "{at}.ask.question: Die Frage ist leer"
+        ));
     }
+}
+
+fn missing_question(at: &str, question: &str) -> String {
+    crate::tr!(
+        "{at}: the question \"{question}\" doesn't exist",
+        "{at}: Die Frage „{question}“ gibt es nicht"
+    )
 }
 
 fn reload_checks(r: &Ruleset, used_keys: &BTreeSet<String>, p: &mut Vec<String>) {
     let mut keys = BTreeSet::new();
     for item in &r.items {
         if !keys.insert(item.key.as_str()) {
-            p.push(format!("items: the key \"{}\" is used twice", item.key));
+            p.push(crate::tr!(
+                "items: the key \"{}\" is used twice",
+                "items: Der Schlüssel „{}“ kommt zweimal vor",
+                item.key
+            ));
         }
     }
     for key in used_keys {
         if !keys.contains(key.as_str()) {
-            p.push(format!(
-                "items: \"{key}\" is missing, but entries use it; keys can't be removed or renamed"
+            p.push(crate::tr!(
+                "items: \"{key}\" is missing, but entries use it; keys can't be removed or renamed",
+                "items: „{key}“ fehlt, wird aber von Einträgen verwendet; Schlüssel können nicht entfernt oder umbenannt werden"
             ));
         }
     }
@@ -183,16 +235,18 @@ fn reload_checks(r: &Ruleset, used_keys: &BTreeSet<String>, p: &mut Vec<String>)
     for (i, item) in r.items.iter().enumerate() {
         let at = format!("items[{i}] ({})", item.key);
         if !sections.contains(item.section.as_str()) {
-            p.push(format!(
+            p.push(crate::tr!(
                 "{at}: the section \"{}\" doesn't exist",
+                "{at}: Den Abschnitt „{}“ gibt es nicht",
                 item.section
             ));
         }
         if let Some(d) = &item.depreciation
             && !r.useful_life.contains_key(&d.asset_class)
         {
-            p.push(format!(
+            p.push(crate::tr!(
                 "{at}: the asset class \"{}\" has no usefulLife",
+                "{at}: Die Anlagenklasse „{}“ hat kein usefulLife",
                 d.asset_class
             ));
         }
@@ -201,12 +255,13 @@ fn reload_checks(r: &Ruleset, used_keys: &BTreeSet<String>, p: &mut Vec<String>)
                 EstimateRule::Requires { question, .. }
                     if !questions.contains_key(question.as_str()) =>
                 {
-                    p.push(format!("{at}: the question \"{question}\" doesn't exist"));
+                    p.push(missing_question(&at, question));
                 }
                 EstimateRule::ReduceBy { question } => match questions.get(question.as_str()) {
-                    None => p.push(format!("{at}: the question \"{question}\" doesn't exist")),
-                    Some(QuestionType::Integer) => p.push(format!(
-                        "{at}: reduceBy needs an amount question, \"{question}\" is an integer"
+                    None => p.push(missing_question(&at, question)),
+                    Some(QuestionType::Integer) => p.push(crate::tr!(
+                        "{at}: reduceBy needs an amount question, \"{question}\" is an integer",
+                        "{at}: reduceBy braucht eine Betragsfrage, „{question}“ ist eine ganze Zahl"
                     )),
                     Some(QuestionType::Amount) => {}
                 },
@@ -221,8 +276,9 @@ fn reload_checks(r: &Ruleset, used_keys: &BTreeSet<String>, p: &mut Vec<String>)
                 .iter()
                 .any(|rate| rate.vehicle == vehicle)
         {
-            p.push(format!(
+            p.push(crate::tr!(
                 "{at}: there is no kilometergeld rate for the vehicle \"{}\"",
+                "{at}: Für das Fahrzeug „{}“ gibt es keinen kilometergeld-Satz",
                 vehicle.as_str()
             ));
         }
@@ -241,10 +297,17 @@ fn km_ranges(r: &Ruleset, p: &mut Vec<String>) {
         };
         let at = format!("rates.kilometergeld[{i}]");
         if from > to {
-            p.push(format!("{at}: from is after to"));
+            p.push(crate::tr!(
+                "{at}: from is after to",
+                "{at}: from liegt nach to"
+            ));
         }
         if Some(from) < first || Some(to) > last {
-            p.push(format!("{at}: the range falls outside {}", r.year));
+            p.push(crate::tr!(
+                "{at}: the range falls outside {}",
+                "{at}: Der Zeitraum liegt außerhalb von {}",
+                r.year
+            ));
         }
         by_vehicle
             .entry(rate.vehicle)
@@ -256,8 +319,9 @@ fn km_ranges(r: &Ruleset, p: &mut Vec<String>) {
         for pair in ranges.windows(2) {
             let ((_, end, a), (start, _, b)) = (pair[0], pair[1]);
             if start <= end {
-                p.push(format!(
-                    "rates.kilometergeld[{a}] and [{b}]: the ranges overlap"
+                p.push(crate::tr!(
+                    "rates.kilometergeld[{a}] and [{b}]: the ranges overlap",
+                    "rates.kilometergeld[{a}] und [{b}]: Die Zeiträume überschneiden sich"
                 ));
             }
         }

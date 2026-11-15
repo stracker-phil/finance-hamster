@@ -9,6 +9,7 @@ use ts_rs::TS;
 
 use crate::db::{Change, Db, Op, Source, Written};
 use crate::error::{AppError, AppResult};
+use crate::tr;
 
 pub const TABLE: &str = "accounts";
 
@@ -158,7 +159,7 @@ fn required_name(value: &str) -> AppResult<String> {
     if value.is_empty() {
         return Err(AppError::InvalidField {
             field: "account.name".into(),
-            message: "The name can't be empty".into(),
+            message: tr!("The name can't be empty", "Der Name darf nicht leer sein"),
         });
     }
     Ok(value.to_string())
@@ -168,12 +169,15 @@ pub fn add(db: &Db, input: NewAccount, now: i64) -> AppResult<(Account, Written)
     let name = required_name(&input.name)?;
     let iban = normalize_iban(&input.iban).ok_or_else(|| AppError::InvalidField {
         field: "account.iban".into(),
-        message: "This isn't a valid IBAN".into(),
+        message: tr!("This isn't a valid IBAN", "Das ist keine gültige IBAN"),
     })?;
     if db.read(rows)?.iter().any(|a| a.iban == iban) {
         return Err(AppError::InvalidField {
             field: "account.iban".into(),
-            message: "An account with this IBAN exists".into(),
+            message: tr!(
+                "An account with this IBAN exists",
+                "Ein Konto mit dieser IBAN gibt es schon"
+            ),
         });
     }
     let row = AccountRow {
@@ -186,7 +190,7 @@ pub fn add(db: &Db, input: NewAccount, now: i64) -> AppResult<(Account, Written)
         statement_name: optional(input.statement_name),
     };
     let op = Op::new(
-        format!("Add Account {name}"),
+        tr!("Add Account {name}", "Konto {name} hinzufügen"),
         vec![Change::insert(TABLE, &row)?],
     );
     let written = db.write(op, Source::Ui)?;
@@ -196,7 +200,7 @@ pub fn add(db: &Db, input: NewAccount, now: i64) -> AppResult<(Account, Written)
 pub fn edit(db: &Db, id: &str, input: AccountEdit) -> AppResult<Written> {
     let before = db
         .read(|c| row(c, id))?
-        .ok_or_else(|| AppError::NotFound(format!("No account {id}")))?;
+        .ok_or_else(|| AppError::NotFound(tr!("No account {id}", "Kein Konto {id}")))?;
     let after = AccountRow {
         name: required_name(&input.name)?,
         bank: input.bank.trim().to_string(),
@@ -216,7 +220,10 @@ pub fn edit(db: &Db, id: &str, input: AccountEdit) -> AppResult<Written> {
         let now = chrono::Utc::now().timestamp_millis();
         changes.extend(db.read(|c| crate::rules::apply::changes_with_own(c, &own, now))?);
     }
-    let op = Op::new(format!("Edit Account {}", after.name), changes);
+    let op = Op::new(
+        tr!("Edit Account {}", "Konto {} bearbeiten", after.name),
+        changes,
+    );
     db.write(op, Source::Ui)
 }
 

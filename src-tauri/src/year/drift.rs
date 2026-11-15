@@ -29,9 +29,14 @@ pub fn restore_filed(
         }
         changed.push(AttentionView {
             kind: AttentionKind::ChangedSinceClosing,
-            title: format!("KZ {} changed since closing", k.kz),
-            detail: format!(
+            title: crate::tr!(
+                "KZ {} changed since closing",
+                "KZ {} hat sich seit dem Abschluss geändert",
+                k.kz
+            ),
+            detail: crate::tr!(
                 "Filed {value}; the data now gives {}. Reopen the year to look into it.",
+                "Eingereicht {value}; die Daten ergeben jetzt {}. Öffne das Jahr wieder, um es zu prüfen.",
                 k.copy
             ),
             document_id: None,

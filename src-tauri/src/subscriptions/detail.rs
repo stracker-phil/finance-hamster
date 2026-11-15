@@ -13,8 +13,10 @@ use super::view::{Format, interval_text, letter};
 use crate::accounts::AccountRow;
 use crate::date;
 use crate::error::{AppError, AppResult};
+use crate::i18n::Text;
 use crate::money::format_plain;
 use crate::rules::ItemOption;
+use crate::tr;
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
 #[serde(rename_all = "camelCase")]
@@ -82,11 +84,14 @@ pub struct SubscriptionDetail {
 
 fn relative(days: i64) -> String {
     match days {
-        0 => "today".into(),
-        1 => "tomorrow".into(),
-        -1 => "yesterday".into(),
-        n if n < 0 => format!("{} days ago", -n),
-        n => format!("in {n} days"),
+        0 => tr!("today", "heute"),
+        1 => tr!("tomorrow", "morgen"),
+        -1 => tr!("yesterday", "gestern"),
+        n if n < 0 => {
+            let ago = -n;
+            tr!("{ago} days ago", "vor {ago} Tagen")
+        }
+        n => tr!("in {n} days", "in {n} Tagen"),
     }
 }
 
@@ -101,7 +106,10 @@ fn price(plan: &PlanRow, format: &Format) -> String {
 fn when(plan: &PlanRow, format: &Format) -> String {
     let start = date::parse(&plan.start);
     match (start, plan.end.as_deref().and_then(date::parse)) {
-        (Some(s), None) => format!("since {}", date::day_month_year(s, format.order)),
+        (Some(s), None) => {
+            let day = date::day_month_year(s, format.order);
+            tr!("since {day}", "seit {day}")
+        }
         (Some(s), Some(e)) => format!(
             "{} – {}",
             date::day_month(s, format.order),
@@ -127,7 +135,7 @@ fn timeline(plans: &[&PlanRow], sub: &SubscriptionRow, year: i32) -> Vec<Timelin
                 plan: plan.map(|i| i as u32),
                 tip: match plan {
                     Some(i) => format!("{name}: {}", plans[i].name),
-                    None => format!("{name}: no plan"),
+                    None => tr!("{name}: no plan", "{name}: kein Tarif"),
                 },
             }
         })
@@ -162,7 +170,7 @@ pub fn detail(
 ) -> AppResult<SubscriptionDetail> {
     let sub = book
         .find(id)
-        .ok_or_else(|| AppError::NotFound(format!("No subscription {id}")))?;
+        .ok_or_else(|| AppError::NotFound(tr!("No subscription {id}", "Kein Abo {id}")))?;
     let running = book.running(sub);
     let current = running.current(today);
     let next = running.next_charge(today).map(|n| {
@@ -172,25 +180,28 @@ pub fn detail(
             relative((n - today).num_days())
         )
     });
-    let per = current.map_or("", |p| match p.interval {
-        Interval::Monthly => " / month",
-        Interval::Quarterly => " / quarter",
-        Interval::Yearly => " / year",
+    let per = current.map_or("", |p| {
+        match p.interval {
+            Interval::Monthly => Text::new(" / month", " / Monat"),
+            Interval::Quarterly => Text::new(" / quarter", " / Quartal"),
+            Interval::Yearly => Text::new(" / year", " / Jahr"),
+        }
+        .get()
     });
     let amount = running
         .charge_cents(today)
         .map_or_else(String::new, |c| format!("{}{per}", format.eur(c)));
     let anv = match &sub.item_key {
-        Some(key) => items
-            .iter()
-            .find(|i| &i.key == key)
-            .map_or_else(|| format!("Yes · {key}"), |i| format!("Yes · {}", i.label)),
-        None => "No".into(),
+        Some(key) => items.iter().find(|i| &i.key == key).map_or_else(
+            || tr!("Yes · {key}", "Ja · {key}"),
+            |i| tr!("Yes · {}", "Ja · {}", i.label),
+        ),
+        None => tr!("No", "Nein"),
     };
     let amount_rule = if sub.exact_only {
-        "exact amount only"
+        tr!("exact amount only", "nur der genaue Betrag")
     } else {
-        "another amount asks"
+        tr!("another amount asks", "ein anderer Betrag fragt nach")
     };
     let charges = running
         .charges
@@ -219,11 +230,10 @@ pub fn detail(
         interval: interval_text(current, format),
         amount,
         next,
-        ended: sub
-            .ended_on
-            .as_deref()
-            .and_then(date::parse)
-            .map(|d| format!("Ended {}", date::day_month_year(d, format.order))),
+        ended: sub.ended_on.as_deref().and_then(date::parse).map(|d| {
+            let day = date::day_month_year(d, format.order);
+            tr!("Ended {day}", "Beendet am {day}")
+        }),
         year,
         timeline: timeline(&running.plans, sub, year),
         plans: running
@@ -237,10 +247,13 @@ pub fn detail(
             .collect(),
         anv,
         reminder: sub.reminder.label().into(),
-        rule: format!(
-            "text contains {} · {amount_rule}",
-            sub.match_text.to_uppercase()
-        ),
+        rule: {
+            let text = sub.match_text.to_uppercase();
+            tr!(
+                "text contains {text} · {amount_rule}",
+                "Text enthält {text} · {amount_rule}"
+            )
+        },
         charges,
         form: form_of(sub, plan_on(&running.plans, &date::iso(today)), format),
         current_plan,

@@ -12,11 +12,13 @@ use super::schedule::Running;
 use super::store::{Interval, PlanRow, Reminder, SubscriptionRow};
 use crate::date::{self, DateOrder};
 use crate::error::{AppError, AppResult};
+use crate::i18n::Text;
 use crate::money::{Money, format_money, format_plain};
 use crate::review::{key_of, title_of};
 use crate::rules::ItemOption;
 use crate::settings::NumberFormat;
 use crate::statements::store::{self as statements, TransactionRow};
+use crate::tr;
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
 #[serde(rename_all = "camelCase")]
@@ -97,8 +99,8 @@ impl Format {
     /// `Tomorrow`, `Today`, `9 Dec`, or `9 Dec 2027` beyond a month.
     pub fn next(&self, next: NaiveDate, today: NaiveDate) -> String {
         match (next - today).num_days() {
-            0 => "Today".into(),
-            1 => "Tomorrow".into(),
+            0 => tr!("Today", "Heute"),
+            1 => tr!("Tomorrow", "Morgen"),
             n if n > 31 => date::day_month_year(next, self.order),
             _ => date::day_month(next, self.order),
         }
@@ -141,10 +143,11 @@ fn recent_change(running: &Running, today: NaiveDate, format: &Format) -> Option
         return None;
     }
     let sign = if difference > 0 { "+" } else { "\u{2212}" };
-    Some(format!(
-        "{sign}{} since {}",
-        format.money(difference.abs(), &last.currency),
-        date::short_month(start)
+    let amount = format.money(difference.abs(), &last.currency);
+    let month = date::short_month(start);
+    Some(tr!(
+        "{sign}{amount} since {month}",
+        "{sign}{amount} seit {month}"
     ))
 }
 
@@ -175,17 +178,18 @@ fn ended_view(running: &Running, today: NaiveDate, format: &Format) -> EndedRowV
         .ended_on
         .as_deref()
         .and_then(date::parse)
-        .map(|d| format!("Ended {}", date::day_month_year(d, format.order)))
+        .map(|d| {
+            let day = date::day_month_year(d, format.order);
+            tr!("Ended {day}", "Beendet am {day}")
+        })
         .unwrap_or_default();
     if let Some(last) = running
         .charges
         .last()
         .and_then(|c| date::parse(&c.value_date))
     {
-        ended.push_str(&format!(
-            " · last charge {}",
-            date::day_month_year(last, format.order)
-        ));
+        let day = date::day_month_year(last, format.order);
+        ended.push_str(&tr!(" · last charge {day}", " · letzte Abbuchung {day}"));
     }
     EndedRowView {
         id: sub.id.clone(),
@@ -197,10 +201,10 @@ fn ended_view(running: &Running, today: NaiveDate, format: &Format) -> EndedRowV
     }
 }
 
-const GROUPS: [(&str, i64, i64); 3] = [
-    ("Next 7 days", i64::MIN, 7),
-    ("Next 30 days", 8, 31),
-    ("Later", 32, i64::MAX),
+const GROUPS: [(Text, i64, i64); 3] = [
+    (Text::new("Next 7 days", "Nächste 7 Tage"), i64::MIN, 7),
+    (Text::new("Next 30 days", "Nächste 30 Tage"), 8, 31),
+    (Text::new("Later", "Später"), 32, i64::MAX),
 ];
 
 /// `query` keeps the subscriptions whose name or category contains it.
@@ -249,7 +253,7 @@ pub fn subscriptions(
                 .filter(|(next, ..)| (from..=to).contains(&&(*next - today).num_days()))
                 .collect();
             (!rows.is_empty()).then(|| SubscriptionGroup {
-                label: (*label).into(),
+                label: label.get().into(),
                 total: format.eur(rows.iter().map(|(.., c)| c).sum()),
                 rows: rows.into_iter().map(|(_, row, _)| row.clone()).collect(),
             })
@@ -264,7 +268,13 @@ pub fn subscriptions(
     categories.sort();
     categories.dedup();
     SubscriptionsView {
-        summary: format!("{count} active · {} per month", format.eur(monthly)),
+        summary: {
+            let monthly = format.eur(monthly);
+            tr!(
+                "{count} active · {monthly} per month",
+                "{count} aktiv · {monthly} pro Monat"
+            )
+        },
         groups,
         ended,
         empty: book.subscriptions.is_empty(),
@@ -323,15 +333,24 @@ pub fn match_count(
         .filter_map(|l| date::parse(&l.value_date))
         .max();
     let text = match (count, last) {
-        (0, _) | (_, None) => "No charge in the statements matches yet".into(),
-        (1, Some(last)) => format!(
-            "Matches 1 charge, on {}",
-            date::day_month_year(last, format.order)
+        (0, _) | (_, None) => tr!(
+            "No charge in the statements matches yet",
+            "Noch keine Abbuchung in den Kontoauszügen passt"
         ),
-        (n, Some(last)) => format!(
-            "Matches {n} charges, the last on {}",
-            date::day_month_year(last, format.order)
-        ),
+        (1, Some(last)) => {
+            let day = date::day_month_year(last, format.order);
+            tr!(
+                "Matches 1 charge, on {day}",
+                "Passt zu 1 Abbuchung, am {day}"
+            )
+        }
+        (n, Some(last)) => {
+            let day = date::day_month_year(last, format.order);
+            tr!(
+                "Matches {n} charges, the last on {day}",
+                "Passt zu {n} Abbuchungen, die letzte am {day}"
+            )
+        }
     };
     MatchCount { text, count }
 }
@@ -345,7 +364,7 @@ pub fn prefill(
     format: &Format,
 ) -> AppResult<SubscriptionForm> {
     let line = statements::transaction_by_id(conn, line_id)?
-        .ok_or_else(|| AppError::NotFound(format!("No line {line_id}")))?;
+        .ok_or_else(|| AppError::NotFound(tr!("No line {line_id}", "Keine Buchung {line_id}")))?;
     let match_text = crate::review::rule_term(&line, term)?;
     // The first charge is the oldest line of the account with that text, not the one being reviewed.
     let start = statements::all_transactions(conn)?

@@ -11,6 +11,7 @@ use ts_rs::TS;
 
 use crate::db::Db;
 use crate::error::{AppError, AppResult};
+use crate::tr;
 
 #[derive(Deserialize, Clone, Copy, Debug, PartialEq, Eq, TS)]
 #[serde(rename_all = "snake_case")]
@@ -56,8 +57,14 @@ pub fn resolve(db: &Db, config_dir: &Path, source: &PdfSource) -> AppResult<Path
             .read(|c| crate::statements::store::statement_by_id(c, &source.id))?
             .map(|s| s.file),
     };
-    file.map(|f| config_dir.join(f))
-        .ok_or_else(|| AppError::NotFound(format!("No PDF for {:?} {}", source.kind, source.id)))
+    file.map(|f| config_dir.join(f)).ok_or_else(|| {
+        AppError::NotFound(tr!(
+            "No PDF for {:?} {}",
+            "Kein PDF für {:?} {}",
+            source.kind,
+            source.id
+        ))
+    })
 }
 
 #[cfg(test)]

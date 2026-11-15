@@ -114,10 +114,10 @@ export function depreciationView(patch: Partial<DepreciationView> = {}): Depreci
     own: false,
     why: "€1,500.00 is above the GWG limit, so it is spread over its useful life",
     slices: [
-      { year: 2026, amount: "€250.00", note: "half year" },
-      { year: 2027, amount: "€500.00", note: null },
-      { year: 2028, amount: "€500.00", note: null },
-      { year: 2029, amount: "€250.00", note: null },
+      { year: 2026, amount: "€250.00", note: "half year", frozen: false },
+      { year: 2027, amount: "€500.00", note: null, frozen: false },
+      { year: 2028, amount: "€500.00", note: null, frozen: false },
+      { year: 2029, amount: "€250.00", note: null, frozen: false },
     ],
     ...patch,
   };

@@ -46,12 +46,18 @@ pub fn rule_delete(app: AppHandle, state: State<'_, AppState>, id: String) -> Ap
 #[tauri::command]
 pub fn rules_rerun(app: AppHandle, state: State<'_, AppState>) -> AppResult<String> {
     Ok(match super::rerun(&state.db, now(), Source::Ui)? {
-        None => "Rules applied · no line changed".into(),
+        None => crate::tr!(
+            "Rules applied · no line changed",
+            "Regeln angewendet · keine Buchung geändert"
+        ),
         Some((written, lines)) => {
             announce(&app, &written);
-            format!(
-                "Rules applied · {lines} {} changed",
-                if lines == 1 { "line" } else { "lines" }
+            crate::tr_plural!(
+                lines,
+                "Rules applied · {lines} line changed",
+                "Rules applied · {lines} lines changed",
+                "Regeln angewendet · {lines} Buchung geändert",
+                "Regeln angewendet · {lines} Buchungen geändert"
             )
         }
     })

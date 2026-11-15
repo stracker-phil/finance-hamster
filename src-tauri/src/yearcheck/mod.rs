@@ -168,8 +168,9 @@ pub fn last_run(db: &Db, year: i32) -> AppResult<Option<NaiveDate>> {
 }
 
 fn year_row(db: &Db, year: i32) -> AppResult<taxyears::TaxYearRow> {
-    db.read(|c| taxyears::row(c, year))?
-        .ok_or_else(|| AppError::NotFound(format!("No tax year {year}")))
+    db.read(|c| taxyears::row(c, year))?.ok_or_else(|| {
+        AppError::NotFound(crate::tr!("No tax year {year}", "Kein Steuerjahr {year}"))
+    })
 }
 
 fn ruleset_of(db: &Db, year: i32) -> AppResult<(taxyears::TaxYearRow, Ruleset)> {
@@ -222,24 +223,38 @@ pub fn view(
     let after_end = after_year_end(last, year);
     let label = last.map(|d| date::day_month_year(d, order));
     let line = match (&label, after_end, year_over) {
-        _ if checks.is_empty() => format!("Year check: rules-{year}.json asks nothing yet"),
-        (None, ..) => "Year check: not run yet".to_string(),
-        (Some(l), true, _) => format!("Year check: last run {l}"),
-        (Some(l), false, false) => format!("Year check: last run {l} · run it again after 31 Dec"),
-        (Some(l), false, true) => {
-            format!("Year check: last run {l} · purchases and trips since then may be missing")
-        }
+        _ if checks.is_empty() => crate::tr!(
+            "Year check: rules-{year}.json asks nothing yet",
+            "Jahrescheck: rules-{year}.json fragt noch nichts"
+        ),
+        (None, ..) => crate::tr!("Year check: not run yet", "Jahrescheck: noch nicht gemacht"),
+        (Some(l), true, _) => crate::tr!("Year check: last run {l}", "Jahrescheck: zuletzt am {l}"),
+        (Some(l), false, false) => crate::tr!(
+            "Year check: last run {l} · run it again after 31 Dec",
+            "Jahrescheck: zuletzt am {l} · nach dem 31. Dez. noch einmal machen"
+        ),
+        (Some(l), false, true) => crate::tr!(
+            "Year check: last run {l} · purchases and trips since then may be missing",
+            "Jahrescheck: zuletzt am {l} · Käufe und Fahrten seither fehlen vielleicht"
+        ),
     };
     let count = checks.len();
     let close_prompt = (count > 0 && !after_end).then(|| {
-        let minute = format!(
-            "It takes a minute: {count} question{}, most answered with No.",
-            if count == 1 { "" } else { "s" }
+        let minute = crate::tr_plural!(
+            count,
+            "It takes a minute: {count} question, most answered with No.",
+            "It takes a minute: {count} questions, most answered with No.",
+            "Dauert eine Minute: {count} Frage, meist mit Nein beantwortet.",
+            "Dauert eine Minute: {count} Fragen, meist mit Nein beantwortet."
         );
         match &label {
-            None => format!("The year check for {year} hasn't run yet. {minute}"),
-            Some(l) => format!(
-                "The last year check for {year} was on {l}, before the year ended. Purchases and trips since then may be missing. {minute}"
+            None => crate::tr!(
+                "The year check for {year} hasn't run yet. {minute}",
+                "Der Jahrescheck für {year} wurde noch nicht gemacht. {minute}"
+            ),
+            Some(l) => crate::tr!(
+                "The last year check for {year} was on {l}, before the year ended. Purchases and trips since then may be missing. {minute}",
+                "Der letzte Jahrescheck für {year} war am {l}, vor dem Jahresende. Käufe und Fahrten seither fehlen vielleicht. {minute}"
             ),
         }
     });
@@ -257,8 +272,9 @@ pub fn view(
 /// Records a completed run of an open year: one op, undoable like any other.
 pub fn complete(db: &Db, year: i32, now: i64, source: Source) -> AppResult<Written> {
     if year_row(db, year)?.state == YearState::Closed {
-        return Err(AppError::InvalidInput(format!(
-            "Tax year {year} is closed; reopen it to run the year check"
+        return Err(AppError::InvalidInput(crate::tr!(
+            "Tax year {year} is closed; reopen it to run the year check",
+            "Das Steuerjahr {year} ist abgeschlossen; öffne es wieder, um den Jahrescheck zu machen"
         )));
     }
     let after = YearCheckRow {
@@ -271,7 +287,13 @@ pub fn complete(db: &Db, year: i32, now: i64, source: Source) -> AppResult<Writt
         None => Change::insert(TABLE, &after)?,
     };
     db.write(
-        Op::new(format!("Complete Year Check {year}"), vec![change]),
+        Op::new(
+            crate::tr!(
+                "Complete Year Check {year}",
+                "Jahrescheck {year} abschließen"
+            ),
+            vec![change],
+        ),
         source,
     )
 }

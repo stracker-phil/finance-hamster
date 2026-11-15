@@ -55,17 +55,27 @@ fn changed(app: &AppHandle) {
 
 /// Help → Show Data Folder: the folder holding the database, the journal and every PDF, in Finder.
 pub fn show_data_folder(_app: &AppHandle) -> AppResult<()> {
-    tauri_plugin_opener::reveal_item_in_dir(crate::config_dir())
-        .map_err(|e| AppError::Internal(format!("Couldn't show the data folder: {e}")))
+    tauri_plugin_opener::reveal_item_in_dir(crate::config_dir()).map_err(|e| {
+        AppError::Internal(crate::tr!(
+            "Couldn't show the data folder: {e}",
+            "Der Datenordner konnte nicht angezeigt werden: {e}"
+        ))
+    })
 }
 
 /// Help → Open Log Folder.
 pub fn open_log_folder(app: &AppHandle) -> AppResult<()> {
-    let dir = app
-        .path()
-        .app_log_dir()
-        .map_err(|e| AppError::Internal(format!("Couldn't find the log folder: {e}")))?;
+    let dir = app.path().app_log_dir().map_err(|e| {
+        AppError::Internal(crate::tr!(
+            "Couldn't find the log folder: {e}",
+            "Der Log-Ordner wurde nicht gefunden: {e}"
+        ))
+    })?;
     crate::store::json_file::create_private_dir(&dir)?;
-    tauri_plugin_opener::open_path(&dir, None::<&str>)
-        .map_err(|e| AppError::Internal(format!("Couldn't open the log folder: {e}")))
+    tauri_plugin_opener::open_path(&dir, None::<&str>).map_err(|e| {
+        AppError::Internal(crate::tr!(
+            "Couldn't open the log folder: {e}",
+            "Der Log-Ordner konnte nicht geöffnet werden: {e}"
+        ))
+    })
 }

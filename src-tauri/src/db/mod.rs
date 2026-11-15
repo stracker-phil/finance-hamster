@@ -21,6 +21,7 @@ pub use change::{Change, Row};
 
 use crate::error::{AppError, AppResult};
 use crate::lock::MutexExt;
+use crate::tr;
 use undo::UndoStack;
 
 pub const FILE_NAME: &str = "hamster.sqlite";
@@ -167,7 +168,10 @@ impl Db {
 
     fn apply(&self, op: &Op, source: Source) -> AppResult<Written> {
         if op.changes.is_empty() {
-            return Err(AppError::InvalidInput("Nothing to change".into()));
+            return Err(AppError::InvalidInput(tr!(
+                "Nothing to change",
+                "Nichts zu ändern"
+            )));
         }
         let mut conn = self.conn.lock_unpoisoned();
         let tx = conn.transaction()?;

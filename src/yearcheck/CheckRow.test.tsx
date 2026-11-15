@@ -116,6 +116,12 @@ describe("CheckRow after a Yes", () => {
     expect(screen.getByText(/Added 2 · Trip to KZ 721/)).toBeTruthy();
   });
 
+  it("says what was added without the trailing German hinzufügen", () => {
+    renderRow({ added: { count: 1, label: "Fahrt zu KZ 721 hinzufügen" } });
+
+    expect(screen.getByText(/Added 1 · Fahrt zu KZ 721$/)).toBeTruthy();
+  });
+
   it("offers Add Another and Done in place of Yes, No and Later", () => {
     renderRow({ added });
 

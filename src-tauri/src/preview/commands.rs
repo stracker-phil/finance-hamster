@@ -6,11 +6,13 @@ use super::PdfSource;
 use crate::error::{AppError, AppResult};
 use crate::platform::pdf_view::{self, Change, Frame};
 use crate::state::AppState;
+use crate::tr;
 use crate::window::MAIN;
 
 fn main_window(app: &AppHandle) -> AppResult<tauri::WebviewWindow> {
-    app.get_webview_window(MAIN)
-        .ok_or_else(|| AppError::Internal("The main window is gone".into()))
+    app.get_webview_window(MAIN).ok_or_else(|| {
+        AppError::Internal(tr!("The main window is gone", "Das Hauptfenster ist weg"))
+    })
 }
 
 fn change(app: &AppHandle, change: Change) -> AppResult<()> {

@@ -46,20 +46,26 @@ pub async fn rules_import(app: AppHandle) -> AppResult<Option<Imported>> {
     let (tx, rx) = tokio::sync::oneshot::channel();
     app.dialog()
         .file()
-        .set_title("Import a Rules File")
-        .add_filter("Rules file", &["json"])
+        .set_title(crate::tr!("Import a Rules File", "Regeldatei importieren"))
+        .add_filter(crate::tr!("Rules file", "Regeldatei"), &["json"])
         .pick_file(move |path| {
             let _ = tx.send(path);
         });
-    let chosen = rx
-        .await
-        .map_err(|_| AppError::Io("The file panel closed without an answer".into()))?;
+    let chosen = rx.await.map_err(|_| {
+        AppError::Io(crate::tr!(
+            "The file panel closed without an answer",
+            "Das Dateifenster wurde ohne Antwort geschlossen"
+        ))
+    })?;
     let Some(path) = chosen else {
         return Ok(None);
     };
-    let path = path
-        .into_path()
-        .map_err(|e| AppError::Io(format!("The chosen file isn't a file path: {e}")))?;
+    let path = path.into_path().map_err(|e| {
+        AppError::Io(crate::tr!(
+            "The chosen file isn't a file path: {e}",
+            "Die gewählte Datei ist kein Dateipfad: {e}"
+        ))
+    })?;
     let state = app.state::<AppState>();
     super::import_file(&state.db, &crate::config_dir(), &path).map(Some)
 }
@@ -73,13 +79,22 @@ pub fn rules_duplicate(state: State<'_, AppState>) -> AppResult<String> {
 #[tauri::command]
 pub fn rules_open(state: State<'_, AppState>, year: i32) -> AppResult<()> {
     let path = super::open_target(&state.db, &crate::config_dir(), year)?;
-    tauri_plugin_opener::open_path(&path, None::<&str>)
-        .map_err(|e| AppError::Internal(format!("Couldn't open {}: {e}", path.display())))
+    tauri_plugin_opener::open_path(&path, None::<&str>).map_err(|e| {
+        AppError::Internal(crate::tr!(
+            "Couldn't open {}: {e}",
+            "{} ließ sich nicht öffnen: {e}",
+            path.display()
+        ))
+    })
 }
 
 #[tauri::command]
 pub fn rules_show_folder() -> AppResult<()> {
     let dir = files::dir(&crate::config_dir());
-    tauri_plugin_opener::reveal_item_in_dir(&dir)
-        .map_err(|e| AppError::Internal(format!("Couldn't show the rules folder: {e}")))
+    tauri_plugin_opener::reveal_item_in_dir(&dir).map_err(|e| {
+        AppError::Internal(crate::tr!(
+            "Couldn't show the rules folder: {e}",
+            "Der Regelordner ließ sich nicht zeigen: {e}"
+        ))
+    })
 }

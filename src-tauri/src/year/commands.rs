@@ -53,17 +53,19 @@ pub fn year_answer(
 }
 
 fn year_row(state: &AppState, year: i32) -> AppResult<taxyears::TaxYearRow> {
-    state
-        .db
-        .read(|c| taxyears::row(c, year))?
-        .ok_or_else(|| AppError::NotFound(format!("No tax year {year}")))
+    state.db.read(|c| taxyears::row(c, year))?.ok_or_else(|| {
+        AppError::NotFound(crate::tr!("No tax year {year}", "Kein Steuerjahr {year}"))
+    })
 }
 
 /// The year's row, refused once the year is closed: its entries are frozen.
 fn open_year(state: &AppState, year: i32) -> AppResult<taxyears::TaxYearRow> {
     let row = year_row(state, year)?;
     if row.state == taxyears::YearState::Closed {
-        return Err(AppError::InvalidInput(format!("Tax year {year} is closed")));
+        return Err(AppError::InvalidInput(crate::tr!(
+            "Tax year {year} is closed",
+            "Das Steuerjahr {year} ist abgeschlossen"
+        )));
     }
     Ok(row)
 }
@@ -109,21 +111,29 @@ pub async fn year_evidence_choose(app: AppHandle) -> AppResult<Option<String>> {
     let (tx, rx) = tokio::sync::oneshot::channel();
     app.dialog()
         .file()
-        .set_title("Choose the Evidence PDF")
+        .set_title(crate::tr!("Choose the Evidence PDF", "Nachweis-PDF wählen"))
         .add_filter("PDF", &["pdf"])
         .pick_file(move |path| {
             let _ = tx.send(path);
         });
-    let chosen = rx
-        .await
-        .map_err(|_| AppError::Io("The file panel closed without an answer".into()))?;
+    let chosen = rx.await.map_err(|_| {
+        AppError::Io(crate::tr!(
+            "The file panel closed without an answer",
+            "Das Dateifenster wurde ohne Antwort geschlossen"
+        ))
+    })?;
     chosen.map(chosen_path).transpose()
 }
 
 fn chosen_path(path: FilePath) -> AppResult<String> {
     path.into_path()
         .map(|p| p.to_string_lossy().into_owned())
-        .map_err(|e| AppError::Io(format!("The chosen file isn't a file path: {e}")))
+        .map_err(|e| {
+            AppError::Io(crate::tr!(
+                "The chosen file isn't a file path: {e}",
+                "Die gewählte Datei ist kein Dateipfad: {e}"
+            ))
+        })
 }
 
 /// Attaches the PDF at `path` to an amount; returns the label of the change.
@@ -152,8 +162,13 @@ pub fn year_entry_attach(
 #[tauri::command]
 pub fn year_evidence_open(state: State<'_, AppState>, year: i32, id: String) -> AppResult<()> {
     let path = entries::evidence_path(&state.db, &crate::config_dir(), year, &id)?;
-    tauri_plugin_opener::open_path(&path, None::<&str>)
-        .map_err(|e| AppError::Internal(format!("Couldn't open {}: {e}", path.display())))
+    tauri_plugin_opener::open_path(&path, None::<&str>).map_err(|e| {
+        AppError::Internal(crate::tr!(
+            "Couldn't open {}: {e}",
+            "{} ließ sich nicht öffnen: {e}",
+            path.display()
+        ))
+    })
 }
 
 fn stamp(prefix: &str) -> String {
@@ -185,7 +200,7 @@ pub fn year_close(app: AppHandle, state: State<'_, AppState>, year: i32) -> AppR
         year,
         state.settings.get().number_format,
         DateOrder::system(),
-        &stamp("Closed on"),
+        &stamp(&crate::tr!("Closed on", "Abgeschlossen am")),
         chrono::Utc::now().timestamp_millis(),
         Source::Ui,
     )?;
@@ -204,8 +219,13 @@ pub fn year_reopen(app: AppHandle, state: State<'_, AppState>, year: i32) -> App
 #[tauri::command]
 pub fn year_open_snapshot(state: State<'_, AppState>, year: i32) -> AppResult<()> {
     let path = close::snapshot_file(&state.db, &crate::config_dir(), year)?;
-    tauri_plugin_opener::open_path(&path, None::<&str>)
-        .map_err(|e| AppError::Internal(format!("Couldn't open {}: {e}", path.display())))
+    tauri_plugin_opener::open_path(&path, None::<&str>).map_err(|e| {
+        AppError::Internal(crate::tr!(
+            "Couldn't open {}: {e}",
+            "{} ließ sich nicht öffnen: {e}",
+            path.display()
+        ))
+    })
 }
 
 /// Asks where to save the year's summary PDF and writes it; false when cancelled.
@@ -214,15 +234,24 @@ pub async fn year_export_summary(app: AppHandle, year: i32) -> AppResult<bool> {
     let (tx, rx) = tokio::sync::oneshot::channel();
     app.dialog()
         .file()
-        .set_title("Export Summary PDF")
-        .set_file_name(format!("Tax year {year} summary.pdf"))
+        .set_title(crate::tr!(
+            "Export Summary PDF",
+            "Zusammenfassung als PDF exportieren"
+        ))
+        .set_file_name(crate::tr!(
+            "Tax year {year} summary.pdf",
+            "Steuerjahr {year} Zusammenfassung.pdf"
+        ))
         .add_filter("PDF", &["pdf"])
         .save_file(move |path| {
             let _ = tx.send(path);
         });
-    let chosen = rx
-        .await
-        .map_err(|_| AppError::Io("The file panel closed without an answer".into()))?;
+    let chosen = rx.await.map_err(|_| {
+        AppError::Io(crate::tr!(
+            "The file panel closed without an answer",
+            "Das Dateifenster wurde ohne Antwort geschlossen"
+        ))
+    })?;
     let Some(path) = chosen.map(chosen_path).transpose()? else {
         return Ok(false);
     };
@@ -234,6 +263,9 @@ pub async fn year_export_summary(app: AppHandle, year: i32) -> AppResult<bool> {
         state.settings.get().number_format,
         DateOrder::system(),
     )?;
-    std::fs::write(&path, report::summary_pdf(&page, &stamp("Exported on")))?;
+    std::fs::write(
+        &path,
+        report::summary_pdf(&page, &stamp(&crate::tr!("Exported on", "Exportiert am"))),
+    )?;
     Ok(true)
 }

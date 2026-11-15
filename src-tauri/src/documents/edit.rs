@@ -12,6 +12,7 @@ use crate::error::{AppError, AppResult};
 use crate::money::parse_cents;
 use crate::rules;
 use crate::statements::store as statements;
+use crate::tr;
 
 /// One field of the Document page.
 #[derive(Deserialize, Clone, Debug, PartialEq, TS)]
@@ -56,10 +57,10 @@ pub enum DocumentEdit {
     },
 }
 
-fn invalid(field: &str, message: &str) -> AppError {
+fn invalid(field: &str, message: String) -> AppError {
     AppError::InvalidField {
         field: format!("document.{field}"),
-        message: message.into(),
+        message,
     }
 }
 
@@ -73,7 +74,7 @@ fn amount_cents(value: &Option<String>, field: &str) -> AppResult<Option<i64>> {
         .map(|t| {
             parse_cents(t)
                 .map(i64::abs)
-                .ok_or_else(|| invalid(field, "This isn't an amount"))
+                .ok_or_else(|| invalid(field, tr!("This isn't an amount", "Das ist kein Betrag")))
         })
         .transpose()
 }
@@ -92,7 +93,7 @@ pub fn edit(
 ) -> AppResult<Option<Written>> {
     let doc = db
         .read(|c| store::document_by_id(c, id))?
-        .ok_or_else(|| AppError::NotFound(format!("No document {id}")))?;
+        .ok_or_else(|| AppError::NotFound(tr!("No document {id}", "Kein Beleg {id}")))?;
     editable(&doc)?;
     let vendors = db.read(store::vendors)?;
     let title = title_of(&doc, &vendors);
@@ -102,22 +103,31 @@ pub fn edit(
         DocumentEdit::PayDate { value } => {
             after.pay_date = typed(value)
                 .map(|text| {
-                    date::parse(text)
-                        .map(date::iso)
-                        .ok_or_else(|| invalid("payDate", "This isn't a date"))
+                    date::parse(text).map(date::iso).ok_or_else(|| {
+                        invalid("payDate", tr!("This isn't a date", "Das ist kein Datum"))
+                    })
                 })
                 .transpose()?;
         }
         DocumentEdit::Paid { value } => {
             if !linked_lines(db, id)?.is_empty() {
-                return Err(invalid("paid", "The linked bank line is the amount paid"));
+                return Err(invalid(
+                    "paid",
+                    tr!(
+                        "The linked bank line is the amount paid",
+                        "Die verknüpfte Buchung ist der bezahlte Betrag"
+                    ),
+                ));
             }
             after.paid_cents = amount_cents(value, "paid")?;
         }
         DocumentEdit::Vendor { name } => {
             let name = name.trim();
             if name.is_empty() {
-                return Err(invalid("vendor", "Name the vendor"));
+                return Err(invalid(
+                    "vendor",
+                    tr!("Name the vendor", "Gib den Händler an"),
+                ));
             }
             let vendor_id = match vendors.iter().find(|v| v.name.eq_ignore_ascii_case(name)) {
                 Some(v) => v.id.clone(),
@@ -137,17 +147,27 @@ pub fn edit(
         DocumentEdit::Item { key } => match key.as_deref().filter(|k| !k.is_empty()) {
             None => after.item_key = None,
             Some(key) => {
-                let year = doc
-                    .pay_date
-                    .as_deref()
-                    .and_then(year_of)
-                    .ok_or_else(|| invalid("item", "Set the payment date first"))?;
+                let year = doc.pay_date.as_deref().and_then(year_of).ok_or_else(|| {
+                    invalid(
+                        "item",
+                        tr!(
+                            "Set the payment date first",
+                            "Setze zuerst das Zahlungsdatum"
+                        ),
+                    )
+                })?;
                 let ruleset = rules::ruleset_for_year(db, year)?;
                 if !ruleset
                     .as_ref()
                     .is_some_and(|r| r.items.iter().any(|i| i.key == key && i.visible))
                 {
-                    return Err(invalid("item", "Choose one of the year's items"));
+                    return Err(invalid(
+                        "item",
+                        tr!(
+                            "Choose one of the year's items",
+                            "Wähle einen der Posten des Jahres"
+                        ),
+                    ));
                 }
                 after.item_key = Some(key.to_string());
                 after.work_share = amounts::default_work_share(ruleset.as_ref(), Some(key));
@@ -161,33 +181,56 @@ pub fn edit(
                 .parse::<i64>()
                 .ok()
                 .filter(|share| (0..=100).contains(share))
-                .ok_or_else(|| invalid("workShare", "A share between 0 and 100 %"))?;
+                .ok_or_else(|| {
+                    invalid(
+                        "workShare",
+                        tr!(
+                            "A share between 0 and 100 %",
+                            "Ein Anteil zwischen 0 und 100 %"
+                        ),
+                    )
+                })?;
         }
         DocumentEdit::Note { text } => after.note = text.clone(),
         DocumentEdit::Invoice { amount, currency } => {
             let code = currency.trim().to_uppercase();
             if code.len() != 3 || !code.chars().all(|c| c.is_ascii_alphabetic()) {
-                return Err(invalid("invoice", "A three-letter currency code"));
+                return Err(invalid(
+                    "invoice",
+                    tr!(
+                        "A three-letter currency code",
+                        "Ein dreistelliger Währungscode"
+                    ),
+                ));
             }
             after.invoice_cents = amount_cents(amount, "invoice")?;
             after.invoice_currency = after.invoice_cents.map(|_| code);
         }
         DocumentEdit::UsefulLife { years } => {
             if years.is_some_and(|y| !(1..=50).contains(&y)) {
-                return Err(invalid("usefulLife", "Between 1 and 50 years"));
+                return Err(invalid(
+                    "usefulLife",
+                    tr!("Between 1 and 50 years", "Zwischen 1 und 50 Jahren"),
+                ));
             }
             after.useful_life = *years;
         }
         DocumentEdit::Link { line } => {
             let row = db
                 .read(|c| statements::transaction_by_id(c, line))?
-                .ok_or_else(|| AppError::NotFound(format!("No line {line}")))?;
+                .ok_or_else(|| AppError::NotFound(tr!("No line {line}", "Keine Buchung {line}")))?;
             let links = db.read(store::links)?;
             if links
                 .iter()
                 .any(|l| l.document_id == doc.id && &l.transaction_id == line)
             {
-                return Err(invalid("lines", "This line is linked already"));
+                return Err(invalid(
+                    "lines",
+                    tr!(
+                        "This line is linked already",
+                        "Diese Buchung ist schon verknüpft"
+                    ),
+                ));
             }
             super::refuse_paid_elsewhere(db, line, &doc.id)?;
             changes.push(Change::insert(
@@ -209,7 +252,12 @@ pub fn edit(
                 .read(store::links)?
                 .into_iter()
                 .find(|l| l.document_id == doc.id && &l.transaction_id == line)
-                .ok_or_else(|| AppError::NotFound(format!("Line {line} isn't linked")))?;
+                .ok_or_else(|| {
+                    AppError::NotFound(tr!(
+                        "Line {line} isn't linked",
+                        "Buchung {line} ist nicht verknüpft"
+                    ))
+                })?;
             changes.push(Change::delete(store::LINKS, &link)?);
         }
     }
@@ -234,6 +282,9 @@ fn write(
     if changes.is_empty() {
         return Ok(None);
     }
-    db.write(Op::new(format!("Edit {title}"), changes), source)
-        .map(Some)
+    db.write(
+        Op::new(tr!("Edit {title}", "Bearbeiten: {title}"), changes),
+        source,
+    )
+    .map(Some)
 }

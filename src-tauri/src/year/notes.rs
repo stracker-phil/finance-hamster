@@ -13,7 +13,10 @@ fn short(label: &str) -> &str {
 }
 
 fn answer_first(question: &str) -> String {
-    format!("Answer {question} under Questions first.")
+    crate::tr!(
+        "Answer {question} under Questions first.",
+        "Beantworte zuerst {question} unter Fragen."
+    )
 }
 
 fn amount(cents: i64, format: NumberFormat) -> String {
@@ -44,9 +47,10 @@ pub fn note(
             EstimateRule::Requires { question, min } => match answers.get(question) {
                 None => return Some(answer_first(&label(question))),
                 Some(value) if (*value as f64) < *min => {
-                    return Some(format!(
-                        "Fewer than {min} {}: the tax office won't accept this.",
-                        label(question)
+                    let label = label(question);
+                    return Some(crate::tr!(
+                        "Fewer than {min} {label}: the tax office won't accept this.",
+                        "Weniger als {min} {label}: Das Finanzamt erkennt das nicht an."
                     ));
                 }
                 Some(_) => {}
@@ -57,21 +61,27 @@ pub fn note(
                     .any(|q| &q.id == question && q.kind == QuestionType::Amount);
                 return Some(match answers.get(question) {
                     None => answer_first(&label(question)),
-                    Some(cents) if is_amount => format!(
-                        "The tax office subtracts the {} {} you received.",
-                        amount(*cents, format),
-                        label(question)
-                    ),
-                    Some(_) => format!(
-                        "The tax office subtracts the {} you received.",
-                        label(question)
-                    ),
+                    Some(cents) if is_amount => {
+                        let (amount, label) = (amount(*cents, format), label(question));
+                        crate::tr!(
+                            "The tax office subtracts the {amount} {label} you received.",
+                            "Das Finanzamt zieht {amount} ({label}) ab."
+                        )
+                    }
+                    Some(_) => {
+                        let label = label(question);
+                        crate::tr!(
+                            "The tax office subtracts the {label} you received.",
+                            "Das Finanzamt zieht {label} ab."
+                        )
+                    }
                 });
             }
             EstimateRule::Cap { amount: cap, .. } => {
-                return Some(format!(
-                    "Enter the full amount. The tax office counts up to {} per year.",
-                    amount(cap.0, format)
+                let cap = amount(cap.0, format);
+                return Some(crate::tr!(
+                    "Enter the full amount. The tax office counts up to {cap} per year.",
+                    "Trag den vollen Betrag ein. Das Finanzamt zählt bis zu {cap} pro Jahr."
                 ));
             }
         }
@@ -180,6 +190,32 @@ mod tests {
         assert_eq!(
             note_of(estimate, &[("telearbeitstage", 30)]),
             Some("The tax office subtracts the Telearbeitstage you received.".into())
+        );
+    }
+
+    #[test]
+    fn notes_read_in_german_when_the_language_is_german() {
+        use crate::i18n::with_lang;
+        use crate::settings::Language;
+        let german = |estimate: Value, answers: &[(&str, i64)]| {
+            with_lang(Language::De, || note_of(estimate, answers))
+        };
+
+        assert_eq!(
+            german(json!([requires()]), &[]),
+            Some("Beantworte zuerst Telearbeitstage unter Fragen.".into())
+        );
+        assert_eq!(
+            german(json!([requires()]), &[("telearbeitstage", 25)]),
+            Some("Weniger als 26 Telearbeitstage: Das Finanzamt erkennt das nicht an.".into())
+        );
+        assert_eq!(
+            german(json!([reduce_by()]), &[("pauschale", 12_000)]),
+            Some("Das Finanzamt zieht €120.00 (Telearbeitspauschale) ab.".into())
+        );
+        assert_eq!(
+            german(json!([cap()]), &[]),
+            Some("Trag den vollen Betrag ein. Das Finanzamt zählt bis zu €300.00 pro Jahr.".into())
         );
     }
 

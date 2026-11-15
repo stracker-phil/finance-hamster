@@ -18,6 +18,7 @@ use crate::subscriptions::matcher::{self, Matchers};
 use crate::subscriptions::store::Reminder;
 use crate::subscriptions::view::Format;
 use crate::taxyears::{self, YearState};
+use crate::tr;
 
 /// A notification with the key that keeps it from being told twice.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -59,11 +60,15 @@ fn renewals(db: &Db, today: NaiveDate, format: &Format) -> AppResult<Vec<Due>> {
         }
         let amount = running
             .charge_cents(today)
-            .map(|c| format!("{} on ", format.eur(c)))
+            .map(|c| {
+                let eur = format.eur(c);
+                tr!("{eur} on ", "{eur} am ")
+            })
             .unwrap_or_default();
+        let name = &sub.name;
         out.push(due(
             format!("renewal:{}:{}", sub.id, date::iso(next)),
-            format!("{} renews soon", sub.name),
+            tr!("{name} renews soon", "{name} verlängert sich bald"),
             format!("{amount}{}", date::weekday_short(next, format.order)),
         ));
     }
@@ -83,8 +88,15 @@ fn price_changes(db: &Db) -> AppResult<Vec<Due>> {
             let (sub, _) = asked.asks_about(&t.id)?;
             Some(due(
                 format!("plan:{}", t.id),
-                format!("{} charged a different amount", sub.name),
-                "Review the line: a new price, a one-off, or not this subscription.".into(),
+                tr!(
+                    "{} charged a different amount",
+                    "{} hat einen anderen Betrag abgebucht",
+                    sub.name
+                ),
+                tr!(
+                    "Review the line: a new price, a one-off, or not this subscription.",
+                    "Prüfe die Buchung: ein neuer Preis, einmalig oder nicht dieses Abo."
+                ),
             ))
         })
         .collect())
@@ -113,9 +125,14 @@ fn statements_due(
         {
             out.push(due(
                 format!("import:{}:{}", account.id, date::iso(end)),
-                format!("Import the {} statement", account.name),
-                format!(
+                tr!(
+                    "Import the {} statement",
+                    "Importiere den Kontoauszug von {}",
+                    account.name
+                ),
+                tr!(
                     "Its last statement ended on {}.",
+                    "Sein letzter Kontoauszug endete am {}.",
                     date::day_month(end, order)
                 ),
             ));
@@ -125,7 +142,11 @@ fn statements_due(
         {
             out.push(due(
                 format!("gap:{}:{note}", account.id),
-                format!("A {} statement is missing", account.name),
+                tr!(
+                    "A {} statement is missing",
+                    "Ein Kontoauszug von {} fehlt",
+                    account.name
+                ),
                 note.clone(),
             ));
         }
@@ -146,8 +167,14 @@ fn tax_years(db: &Db, settings: &Settings, today: NaiveDate) -> AppResult<Vec<Du
         if settings.remind_filing && filing.is_some_and(|d| today >= d) {
             out.push(due(
                 format!("filing:{year}"),
-                format!("Tax year {year} can be closed"),
-                "Close it in Hamster, then copy the Kennzahlen into FinanzOnline.".into(),
+                tr!(
+                    "Tax year {year} can be closed",
+                    "Steuerjahr {year} kann abgeschlossen werden"
+                ),
+                tr!(
+                    "Close it in Hamster, then copy the Kennzahlen into FinanzOnline.",
+                    "Schließe es in Hamster ab und übertrage dann die Kennzahlen in FinanzOnline."
+                ),
             ));
         }
     }
@@ -156,18 +183,27 @@ fn tax_years(db: &Db, settings: &Settings, today: NaiveDate) -> AppResult<Vec<Du
             let (phase, body) = if today.year() > year {
                 (
                     "after",
-                    "The year is over: run the year check once more before closing it.",
+                    tr!(
+                        "The year is over: run the year check once more before closing it.",
+                        "Das Jahr ist vorbei: Mach den Jahrescheck noch einmal, bevor du es abschließt."
+                    ),
                 )
             } else {
                 (
                     "november",
-                    "A few quick questions about things you might forget to claim.",
+                    tr!(
+                        "A few quick questions about things you might forget to claim.",
+                        "Ein paar kurze Fragen zu Dingen, die du vielleicht vergisst."
+                    ),
                 )
             };
             out.push(due(
                 format!("yearcheck:{year}:{phase}"),
-                format!("Year check for Tax year {year}"),
-                body.into(),
+                tr!(
+                    "Year check for Tax year {year}",
+                    "Jahrescheck für das Steuerjahr {year}"
+                ),
+                body,
             ));
         }
     }
@@ -552,6 +588,42 @@ mod tests {
                 notification: notification(
                     "Tax year 2025 can be closed",
                     "Close it in Hamster, then copy the Kennzahlen into FinanzOnline."
+                ),
+            }]
+        );
+    }
+
+    #[test]
+    fn reminders_read_in_german_when_the_language_is_german() {
+        use crate::i18n::with_lang;
+        use crate::settings::Language;
+        let (_dir, db) = asking_year(YearState::Open);
+        insert(&db, crate::taxyears::TABLE, &year_row(2025, false));
+
+        let filing = with_lang(Language::De, || {
+            due_with(&db, &Settings::default(), today(), "filing:")
+        });
+        let check = with_lang(Language::De, || {
+            due_with(&db, &Settings::default(), day(2027, 1, 9), "yearcheck:")
+        });
+
+        assert_eq!(
+            filing,
+            vec![Due {
+                key: "filing:2025".into(),
+                notification: notification(
+                    "Steuerjahr 2025 kann abgeschlossen werden",
+                    "Schließe es in Hamster ab und übertrage dann die Kennzahlen in FinanzOnline."
+                ),
+            }]
+        );
+        assert_eq!(
+            check,
+            vec![Due {
+                key: "yearcheck:2026:after".into(),
+                notification: notification(
+                    "Jahrescheck für das Steuerjahr 2026",
+                    "Das Jahr ist vorbei: Mach den Jahrescheck noch einmal, bevor du es abschließt."
                 ),
             }]
         );

@@ -7,6 +7,7 @@ use serde_json::Value;
 
 use super::{Change, Row};
 use crate::error::{AppError, AppResult};
+use crate::tr;
 
 /// Refuses `change` when a row it removes or writes counts in a closed tax year.
 pub(super) fn check(tx: &Transaction, change: &Change) -> AppResult<()> {
@@ -17,8 +18,9 @@ pub(super) fn check(tx: &Transaction, change: &Change) -> AppResult<()> {
     for row in rows {
         for year in years_of(tx, change.table(), row)? {
             if is_closed(tx, year)? {
-                return Err(AppError::InvalidInput(format!(
-                    "Tax year {year} is closed; reopen it to change what it counts"
+                return Err(AppError::InvalidInput(tr!(
+                    "Tax year {year} is closed; reopen it to change what it counts",
+                    "Das Steuerjahr {year} ist abgeschlossen; öffne es wieder, um zu ändern, was es zählt"
                 )));
             }
         }

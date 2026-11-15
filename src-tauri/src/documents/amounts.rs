@@ -6,6 +6,7 @@ use ts_rs::TS;
 use crate::money::{Money, format_money};
 use crate::settings::NumberFormat;
 use crate::taxrules::model::Ruleset;
+use crate::tr;
 
 /// The share of the payment that counts: 100 % less the item's `privateShare`.
 pub fn default_work_share(ruleset: Option<&Ruleset>, item_key: Option<&str>) -> i64 {
@@ -51,24 +52,27 @@ pub fn estimate(
         .and_then(|(r, key)| r.items.iter().find(|i| i.key == key));
     let share_hint = item
         .and_then(|i| i.private_share)
-        .map(|p| format!("from the item: {p} % private"));
+        .map(|p| tr!("from the item: {p} % private", "vom Posten: {p} % privat"));
     let anv = anv_cents(paid_cents, work_share);
     let gwg = ruleset.zip(item).map(|(r, i)| {
         let limit = r.settings.gwg_limit.0;
         if anv <= limit {
-            format!(
+            tr!(
                 "{} is below the GWG limit ({}): counts fully in {year}.",
+                "{} liegt unter der GWG-Grenze ({}): zählt voll in {year}.",
                 eur(anv),
                 eur(limit)
             )
         } else if i.depreciation.is_none() {
-            format!(
+            tr!(
                 "{} counts fully in {year}: this item is never depreciated.",
+                "{} zählt voll in {year}: dieser Posten wird nie abgeschrieben.",
                 eur(anv)
             )
         } else {
-            format!(
+            tr!(
                 "{} is above the GWG limit ({}): it is depreciated over several years.",
+                "{} liegt über der GWG-Grenze ({}): wird über mehrere Jahre abgeschrieben.",
                 eur(anv),
                 eur(limit)
             )

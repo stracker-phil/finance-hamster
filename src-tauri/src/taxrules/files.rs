@@ -114,8 +114,9 @@ pub fn replace(
 pub fn create(config_dir: &Path, year: i32, text: &str) -> AppResult<()> {
     let path = dir(config_dir).join(file_name(year));
     if path.exists() {
-        return Err(AppError::InvalidInput(format!(
+        return Err(AppError::InvalidInput(crate::tr!(
             "{} already exists",
+            "{} gibt es schon",
             file_name(year)
         )));
     }
@@ -146,14 +147,17 @@ fn write_atomic(path: &Path, text: &str) -> AppResult<()> {
 /// Kilometergeld ranges moved by one year. Everything else is copied as it is.
 pub fn next_year_text(text: &str) -> AppResult<String> {
     let Value::Object(old) = serde_json::from_str::<Value>(text)? else {
-        return Err(AppError::InvalidInput(
-            "The rules file isn't an object".into(),
-        ));
+        return Err(AppError::InvalidInput(crate::tr!(
+            "The rules file isn't an object",
+            "Die Regeldatei ist kein Objekt"
+        )));
     };
-    let year = old
-        .get("year")
-        .and_then(Value::as_i64)
-        .ok_or_else(|| AppError::InvalidInput("The rules file has no year".into()))?;
+    let year = old.get("year").and_then(Value::as_i64).ok_or_else(|| {
+        AppError::InvalidInput(crate::tr!(
+            "The rules file has no year",
+            "Die Regeldatei hat kein Jahr"
+        ))
+    })?;
     let ruleset = old.get("ruleset").cloned().unwrap_or(Value::Null);
     let mut next = Map::new();
     for (key, value) in old {

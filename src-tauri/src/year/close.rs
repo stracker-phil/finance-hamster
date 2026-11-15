@@ -63,45 +63,57 @@ pub struct SnapshotRow {
     pub file: String,
 }
 
-fn plural(n: usize, one: &str, many: &str) -> String {
-    format!("{n} {}", if n == 1 { one } else { many })
-}
-
 pub fn check(page: &YearPage) -> CloseCheck {
     let count = |kind| page.attention.iter().filter(|a| a.kind == kind).count();
     let mut blockers = Vec::new();
     let drafts = count(AttentionKind::Draft);
     if drafts > 0 {
-        blockers.push(format!("{} to finish", plural(drafts, "draft", "drafts")));
+        blockers.push(crate::tr_plural!(
+            drafts,
+            "{drafts} draft to finish",
+            "{drafts} drafts to finish",
+            "{drafts} Entwurf abzuschließen",
+            "{drafts} Entwürfe abzuschließen"
+        ));
     }
     let undated = count(AttentionKind::Undated);
     if undated > 0 {
-        blockers.push(format!(
-            "{} without a payment date",
-            plural(undated, "document", "documents")
+        blockers.push(crate::tr_plural!(
+            undated,
+            "{undated} document without a payment date",
+            "{undated} documents without a payment date",
+            "{undated} Beleg ohne Zahlungsdatum",
+            "{undated} Belege ohne Zahlungsdatum"
         ));
     }
     let mut warnings = Vec::new();
     let missing = count(AttentionKind::MissingInvoice);
     if missing > 0 {
-        warnings.push(format!(
-            "{} without the invoice won't count",
-            plural(missing, "payment", "payments")
+        warnings.push(crate::tr_plural!(
+            missing,
+            "{missing} payment without the invoice won't count",
+            "{missing} payments without the invoice won't count",
+            "{missing} Zahlung ohne Rechnung zählt nicht",
+            "{missing} Zahlungen ohne Rechnung zählen nicht"
         ));
     }
     let open = page.questions.iter().filter(|q| !q.answered).count();
     if open > 0 {
-        warnings.push(format!(
-            "{} unanswered",
-            plural(open, "question", "questions")
+        warnings.push(crate::tr_plural!(
+            open,
+            "{open} question unanswered",
+            "{open} questions unanswered",
+            "{open} Frage unbeantwortet",
+            "{open} Fragen unbeantwortet"
         ));
     }
     CloseCheck { blockers, warnings }
 }
 
 fn year_row(db: &Db, year: i32) -> AppResult<TaxYearRow> {
-    db.read(|c| taxyears::row(c, year))?
-        .ok_or_else(|| AppError::NotFound(format!("No tax year {year}")))
+    db.read(|c| taxyears::row(c, year))?.ok_or_else(|| {
+        AppError::NotFound(crate::tr!("No tax year {year}", "Kein Steuerjahr {year}"))
+    })
 }
 
 /// The first free `<year>-summary[-n].pdf` in `snapshots/`.
@@ -170,16 +182,18 @@ pub fn close(
 ) -> AppResult<Written> {
     let before = year_row(db, year)?;
     if before.state == YearState::Closed {
-        return Err(AppError::InvalidInput(format!(
-            "Tax year {year} is closed already"
+        return Err(AppError::InvalidInput(crate::tr!(
+            "Tax year {year} is closed already",
+            "Das Steuerjahr {year} ist schon abgeschlossen"
         )));
     }
     let page = page::page(db, year, "", number, order)?;
     let blockers = check(&page).blockers;
     if !blockers.is_empty() {
-        return Err(AppError::InvalidInput(format!(
-            "Before closing: {}",
-            blockers.join(", ")
+        let blockers = blockers.join(", ");
+        return Err(AppError::InvalidInput(crate::tr!(
+            "Before closing: {blockers}",
+            "Vor dem Abschließen: {blockers}"
         )));
     }
     let file = write_summary(config_dir, &page, stamp)?;
@@ -199,9 +213,12 @@ pub fn close(
         ..before.clone()
     };
     let label = if crate::yearcheck::close_needs_run(db, year)? {
-        format!("Close Tax Year {year} without year check")
+        crate::tr!(
+            "Close Tax Year {year} without year check",
+            "Steuerjahr {year} ohne Jahrescheck abschließen"
+        )
     } else {
-        format!("Close Tax Year {year}")
+        crate::tr!("Close Tax Year {year}", "Steuerjahr {year} abschließen")
     };
     db.write(
         Op::new(
@@ -219,7 +236,10 @@ pub fn close(
 pub fn reopen(db: &Db, year: i32, source: Source) -> AppResult<Written> {
     let before = year_row(db, year)?;
     if before.state == YearState::Open {
-        return Err(AppError::InvalidInput(format!("Tax year {year} is open")));
+        return Err(AppError::InvalidInput(crate::tr!(
+            "Tax year {year} is open",
+            "Das Steuerjahr {year} ist offen"
+        )));
     }
     let after = TaxYearRow {
         state: YearState::Open,
@@ -228,7 +248,7 @@ pub fn reopen(db: &Db, year: i32, source: Source) -> AppResult<Written> {
     };
     db.write(
         Op::new(
-            format!("Reopen Tax Year {year}"),
+            crate::tr!("Reopen Tax Year {year}", "Steuerjahr {year} wieder öffnen"),
             vec![Change::update(taxyears::TABLE, &before, &after)?],
         ),
         source,
@@ -245,8 +265,12 @@ pub fn snapshot_file(db: &Db, config_dir: &Path, year: i32) -> AppResult<PathBuf
         )
         .optional()?)
     })?;
-    file.map(|f| config_dir.join(f))
-        .ok_or_else(|| AppError::NotFound(format!("Tax year {year} has no snapshot")))
+    file.map(|f| config_dir.join(f)).ok_or_else(|| {
+        AppError::NotFound(crate::tr!(
+            "Tax year {year} has no snapshot",
+            "Das Steuerjahr {year} hat keinen Schnappschuss"
+        ))
+    })
 }
 
 #[cfg(test)]
@@ -421,6 +445,88 @@ mod tests {
         assert_eq!(
             check(&page).blockers,
             vec!["2 documents without a payment date".to_string()]
+        );
+    }
+
+    #[test]
+    fn the_check_reads_in_german_with_singular_and_plural() {
+        use crate::i18n::with_lang;
+        use crate::settings::Language;
+        use AttentionKind::{Draft, MissingInvoice, Undated};
+
+        let one = with_lang(Language::De, || {
+            check(&bare_page(&[Draft, Undated, MissingInvoice], &[false]))
+        });
+        let many = with_lang(Language::De, || {
+            check(&bare_page(
+                &[
+                    Draft,
+                    Draft,
+                    Undated,
+                    Undated,
+                    MissingInvoice,
+                    MissingInvoice,
+                ],
+                &[false, false],
+            ))
+        });
+
+        assert_eq!(
+            one,
+            CloseCheck {
+                blockers: vec![
+                    "1 Entwurf abzuschließen".into(),
+                    "1 Beleg ohne Zahlungsdatum".into()
+                ],
+                warnings: vec![
+                    "1 Zahlung ohne Rechnung zählt nicht".into(),
+                    "1 Frage unbeantwortet".into()
+                ],
+            }
+        );
+        assert_eq!(
+            many,
+            CloseCheck {
+                blockers: vec![
+                    "2 Entwürfe abzuschließen".into(),
+                    "2 Belege ohne Zahlungsdatum".into()
+                ],
+                warnings: vec![
+                    "2 Zahlungen ohne Rechnung zählen nicht".into(),
+                    "2 Fragen unbeantwortet".into()
+                ],
+            }
+        );
+    }
+
+    #[test]
+    fn closing_in_german_labels_the_op_in_german() {
+        let (dir, db) = two_documents_year();
+
+        let written = crate::i18n::with_lang(crate::settings::Language::De, || {
+            close_2026(&db, dir.path(), 500).unwrap()
+        });
+
+        assert_eq!(written.label, "Steuerjahr 2026 abschließen");
+    }
+
+    #[test]
+    fn closing_a_closed_year_fails_in_the_current_language() {
+        let (dir, db) = two_documents_year();
+        close_2026(&db, dir.path(), 500).unwrap();
+
+        let english = close_2026(&db, dir.path(), 600).unwrap_err();
+        let german = crate::i18n::with_lang(crate::settings::Language::De, || {
+            close_2026(&db, dir.path(), 600).unwrap_err()
+        });
+
+        assert_eq!(
+            english,
+            AppError::InvalidInput("Tax year 2026 is closed already".into())
+        );
+        assert_eq!(
+            german,
+            AppError::InvalidInput("Das Steuerjahr 2026 ist schon abgeschlossen".into())
         );
     }
 

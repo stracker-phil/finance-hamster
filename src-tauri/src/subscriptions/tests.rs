@@ -1423,6 +1423,34 @@ fn the_next_charge_reads_as_today_tomorrow_a_day_or_a_day_with_the_year_beyond_a
     assert_eq!(month_first.next(day(2026, 11, 23), today), "Nov 23");
 }
 
+#[test]
+fn today_tomorrow_the_group_names_and_the_summary_read_in_german() {
+    use crate::i18n::with_lang;
+    use crate::settings::Language;
+    let today = day(2026, 11, 13);
+    let (_dir, db) = imported(&[]);
+    sub_with_plan(&db, "sub-today", "Today Club", 500, "2026-11-13");
+    sub_with_plan(&db, "sub-tomorrow", "Tomorrow Club", 300, "2026-11-14");
+    sub_with_plan(&db, "sub-cloud", "Cloud", 1_000, "2026-12-01");
+    sub_with_plan(&db, "sub-later", "Later Club", 5_000, "2027-01-15");
+
+    let view = with_lang(Language::De, || view(&db, ""));
+
+    assert_eq!(view.summary, "4 aktiv · €68.00 pro Monat");
+    let labels: Vec<&str> = view.groups.iter().map(|g| g.label.as_str()).collect();
+    assert_eq!(labels, ["Nächste 7 Tage", "Nächste 30 Tage", "Später"]);
+    let nexts: Vec<&str> = view.groups[0]
+        .rows
+        .iter()
+        .map(|r| r.next.as_str())
+        .collect();
+    assert_eq!(nexts, ["Heute", "Morgen"]);
+    assert_eq!(
+        with_lang(Language::De, || fmt().next(today, today)),
+        "Heute"
+    );
+}
+
 fn running_row(id: &str, name: &str, next: &str, amount: &str) -> SubscriptionRowView {
     SubscriptionRowView {
         id: id.into(),

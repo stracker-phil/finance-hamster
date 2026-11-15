@@ -126,6 +126,50 @@ fn a_printed_new_balance_that_does_not_add_up_fails_with_the_difference() {
 }
 
 #[test]
+fn a_check_error_reads_in_english_and_in_german() {
+    use crate::i18n::with_lang;
+    use crate::settings::Language;
+    let balance = CheckError::Balance {
+        page: 2,
+        difference: "€0.42".into(),
+    };
+    let credits = CheckError::Credits {
+        page: 1,
+        lines: "€10.00".into(),
+        printed: "€12.00".into(),
+    };
+    let debits = CheckError::Debits {
+        page: 1,
+        lines: "-€10.00".into(),
+        printed: "-€12.00".into(),
+    };
+
+    for (language, expected) in [
+        (
+            Language::En,
+            [
+                "Page 2: the old balance plus the sums isn't the new balance; it is off by €0.42",
+                "Page 1: the credits add up to €10.00, the statement prints €12.00",
+                "Page 1: the debits add up to -€10.00, the statement prints -€12.00",
+            ],
+        ),
+        (
+            Language::De,
+            [
+                "Seite 2: Alter Saldo plus Summen ergibt nicht den neuen Saldo; Differenz €0.42",
+                "Seite 1: Die Gutschriften ergeben €10.00, der Kontoauszug zeigt €12.00",
+                "Seite 1: Die Lastschriften ergeben -€10.00, der Kontoauszug zeigt -€12.00",
+            ],
+        ),
+    ] {
+        let shown = with_lang(language, || {
+            [&balance, &credits, &debits].map(|e| e.to_string())
+        });
+        assert_eq!(shown, expected, "{language:?}");
+    }
+}
+
+#[test]
 fn the_balance_is_checked_before_the_lines() {
     let mut parsed = read(&demo());
     parsed.credits += 100;

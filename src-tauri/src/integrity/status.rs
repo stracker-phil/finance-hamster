@@ -16,6 +16,7 @@ use crate::error::AppResult;
 use crate::statements::store as statements;
 use crate::statements::view::{self as statement_view, AccountCoverage};
 use crate::taxrules;
+use crate::{tr, tr_plural};
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
 #[serde(rename_all = "camelCase")]
@@ -51,6 +52,8 @@ impl Tone {
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "src/api/types.gen.ts")]
 pub struct StatusGroup {
+    /// Stable across languages: the page anchors the group by it (`status-<id>`).
+    pub id: String,
     pub title: String,
     pub rows: Vec<StatusRow>,
 }
@@ -92,15 +95,34 @@ fn statement_row(db: &Db, account: &AccountCoverage, order: DateOrder) -> AppRes
         .iter()
         .filter_map(|s| date::parse(&s.to_date))
         .max()
-        .map(|d| format!("until {}", date::day_month(d, order)));
+        .map(|d| {
+            let day = date::day_month(d, order);
+            tr!("until {day}", "bis {day}")
+        });
     let name = account.name.clone();
     Ok(match (until, &account.note) {
-        (None, _) => row(name, "No statement imported yet", "None", Tone::Info),
+        (None, _) => row(
+            name,
+            tr!(
+                "No statement imported yet",
+                "Noch kein Kontoauszug importiert"
+            ),
+            tr!("None", "Keiner"),
+            Tone::Info,
+        ),
         // The chain's note names its first break: a missing number or balances that don't connect.
-        (Some(until), Some(note)) => row(name, format!("{note} · {until}"), "Gap", Tone::Error),
+        (Some(until), Some(note)) => row(
+            name,
+            format!("{note} · {until}"),
+            tr!("Gap", "Lücke"),
+            Tone::Error,
+        ),
         (Some(until), None) => row(
             name,
-            format!("Chain complete · balances check out · {until}"),
+            tr!(
+                "Chain complete · balances check out · {until}",
+                "Kette vollständig · Salden stimmen · {until}"
+            ),
             "OK",
             Tone::Ok,
         ),
@@ -120,35 +142,35 @@ fn journal_row(db: &Db, config_dir: &Path) -> AppResult<StatusRow> {
     let path = config_dir.join(journal::FILE_NAME);
     let mirror = db.read(|c| journal::compare(c, &path))?;
     let checked = if let Some(first) = mirror.edited.first() {
+        let file = journal::FILE_NAME;
+        let count = mirror.edited.len();
         row(
             "Journal",
-            format!(
-                "{} · {} entries differ from the database, the first is entry {first}",
-                journal::FILE_NAME,
-                mirror.edited.len()
+            tr!(
+                "{file} · {count} entries differ from the database, the first is entry {first}",
+                "{file} · {count} Einträge weichen von der Datenbank ab, der erste ist Eintrag {first}"
             ),
-            "Edited",
+            tr!("Edited", "Bearbeitet"),
             Tone::Error,
         )
     } else if mirror.behind() > 0 {
+        let (file, matching, rows) = (journal::FILE_NAME, mirror.matching, mirror.rows);
         row(
             "Journal",
-            format!(
-                "{} · {} entries, the database has {}; caught up at the next write",
-                journal::FILE_NAME,
-                mirror.matching,
-                mirror.rows
+            tr!(
+                "{file} · {matching} entries, the database has {rows}; caught up at the next write",
+                "{file} · {matching} Einträge, die Datenbank hat {rows}; wird beim nächsten Schreiben nachgeholt"
             ),
-            "Behind",
+            tr!("Behind", "Im Rückstand"),
             Tone::Warning,
         )
     } else {
+        let (file, rows) = (journal::FILE_NAME, mirror.rows);
         row(
             "Journal",
-            format!(
-                "{} · {} entries · matches the database",
-                journal::FILE_NAME,
-                mirror.rows
+            tr!(
+                "{file} · {rows} entries · matches the database",
+                "{file} · {rows} Einträge · stimmt mit der Datenbank überein"
             ),
             "OK",
             Tone::Ok,
@@ -161,17 +183,18 @@ fn checksum_row(check: Option<&FileCheck>, order: DateOrder) -> StatusRow {
     match check {
         Some(check) => {
             let good = check.checked as usize - check.problems.len();
+            let (day, checked) = (local_day(check.at, order), check.checked);
             row(
-                "PDF checksums",
-                format!("Last verified {}", local_day(check.at, order)),
-                format!("{good} of {}", check.checked),
+                tr!("PDF checksums", "PDF-Prüfsummen"),
+                tr!("Last verified {day}", "Zuletzt geprüft am {day}"),
+                tr!("{good} of {checked}", "{good} von {checked}"),
                 Tone::ok_or(check.problems.is_empty(), Tone::Error),
             )
         }
         None => row(
-            "PDF checksums",
-            "Not verified since launch",
-            "Not run",
+            tr!("PDF checksums", "PDF-Prüfsummen"),
+            tr!("Not verified since launch", "Seit dem Start nicht geprüft"),
+            tr!("Not run", "Nicht gelaufen"),
             Tone::Info,
         ),
     }
@@ -183,14 +206,19 @@ fn inbox_row(db: &Db) -> AppResult<StatusRow> {
         .iter()
         .filter(|d| d.pay_date.is_none() && d.state != documents::DocState::Excluded)
         .count();
-    let files = if inbox == 1 {
-        "1 file".to_string()
-    } else {
-        format!("{inbox} files")
-    };
+    let files = tr_plural!(
+        inbox,
+        "1 file",
+        "{inbox} files",
+        "1 Datei",
+        "{inbox} Dateien"
+    );
     Ok(row(
-        "Inbox",
-        "docs/inbox/ · documents without a payment date",
+        tr!("Inbox", "Eingang"),
+        tr!(
+            "docs/inbox/ · documents without a payment date",
+            "docs/inbox/ · Belege ohne Zahlungsdatum"
+        ),
         files,
         Tone::ok_or(inbox == 0, Tone::Info),
     ))
@@ -219,25 +247,41 @@ fn rules_rows(db: &Db, config_dir: &Path, order: DateOrder) -> AppResult<Vec<Sta
                 let when = f
                     .loaded_on
                     .as_ref()
-                    .map(|d| format!(" · loaded {d}"))
+                    .map(|d| tr!(" · loaded {d}", " · geladen am {d}"))
                     .unwrap_or_default();
-                row(&f.file_name, format!("Valid{when}"), "OK", Tone::Ok)
+                row(
+                    &f.file_name,
+                    tr!("Valid{when}", "Gültig{when}"),
+                    "OK",
+                    Tone::Ok,
+                )
             } else if f.missing {
                 row(
                     &f.file_name,
-                    "The file is gone; the year keeps what it applied",
-                    "Missing",
+                    tr!(
+                        "The file is gone; the year keeps what it applied",
+                        "Die Datei fehlt; das Jahr behält, was es angewendet hat"
+                    ),
+                    tr!("Missing", "Fehlt"),
                     Tone::Warning,
                 )
             } else {
-                row(&f.file_name, f.problems.join(" · "), "Invalid", Tone::Error)
+                row(
+                    &f.file_name,
+                    f.problems.join(" · "),
+                    tr!("Invalid", "Ungültig"),
+                    Tone::Error,
+                )
             }
         })
         .collect();
     let unverified: u32 = files.iter().map(|f| f.unverified).sum();
     rows.push(row(
-        "Unverified values",
-        "Marked \"verified\": false in the files",
+        tr!("Unverified values", "Ungeprüfte Werte"),
+        tr!(
+            "Marked \"verified\": false in the files",
+            "In den Dateien mit \"verified\": false markiert"
+        ),
         unverified.to_string(),
         Tone::ok_or(unverified == 0, Tone::Warning),
     ));
@@ -253,15 +297,18 @@ pub fn status(
 ) -> AppResult<Vec<StatusGroup>> {
     Ok(vec![
         StatusGroup {
-            title: "Statements".into(),
+            id: "statements".into(),
+            title: tr!("Statements", "Kontoauszüge"),
             rows: statement_rows(db, today, order)?,
         },
         StatusGroup {
-            title: "Files".into(),
+            id: "files".into(),
+            title: tr!("Files", "Dateien"),
             rows: file_rows(db, config_dir, check, order)?,
         },
         StatusGroup {
-            title: "Rules".into(),
+            id: "rules".into(),
+            title: tr!("Rules", "Regeln"),
             rows: rules_rows(db, config_dir, order)?,
         },
     ])
@@ -407,6 +454,51 @@ mod tests {
             .collect();
 
         assert_eq!(titles, ["Statements", "Files", "Rules"]);
+    }
+
+    #[test]
+    fn group_ids_are_the_same_in_every_language_while_titles_follow_it() {
+        use crate::i18n::with_lang;
+        use crate::settings::Language;
+        let (dir, db) = open_with_accounts_and_year();
+
+        let english = with_lang(Language::En, || groups(&db, dir.path(), None));
+        let german = with_lang(Language::De, || groups(&db, dir.path(), None));
+
+        let ids = |all: &[StatusGroup]| all.iter().map(|g| g.id.clone()).collect::<Vec<_>>();
+        let titles = |all: &[StatusGroup]| all.iter().map(|g| g.title.clone()).collect::<Vec<_>>();
+        assert_eq!(ids(&english), ["statements", "files", "rules"]);
+        assert_eq!(ids(&german), ids(&english));
+        assert_eq!(titles(&german), ["Kontoauszüge", "Dateien", "Regeln"]);
+    }
+
+    #[test]
+    fn rows_read_in_german_when_the_language_is_german() {
+        use crate::i18n::with_lang;
+        use crate::settings::Language;
+        let (dir, db) = open_with_accounts_and_year();
+
+        let all = with_lang(Language::De, || groups(&db, dir.path(), None));
+
+        assert_eq!(
+            row_of(&all, "Kontoauszüge", "Private"),
+            row(
+                "Private",
+                "Noch kein Kontoauszug importiert",
+                "Keiner",
+                Tone::Info
+            )
+        );
+        assert_eq!(
+            row_of(&all, "Dateien", "PDF-Prüfsummen"),
+            row(
+                "PDF-Prüfsummen",
+                "Seit dem Start nicht geprüft",
+                "Nicht gelaufen",
+                Tone::Info
+            )
+        );
+        assert_eq!(row_of(&all, "Dateien", "Eingang").value, "0 Dateien");
     }
 
     #[test]

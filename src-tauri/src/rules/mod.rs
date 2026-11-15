@@ -23,6 +23,7 @@ use crate::error::{AppError, AppResult};
 use crate::money::parse_cents;
 use crate::taxrules::model::Ruleset;
 use crate::taxyears::{self, YearState};
+use crate::tr;
 use store::{Action, Builtin, RuleRow};
 
 /// A rule as the Rule sheet edits it; amounts as typed.
@@ -55,10 +56,10 @@ pub const TRANSFERS_ID: &str = "builtin-transfers";
 const BANK_FEES_ID: &str = "builtin-bank-fees";
 const BANK_FEE_TOKENS: [&str; 2] = ["Kontoführung", "Debitkarte"];
 
-fn invalid(field: &str, message: &str) -> AppError {
+fn invalid(field: &str, message: String) -> AppError {
     AppError::InvalidField {
         field: format!("rule.{field}"),
-        message: message.into(),
+        message,
     }
 }
 
@@ -110,7 +111,7 @@ fn parse_amount(field: &str, text: &Option<String>) -> AppResult<Option<i64>> {
         .map(|t| {
             parse_cents(t)
                 .map(i64::abs)
-                .ok_or_else(|| invalid(field, "This isn't an amount"))
+                .ok_or_else(|| invalid(field, tr!("This isn't an amount", "Das ist kein Betrag")))
         })
         .transpose()
 }
@@ -155,7 +156,13 @@ fn conditions(db: &Db, form: &RuleForm) -> AppResult<Conditions> {
     let amount_cents = parse_amount("amount", &form.amount)?;
     let tolerance_cents = parse_amount("tolerance", &form.tolerance)?.unwrap_or(0);
     if tolerance_cents > 0 && amount_cents.is_none() {
-        return Err(invalid("tolerance", "A tolerance needs an amount"));
+        return Err(invalid(
+            "tolerance",
+            tr!(
+                "A tolerance needs an amount",
+                "Eine Toleranz braucht einen Betrag"
+            ),
+        ));
     }
     if let Some(account) = &form.account_id
         && !db
@@ -163,23 +170,37 @@ fn conditions(db: &Db, form: &RuleForm) -> AppResult<Conditions> {
             .iter()
             .any(|a| &a.id == account)
     {
-        return Err(invalid("account", "This account doesn't exist"));
+        return Err(invalid(
+            "account",
+            tr!("This account doesn't exist", "Dieses Konto gibt es nicht"),
+        ));
     }
     if tokens.is_empty()
         && amount_cents.is_none()
         && form.account_id.is_none()
         && !form.own_counterparty
     {
-        return Err(invalid("conditions", "Add at least one condition"));
+        return Err(invalid(
+            "conditions",
+            tr!(
+                "Add at least one condition",
+                "Füge mindestens eine Bedingung hinzu"
+            ),
+        ));
     }
     match form.action {
         Action::Anv => {
             let key = form.item_key.as_deref().unwrap_or_default();
             if !items(db)?.iter().any(|i| i.key == key) {
-                return Err(invalid("item", "Choose an item"));
+                return Err(invalid("item", tr!("Choose an item", "Wähle einen Posten")));
             }
         }
-        Action::Subscription => return Err(invalid("action", "Choose a subscription")),
+        Action::Subscription => {
+            return Err(invalid(
+                "action",
+                tr!("Choose a subscription", "Wähle ein Abo"),
+            ));
+        }
         Action::Ignore => {}
     }
     Ok(Conditions {
@@ -247,18 +268,32 @@ pub fn save(
             let index = rules
                 .iter()
                 .position(|r| r.id == id)
-                .ok_or_else(|| AppError::NotFound(format!("No rule {id}")))?;
+                .ok_or_else(|| AppError::NotFound(tr!("No rule {id}", "Keine Regel {id}")))?;
             let after = fields(rules[index].clone());
             let change = Change::update(store::RULES, &rules[index], &after)?;
             rules[index] = after;
-            write_with_rerun(db, "Edit Rule".into(), change, &rules, now, source)
+            write_with_rerun(
+                db,
+                tr!("Edit Rule", "Regel bearbeiten"),
+                change,
+                &rules,
+                now,
+                source,
+            )
         }
         None => {
             let position = rules.iter().map(|r| r.position).max().unwrap_or(-1) + 1;
             let row = fields(blank(uuid::Uuid::new_v4().to_string(), position, now));
             let change = Change::insert(store::RULES, &row)?;
             rules.push(row);
-            write_with_rerun(db, "Add Rule".into(), change, &rules, now, source)
+            write_with_rerun(
+                db,
+                tr!("Add Rule", "Regel hinzufügen"),
+                change,
+                &rules,
+                now,
+                source,
+            )
         }
     }
 }
@@ -269,15 +304,23 @@ pub fn delete(db: &Db, id: &str, now: i64, source: Source) -> AppResult<Written>
     let index = rules
         .iter()
         .position(|r| r.id == id)
-        .ok_or_else(|| AppError::NotFound(format!("No rule {id}")))?;
+        .ok_or_else(|| AppError::NotFound(tr!("No rule {id}", "Keine Regel {id}")))?;
     if rules[index].builtin.is_some() {
-        return Err(AppError::InvalidInput(
-            "A built-in rule can't be deleted".into(),
-        ));
+        return Err(AppError::InvalidInput(tr!(
+            "A built-in rule can't be deleted",
+            "Eine integrierte Regel kann nicht gelöscht werden"
+        )));
     }
     let removed = rules.remove(index);
     let change = Change::delete(store::RULES, &removed)?;
-    write_with_rerun(db, "Delete Rule".into(), change, &rules, now, source)
+    write_with_rerun(
+        db,
+        tr!("Delete Rule", "Regel löschen"),
+        change,
+        &rules,
+        now,
+        source,
+    )
 }
 
 /// Applies the rules to every line again, with the number of lines whose decision changed; None when
@@ -289,7 +332,10 @@ pub fn rerun(db: &Db, now: i64, source: Source) -> AppResult<Option<(Written, us
         return Ok(None);
     }
     let lines = changes.len();
-    let written = db.write(Op::new("Re-run Rules", changes), source)?;
+    let written = db.write(
+        Op::new(tr!("Re-run Rules", "Regeln erneut anwenden"), changes),
+        source,
+    )?;
     Ok(Some((written, lines)))
 }
 
@@ -330,6 +376,12 @@ pub fn ensure_builtins(db: &Db, now: i64, source: Source) -> AppResult<Option<Wr
     }
     rules.sort_by_key(|r| (r.position, r.created_at));
     changes.extend(db.read(|c| apply::changes(c, &rules, now))?);
-    db.write(Op::new("Add Built-in Rules", changes), source)
-        .map(Some)
+    db.write(
+        Op::new(
+            tr!("Add Built-in Rules", "Integrierte Regeln hinzufügen"),
+            changes,
+        ),
+        source,
+    )
+    .map(Some)
 }

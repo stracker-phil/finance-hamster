@@ -6,6 +6,7 @@ vi.mock("../../api", async (orig) => ({ ...(await orig<object>()), api: (await i
 
 import { api } from "../../api";
 import { useStore } from "../../state/store";
+import { RevealTarget } from "../controls";
 import { statusGroup, statusRow } from "../../test/integrity";
 import { renderWithQuery } from "../../test/renderWithQuery";
 import { StatusPage } from "./StatusPage";
@@ -33,6 +34,22 @@ describe("StatusPage", () => {
     expect(screen.getByText("Stored PDFs")).toBeTruthy();
     expect(screen.getByText("Checked against their checksums")).toBeTruthy();
     expect(screen.getByText("41 of 41")).toBeTruthy();
+  });
+
+  it("anchors a group by its id, not its shown title", async () => {
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    mocked.statusView.mockResolvedValue([statusGroup({ id: "statements", title: "Kontoauszüge" })]);
+    renderWithQuery(
+      <RevealTarget.Provider value={{ id: "status-statements" }}>
+        <StatusPage />
+      </RevealTarget.Provider>,
+    );
+
+    const region = await screen.findByRole("region", { name: "Kontoauszüge" });
+
+    await waitFor(() => expect(scroll.mock.contexts).toContain(region));
+    delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
   });
 
   it("says a group has nothing to check when it has no rows", async () => {

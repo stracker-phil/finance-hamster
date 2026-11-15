@@ -87,7 +87,7 @@ fn same(a: &str, b: &str) -> bool {
 }
 
 fn command_for(id: &str) -> AppResult<&'static CommandDef> {
-    find(id).ok_or_else(|| AppError::NotFound(format!("No command {id}")))
+    find(id).ok_or_else(|| AppError::NotFound(crate::tr!("No command {id}", "Kein Befehl {id}")))
 }
 
 fn holder(
@@ -108,14 +108,16 @@ fn ensure_available(
     overrides: &Overrides,
 ) -> AppResult<()> {
     if !valid(accelerator) {
-        return Err(AppError::InvalidInput(format!(
+        return Err(AppError::InvalidInput(crate::tr!(
             "{} needs ⌘, ⌃ or ⌥ and one key",
+            "{} braucht ⌘, ⌃ oder ⌥ und eine Taste",
             shortcut_label(accelerator)
         )));
     }
     if let Some(other) = holder(command, accelerator, overrides) {
-        return Err(AppError::InvalidInput(format!(
+        return Err(AppError::InvalidInput(crate::tr!(
             "{} is already used by {}",
+            "{} ist schon „{}“ zugewiesen",
             shortcut_label(accelerator),
             other.title.get()
         )));

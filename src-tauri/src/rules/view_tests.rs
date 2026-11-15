@@ -100,6 +100,35 @@ fn rules_are_grouped_by_action_and_described_in_words_with_their_matches() {
 }
 
 #[test]
+fn built_in_rules_are_described_in_german_when_the_language_is_german() {
+    let (_dir, db) = setup();
+    ensure_builtins(&db, NOW, Source::App).unwrap();
+    add(&db, ignore(&["Nothing", "Other"]));
+
+    let view = crate::i18n::with_lang(crate::settings::Language::De, || {
+        view_of(&db, DOT, DateOrder::DayFirst)
+    });
+
+    assert_eq!(
+        shown(&view),
+        vec![(
+            "Ignorieren",
+            vec![
+                (
+                    "Gegenkonto ist eines meiner Konten",
+                    "Umbuchungen · integriert · 0 Treffer"
+                ),
+                (
+                    "Banktext enthält Kontoführung oder Debitkarte",
+                    "Bankgebühren · integriert · 0 Treffer"
+                ),
+                ("Banktext enthält Nothing oder Other", "0 Treffer"),
+            ]
+        )]
+    );
+}
+
+#[test]
 fn amounts_and_dates_follow_the_number_format_and_the_date_order() {
     let (_dir, db) = scene();
 

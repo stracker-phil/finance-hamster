@@ -12,6 +12,7 @@ use crate::db::{Change, Db, Op, Source, Written};
 use crate::error::AppResult;
 use crate::statements::import::slug;
 use crate::store::json_file::{create_private_dir, write_private_file};
+use crate::tr;
 
 pub const FOLDER: &str = "docs";
 const INBOX: &str = "docs/inbox";
@@ -154,6 +155,12 @@ pub fn relocate(db: &Db, config_dir: &Path) -> AppResult<Option<Written>> {
     if changes.is_empty() {
         return Ok(None);
     }
-    db.write(Op::new("Move Document Files", changes), Source::App)
-        .map(Some)
+    db.write(
+        Op::new(
+            tr!("Move Document Files", "Beleg-Dateien verschieben"),
+            changes,
+        ),
+        Source::App,
+    )
+    .map(Some)
 }

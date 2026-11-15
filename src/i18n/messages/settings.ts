@@ -20,7 +20,7 @@ export const settings = both(
     },
     rules: {
       label: "Rules",
-      intro: "Rules run on every import, top to bottom, and the first that matches decides. Most are created right in Review with “Always do this”. Your own choice on a line always wins; subscriptions find their own charges.",
+      intro: "Rules run on every import, top to bottom, and the first that matches decides. Most are created right in Review, by deciding every line with the same text the same way. Your own choice on a line always wins; subscriptions find their own charges.",
       newRule: "New rule",
       newRuleDescription: "Match bank text, amount or account. Then: assign an item or ignore.",
       newRuleButton: "New Rule…",
@@ -302,7 +302,7 @@ export const settings = both(
     },
     rules: {
       label: "Regeln",
-      intro: "Regeln laufen bei jedem Import von oben nach unten; die erste passende entscheidet. Die meisten entstehen direkt beim Prüfen mit „Immer so machen“. Deine eigene Wahl für eine Buchung gewinnt immer; Abos finden ihre Abbuchungen selbst.",
+      intro: "Regeln laufen bei jedem Import von oben nach unten; die erste passende entscheidet. Die meisten entstehen direkt beim Prüfen, wenn du alle Buchungen mit demselben Text gleich entscheidest. Deine eigene Wahl für eine Buchung gewinnt immer; Abos finden ihre Abbuchungen selbst.",
       newRule: "Neue Regel",
       newRuleDescription: "Banktext, Betrag oder Konto abgleichen. Dann: einen Posten zuordnen oder ignorieren.",
       newRuleButton: "Neue Regel …",

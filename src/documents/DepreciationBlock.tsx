@@ -30,7 +30,7 @@ export function DepreciationBlock({ depreciation, disabled, onYears }: { depreci
       </div>
       <ol className="depreciation__slices" aria-label={text.slices}>
         {depreciation.slices.map((slice) => (
-          <li key={slice.year} className={slice.note === "frozen" ? "slice slice--frozen" : "slice"}>
+          <li key={slice.year} className={slice.frozen ? "slice slice--frozen" : "slice"}>
             <span className="slice__year">{slice.year}</span>
             <span className="slice__amount">{slice.amount}</span>
             <span className="add-doc__hint">{slice.note ?? ""}</span>

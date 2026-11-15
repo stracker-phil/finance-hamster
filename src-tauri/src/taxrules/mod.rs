@@ -86,7 +86,12 @@ pub struct Imported {
 }
 
 fn year_problem(file_year: i32, year: i32) -> Option<String> {
-    (file_year != year).then(|| format!("year: the file says {file_year}, its name says {year}"))
+    (file_year != year).then(|| {
+        crate::tr!(
+            "year: the file says {file_year}, its name says {year}",
+            "year: Die Datei sagt {file_year}, ihr Name sagt {year}"
+        )
+    })
 }
 
 fn ruleset_name(text: &str) -> Option<String> {
@@ -195,10 +200,16 @@ fn preview_year(row: &TaxYearRow, text: &str) -> ReloadPreview {
         Ok(next) => {
             preview.changes = match check::read(&row.rules, &BTreeSet::new()) {
                 Ok(current) => diff::describe(&current, &next),
-                Err(_) => vec!["The applied rules can't be read; the file replaces them".into()],
+                Err(_) => vec![crate::tr!(
+                    "The applied rules can't be read; the file replaces them",
+                    "Die angewendeten Regeln sind nicht lesbar; die Datei ersetzt sie"
+                )],
             };
             if preview.changes.is_empty() {
-                preview.changes.push("Only the formatting changed".into());
+                preview.changes.push(crate::tr!(
+                    "Only the formatting changed",
+                    "Nur die Formatierung hat sich geändert"
+                ));
             }
             preview.to = Some(next.ruleset);
         }
@@ -210,8 +221,9 @@ fn preview_year(row: &TaxYearRow, text: &str) -> ReloadPreview {
 pub fn apply(db: &Db, config_dir: &Path, now: i64) -> AppResult<Option<Written>> {
     let previews = preview(db, config_dir)?;
     if let Some(bad) = previews.iter().find(|p| !p.problems.is_empty()) {
-        return Err(AppError::InvalidInput(format!(
+        return Err(AppError::InvalidInput(crate::tr!(
             "{} can't be loaded: {}",
+            "{} lässt sich nicht laden: {}",
             files::file_name(bad.year),
             bad.problems.join("; ")
         )));
@@ -235,21 +247,30 @@ pub fn apply(db: &Db, config_dir: &Path, now: i64) -> AppResult<Option<Written>>
     if changes.is_empty() {
         return Ok(None);
     }
-    Ok(Some(
-        db.write(Op::new("Reload Tax Rules", changes), Source::Ui)?,
-    ))
+    Ok(Some(db.write(
+        Op::new(
+            crate::tr!("Reload Tax Rules", "Steuerregeln neu laden"),
+            changes,
+        ),
+        Source::Ui,
+    )?))
 }
 
 /// Puts a checked rules file in place of its year's file, keeping the old one; a closed year refuses.
 pub fn import(db: &Db, config_dir: &Path, text: &str) -> AppResult<Imported> {
     let ruleset = check::read(text, &BTreeSet::new()).map_err(|problems| {
-        AppError::InvalidInput(format!("The file can't be used: {}", problems.join("; ")))
+        AppError::InvalidInput(crate::tr!(
+            "The file can't be used: {}",
+            "Die Datei ist nicht verwendbar: {}",
+            problems.join("; ")
+        ))
     })?;
     let year = ruleset.year;
     let row = db.read(|c| taxyears::row(c, year))?;
     if row.as_ref().is_some_and(|r| r.state == YearState::Closed) {
-        return Err(AppError::InvalidInput(format!(
-            "Tax year {year} is closed; its rules are frozen"
+        return Err(AppError::InvalidInput(crate::tr!(
+            "Tax year {year} is closed; its rules are frozen",
+            "Das Steuerjahr {year} ist abgeschlossen; seine Regeln sind eingefroren"
         )));
     }
     let old_ruleset = files::read(config_dir, year)?.and_then(|old| ruleset_name(&old));
@@ -293,7 +314,12 @@ pub fn duplicate(db: &Db, config_dir: &Path) -> AppResult<String> {
         .read(taxyears::rows)?
         .into_iter()
         .find(|r| r.state == YearState::Open)
-        .ok_or_else(|| AppError::InvalidInput("There is no open tax year to copy".into()))?;
+        .ok_or_else(|| {
+            AppError::InvalidInput(crate::tr!(
+                "There is no open tax year to copy",
+                "Es gibt kein offenes Steuerjahr zum Kopieren"
+            ))
+        })?;
     let text = files::read(config_dir, newest.year)?.unwrap_or(newest.rules);
     let next = files::next_year_text(&text)?;
     files::create(config_dir, newest.year + 1, &next)?;

@@ -56,13 +56,16 @@ fn parse(question: &Question, text: &str) -> AppResult<i64> {
     let (value, message) = match question.kind {
         QuestionType::Integer => (
             text.trim().parse::<i64>().ok().filter(|n| *n >= 0),
-            "A whole number",
+            crate::tr!("A whole number", "Eine ganze Zahl"),
         ),
-        QuestionType::Amount => (parse_cents(text).map(i64::abs), "This isn't an amount"),
+        QuestionType::Amount => (
+            parse_cents(text).map(i64::abs),
+            crate::tr!("This isn't an amount", "Das ist kein Betrag"),
+        ),
     };
     value.ok_or_else(|| AppError::InvalidField {
         field: format!("answer.{}", question.id),
-        message: message.into(),
+        message,
     })
 }
 
@@ -107,12 +110,20 @@ pub fn answer(
         .questions
         .iter()
         .find(|q| q.id == question_id)
-        .ok_or_else(|| AppError::NotFound(format!("No question {question_id} in {year}")))?;
+        .ok_or_else(|| {
+            AppError::NotFound(crate::tr!(
+                "No question {question_id} in {year}",
+                "Keine Frage {question_id} in {year}"
+            ))
+        })?;
     let Some(change) = change_for(db, question, year, text, now)? else {
         return Ok(None);
     };
     db.write(
-        Op::new(format!("Answer {}", question.label), vec![change]),
+        Op::new(
+            crate::tr!("Answer {}", "Antwort: {}", question.label),
+            vec![change],
+        ),
         source,
     )
     .map(Some)

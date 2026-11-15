@@ -14,8 +14,9 @@ impl<'de> Deserialize<'de> for Cents {
         let value = f64::deserialize(deserializer)?;
         let cents = (value * 100.0).round();
         if value < 0.0 || (value * 100.0 - cents).abs() > 1e-6 || cents > i64::MAX as f64 {
-            return Err(serde::de::Error::custom(format!(
-                "{value} isn't an amount of at least 0 with at most two decimals"
+            return Err(serde::de::Error::custom(crate::tr!(
+                "{value} isn't an amount of at least 0 with at most two decimals",
+                "{value} ist kein Betrag ab 0 mit höchstens zwei Nachkommastellen"
             )));
         }
         Ok(Cents(cents as i64))

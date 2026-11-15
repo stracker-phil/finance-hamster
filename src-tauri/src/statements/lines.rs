@@ -12,6 +12,7 @@ use crate::money::{Money, format_money, format_signed};
 use crate::rules::store::{self as rules_store, Action, DecisionRow};
 use crate::rules::{self, ItemOption};
 use crate::settings::NumberFormat;
+use crate::{tr, tr_plural};
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
 #[serde(rename_all = "camelCase")]
@@ -50,7 +51,10 @@ fn status(
     items: &[ItemOption],
 ) -> (LineStatus, Option<String>) {
     let Some(d) = decision else {
-        return (LineStatus::Review, Some("Waiting for review".into()));
+        return (
+            LineStatus::Review,
+            Some(tr!("Waiting for review", "Wartet auf Prüfung")),
+        );
     };
     match d.kind {
         Action::Anv => {
@@ -69,11 +73,11 @@ fn status(
         }
         Action::Ignore => {
             let text = if d.by_hand() {
-                "Ignored"
+                tr!("Ignored", "Ignoriert")
             } else {
-                "Ignored by rule"
+                tr!("Ignored by rule", "Per Regel ignoriert")
             };
-            (LineStatus::Ignored, Some(text.into()))
+            (LineStatus::Ignored, Some(text))
         }
     }
 }
@@ -101,15 +105,20 @@ fn missing_between(older: &StatementRow, newer: &StatementRow) -> Option<String>
     }
     Some(
         if newer.year == older.year && newer.number == older.number + 2 {
-            format!(
+            tr!(
                 "Nr. {:03}/{} was never imported",
+                "Nr. {:03}/{} wurde nie importiert",
                 older.number + 1,
                 older.year
             )
         } else {
-            format!(
+            tr!(
                 "Statements between Nr. {:03}/{} and Nr. {:03}/{} were never imported",
-                older.number, older.year, newer.number, newer.year
+                "Kontoauszüge zwischen Nr. {:03}/{} und Nr. {:03}/{} wurden nie importiert",
+                older.number,
+                older.year,
+                newer.number,
+                newer.year
             )
         },
     )
@@ -171,7 +180,9 @@ pub fn account_lines(
         .read(accounts::rows)?
         .into_iter()
         .find(|a| a.id == account_id)
-        .ok_or_else(|| AppError::NotFound(format!("No account {account_id}")))?;
+        .ok_or_else(|| {
+            AppError::NotFound(tr!("No account {account_id}", "Kein Konto {account_id}"))
+        })?;
     let decisions = db.read(rules_store::decisions)?;
     let items = rules::items(db)?;
     let mut groups = Vec::new();
@@ -213,11 +224,10 @@ pub fn account_lines(
         groups.push(StatementGroup {
             label: format!("Nr. {:03}/{}", s.number, s.year),
             range,
-            count: format!(
-                "{} {}",
-                lines.len(),
-                if lines.len() == 1 { "line" } else { "lines" }
-            ),
+            count: {
+                let n = lines.len();
+                tr_plural!(n, "{n} line", "{n} lines", "{n} Buchung", "{n} Buchungen")
+            },
             lines: lines
                 .into_iter()
                 .map(|t| {

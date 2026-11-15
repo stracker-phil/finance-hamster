@@ -9,7 +9,7 @@ pub type AppResult<T> = Result<T, AppError>;
 /// Every error that crosses the Tauri boundary.
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
 pub enum AppError {
-    #[error("File error: {0}")]
+    #[error("{}", file_error(.0))]
     Io(String),
     #[error("{0}")]
     InvalidInput(String),
@@ -21,6 +21,11 @@ pub enum AppError {
     /// A bug or a broken invariant, not a user mistake.
     #[error("{0}")]
     Internal(String),
+}
+
+/// In the UI language when the error is shown.
+fn file_error(message: &str) -> String {
+    crate::tr!("File error: {message}", "Dateifehler: {message}")
 }
 
 impl AppError {
@@ -94,7 +99,7 @@ impl From<std::io::Error> for AppError {
 /// A database error is a bug or a broken file, never the owner's input.
 impl From<rusqlite::Error> for AppError {
     fn from(e: rusqlite::Error) -> Self {
-        AppError::Internal(format!("Database: {e}"))
+        AppError::Internal(crate::tr!("Database: {e}", "Datenbank: {e}"))
     }
 }
 
@@ -196,6 +201,30 @@ mod tests {
         ));
         assert_eq!(err, AppError::Io("denied".into()));
         assert_eq!(err.to_string(), "File error: denied");
+    }
+
+    #[test]
+    fn io_errors_and_database_errors_read_in_the_current_language() {
+        use crate::i18n::with_lang;
+        use crate::settings::Language;
+        let io = AppError::Io("denied".into());
+        let database = AppError::from(rusqlite::Error::QueryReturnedNoRows);
+
+        for (language, file, prefix) in [
+            (Language::En, "File error: denied", "Database: "),
+            (Language::De, "Dateifehler: denied", "Datenbank: "),
+        ] {
+            with_lang(language, || {
+                assert_eq!(io.to_string(), file, "{language:?}");
+                let AppError::Internal(message) =
+                    AppError::from(rusqlite::Error::QueryReturnedNoRows)
+                else {
+                    panic!("not internal");
+                };
+                assert!(message.starts_with(prefix), "{language:?}: {message}");
+            });
+        }
+        assert_eq!(database.kind(), ErrorKind::Internal);
     }
 
     #[test]

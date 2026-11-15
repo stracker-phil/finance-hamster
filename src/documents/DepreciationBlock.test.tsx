@@ -91,14 +91,21 @@ describe("DepreciationBlock", () => {
     it("shows the frozen note on a slice of a closed year", () => {
       renderBlock({
         slices: [
-          { year: 2026, amount: "€250.00", note: "frozen" },
-          { year: 2027, amount: "€500.00", note: null },
+          { year: 2026, amount: "€250.00", note: "frozen", frozen: true },
+          { year: 2027, amount: "€500.00", note: null, frozen: false },
         ],
       });
 
       const items = within(screen.getByRole("list", { name: "Slices" })).getAllByRole("listitem");
       expect(items[0].textContent).toBe("2026€250.00frozen");
       expect(items[1].textContent).toBe("2027€500.00");
+    });
+
+    it("still renders a frozen slice whose note is German", () => {
+      renderBlock({ slices: [{ year: 2026, amount: "€250.00", note: "eingefroren", frozen: true }] });
+
+      const [item] = within(screen.getByRole("list", { name: "Slices" })).getAllByRole("listitem");
+      expect(item.textContent).toBe("2026€250.00eingefroren");
     });
   });
 });

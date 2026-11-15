@@ -25,6 +25,7 @@ use store::{DocumentRow, VendorRow};
 
 use crate::db::Db;
 use crate::error::{AppError, AppResult};
+use crate::tr;
 
 /// Refuses linking `line` to `doc_id` while another document that counts already has it: the year would count
 /// the line's amount twice.
@@ -46,8 +47,9 @@ pub fn refuse_paid_elsewhere(db: &Db, line: &str, doc_id: &str) -> AppResult<()>
     match holder {
         Some(doc) => Err(AppError::InvalidField {
             field: "document.lines".into(),
-            message: format!(
+            message: tr!(
                 "This line already pays {}; unlink it there first",
+                "Diese Buchung bezahlt schon {}; löse dort zuerst die Verknüpfung",
                 title_of(&doc, &vendors)
             ),
         }),
@@ -68,6 +70,6 @@ pub fn title_of(doc: &DocumentRow, vendors: &[VendorRow]) -> String {
                     .unwrap_or(&doc.original_name)
                     .to_string()
             },
-            |v| format!("{} invoice", v.name),
+            |v| tr!("{} invoice", "Rechnung {}", v.name),
         )
 }

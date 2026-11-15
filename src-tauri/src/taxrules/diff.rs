@@ -23,8 +23,9 @@ pub fn describe(old: &Ruleset, new: &Ruleset) -> Vec<String> {
         keyed(list, id, o.get(*list), n.get(*list), &mut lines);
     }
     if !lines.is_empty() && old.ruleset == new.ruleset {
-        lines.push(format!(
+        lines.push(crate::tr!(
             "The ruleset is still \"{}\"; bump it to tell the versions apart",
+            "Das ruleset heißt noch „{}“; erhöh die Version, damit sich die Fassungen unterscheiden",
             new.ruleset
         ));
     }
@@ -53,13 +54,23 @@ fn keyed(list: &str, id: &str, old: Option<&Value>, new: Option<&Value>, lines: 
     let (o, n) = (by_id(old, id), by_id(new, id));
     for (key, value) in &o {
         match find(&n, key) {
-            None => lines.push(format!("{list}: \"{key}\"{} removed", label(value))),
+            None => {
+                let label = label(value);
+                lines.push(crate::tr!(
+                    "{list}: \"{key}\"{label} removed",
+                    "{list}: „{key}“{label} entfernt"
+                ));
+            }
             Some(next) => compare(&format!("{list}.{key}"), Some(value), Some(next), lines),
         }
     }
     for (key, value) in &n {
         if find(&o, key).is_none() {
-            lines.push(format!("{list}: \"{key}\"{} added", label(value)));
+            let label = label(value);
+            lines.push(crate::tr!(
+                "{list}: \"{key}\"{label} added",
+                "{list}: „{key}“{label} hinzugefügt"
+            ));
         }
     }
 }
@@ -88,7 +99,7 @@ fn label(entry: &Value) -> String {
 
 fn show(value: Option<&Value>) -> String {
     match value {
-        None | Some(Value::Null) => "none".into(),
+        None | Some(Value::Null) => crate::tr!("none", "keiner"),
         Some(Value::Number(n)) => match n.as_f64() {
             Some(f) if f.fract() == 0.0 && n.is_f64() => format!("{f:.0}"),
             _ => n.to_string(),

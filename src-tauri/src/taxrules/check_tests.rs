@@ -339,6 +339,26 @@ fn no_sections_is_reported_together_with_the_items_that_lose_their_section() {
 }
 
 #[test]
+fn problems_read_in_german_when_the_language_is_german() {
+    let german = crate::i18n::with_lang(crate::settings::Language::De, || {
+        problems_of(&[
+            ("/schemaVersion", json!(2)),
+            ("/ruleset", json!("2026-v1")),
+            ("/year", json!(1999)),
+        ])
+    });
+
+    assert_eq!(
+        german,
+        vec![
+            "schemaVersion: Dieser Hamster liest Version 1, nicht 2".to_string(),
+            "ruleset: „2026-v1“ sollte wie „2026 v1“ aussehen".to_string(),
+            "year: 1999 liegt nicht zwischen 2000 und 2100".to_string(),
+        ]
+    );
+}
+
+#[test]
 fn every_problem_is_reported_at_once() {
     let problems = problems_of(&[
         ("/schemaVersion", json!(3)),

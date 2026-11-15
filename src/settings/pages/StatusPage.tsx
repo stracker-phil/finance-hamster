@@ -38,7 +38,7 @@ export function StatusPage() {
   return (
     <>
       {groups?.map((group) => (
-        <Group key={group.title} title={group.title} anchor={`status-${group.title.toLowerCase()}`}>
+        <Group key={group.id} title={group.title} anchor={`status-${group.id}`}>
           {group.rows.length === 0 && <Row label={text.nothing} />}
           {group.rows.map((row) => (
             <Row key={row.label} label={row.label} description={row.detail}>

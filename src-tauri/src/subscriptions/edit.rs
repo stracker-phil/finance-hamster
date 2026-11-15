@@ -13,6 +13,7 @@ use crate::db::{Change, Db, Op, Source, Written};
 use crate::error::{AppError, AppResult};
 use crate::money::parse_cents;
 use crate::rules::{self, apply, store as rules_store};
+use crate::tr;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, TS)]
 #[serde(rename_all = "camelCase")]
@@ -47,10 +48,10 @@ pub struct PlanForm {
     pub start: String,
 }
 
-fn invalid(field: &str, message: &str) -> AppError {
+fn invalid(field: &str, message: String) -> AppError {
     AppError::InvalidField {
         field: format!("subscription.{field}"),
-        message: message.into(),
+        message,
     }
 }
 
@@ -58,7 +59,7 @@ fn amount(text: &str) -> AppResult<i64> {
     parse_cents(text)
         .map(i64::abs)
         .filter(|c| *c > 0)
-        .ok_or_else(|| invalid("amount", "This isn't an amount"))
+        .ok_or_else(|| invalid("amount", tr!("This isn't an amount", "Das ist kein Betrag")))
 }
 
 fn currency(text: &str) -> AppResult<String> {
@@ -66,12 +67,18 @@ fn currency(text: &str) -> AppResult<String> {
     if code.len() == 3 && code.chars().all(|c| c.is_ascii_alphabetic()) {
         Ok(code)
     } else {
-        Err(invalid("currency", "A three-letter code, such as EUR"))
+        Err(invalid(
+            "currency",
+            tr!(
+                "A three-letter code, such as EUR",
+                "Ein dreistelliger Code, etwa EUR"
+            ),
+        ))
     }
 }
 
 fn day(field: &str, text: &str) -> AppResult<NaiveDate> {
-    date::parse(text).ok_or_else(|| invalid(field, "This isn't a date"))
+    date::parse(text).ok_or_else(|| invalid(field, tr!("This isn't a date", "Das ist kein Datum")))
 }
 
 /// The subscription row a form describes, keeping `id` and `created_at`.
@@ -84,15 +91,30 @@ fn row_of(
 ) -> AppResult<SubscriptionRow> {
     let name = form.name.trim();
     if name.is_empty() {
-        return Err(invalid("name", "Give it a name"));
+        return Err(invalid(
+            "name",
+            tr!("Give it a name", "Gib ihm einen Namen"),
+        ));
     }
     if form.match_text.trim().is_empty() {
-        return Err(invalid("match", "The bank text its charges contain"));
+        return Err(invalid(
+            "match",
+            tr!(
+                "The bank text its charges contain",
+                "Der Banktext, den seine Abbuchungen enthalten"
+            ),
+        ));
     }
     if let Some(key) = &form.item_key
         && !rules::items(db)?.iter().any(|i| &i.key == key)
     {
-        return Err(invalid("item", "Choose one of the year's items"));
+        return Err(invalid(
+            "item",
+            tr!(
+                "Choose one of the year's items",
+                "Wähle einen Posten des Jahres"
+            ),
+        ));
     }
     let ended_on = if form.active {
         None
@@ -144,7 +166,7 @@ fn existing(subscriptions: &[SubscriptionRow], id: &str) -> AppResult<Subscripti
         .iter()
         .find(|s| s.id == id)
         .cloned()
-        .ok_or_else(|| AppError::NotFound(format!("No subscription {id}")))
+        .ok_or_else(|| AppError::NotFound(tr!("No subscription {id}", "Kein Abo {id}")))
 }
 
 fn replace(rows: &mut [SubscriptionRow], row: &SubscriptionRow) {
@@ -178,7 +200,8 @@ pub fn create(
         Change::insert(store::SUBSCRIPTIONS, &sub)?,
         Change::insert(store::PLANS, &plan)?,
     ];
-    let label = format!("New Subscription: {}", sub.name);
+    let name = &sub.name;
+    let label = tr!("New Subscription: {name}", "Neues Abo: {name}");
     subscriptions.push(sub);
     plans.push(plan);
     write_matched(db, label, changes, subscriptions, plans, now, source)
@@ -210,7 +233,8 @@ pub fn update(
         }
     }
     replace(&mut subscriptions, &after);
-    let label = format!("Edit Subscription: {}", after.name);
+    let name = &after.name;
+    let label = tr!("Edit Subscription: {name}", "Abo bearbeiten: {name}");
     write_matched(db, label, changes, subscriptions, plans, now, source)
 }
 
@@ -227,12 +251,21 @@ pub fn change_plan(
     let start = day("start", &form.start)?;
     let name = form.name.trim();
     if name.is_empty() {
-        return Err(invalid("planName", "Name the plan"));
+        return Err(invalid(
+            "planName",
+            tr!("Name the plan", "Gib dem Tarif einen Namen"),
+        ));
     }
     let mut changes = Vec::new();
     if let Some(current) = plans.iter_mut().rev().find(|p| p.subscription_id == id) {
         if date::iso(start) <= current.start {
-            return Err(invalid("start", "After the current plan's start"));
+            return Err(invalid(
+                "start",
+                tr!(
+                    "After the current plan's start",
+                    "Nach dem Beginn des aktuellen Tarifs"
+                ),
+            ));
         }
         let ended = PlanRow {
             end: start.checked_sub_days(Days::new(1)).map(date::iso),
@@ -254,7 +287,8 @@ pub fn change_plan(
     };
     changes.push(Change::insert(store::PLANS, &plan)?);
     plans.push(plan);
-    let label = format!("Change Plan: {}", sub.name);
+    let name = &sub.name;
+    let label = tr!("Change Plan: {name}", "Tarif ändern: {name}");
     write_matched(db, label, changes, subscriptions, plans, now, source)
 }
 
@@ -275,8 +309,8 @@ pub fn set_ended(
         ..before.clone()
     };
     let label = match ended_on {
-        Some(_) => format!("End Subscription: {}", before.name),
-        None => format!("Resume Subscription: {}", before.name),
+        Some(_) => tr!("End Subscription: {}", "Abo beenden: {}", before.name),
+        None => tr!("Resume Subscription: {}", "Abo fortsetzen: {}", before.name),
     };
     let changes = vec![Change::update(store::SUBSCRIPTIONS, &before, &after)?];
     replace(&mut subscriptions, &after);
@@ -300,6 +334,7 @@ pub fn delete(db: &Db, id: &str, now: i64, source: Source) -> AppResult<Written>
     changes.push(Change::delete(store::SUBSCRIPTIONS, &sub)?);
     subscriptions.retain(|s| s.id != id);
     plans.retain(|p| p.subscription_id != id);
-    let label = format!("Delete Subscription: {}", sub.name);
+    let name = &sub.name;
+    let label = tr!("Delete Subscription: {name}", "Abo löschen: {name}");
     write_matched(db, label, changes, subscriptions, plans, now, source)
 }

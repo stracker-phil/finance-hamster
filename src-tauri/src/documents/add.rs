@@ -22,6 +22,7 @@ use crate::platform::pdf::Pdf;
 use crate::rules::{self, ItemOption};
 use crate::settings::NumberFormat;
 use crate::statements::store as statements;
+use crate::tr;
 
 /// Days within which the same vendor and amount look like the same invoice.
 const NEAR_DUPLICATE_DAYS: i64 = 3;
@@ -104,16 +105,18 @@ fn text_of(bytes: &[u8]) -> Vec<String> {
 /// Reads a PDF; refuses one already added.
 pub fn prepare(db: &Db, bytes: Vec<u8>, original_name: String) -> AppResult<AddPending> {
     if !bytes.starts_with(b"%PDF") {
-        return Err(AppError::InvalidInput(format!(
-            "{original_name} isn't a PDF"
+        return Err(AppError::InvalidInput(tr!(
+            "{original_name} isn't a PDF",
+            "{original_name} ist kein PDF"
         )));
     }
     let hash = crate::statements::file_hash(&bytes);
     if let Some(existing) = db.read(|c| store::document_by_hash(c, &hash))? {
         let vendors = db.read(store::vendors)?;
-        return Err(AppError::InvalidInput(format!(
-            "Already added: {}",
-            title_of(&existing, &vendors)
+        let title = title_of(&existing, &vendors);
+        return Err(AppError::InvalidInput(tr!(
+            "Already added: {title}",
+            "Schon hinzugefügt: {title}"
         )));
     }
     let names: Vec<String> = db
@@ -156,9 +159,10 @@ fn near_duplicate(db: &Db, guess: &Guess) -> AppResult<Option<String>> {
             })
     });
     Ok(similar.map(|d| {
-        format!(
-            "Looks like {}: same vendor and amount a few days apart",
-            title_of(&d, &vendors)
+        let title = title_of(&d, &vendors);
+        tr!(
+            "Looks like {title}: same vendor and amount a few days apart",
+            "Sieht aus wie {title}: gleicher Händler und Betrag, wenige Tage auseinander"
         )
     }))
 }
@@ -171,7 +175,7 @@ fn item_for(db: &Db, vendor: Option<&VendorRow>) -> AppResult<(Option<String>, O
     if let Some(key) = &vendor.default_item_key {
         return Ok((
             Some(key.clone()),
-            Some(format!("default for {}", vendor.name)),
+            Some(tr!("default for {}", "Standard für {}", vendor.name)),
         ));
     }
     let last = db
@@ -182,7 +186,7 @@ fn item_for(db: &Db, vendor: Option<&VendorRow>) -> AppResult<(Option<String>, O
         .next_back();
     let why = last
         .as_ref()
-        .map(|_| format!("last used for {}", vendor.name));
+        .map(|_| tr!("last used for {}", "zuletzt verwendet für {}", vendor.name));
     Ok((last, why))
 }
 
@@ -245,13 +249,13 @@ pub fn commit(
     if name.is_empty() {
         return Err(AppError::InvalidField {
             field: "document.vendor".into(),
-            message: "Name the vendor".into(),
+            message: tr!("Name the vendor", "Gib den Händler an"),
         });
     }
     let line = match &input.line_id {
         Some(id) => Some(
             db.read(|c| statements::transaction_by_id(c, id))?
-                .ok_or_else(|| AppError::NotFound(format!("No line {id}")))?,
+                .ok_or_else(|| AppError::NotFound(tr!("No line {id}", "Keine Buchung {id}")))?,
         ),
         None => None,
     };
@@ -262,7 +266,10 @@ pub fn commit(
     {
         return Err(AppError::InvalidField {
             field: "document.item".into(),
-            message: "Choose one of the year's items".into(),
+            message: tr!(
+                "Choose one of the year's items",
+                "Wähle einen der Posten des Jahres"
+            ),
         });
     }
     let mut changes = Vec::new();
@@ -321,5 +328,11 @@ pub fn commit(
         };
         changes.push(Change::insert(store::LINKS, &link)?);
     }
-    db.write(Op::new(format!("Add Document {name}"), changes), source)
+    db.write(
+        Op::new(
+            tr!("Add Document {name}", "Beleg hinzufügen: {name}"),
+            changes,
+        ),
+        source,
+    )
 }

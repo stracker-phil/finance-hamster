@@ -19,6 +19,7 @@ use crate::statements::view::{self as coverage, AccountState, Coverage};
 use crate::subscriptions::Book;
 use crate::subscriptions::view::{Format, letter};
 use crate::taxyears::{self, YearState};
+use crate::tr;
 use crate::year::page::{self as year_page, AttentionKind, YearPage};
 use steps::{
     attach_step, draft_step, import_step, joined, questions_step, review_step, year_check_step,
@@ -141,8 +142,15 @@ fn reach(db: &Db, view: &Coverage, order: DateOrder) -> AppResult<Vec<StatementR
         .into_iter()
         .map(|(end, behind, names)| StatementReach {
             text: match end {
-                Some(end) => format!("{} until {}", joined(&names), date::day_month(end, order)),
-                None => format!("{}: none yet", joined(&names)),
+                Some(end) => {
+                    let names = joined(&names);
+                    let day = date::day_month(end, order);
+                    tr!("{names} until {day}", "{names} bis {day}")
+                }
+                None => {
+                    let names = joined(&names);
+                    tr!("{names}: none yet", "{names}: noch keiner")
+                }
             },
             behind,
         })
@@ -167,9 +175,9 @@ fn upcoming(db: &Db, today: NaiveDate, format: &Format) -> AppResult<Vec<Upcomin
                     tone: sub.tone,
                     anv: sub.item_key.is_some(),
                     when: match days {
-                        i64::MIN..=0 => "today".into(),
-                        1 => "tomorrow".into(),
-                        2..=31 => format!("in {days} days"),
+                        i64::MIN..=0 => tr!("today", "heute"),
+                        1 => tr!("tomorrow", "morgen"),
+                        2..=31 => tr!("in {days} days", "in {days} Tagen"),
                         _ => date::day_month_year(next, format.order),
                     },
                     soon: days <= SOON_DAYS,
