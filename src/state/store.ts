@@ -1,6 +1,7 @@
 import type { AddPreview, ImportPreview, PlanForm, ReviewLine, SubscriptionForm } from "../api";
 import { create } from "zustand";
 import type { MenuAt, MenuEntry, OpenMenu } from "../components/menu/types";
+import { t } from "../i18n";
 import { HOME, sameRoute, type Route } from "./route";
 
 export type ToastKind = "success" | "info" | "error";
@@ -142,7 +143,7 @@ export const useStore = create<AppStore>((set, get) => ({
   uncoverPdf: () => set({ pdfCovers: Math.max(0, get().pdfCovers - 1) }),
 
   menu: null,
-  openMenu: (entries, at, label = "Menu") => {
+  openMenu: (entries, at, label = t().components.menu) => {
     if (at instanceof HTMLElement && get().menu?.at === at) return set({ menu: null });
     const focused = document.activeElement;
     const opener = at instanceof HTMLElement ? at : focused instanceof HTMLElement && focused !== document.body ? focused : null;

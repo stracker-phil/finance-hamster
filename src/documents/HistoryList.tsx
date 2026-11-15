@@ -1,4 +1,5 @@
 import type { HistoryEntry, HistoryKind } from "../api";
+import { useT } from "../i18n";
 
 const KIND_CLASS: Record<HistoryKind, string> = {
   added: "history__dot--added",
@@ -14,8 +15,9 @@ const KIND_CLASS: Record<HistoryKind, string> = {
 
 /** History lines, newest first; `withDocument` also names the document each is about. */
 export function HistoryList({ entries, withDocument, onOpen }: { entries: HistoryEntry[]; withDocument?: boolean; onOpen?: (documentId: string) => void }) {
+  const text = useT().documents.history;
   return (
-    <ol className="history" aria-label="Changes">
+    <ol className="history" aria-label={text.changes}>
       {entries.map((entry, i) => (
         <li key={i} className="history__entry">
           <span className={`history__dot ${KIND_CLASS[entry.kind]}`} />

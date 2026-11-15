@@ -6,7 +6,8 @@ import { undoToast } from "../lib/undoToast";
 import { Segmented } from "../settings/controls";
 import { useStore } from "../state/store";
 import { SourceLine } from "./SourceLine";
-import { INTERVALS } from "./SubscriptionSheet";
+import { intervals } from "./SubscriptionSheet";
+import { useT } from "../i18n";
 
 const dayBefore = (iso: string) => {
   const day = new Date(`${iso}T12:00:00`);
@@ -22,6 +23,8 @@ export function PlanSheet({ id, name, currentPlan, initial, source, onClose }: {
   const [form, setForm] = useState(initial);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  const all = useT().subscriptions;
+  const text = all.plan;
   const set = (patch: Partial<PlanForm>) => setForm((f) => ({ ...f, ...patch }));
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -52,45 +55,45 @@ export function PlanSheet({ id, name, currentPlan, initial, source, onClose }: {
     <Modal labelledBy={titleId} onClose={onClose}>
       <form onSubmit={submit} className="plan-sheet">
         <div>
-          <h2 id={titleId}>Change plan · {name}</h2>
-          <span className="add-doc__hint">Current: {currentPlan}</span>
+          <h2 id={titleId}>{text.title(name)}</h2>
+          <span className="add-doc__hint">{text.current(currentPlan)}</span>
         </div>
         {source && <SourceLine line={source} />}
         <div className="sub-grid">
-          <label htmlFor={field("name")}>New plan</label>
+          <label htmlFor={field("name")}>{text.newPlan}</label>
           <div>
-            <input id={field("name")} className="field" value={form.name} placeholder="Pro, Family, …" autoFocus aria-invalid={!!message("planName")} onChange={(e) => set({ name: e.target.value })} />
+            <input id={field("name")} className="field" value={form.name} placeholder={text.namePlaceholder} autoFocus aria-invalid={!!message("planName")} onChange={(e) => set({ name: e.target.value })} />
             {fieldError("planName")}
           </div>
-          <label htmlFor={field("amount")}>Amount</label>
+          <label htmlFor={field("amount")}>{text.amount}</label>
           <div>
             <div className="sub-grid__pair">
               <input id={field("amount")} className="field sub-sheet__amount" inputMode="decimal" value={form.amount} aria-invalid={!!message("amount")} onChange={(e) => set({ amount: e.target.value })} />
-              <input className="field sub-sheet__currency" aria-label="Currency" maxLength={3} value={form.currency} onChange={(e) => set({ currency: e.target.value.toUpperCase() })} />
+              <input className="field sub-sheet__currency" aria-label={text.currency} maxLength={3} value={form.currency} onChange={(e) => set({ currency: e.target.value.toUpperCase() })} />
             </div>
             {fieldError("amount", "currency")}
           </div>
-          <span>Repeats</span>
+          <span>{text.repeats}</span>
           <div>
-              <Segmented label="Repeats" options={INTERVALS} value={form.interval} onChange={(interval) => set({ interval })} />
+              <Segmented label={text.repeats} options={intervals(all.sheet)} value={form.interval} onChange={(interval) => set({ interval })} />
               <div className="form-field__error" />
             </div>
-          <label htmlFor={field("start")}>Starts</label>
+          <label htmlFor={field("start")}>{text.starts}</label>
           <div>
             <input id={field("start")} type="date" className="field" value={form.start} aria-invalid={!!message("start")} onChange={(e) => set({ start: e.target.value })} />
             {fieldError("start")}
           </div>
         </div>
         <p className="plan-sheet__box">
-          {ends ? `The current plan ends on ${ends}. Its charges stay with it; the bank text keeps matching, so the next charges link to the new plan.` : "Choose when the new plan starts."}
+          {ends ? text.ends(ends) : text.chooseStart}
         </p>
         {fieldError("form")}
         <div className="actions">
           <button type="button" className="btn" onClick={onClose}>
-            Cancel
+            {text.cancel}
           </button>
           <button type="submit" className="btn btn--primary" disabled={busy}>
-            Change Plan
+            {text.change}
           </button>
         </div>
       </form>

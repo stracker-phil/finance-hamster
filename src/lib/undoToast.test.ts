@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
 
 import { api } from "../api";
+import { setLanguage } from "../i18n";
 import { useStore } from "../state/store";
 import { showError, undoToast } from "./undoToast";
 
@@ -71,5 +72,24 @@ describe("undoToast", () => {
     useStore.getState().toasts[0].action!.run();
 
     await vi.waitFor(() => expect(toasts()).toContainEqual(["error", "Tax year 2026 is closed"]));
+  });
+
+  describe("in German", () => {
+    beforeEach(() => setLanguage("de"));
+
+    it("offers the action as Widerrufen", () => {
+      undoToast("Beleg gelöscht");
+
+      expect(useStore.getState().toasts[0].action?.label).toBe("Widerrufen");
+    });
+
+    it("says what was undone in German when the action is run", async () => {
+      mocked.undo.mockResolvedValue("Beleg gelöscht");
+      undoToast("Beleg gelöscht");
+
+      useStore.getState().toasts[0].action!.run();
+
+      await vi.waitFor(() => expect(toasts()).toContainEqual(["success", "Widerrufen: Beleg gelöscht"]));
+    });
   });
 });

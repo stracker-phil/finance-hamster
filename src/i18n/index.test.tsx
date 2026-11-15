@@ -3,19 +3,19 @@ import { describe, expect, it } from "vitest";
 import { setLanguage, t, useT } from "./index";
 
 function Heading() {
-  return <h1>{useT().appearance.languageGroup}</h1>;
+  return <h1>{useT().settings.appearance.languageGroup}</h1>;
 }
 
 describe("i18n", () => {
   it("speaks English until a language is set", () => {
-    expect(t().appearance.languageGroup).toBe("Language");
+    expect(t().settings.appearance.languageGroup).toBe("Language");
     expect(document.documentElement.lang).not.toBe("de");
   });
 
   it("switches t() to German and marks the document as German", () => {
     setLanguage("de");
 
-    expect(t().appearance.languageGroup).toBe("Sprache");
+    expect(t().settings.appearance.languageGroup).toBe("Sprache");
     expect(document.documentElement.lang).toBe("de");
   });
 
@@ -33,7 +33,7 @@ describe("i18n", () => {
 
     setLanguage("en");
 
-    expect(t().appearance.languageGroup).toBe("Language");
+    expect(t().settings.appearance.languageGroup).toBe("Language");
     expect(document.documentElement.lang).toBe("en");
   });
 });

@@ -1,32 +1,34 @@
 import { PopUpButton } from "../components/menu";
 import { useId } from "react";
 import type { DepreciationView } from "../api";
+import { useT } from "../i18n";
 
 const YEARS = Array.from({ length: 15 }, (_, i) => i + 1);
 
 /** A purchase above the GWG limit: its cost, the useful life (the rule's or the document's own), and its slices. */
 export function DepreciationBlock({ depreciation, disabled, onYears }: { depreciation: DepreciationView; disabled: boolean; onYears: (years: number | null) => void }) {
   const id = useId();
+  const text = useT().documents.depreciation;
   return (
-    <section className="depreciation" aria-label="Depreciation">
-      <h3 className="doc-form__heading">Depreciation</h3>
+    <section className="depreciation" aria-label={text.title}>
+      <h3 className="doc-form__heading">{text.title}</h3>
       <div className="doc-form__grid">
-        <label htmlFor={`${id}-life`}>Useful life</label>
+        <label htmlFor={`${id}-life`}>{text.usefulLife}</label>
         <div className="doc-form__row">
           <PopUpButton
             id={`${id}-life`}
             className="depreciation__life"
             value={depreciation.own ? depreciation.years : 0}
             disabled={disabled}
-            options={[{ value: 0, label: "As the rules say" }, ...YEARS.map((y) => ({ value: y, label: `${y} ${y === 1 ? "year" : "years"}` }))]}
+            options={[{ value: 0, label: text.asRules }, ...YEARS.map((y) => ({ value: y, label: text.years(y) }))]}
             onChange={(years) => onYears(years || null)}
           />
           <span className="add-doc__hint">{depreciation.rule}</span>
         </div>
-        <span>Why</span>
+        <span>{text.why}</span>
         <span className="depreciation__why">{depreciation.why}</span>
       </div>
-      <ol className="depreciation__slices" aria-label="Slices">
+      <ol className="depreciation__slices" aria-label={text.slices}>
         {depreciation.slices.map((slice) => (
           <li key={slice.year} className={slice.note === "frozen" ? "slice slice--frozen" : "slice"}>
             <span className="slice__year">{slice.year}</span>

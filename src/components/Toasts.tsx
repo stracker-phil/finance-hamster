@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle2, Info, X } from "lucide-react";
+import { useT } from "../i18n";
 import { useStore, type Toast } from "../state/store";
 import { useCoversPdf } from "../lib/pdfCover";
 
@@ -15,20 +16,21 @@ function ToastItem({ toast }: { toast: Toast }) {
     return () => clearTimeout(timer);
   }, [toast, dismiss]);
   const [details, setDetails] = useState(false);
+  const text = useT().components;
   const Icon = toast.kind === "error" ? AlertTriangle : toast.kind === "success" ? CheckCircle2 : Info;
   const [headline, ...rest] = toast.kind === "error" ? errorLines(toast.message) : [toast.message];
   return (
     <div className={`toast toast--${toast.kind}`} role={toast.kind === "error" ? "alert" : "status"}>
       <Icon size={16} />
       <span className="toast__text">
-        {toast.kind === "error" && <strong className="toast__title">Something went wrong{toast.count > 1 ? ` (×${toast.count})` : ""}</strong>}
+        {toast.kind === "error" && <strong className="toast__title">{text.somethingWrong}{toast.count > 1 ? ` (×${toast.count})` : ""}</strong>}
         {toast.kind !== "error" && toast.count > 1 && <span className="toast__count">×{toast.count} </span>}
         <span>{headline}</span>
         {rest.length > 0 && (
           <>
             {" "}
             <button className="link-btn" onClick={() => setDetails((d) => !d)}>
-              {details ? "Hide details" : "Details"}
+              {details ? text.hideDetails : text.details}
             </button>
             {details && <pre className="toast__details">{rest.join("\n")}</pre>}
           </>
@@ -45,7 +47,7 @@ function ToastItem({ toast }: { toast: Toast }) {
           {toast.action.label}
         </button>
       )}
-      <button className="icon-btn icon-btn--tiny" aria-label="Dismiss" onClick={() => dismiss(toast.id)}>
+      <button className="icon-btn icon-btn--tiny" aria-label={text.dismiss} onClick={() => dismiss(toast.id)}>
         <X size={13} />
       </button>
     </div>

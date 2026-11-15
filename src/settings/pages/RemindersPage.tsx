@@ -1,33 +1,34 @@
 import type { Reminder } from "../../api";
+import { useT } from "../../i18n";
 import { useSettings, useUpdateSettings } from "../../queries/settings";
 import { Group, Row, Segmented, Switch } from "../controls";
-
-const REMINDERS: { value: Reminder; label: string }[] = [
-  { value: "off", label: "Off" },
-  { value: "one_day", label: "1 day" },
-  { value: "three_days", label: "3 days" },
-  { value: "one_week", label: "1 week" },
-];
 
 export function RemindersPage() {
   const { data: settings } = useSettings();
   const { mutate } = useUpdateSettings();
+  const text = useT().settings.reminders;
+  const reminders: { value: Reminder; label: string }[] = [
+    { value: "off", label: text.off },
+    { value: "one_day", label: text.oneDay },
+    { value: "three_days", label: text.threeDays },
+    { value: "one_week", label: text.oneWeek },
+  ];
   return (
     <>
-      <Group title="Subscriptions" anchor="reminders-subscriptions">
-        <Row label="Default reminder for new subscriptions" description="Each subscription keeps its own; change it in its sheet." anchor="default-reminder">
-          <Segmented<Reminder> label="Default reminder" options={REMINDERS} value={settings?.defaultReminder} onChange={(defaultReminder) => mutate({ defaultReminder })} />
+      <Group title={text.subscriptions} anchor="reminders-subscriptions">
+        <Row label={text.defaultReminder} description={text.defaultReminderDescription} anchor="default-reminder">
+          <Segmented<Reminder> label={text.defaultReminderLabel} options={reminders} value={settings?.defaultReminder} onChange={(defaultReminder) => mutate({ defaultReminder })} />
         </Row>
         <Switch
-          label="Tell me when a price changes"
-          description="When a charge differs from the usual amount."
+          label={text.priceChanges}
+          description={text.priceChangesDescription}
           anchor="price-changes"
           checked={settings?.remindPriceChanges ?? true}
           onChange={(remindPriceChanges) => mutate({ remindPriceChanges })}
         />
       </Group>
-      <Group title="Statements" anchor="reminders-statements">
-        <Row label="Remind me to import after" description="Counted from the end of the last statement of each account." htmlFor="import-after" anchor="import-after">
+      <Group title={text.statements} anchor="reminders-statements">
+        <Row label={text.importAfter} description={text.importAfterDescription} htmlFor="import-after" anchor="import-after">
           <input
             id="import-after"
             className="field settings-number"
@@ -39,27 +40,27 @@ export function RemindersPage() {
               if (days >= 1) mutate({ importAfterDays: days });
             }}
           />
-          <span className="settings-value">days</span>
+          <span className="settings-value">{text.days}</span>
         </Row>
         <Switch
-          label="Tell me about gaps"
-          description="When a statement doesn’t continue the previous one."
+          label={text.gaps}
+          description={text.gapsDescription}
           anchor="gaps"
           checked={settings?.remindGaps ?? true}
           onChange={(remindGaps) => mutate({ remindGaps })}
         />
       </Group>
-      <Group title="Tax year" anchor="reminders-tax-year">
+      <Group title={text.taxYear} anchor="reminders-tax-year">
         <Switch
-          label="Filing reminder"
-          description="On 1 March, when the previous tax year can be closed."
+          label={text.filing}
+          description={text.filingDescription}
           anchor="filing"
           checked={settings?.remindFiling ?? true}
           onChange={(remindFiling) => mutate({ remindFiling })}
         />
         <Switch
-          label="Year check"
-          description="From 1 November until it ran, and again after 31 Dec until it ran once more."
+          label={text.yearCheck}
+          description={text.yearCheckDescription}
           anchor="year-check"
           checked={settings?.remindQuestions ?? true}
           onChange={(remindQuestions) => mutate({ remindQuestions })}

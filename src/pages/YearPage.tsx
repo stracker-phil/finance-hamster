@@ -11,6 +11,7 @@ import { AddButton, AddEntry } from "../year/AddEntry";
 import { YearMenu } from "../year/YearMenu";
 import { attachEvidence, deleteEntry, openEvidence } from "../year/entryActions";
 import { EmptyPage } from "./EmptyPage";
+import { t, useT } from "../i18n";
 
 
 function QuestionRow({ year, question }: { year: number; question: QuestionView }) {
@@ -46,9 +47,10 @@ function QuestionRow({ year, question }: { year: number; question: QuestionView 
 const ROW_ICONS = { document: FileText, line: Landmark, amount: Euro, trip: Car };
 
 function AttachButton({ year, entryId }: { year: number; entryId: string }) {
+  const text = useT().pages.year;
   return (
     <button className="btn btn--small" onClick={() => attachEvidence(year, entryId)}>
-      Attach PDF…
+      {text.attachPdf}
     </button>
   );
 }
@@ -63,20 +65,21 @@ function Row({ row, year, withAmount, open }: { row: YearRow; year: number; with
         ? () => openEvidence(year, row.id)
         : undefined;
   const Icon = ROW_ICONS[row.kind];
+  const text = useT().pages.year;
   return (
     <div className="year-row-wrap">
       <button className="year-row" onClick={onOpen} disabled={!onOpen}>
         <Icon size={15} strokeWidth={1.8} className="docs-row__icon" />
         <span className="year-row__title">{row.title}</span>
-        {row.draft && <span className="pill pill--dashed">Draft</span>}
-        {row.carriedFrom && <span className="pill">From {row.carriedFrom}</span>}
+        {row.draft && <span className="pill pill--dashed">{text.draft}</span>}
+        {row.carriedFrom && <span className="pill">{text.carriedFrom(row.carriedFrom)}</span>}
         <span className="add-doc__hint year-row__detail">{row.detail}</span>
         {withAmount && <span className="year-row__amount">{row.amount}</span>}
       </button>
       {isEntry && open && (
         <span className="year-row__actions">
           {row.attach && <AttachButton year={year} entryId={row.id} />}
-          <button className="icon-btn" aria-label={`Delete ${row.title}`} onClick={() => deleteEntry(year, row.id)}>
+          <button className="icon-btn" aria-label={text.delete(row.title)} onClick={() => deleteEntry(year, row.id)}>
             <Trash2 size={14} />
           </button>
         </span>
@@ -87,9 +90,10 @@ function Row({ row, year, withAmount, open }: { row: YearRow; year: number; with
 
 function Kennzahl({ item, year, open }: { item: KennzahlView; year: number; open: boolean }) {
   const [adding, setAdding] = useState(false);
+  const text = useT().pages.year;
   const copy = () =>
     copyText(item.copy)
-      .then(() => useStore.getState().showToast("success", `Copied ${item.copy} for KZ ${item.kz}`))
+      .then(() => useStore.getState().showToast("success", t().pages.year.copied(item.copy, item.kz)))
       .catch(showError);
   return (
     <section className={item.rows.length === 0 ? "kennzahl kennzahl--empty" : "kennzahl"} aria-label={`KZ ${item.kz} ${item.name}`}>
@@ -98,9 +102,9 @@ function Kennzahl({ item, year, open }: { item: KennzahlView; year: number; open
         <span className="kennzahl__name">{item.name}</span>
         {open && <AddButton item={item} adding={adding} onToggle={() => setAdding((a) => !a)} />}
         {item.reported ? (
-          <span className="pill">Not counted</span>
+          <span className="pill">{text.notCounted}</span>
         ) : (
-          <button className="copy-btn" onClick={() => void copy()} aria-label={`Copy ${item.copy} for KZ ${item.kz}`}>
+          <button className="copy-btn" onClick={() => void copy()} aria-label={text.copy(item.copy, item.kz)}>
             {item.copy}
             <Copy size={13} />
           </button>
@@ -118,13 +122,6 @@ function Kennzahl({ item, year, open }: { item: KennzahlView; year: number; open
 /** Rows shown before "Show all": a long list hides the sections below it. */
 const ATTENTION_SHOWN = 5;
 
-const KIND_HEADING: Record<AttentionKind, string> = {
-  missing_invoice: "Invoices to attach",
-  draft: "Drafts to finish",
-  undated: "Documents without a date",
-  changed_since_closing: "Changed since closing",
-};
-
 /** A missing invoice's Attach PDF…: for its bank line when it has one, else any new document. */
 const attachMissing = (item: AttentionView) => (item.lineId ? void attachInvoiceTo(item.lineId) : startAddDocument());
 
@@ -134,6 +131,7 @@ function AttentionList({ year, items, focus }: { year: number; items: AttentionV
   const [all, setAll] = useState(false);
   const [only, setOnly] = useState(focus);
   const section = useRef<HTMLElement>(null);
+  const text = useT().pages.year;
   useEffect(() => {
     if (focus) section.current?.scrollIntoView({ block: "start" });
   }, [focus]);
@@ -145,12 +143,12 @@ function AttentionList({ year, items, focus }: { year: number; items: AttentionV
     setAll(true);
   };
   return (
-    <section ref={section} className="year-attention" aria-label="Needs attention">
+    <section ref={section} className="year-attention" aria-label={text.needsAttention}>
       <div className="year-heading-row">
-        <h3 className="year-heading">{only ? KIND_HEADING[only] : "Needs attention"}</h3>
+        <h3 className="year-heading">{only ? text.headings[only] : text.needsAttention}</h3>
         {only && kept.length < items.length && (
           <button className="link-btn year-heading__more" onClick={showEverything}>
-            Show all {items.length} that need attention
+            {text.showAllAttention(items.length)}
           </button>
         )}
       </div>
@@ -165,13 +163,13 @@ function AttentionList({ year, items, focus }: { year: number; items: AttentionV
             </span>
             {documentId ? (
               <button className="btn btn--small" onClick={() => navigate({ page: "document", documentId, year })}>
-                {item.kind === "draft" ? "Open Draft" : "Open"}
+                {item.kind === "draft" ? text.openDraft : text.open}
               </button>
             ) : entryId ? (
               <AttachButton year={year} entryId={entryId} />
             ) : item.kind === "changed_since_closing" ? null : (
               <button className="btn btn--small" onClick={() => attachMissing(item)}>
-                Attach PDF…
+                {text.attachPdf}
               </button>
             )}
           </div>
@@ -179,7 +177,7 @@ function AttentionList({ year, items, focus }: { year: number; items: AttentionV
       })}
       {!only && items.length > ATTENTION_SHOWN && (
         <button className="link-btn year-more" onClick={() => setAll((open) => !open)}>
-          {all ? "Show fewer" : `Show all ${items.length}`}
+          {all ? text.showFewer : text.showAll(items.length)}
         </button>
       )}
     </section>
@@ -187,7 +185,8 @@ function AttentionList({ year, items, focus }: { year: number; items: AttentionV
 }
 
 function MonthList({ year, months, open }: { year: number; months: MonthView[]; open: boolean }) {
-  if (months.length === 0) return <p className="add-doc__hint">Nothing counts in {year} yet.</p>;
+  const text = useT().pages.year;
+  if (months.length === 0) return <p className="add-doc__hint">{text.nothingCounts(year)}</p>;
   return (
     <>
       {months.map((month) => (
@@ -209,13 +208,14 @@ function MonthList({ year, months, open }: { year: number; months: MonthView[]; 
 function CheckLine({ year }: { year: number }) {
   const { data } = useYearCheck(year);
   const navigate = useStore((s) => s.navigate);
+  const text = useT().pages.year;
   if (!data?.open) return null;
   return (
     <div className="check-line">
       <ListChecks size={15} />
       <span>{data.line}</span>
       <button className="btn btn--small" onClick={() => navigate({ page: "yearCheck", year })}>
-        Start Year Check
+        {text.startCheck}
       </button>
     </div>
   );
@@ -225,7 +225,8 @@ export function YearPage({ year, attention }: { year: number; attention?: Attent
   const filter = useStore((s) => s.filter);
   const [view, setView] = useState<"kennzahl" | "month">("kennzahl");
   const { data, isError } = useYearPage(year, filter);
-  if (isError) return <EmptyPage title={`No tax year ${year}`} text="Its rules file isn't loaded yet; see Settings → Tax Rules." />;
+  const text = useT().pages.year;
+  if (isError) return <EmptyPage title={text.missingTitle(year)} text={text.missingText} />;
   if (!data) return null;
   const open = data.state === "open";
   return (
@@ -234,8 +235,8 @@ export function YearPage({ year, attention }: { year: number; attention?: Attent
         <div className="year-hero">
           <div className="year-hero__main">
             <div className="add-doc__hint">
-              Total to enter for {data.year} · ruleset {data.ruleset}
-              {!open && <span> · Closed, read-only</span>}
+              {text.totalFor(data.year, data.ruleset)}
+              {!open && <span>{text.closed}</span>}
             </div>
             <div className="year-hero__total">{data.total}</div>
             {data.pauschaleNote && <div className="add-doc__hint">{data.pauschaleNote}</div>}
@@ -252,8 +253,8 @@ export function YearPage({ year, attention }: { year: number; attention?: Attent
         {open && <CheckLine year={data.year} />}
 
         {open && data.questions.length > 0 && (
-          <section aria-label={`Questions for ${data.year}`}>
-            <h3 className="year-heading">Questions for {data.year}</h3>
+          <section aria-label={text.questionsFor(data.year)}>
+            <h3 className="year-heading">{text.questionsFor(data.year)}</h3>
             {data.questions.map((q) => (
               <QuestionRow key={q.id} year={data.year} question={q} />
             ))}
@@ -262,12 +263,12 @@ export function YearPage({ year, attention }: { year: number; attention?: Attent
 
         <AttentionList key={attention ?? "all"} year={data.year} items={data.attention} focus={attention} />
 
-        <div className="year-switch" role="group" aria-label="Show">
+        <div className="year-switch" role="group" aria-label={text.show}>
           <button className="seg-btn" aria-pressed={view === "kennzahl"} onClick={() => setView("kennzahl")}>
-            By Kennzahl
+            {text.byKennzahl}
           </button>
           <button className="seg-btn" aria-pressed={view === "month"} onClick={() => setView("month")}>
-            By month
+            {text.byMonth}
           </button>
         </div>
 

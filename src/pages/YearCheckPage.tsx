@@ -8,6 +8,7 @@ import { useStore } from "../state/store";
 import { startDocument } from "../year/AddEntry";
 import { CheckRow, type Added } from "../yearcheck/CheckRow";
 import { EmptyPage } from "./EmptyPage";
+import { useT } from "../i18n";
 
 const STACK = 5;
 
@@ -15,22 +16,21 @@ const keysOf = (questions: CheckQuestion[]) => questions.map((q) => q.key);
 
 function Done({ year, view, answered, onAgain }: { year: number; view: YearCheckView; answered: number; onAgain: () => void }) {
   const navigate = useStore((s) => s.navigate);
+  const text = useT().pages.yearCheck;
   return (
     <div className="empty-page check-done">
       <span className="review-done__tile">
         <Check size={22} strokeWidth={2.6} />
       </span>
-      <div className="empty-page__title">Year check done</div>
-      <div>
-        Checked on {view.lastRun} · {answered} {answered === 1 ? "question" : "questions"} answered
-      </div>
-      {!view.yearOver && <div className="check-done__note">{year} isn’t over yet. Run the check again after 31 Dec; Close Year will remind you.</div>}
+      <div className="empty-page__title">{text.doneTitle}</div>
+      <div>{text.checkedOn(view.lastRun, answered)}</div>
+      {!view.yearOver && <div className="check-done__note">{text.notOver(year)}</div>}
       <div className="review-done__actions">
         <button className="btn" onClick={onAgain}>
-          Run Again
+          {text.again}
         </button>
         <button className="btn btn--primary" onClick={() => navigate({ page: "year", year })}>
-          Back to Tax Year {year}
+          {text.back(year)}
         </button>
       </div>
     </div>
@@ -46,6 +46,7 @@ export function YearCheckPage({ year }: { year: number }) {
   const [added, setAdded] = useState<Record<string, Added>>({});
   const [inline, setInline] = useState<string | null>(null);
   const [finished, setFinished] = useState<YearCheckView | null>(null);
+  const text = useT().pages.yearCheck;
 
   useEffect(() => {
     if (data && queue === null) setQueue(keysOf(data.questions));
@@ -96,18 +97,16 @@ export function YearCheckPage({ year }: { year: number }) {
 
   if (!data || queue === null) return null;
   if (finished) return <Done year={year} view={finished} answered={answered} onAgain={again} />;
-  if (!data.open) return <EmptyPage title={`Tax year ${year} is closed`} text="Reopen it to run the year check." />;
+  if (!data.open) return <EmptyPage title={text.closedTitle(year)} text={text.closedText} />;
   if (data.questions.length === 0)
-    return <EmptyPage title="Nothing to ask" text={`No item in rules-${year}.json has an ask block. Add them to the rules file, then Reload in Settings → Tax Rules.`} />;
+    return <EmptyPage title={text.nothingTitle} text={text.nothingText(year)} />;
   return (
     <div className="page-scroll check">
       <div className="check__column">
         <div className="check__head">
           <div>
-            <h2 className="check__title">
-              Year check {year} · {open.length} open
-            </h2>
-            <div className="check__sub">Things you might forget to claim. Say No to what doesn’t apply. Later moves a question to the end.</div>
+            <h2 className="check__title">{text.title(year, open.length)}</h2>
+            <div className="check__sub">{text.sub}</div>
           </div>
           <span className="review__keys">
             <span className="kbd" style={canAdd ? undefined : { visibility: "hidden" }}>
@@ -137,7 +136,7 @@ export function YearCheckPage({ year }: { year: number }) {
             />
           ))}
         </div>
-        {open.length > STACK && <div className="check__more">{open.length - STACK} more below, they move up as you answer</div>}
+        {open.length > STACK && <div className="check__more">{text.more(open.length - STACK)}</div>}
       </div>
     </div>
   );

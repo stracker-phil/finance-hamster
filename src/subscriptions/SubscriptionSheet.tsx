@@ -11,6 +11,7 @@ import { accountTone } from "../lib/accountTone";
 import { deleteSubscription } from "./flow";
 import { today } from "../lib/today";
 import { SourceLine } from "./SourceLine";
+import { useT, type Messages } from "../i18n";
 
 const TONES = 6;
 
@@ -30,27 +31,29 @@ const empty = (): SubscriptionForm => ({
   exactOnly: false,
 });
 
-export const INTERVALS: { value: Interval; label: string }[] = [
-  { value: "monthly", label: "Monthly" },
-  { value: "quarterly", label: "Quarterly" },
-  { value: "yearly", label: "Yearly" },
+type SheetText = Messages["subscriptions"]["sheet"];
+
+export const intervals = (text: SheetText): { value: Interval; label: string }[] => [
+  { value: "monthly", label: text.monthly },
+  { value: "quarterly", label: text.quarterly },
+  { value: "yearly", label: text.yearly },
 ];
 
-const STATES = [
-  { value: "active" as const, label: "Active" },
-  { value: "cancelled" as const, label: "Cancelled" },
+const states = (text: SheetText) => [
+  { value: "active" as const, label: text.active },
+  { value: "cancelled" as const, label: text.cancelled },
 ];
 
-const REMINDERS: { value: Reminder; label: string }[] = [
-  { value: "off", label: "Off" },
-  { value: "one_day", label: "1 day before" },
-  { value: "three_days", label: "3 days before" },
-  { value: "one_week", label: "1 week before" },
+const reminders = (text: SheetText): { value: Reminder; label: string }[] => [
+  { value: "off", label: text.reminderOff },
+  { value: "one_day", label: text.oneDay },
+  { value: "three_days", label: text.threeDays },
+  { value: "one_week", label: text.oneWeek },
 ];
 
-const OTHER_AMOUNTS = [
-  { value: "ask" as const, label: "Ask me" },
-  { value: "exact" as const, label: "Exact amount only" },
+const otherAmounts = (text: SheetText) => [
+  { value: "ask" as const, label: text.ask },
+  { value: "exact" as const, label: text.exact },
 ];
 
 const letterOf = (name: string) => name.match(/[\p{L}\p{N}]/u)?.[0]?.toUpperCase() ?? "?";
@@ -68,6 +71,7 @@ export function SubscriptionSheet({ id, initial, source, onClose }: { id: string
   const set = (patch: Partial<SubscriptionForm>) => setForm((f) => ({ ...f, ...patch }));
   const editing = id !== null;
   const items = view?.items ?? [];
+  const text = useT().subscriptions.sheet;
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -97,40 +101,40 @@ export function SubscriptionSheet({ id, initial, source, onClose }: { id: string
       </div>
     );
   };
-  const startLabel = form.start < today() ? "First charge" : "Next charge";
+  const startLabel = form.start < today() ? text.firstCharge : text.nextCharge;
 
   return (
     <Modal labelledBy={titleId} className="sub-sheet" onClose={onClose}>
       <form onSubmit={submit}>
         <div className="sub-sheet__head">
-          <button type="button" className={`tile sub-sheet__tile ${accountTone(form.tone)}`} aria-label="Change color" onClick={() => set({ tone: (form.tone + 1) % TONES })}>
+          <button type="button" className={`tile sub-sheet__tile ${accountTone(form.tone)}`} aria-label={text.changeColor} onClick={() => set({ tone: (form.tone + 1) % TONES })}>
             {letterOf(form.name)}
           </button>
           <div className="sub-sheet__title">
-            <h2 id={titleId}>{editing ? `Edit ${form.name}` : "New Subscription"}</h2>
-            <span className="add-doc__hint">{editing ? "Fixes mistakes; Change Plan keeps the history." : "Found in your statements by its bank text."}</span>
+            <h2 id={titleId}>{editing ? text.editTitle(form.name) : text.newTitle}</h2>
+            <span className="add-doc__hint">{editing ? text.editHint : text.newHint}</span>
           </div>
-          <Segmented label="State" options={STATES} value={form.active ? "active" : "cancelled"} onChange={(state) => set({ active: state === "active", endedOn: state === "active" ? null : (form.endedOn ?? today()) })} />
+          <Segmented label={text.state} options={states(text)} value={form.active ? "active" : "cancelled"} onChange={(state) => set({ active: state === "active", endedOn: state === "active" ? null : (form.endedOn ?? today()) })} />
         </div>
         <div className="sub-sheet__body">
           {source && <SourceLine line={source} onSelect={(matchText) => set({ matchText })} />}
           <div className="sub-grid">
-            <label htmlFor={field("name")}>Name</label>
+            <label htmlFor={field("name")}>{text.name}</label>
             <div>
               <input id={field("name")} className="field" value={form.name} autoFocus aria-invalid={!!message("name")} onChange={(e) => set({ name: e.target.value })} />
               {fieldError("name")}
             </div>
-            <label htmlFor={field("amount")}>Amount</label>
+            <label htmlFor={field("amount")}>{text.amount}</label>
             <div>
               <div className="sub-grid__pair">
                 <input id={field("amount")} className="field sub-sheet__amount" inputMode="decimal" value={form.amount} aria-invalid={!!message("amount")} onChange={(e) => set({ amount: e.target.value })} />
-                <input className="field sub-sheet__currency" aria-label="Currency" maxLength={3} value={form.currency} aria-invalid={!!message("currency")} onChange={(e) => set({ currency: e.target.value.toUpperCase() })} />
+                <input className="field sub-sheet__currency" aria-label={text.currency} maxLength={3} value={form.currency} aria-invalid={!!message("currency")} onChange={(e) => set({ currency: e.target.value.toUpperCase() })} />
               </div>
               {fieldError("amount", "currency")}
             </div>
-            <span>Repeats</span>
+            <span>{text.repeats}</span>
             <div>
-              <Segmented label="Repeats" options={INTERVALS} value={form.interval} onChange={(interval) => set({ interval })} />
+              <Segmented label={text.repeats} options={intervals(text)} value={form.interval} onChange={(interval) => set({ interval })} />
               <div className="form-field__error" />
             </div>
             {!editing && (
@@ -144,39 +148,39 @@ export function SubscriptionSheet({ id, initial, source, onClose }: { id: string
             )}
             {!form.active && (
               <>
-                <label htmlFor={field("ended")}>Ended on</label>
+                <label htmlFor={field("ended")}>{text.endedOn}</label>
                 <div>
                   <input id={field("ended")} type="date" className="field" value={form.endedOn ?? ""} onChange={(e) => set({ endedOn: e.target.value || null })} />
                   {fieldError("endedOn")}
                 </div>
               </>
             )}
-            <label htmlFor={field("category")}>Category</label>
+            <label htmlFor={field("category")}>{text.category}</label>
             <div>
-              <input id={field("category")} className="field" list={field("categories")} value={form.category} placeholder="Media, AI & Software, …" onChange={(e) => set({ category: e.target.value })} />
+              <input id={field("category")} className="field" list={field("categories")} value={form.category} placeholder={text.categoryPlaceholder} onChange={(e) => set({ category: e.target.value })} />
               <datalist id={field("categories")}>
                 {view?.categories.map((c) => (
                   <option key={c} value={c} />
                 ))}
               </datalist>
             </div>
-            <label htmlFor={field("reminder")}>Reminder</label>
-            <PopUpButton id={field("reminder")} value={form.reminder} options={REMINDERS} onChange={(reminder: Reminder) => set({ reminder })} />
+            <label htmlFor={field("reminder")}>{text.reminder}</label>
+            <PopUpButton id={field("reminder")} value={form.reminder} options={reminders(text)} onChange={(reminder: Reminder) => set({ reminder })} />
           </div>
 
-          <h3 className="sub-sheet__heading">ANV</h3>
+          <h3 className="sub-sheet__heading">{text.anv}</h3>
           <div className="sub-group">
             <label className="sub-group__row">
               <span className="sub-group__text">
-                Counts for the tax year
-                <span className="add-doc__hint">Charges count for the item below. Each one still needs its invoice PDF.</span>
+                {text.counts}
+                <span className="add-doc__hint">{text.countsHint}</span>
               </span>
               <input type="checkbox" className="switch" role="switch" checked={form.itemKey !== null} onChange={(e) => set({ itemKey: e.target.checked ? (items[0]?.key ?? "") : null })} />
             </label>
             {form.itemKey !== null && (
               <div className="sub-group__row">
                 <label htmlFor={field("item")} className="sub-group__text">
-                  Item
+                  {text.item}
                 </label>
                 <PopUpButton
                   id={field("item")}
@@ -190,25 +194,21 @@ export function SubscriptionSheet({ id, initial, source, onClose }: { id: string
           </div>
           {fieldError("item")}
 
-          <h3 className="sub-sheet__heading">Find it in statements</h3>
+          <h3 className="sub-sheet__heading">{text.find}</h3>
           <div className="sub-group">
             <div className="sub-group__row">
               <label htmlFor={field("match")} className="sub-group__text">
-                Bank text contains
-                {source && <span className="add-doc__hint">Or select text in the line above, such as a contract number.</span>}
+                {text.contains}
+                {source && <span className="add-doc__hint">{text.containsHint}</span>}
               </label>
               <input id={field("match")} className="field mono sub-sheet__match" value={form.matchText} placeholder="LUMEN AI" aria-invalid={!!message("match")} onChange={(e) => set({ matchText: e.target.value })} />
             </div>
             <div className="sub-group__row">
               <span className="sub-group__text">
-                Another amount
-                <span className="add-doc__hint">
-                  {form.exactOnly
-                    ? "Only charges of exactly this amount are this subscription; others are reviewed like any line."
-                    : "A charge at another amount waits in Review: a new plan, a one-off, or not this subscription."}
-                </span>
+                {text.another}
+                <span className="add-doc__hint">{form.exactOnly ? text.exactHint : text.askHint}</span>
               </span>
-              <Segmented label="Another amount" options={OTHER_AMOUNTS} value={form.exactOnly ? "exact" : "ask"} onChange={(v) => set({ exactOnly: v === "exact" })} />
+              <Segmented label={text.another} options={otherAmounts(text)} value={form.exactOnly ? "exact" : "ask"} onChange={(v) => set({ exactOnly: v === "exact" })} />
             </div>
           </div>
           {fieldError("match")}
@@ -220,14 +220,14 @@ export function SubscriptionSheet({ id, initial, source, onClose }: { id: string
         <div className="actions sub-sheet__actions">
           {editing && (
             <button type="button" className="link-btn sub-sheet__delete" onClick={() => void remove()}>
-              Delete Subscription…
+              {text.delete}
             </button>
           )}
           <button type="button" className="btn" onClick={onClose}>
-            Cancel
+            {text.cancel}
           </button>
           <button type="submit" className="btn btn--primary" disabled={busy}>
-            {editing ? "Save" : "Add Subscription"}
+            {editing ? text.save : text.add}
           </button>
         </div>
       </form>

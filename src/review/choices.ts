@@ -1,4 +1,5 @@
 import type { Action, PlanChanged, ReviewLine, SubscriptionOption } from "../api";
+import { t } from "../i18n";
 
 /** One answer to "What is this line?": its key picks it, the confirm button runs it. */
 export interface Choice {
@@ -16,11 +17,7 @@ export interface Choice {
   run: () => void;
 }
 
-export const CHOICES: { action: Action; key: string; label: string; hint: string }[] = [
-  { action: "anv", key: "A", label: "ANV", hint: "Counts for the tax year" },
-  { action: "subscription", key: "S", label: "Subscription", hint: "Recurring payment" },
-  { action: "ignore", key: "I", label: "Ignore", hint: "Not relevant" },
-];
+const KEYS: Record<Action, string> = { anv: "A", subscription: "S", ignore: "I" };
 
 /** What confirming runs; the page owns the writes. */
 export interface Runs {
@@ -31,33 +28,32 @@ export interface Runs {
   notThis: () => void;
 }
 
-const SET_UP = { confirm: "Set Up Subscription…", outcome: "Opens New Subscription with this line, to check before saving." };
-
 /** "Is this <subscription>?" for a charge at another amount than its plan. */
 export function planChoices(plan: PlanChanged, runs: Runs): Choice[] {
+  const text = t().review.choices;
   return [
     {
       key: "U",
-      label: "Yes, new price",
-      hint: "A new plan from this charge",
-      confirm: "Update Plan…",
-      outcome: `Opens Change Plan for ${plan.name} at ${plan.amount} ${plan.currency} from this charge, to check before saving. Later charges at that amount are booked.`,
+      label: text.newPrice,
+      hint: text.newPriceHint,
+      confirm: text.updatePlan,
+      outcome: text.updatePlanOutcome(plan.name, plan.amount, plan.currency),
       run: runs.updatePlan,
     },
     {
       key: "O",
-      label: "Yes, this once",
-      hint: "Keep the plan",
-      confirm: "Link as One-off",
-      outcome: `It becomes a charge of ${plan.name}; the plan stays as it is.`,
+      label: text.once,
+      hint: text.onceHint,
+      confirm: text.oneOff,
+      outcome: text.oneOffOutcome(plan.name),
       run: () => runs.decide("subscription", plan.subscriptionId),
     },
     {
       key: "N",
-      label: "No",
-      hint: `Not ${plan.name}`,
-      confirm: "Not This Subscription",
-      outcome: "Then it's asked like any other line: ANV, another subscription or Ignore.",
+      label: text.no,
+      hint: text.notName(plan.name),
+      confirm: text.notThis,
+      outcome: text.notThisOutcome,
       run: runs.notThis,
     },
   ];
@@ -73,25 +69,23 @@ interface Picks {
 }
 
 export function lineChoices(line: ReviewLine, { itemLabel, linked, ruleTerm }: Picks, runs: Runs): Choice[] {
-  const also = ruleTerm ? `, and so will every line containing ${ruleTerm}, also in future statements` : "";
-  const base = (action: Action) => {
-    const { key, label, hint } = CHOICES.find((c) => c.action === action) ?? CHOICES[0];
-    return { key, label, hint, action, suggested: action === line.suggestion };
-  };
+  const text = t().review.choices;
+  const also = ruleTerm ? text.also(ruleTerm) : "";
+  const base = (action: Action) => ({ key: KEYS[action], ...text[action], action, suggested: action === line.suggestion });
   return [
     {
       ...base("anv"),
-      confirm: "Count as ANV",
-      ...(itemLabel ? { outcome: `It counts for ${itemLabel} in its tax year${also}.` } : { outcome: "", blocked: "Choose the item it counts for." }),
+      confirm: text.countAsAnv,
+      ...(itemLabel ? { outcome: text.anvOutcome(itemLabel, also) } : { outcome: "", blocked: text.chooseItem }),
       run: () => runs.decide("anv", null),
     },
     linked
-      ? { ...base("subscription"), confirm: `Link to ${linked.name}`, outcome: `It becomes a charge of ${linked.name}.`, run: () => runs.decide("subscription", linked.id) }
-      : { ...base("subscription"), ...SET_UP, run: runs.setUp },
+      ? { ...base("subscription"), confirm: text.linkTo(linked.name), outcome: text.becomesCharge(linked.name), run: () => runs.decide("subscription", linked.id) }
+      : { ...base("subscription"), confirm: text.setUp, outcome: text.setUpOutcome, run: runs.setUp },
     {
       ...base("ignore"),
-      confirm: "Ignore Line",
-      outcome: `It stays in the statement and needs nothing more${also}.`,
+      confirm: text.ignoreLine,
+      outcome: text.ignoreOutcome(also),
       run: () => runs.decide("ignore", null),
     },
   ];

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Check } from "lucide-react";
 import { api, toAppError, type CheckQuestion } from "../api";
 import { AddEntry } from "../year/AddEntry";
+import { useT } from "../i18n";
 
 /** What a Yes added to a question during this run. */
 export type Added = { count: number; label: string };
@@ -41,18 +42,19 @@ export function CheckRow(p: Props) {
         setError(failure.field?.message ?? failure.message);
       });
   };
+  const text = useT().year.check;
   const cls = ["check-row", p.focused && "check-row--focused", p.added && "check-row--added"].filter(Boolean).join(" ");
   return (
     <div className={cls} role="group" aria-label={q.question} onFocus={p.onFocus} onMouseDown={p.onFocus}>
       <div className="check-row__main">
-        <span className="check-row__kz">{q.kz ? `KZ ${q.kz}` : "Question"}</span>
+        <span className="check-row__kz">{q.kz ? `KZ ${q.kz}` : text.question}</span>
         <div className="check-row__text">
           <div className="check-row__question">{q.question}</div>
           {q.hint && <div className="check-row__hint">{q.hint}</div>}
           {p.added && (
             <div className="check-row__added">
               <Check size={13} strokeWidth={2.6} />
-              Added {p.added.count} · {shortLabel(p.added.label)}
+              {text.added(p.added.count, shortLabel(p.added.label))}
             </div>
           )}
           {error && (
@@ -69,31 +71,31 @@ export function CheckRow(p: Props) {
                 {q.unit && <span>{q.unit}</span>}
               </label>
               <button className="btn btn--small" onClick={save}>
-                Save
+                {text.save}
               </button>
               <button className="btn btn--small btn--ghost" onClick={p.onLater}>
-                Later
+                {text.later}
               </button>
             </>
           ) : p.added ? (
             <>
               <button className="btn btn--small" onClick={p.onYes}>
-                Add Another
+                {text.another}
               </button>
               <button className="btn btn--small btn--primary" onClick={p.onAnswer}>
-                Done
+                {text.done}
               </button>
             </>
           ) : (
             <>
               <button className="btn btn--small" onClick={p.onYes}>
-                Yes
+                {text.yes}
               </button>
               <button className="btn btn--small" onClick={p.onAnswer}>
-                No
+                {text.no}
               </button>
               <button className="btn btn--small btn--ghost" onClick={p.onLater}>
-                Later
+                {text.later}
               </button>
             </>
           )}

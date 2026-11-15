@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api, toAppError, type RuleView } from "../../api";
+import { t, useT } from "../../i18n";
 import { useLineRules } from "../../queries/lineRules";
 import { useStore } from "../../state/store";
 import { Group, Row } from "../controls";
@@ -7,7 +8,8 @@ import { RuleSheet } from "./RuleSheet";
 
 const rerun = async () => {
   const { confirm, showToast } = useStore.getState();
-  if (!(await confirm({ title: "Apply the rules again?", text: "Every line is checked again. Your own choices stay untouched.", action: "Re-run" }))) return;
+  const text = t().settings.rules;
+  if (!(await confirm({ title: text.rerunTitle, text: text.rerunText, action: text.rerunAction }))) return;
   try {
     showToast("success", await api.rulesRerun());
   } catch (e) {
@@ -17,6 +19,7 @@ const rerun = async () => {
 
 export function RulesPage() {
   const { data } = useLineRules();
+  const { rules: text, common } = useT().settings;
   const [sheet, setSheet] = useState<{ rule?: RuleView } | null>(null);
   return (
     <>
@@ -25,21 +28,21 @@ export function RulesPage() {
           {group.rules.map((rule) => (
             <Row key={rule.id} label={rule.label} description={rule.detail}>
               <button className="btn btn--small" onClick={() => setSheet({ rule })}>
-                Edit…
+                {common.edit}
               </button>
             </Row>
           ))}
         </Group>
       ))}
-      <Group title="Add" anchor="add-rule">
-        <Row label="New rule" description="Match bank text, amount or account. Then: assign an item or ignore.">
+      <Group title={common.add} anchor="add-rule">
+        <Row label={text.newRule} description={text.newRuleDescription}>
           <button className="btn btn--small" onClick={() => setSheet({})}>
-            New Rule…
+            {text.newRuleButton}
           </button>
         </Row>
-        <Row label="Apply rules again" description="Re-checks all lines. Your own choices stay untouched." anchor="rerun">
+        <Row label={text.rerun} description={text.rerunDescription} anchor="rerun">
           <button className="btn btn--small" onClick={() => void rerun()}>
-            Re-run…
+            {text.rerunButton}
           </button>
         </Row>
       </Group>

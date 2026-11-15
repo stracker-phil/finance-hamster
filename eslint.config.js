@@ -21,12 +21,18 @@ export default tseslint.config(
       "no-restricted-syntax": [
         "error",
         { selector: "JSXOpeningElement[name.name='select']", message: "Use PopUpButton from components/menu (ADR 0030)." },
+        { selector: "JSXText[value=/[a-z]{2,}/]", message: "Visible text comes from src/i18n in both languages (ADR 0050)." },
+        {
+          selector: "JSXAttribute[name.name=/^(aria-label|title|placeholder|label|description|text)$/] > Literal[value=/[a-z]{2,}/]",
+          message: "Visible text comes from src/i18n in both languages (ADR 0050).",
+        },
       ],
     },
   },
   {
     files: ["**/*.test.{ts,tsx}", "src/test/**", "src/test-setup.ts", "src/**/apiMock.ts"],
     rules: {
+      "no-restricted-syntax": ["error", { selector: "JSXOpeningElement[name.name='select']", message: "Use PopUpButton from components/menu (ADR 0030)." }],
       "@typescript-eslint/require-await": "off",
       "@typescript-eslint/unbound-method": "off",
       "@typescript-eslint/no-explicit-any": "off",

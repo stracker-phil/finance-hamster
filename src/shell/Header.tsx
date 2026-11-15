@@ -4,6 +4,7 @@ import { useCommands } from "../queries/commands";
 import { ChevronDown, ChevronLeft, Plus, Search, X } from "lucide-react";
 import { startAddDocument } from "../documents/addFlow";
 import { FILTER_PLACEHOLDER } from "../pages/pages";
+import { useT } from "../i18n";
 import type { Route } from "../state/route";
 import { useStore } from "../state/store";
 import { useCoversPdf } from "../lib/pdfCover";
@@ -27,9 +28,10 @@ function ElsewhereMenu({ query }: { query: string }) {
   const { data: matches = [] } = useElsewhere(query);
   const navigate = useStore((s) => s.navigate);
   useCoversPdf(true);
+  const text = useT().shell.header;
   return (
-    <div className="menu elsewhere" role="menu" aria-label="Matches elsewhere">
-      {matches.length > 0 && <div className="elsewhere__caption">Matches elsewhere</div>}
+    <div className="menu elsewhere" role="menu" aria-label={text.matchesElsewhere}>
+      {matches.length > 0 && <div className="elsewhere__caption">{text.matchesElsewhere}</div>}
       {matches.map((match, i) => (
         <button key={i} className="menu-row" role="menuitem" onMouseDown={(e) => e.preventDefault()} onClick={() => navigate(routeOf(match.target))}>
           {match.label}
@@ -37,7 +39,7 @@ function ElsewhereMenu({ query }: { query: string }) {
         </button>
       ))}
       <button className="menu-row" role="menuitem" onMouseDown={(e) => e.preventDefault()} onClick={() => useStore.getState().searchEverywhere(query)}>
-        Search everywhere
+        {text.searchEverywhere}
         <span className="menu-row__key">⌘↩</span>
       </button>
     </div>
@@ -48,8 +50,9 @@ function FilterField({ page }: { page: Route["page"] }) {
   const filter = useStore((s) => s.filter);
   const setFilter = useStore((s) => s.setFilter);
   const [focused, setFocused] = useState(false);
+  const text = useT().shell.header;
   const scoped = FILTER_PLACEHOLDER[page];
-  const placeholder = scoped ?? "Search everywhere";
+  const placeholder = scoped ?? text.searchEverywhere;
   const key = scoped ? "⌘F" : "⌘K";
   return (
     <div className="filter-wrap">
@@ -74,7 +77,7 @@ function FilterField({ page }: { page: Route["page"] }) {
           }}
         />
         {filter ? (
-          <button className="icon-btn icon-btn--tiny" onClick={() => setFilter("")} aria-label="Clear filter (Esc)">
+          <button className="icon-btn icon-btn--tiny" onClick={() => setFilter("")} aria-label={text.clearFilter}>
             <X size={11} />
           </button>
         ) : (
@@ -87,29 +90,30 @@ function FilterField({ page }: { page: Route["page"] }) {
 }
 
 /** The + New menu's commands, with the shortcut each has now. */
-const NEW_ITEMS: { label: string; command: string; run: () => void }[] = [
-  { label: "Import Statement…", command: "statement:import", run: startImport },
-  { label: "Add Invoice PDF…", command: "document:add", run: startAddDocument },
-  { label: "New Subscription", command: "subscription:new", run: newSubscription },
+const NEW_ITEMS: { label: "importStatement" | "addInvoice" | "newSubscription"; command: string; run: () => void }[] = [
+  { label: "importStatement", command: "statement:import", run: startImport },
+  { label: "addInvoice", command: "document:add", run: startAddDocument },
+  { label: "newSubscription", command: "subscription:new", run: newSubscription },
 ];
 
 function NewMenu() {
   const [button, setButton] = useState<HTMLButtonElement | null>(null);
   const open = useMenuOpenOn(button);
   const { data: commands = [] } = useCommands();
+  const text = useT().shell.header;
   const show = () => {
     if (!button) return;
     const entries = NEW_ITEMS.map((item) => ({
-      text: item.label,
+      text: text[item.label],
       hint: commands.find((c) => c.id === item.command)?.shortcut ?? undefined,
       run: item.run,
     }));
-    openMenu(entries, button, "New");
+    openMenu(entries, button, text.newMenu);
   };
   return (
     <button ref={setButton} className="btn new-btn" aria-haspopup="menu" aria-expanded={open} onClick={show}>
       <Plus size={15} />
-      New
+      {text.newMenu}
       <ChevronDown size={12} />
     </button>
   );
@@ -117,9 +121,10 @@ function NewMenu() {
 
 function Crumb({ label, to }: { label: string; to: Route }) {
   const navigate = useStore((s) => s.navigate);
+  const text = useT().shell.header;
   return (
     <>
-      <button className="icon-btn" onClick={() => navigate(to)} aria-label={`Back to ${label}`}>
+      <button className="icon-btn" onClick={() => navigate(to)} aria-label={text.backTo(label)}>
         <ChevronLeft size={16} />
       </button>
       <span className="header__crumb">{label} /</span>

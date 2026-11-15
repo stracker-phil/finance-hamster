@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
 
 import { api } from "../api";
+import { setLanguage } from "../i18n";
 import { useStore } from "../state/store";
 import { renderWithQuery } from "../test/renderWithQuery";
 import { step, todayView, upcomingCharge, yearSummary } from "../test/today";
@@ -53,6 +54,18 @@ describe("TodayPage", () => {
       await userEvent.click(await screen.findByRole("button", { name: "Import statement" }));
 
       expect(mocked.statementImportChoose).toHaveBeenCalled();
+    });
+  });
+
+  describe("in German", () => {
+    beforeEach(() => setLanguage("de"));
+
+    it("says everything is up to date in German", async () => {
+      renderWithQuery(<TodayPage />);
+
+      expect(await screen.findByRole("heading", { name: "Du bist auf dem neuesten Stand." })).toBeTruthy();
+      expect(screen.getByText("Nichts zu prüfen oder anzuhängen.")).toBeTruthy();
+      expect(screen.getByRole("region", { name: "Demnächst" })).toBeTruthy();
     });
   });
 

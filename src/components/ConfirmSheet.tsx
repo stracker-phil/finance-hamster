@@ -1,4 +1,5 @@
 import { useId } from "react";
+import { useT } from "../i18n";
 import { useStore } from "../state/store";
 import { Modal } from "./Modal";
 
@@ -13,13 +14,14 @@ interface Props {
 /** A confirmation before a destructive action: Cancel (also Escape) and the red action button. */
 export function ConfirmSheet({ title, text, action, onCancel, onConfirm }: Props) {
   const id = useId();
+  const cancel = useT().components.cancel;
   return (
     <Modal role="alertdialog" className="sheet--narrow" labelledBy={`${id}-title`} describedBy={`${id}-text`} onClose={onCancel}>
       <h2 id={`${id}-title`}>{title}</h2>
       <p id={`${id}-text`}>{text}</p>
       <div className="actions">
         <button type="button" className="btn" onClick={onCancel}>
-          Cancel
+          {cancel}
         </button>
         <button type="button" className="btn btn--danger" onClick={onConfirm}>
           {action}

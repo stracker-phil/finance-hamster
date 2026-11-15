@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { api } from "../api";
+import { t } from "../i18n";
 
 interface State {
   error: Error | null;
@@ -20,10 +21,10 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
     if (!this.state.error) return this.props.children;
     return (
       <div className="crash" role="alert">
-        <h2>Something went wrong</h2>
+        <h2>{t().components.somethingWrong}</h2>
         <pre>{this.state.error.message}</pre>
         <button className="btn btn--primary" onClick={() => this.setState({ error: null })}>
-          Try Again
+          {t().components.tryAgain}
         </button>
       </div>
     );

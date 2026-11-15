@@ -2,6 +2,7 @@ import { useId, useState } from "react";
 import { Check, FileText, TriangleAlert } from "lucide-react";
 import { api, toAppError, type ImportPreview } from "../api";
 import { Modal } from "../components/Modal";
+import { useT } from "../i18n";
 import { useStore } from "../state/store";
 
 function CheckRow({ ok, title, detail, mono }: { ok: boolean; title: string; detail: string; mono?: boolean }) {
@@ -19,6 +20,8 @@ function CheckRow({ ok, title, detail, mono }: { ok: boolean; title: string; det
 /** What was read and checked; nothing is stored until Import. */
 export function ImportSheet({ preview, onImported }: { preview: ImportPreview; onImported?: () => void }) {
   const id = useId();
+  const text = useT().statements.importSheet;
+  const cancel = useT().components.cancel;
   const [busy, setBusy] = useState(false);
   const close = () => {
     void api.statementImportCancel(preview.token).catch(() => {});
@@ -40,7 +43,7 @@ export function ImportSheet({ preview, onImported }: { preview: ImportPreview; o
   };
   return (
     <Modal labelledBy={id} onClose={close}>
-      <h2 id={id}>Import statement</h2>
+      <h2 id={id}>{text.title}</h2>
       <div className="import-file">
         <FileText size={28} strokeWidth={1.5} />
         <div className="import-file__text">
@@ -50,19 +53,19 @@ export function ImportSheet({ preview, onImported }: { preview: ImportPreview; o
         <span className="import-file__account">{preview.accountName}</span>
       </div>
       <div className="import-checks">
-        <CheckRow ok title={`Read ${preview.lines} ${preview.lines === 1 ? "line" : "lines"}`} detail="Account recognized from the IBAN on page 1." />
-        <CheckRow ok title="Balance adds up" detail={`${preview.balance} · matches the printed new balance`} mono />
+        <CheckRow ok title={text.read(preview.lines)} detail={text.recognized} />
+        <CheckRow ok title={text.balance} detail={text.balanceDetail(preview.balance)} mono />
         <CheckRow ok={preview.chain !== "gap"} title={preview.chainTitle} detail={preview.chainDetail} />
       </div>
       <p>
-        The PDF is copied unchanged to <span className="mono">{preview.file}</span>.
+        {text.copiedTo} <span className="mono">{preview.file}</span>.
       </p>
       <div className="actions">
         <button type="button" className="btn" onClick={close}>
-          Cancel
+          {cancel}
         </button>
         <button type="button" className="btn btn--primary" disabled={busy} onClick={confirm}>
-          Import
+          {text.import}
         </button>
       </div>
     </Modal>

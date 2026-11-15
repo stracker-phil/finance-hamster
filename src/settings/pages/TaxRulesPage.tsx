@@ -1,16 +1,17 @@
 import { useId, useState } from "react";
 import { api, toAppError, type ReloadPreview, type RulesFile, type RulesState } from "../../api";
 import { Modal } from "../../components/Modal";
+import { t, useT } from "../../i18n";
 import { useDataFolder } from "../../queries/settings";
 import { useRulesOverview } from "../../queries/taxYears";
 import { useStore } from "../../state/store";
 import { Group, Row } from "../controls";
 import { ReloadSheet } from "./ReloadSheet";
 
-const PILLS: Record<RulesState, { label: string; className: string }> = {
-  draft: { label: "Draft", className: "pill" },
-  open: { label: "Open", className: "pill pill--blue" },
-  closed: { label: "Closed", className: "pill pill--green" },
+const PILLS: Record<RulesState, string> = {
+  draft: "pill",
+  open: "pill pill--blue",
+  closed: "pill pill--green",
 };
 
 const EXCERPT = `{
@@ -33,23 +34,21 @@ const EXCERPT = `{
 
 const showError = (e: unknown) => useStore.getState().showToast("error", toAppError(e).message);
 
-function problemText(problems: string[]) {
-  const more = problems.length > 1 ? ` (and ${problems.length - 1} more)` : "";
-  return `can't be used: ${problems[0]}${more}`;
-}
+const problemText = (problems: string[]) => t().settings.taxRules.cantBeUsed(problems[0], problems.length - 1);
 
 /** The line under a file: what it is for, and whether it can be used. */
 export function describeFile(file: RulesFile): string {
+  const text = t().settings.taxRules;
   const parts: string[] = [];
-  if (file.state === "draft") parts.push(file.basedOn ? `Duplicated from ${file.basedOn}` : "Next year", "not used yet");
+  if (file.state === "draft") parts.push(file.basedOn ? text.duplicatedFrom(file.basedOn) : text.nextYear, text.notUsedYet);
   if (file.state === "open") {
-    if (file.missing) return "The file is missing; the year keeps the rules it loaded";
-    parts.push(`Tax Year ${file.year}`);
-    if (file.problems.length === 0) parts.push("valid", `${file.items} items`);
-    if (file.unverified > 0) parts.push(`${file.unverified} unverified`);
-    if (file.edited && file.problems.length === 0) parts.push("edited, reload to apply");
+    if (file.missing) return text.missing;
+    parts.push(text.taxYear(file.year));
+    if (file.problems.length === 0) parts.push(text.valid, text.items(file.items));
+    if (file.unverified > 0) parts.push(text.unverified(file.unverified));
+    if (file.edited && file.problems.length === 0) parts.push(text.edited);
   }
-  if (file.state === "closed") parts.push(`Frozen with Tax Year ${file.year}${file.closedOn ? ` on ${file.closedOn}` : ""}`, "read only");
+  if (file.state === "closed") parts.push(text.frozen(file.year, file.closedOn), text.readOnly);
   if (file.problems.length > 0 && file.state !== "closed") parts.push(problemText(file.problems));
   return parts.join(" · ");
 }
@@ -59,32 +58,31 @@ function reloadText(files: RulesFile[]): string {
   const broken = open.find((f) => f.problems.length > 0);
   if (broken) return `${broken.fileName} ${problemText(broken.problems)}`;
   const edited = open.find((f) => f.edited);
-  if (edited) return `${edited.fileName} was edited. Shows what changes before applying.`;
-  const loaded = open[0]?.loadedOn;
-  return `${loaded ? `Last loaded ${loaded} · no errors. ` : ""}Shows what changes in the open year before applying.`;
+  const text = t().settings.taxRules;
+  if (edited) return text.wasEdited(edited.fileName);
+  return text.lastLoaded(open[0]?.loadedOn ?? null);
 }
 
 function DuplicateSheet({ from, onClose }: { from: number; onClose: () => void }) {
   const id = useId();
+  const { taxRules: text, common } = useT().settings;
   const duplicate = () => {
     api
       .rulesDuplicate()
-      .then((name) => useStore.getState().showToast("success", `Created ${name} as a draft`))
+      .then((name) => useStore.getState().showToast("success", t().settings.taxRules.created(name)))
       .catch(showError)
       .finally(onClose);
   };
   return (
     <Modal labelledBy={id} className="sheet--narrow" onClose={onClose}>
-      <h2 id={id}>Start {from + 1}</h2>
-      <p>
-        Copies rules-{from}.json to rules-{from + 1}.json as a draft. Check every value against the new year&apos;s forms before the year opens.
-      </p>
+      <h2 id={id}>{text.startTitle(from + 1)}</h2>
+      <p>{text.startText(from)}</p>
       <div className="actions">
         <button type="button" className="btn" onClick={onClose}>
-          Cancel
+          {common.cancel}
         </button>
         <button type="button" className="btn btn--primary" onClick={duplicate}>
-          Duplicate
+          {text.duplicateAction}
         </button>
       </div>
     </Modal>
@@ -99,13 +97,14 @@ export function TaxRulesPage() {
   const [duplicating, setDuplicating] = useState(false);
   const newestOpen = files.find((f) => f.state === "open")?.year;
   const nextExists = newestOpen !== undefined && files.some((f) => f.year === newestOpen + 1);
+  const { taxRules: text, common } = useT().settings;
 
   const reload = () => {
     api
       .rulesReloadPreview()
       .then((found) => {
         if (found.length > 0) setPreviews(found);
-        else useStore.getState().showToast("info", "No rules file changed since it was loaded");
+        else useStore.getState().showToast("info", t().settings.taxRules.noChange);
       })
       .catch(showError);
   };
@@ -114,8 +113,7 @@ export function TaxRulesPage() {
       .rulesImport()
       .then((imported) => {
         if (!imported) return;
-        const backup = imported.backup ? `; the old file is ${imported.backup}` : "";
-        useStore.getState().showToast("success", `Imported ${imported.fileName}${backup}`);
+        useStore.getState().showToast("success", t().settings.taxRules.imported(imported.fileName, imported.backup));
         void refetch();
         if (imported.needsReload) reload();
       })
@@ -124,44 +122,44 @@ export function TaxRulesPage() {
 
   return (
     <>
-      <Group title="Rulesets" anchor="rulesets">
+      <Group title={text.rulesets} anchor="rulesets">
         {files.map((file) => (
           <Row key={file.year} label={file.fileName} description={describeFile(file)}>
-            <span className={PILLS[file.state].className}>{PILLS[file.state].label}</span>
+            <span className={PILLS[file.state]}>{text.pills[file.state]}</span>
             <button className="btn btn--small" disabled={file.missing && file.state !== "closed"} onClick={() => void api.rulesOpen(file.year).catch(showError)}>
-              {file.state === "closed" ? "View" : "Open in Editor"}
+              {file.state === "closed" ? text.view : text.openInEditor}
             </button>
           </Row>
         ))}
       </Group>
-      <Group title="Actions" anchor="rules-actions">
-        <Row label="Reload after editing" description={reloadText(files)} anchor="reload">
+      <Group title={text.actions} anchor="rules-actions">
+        <Row label={text.reload} description={reloadText(files)} anchor="reload">
           <button className="btn btn--small" onClick={reload}>
-            Reload…
+            {text.reloadButton}
           </button>
         </Row>
-        <Row label="Import a JSON file" description="Replaces the ruleset of a draft or open year. The old file stays in the folder as a backup." anchor="import">
+        <Row label={text.import} description={text.importDescription} anchor="import">
           <button className="btn btn--small" onClick={importFile}>
-            Import…
+            {text.importButton}
           </button>
         </Row>
         <Row
-          label="Start next year"
-          description={newestOpen === undefined ? "Needs an open tax year to copy from." : nextExists ? `rules-${newestOpen + 1}.json exists.` : `Copies rules-${newestOpen}.json to rules-${newestOpen + 1}.json as a draft.`}
+          label={text.duplicate}
+          description={newestOpen === undefined ? text.needsOpenYear : nextExists ? text.nextExists(newestOpen + 1) : text.copies(newestOpen)}
           anchor="duplicate"
         >
           <button className="btn btn--small" disabled={newestOpen === undefined || nextExists} onClick={() => setDuplicating(true)}>
-            Duplicate…
+            {text.duplicateButton}
           </button>
         </Row>
-        <Row label="Rules folder" description={<span className="mono">{folder ? `${folder}rules/` : ""}</span>} anchor="rules-folder">
+        <Row label={text.folder} description={<span className="mono">{folder ? `${folder}rules/` : ""}</span>} anchor="rules-folder">
           <button className="btn btn--small" onClick={() => void api.rulesShowFolder().catch(showError)}>
-            Show in Finder
+            {common.showInFinder}
           </button>
         </Row>
       </Group>
-      <Group title="Format" anchor="rules-format">
-        <Row label="Excerpt of a rules file" description="rules.schema.json and README.md sit next to the files; the README explains every field." />
+      <Group title={text.format} anchor="rules-format">
+        <Row label={text.excerpt} description={text.excerptDescription} />
         <pre className="settings-code">{EXCERPT}</pre>
       </Group>
       {previews && <ReloadSheet previews={previews} onClose={() => setPreviews(null)} />}

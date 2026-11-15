@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api, type Frame, type PdfSource } from "../api";
+import { useT } from "../i18n";
 
 function frameOf(element: HTMLElement): Frame {
   const r = element.getBoundingClientRect();
@@ -11,6 +12,7 @@ function frameOf(element: HTMLElement): Frame {
 export function PdfPreview({ source }: { source: PdfSource }) {
   const ref = useRef<HTMLDivElement>(null);
   const [failed, setFailed] = useState(false);
+  const text = useT().components;
   const { kind, id } = source;
   useEffect(() => {
     const element = ref.current;
@@ -45,7 +47,7 @@ export function PdfPreview({ source }: { source: PdfSource }) {
   }, [kind, id]);
   return (
     <div ref={ref} className="pdf-preview" data-pdf-preview>
-      {failed && <div className="pdf-preview__error">This PDF can&apos;t be shown.</div>}
+      {failed && <div className="pdf-preview__error">{text.pdfFailed}</div>}
     </div>
   );
 }

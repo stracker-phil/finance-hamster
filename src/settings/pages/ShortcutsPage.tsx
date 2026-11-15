@@ -3,30 +3,32 @@ import { api, toAppError, type CommandInfo } from "../../api";
 import { useCommands } from "../../queries/commands";
 import { acceleratorOf } from "../shortcutKeys";
 import { ConfirmSheet } from "../../components/ConfirmSheet";
+import { useT, type Messages } from "../../i18n";
 import { Group, Row } from "../controls";
 
 /** Single keys that work on one page only; they are printed on that page's buttons, so they stay fixed
  *  (ADR 0046). */
-const PAGE_KEYS = [
+const pageKeys = (text: Messages["settings"]["shortcuts"]) => [
   {
-    page: "On the Review page",
+    page: text.reviewPage,
     anchor: "review-keys",
     keys: [
-      { label: "ANV / Subscription / Ignore", keys: "A  S  I" },
-      { label: "Skip", keys: "J" },
+      { label: text.reviewChoices, keys: "A  S  I" },
+      { label: text.skip, keys: "J" },
     ],
   },
   {
-    page: "On the Year Check page",
+    page: text.yearCheckPage,
     anchor: "year-check-keys",
     keys: [
-      { label: "Yes / No / Later", keys: "Y  N  L" },
-      { label: "Previous / Next question", keys: "↑  ↓" },
+      { label: text.yesNoLater, keys: "Y  N  L" },
+      { label: text.previousNext, keys: "↑  ↓" },
     ],
   },
 ];
 
 function ShortcutRow({ command }: { command: CommandInfo }) {
+  const text = useT().settings.shortcuts;
   const [recording, setRecording] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [taking, setTaking] = useState<{ accelerator: string; label: string; from: string } | null>(null);
@@ -59,7 +61,7 @@ function ShortcutRow({ command }: { command: CommandInfo }) {
     if (accelerator) take(accelerator);
   };
   let description: ReactNode = undefined;
-  if (recording) description = "Press the new shortcut; ⌫ removes it, esc cancels.";
+  if (recording) description = text.recording;
   if (error)
     description = (
       <span className="settings-row__error" role="alert">
@@ -77,23 +79,23 @@ function ShortcutRow({ command }: { command: CommandInfo }) {
         disabled={!command.custom}
         onClick={() => run(api.keybindingReset(command.id))}
       >
-        Reset
+        {text.reset}
       </button>
       <button
         className={recording ? "shortcut-btn shortcut-btn--recording" : "shortcut-btn"}
-        aria-label={`Shortcut for ${command.title}`}
+        aria-label={text.shortcutFor(command.title)}
         aria-pressed={recording}
         onClick={() => setRecording((r) => !r)}
         onKeyDown={recording ? onKey : undefined}
         onBlur={() => setRecording(false)}
       >
-        {recording ? "Type shortcut…" : (command.shortcut ?? "None")}
+        {recording ? text.typeShortcut : (command.shortcut ?? text.none)}
       </button>
       {taking && (
         <ConfirmSheet
-          title={`Reassign ${taking.label}?`}
-          text={`${taking.label} is the shortcut for ${taking.from}. Reassigning it leaves ${taking.from} without a shortcut.`}
-          action="Reassign"
+          title={text.reassignTitle(taking.label)}
+          text={text.reassignText(taking.label, taking.from)}
+          action={text.reassign}
           onCancel={() => setTaking(null)}
           onConfirm={() => {
             setTaking(null);
@@ -107,19 +109,20 @@ function ShortcutRow({ command }: { command: CommandInfo }) {
 
 export function ShortcutsPage() {
   const { data = [] } = useCommands();
+  const text = useT().settings.shortcuts;
   const [query, setQuery] = useState("");
   const needle = query.trim().toLowerCase();
   const shown = data.filter((c) => !needle || [c.title, c.id, c.shortcut ?? ""].some((t) => t.toLowerCase().includes(needle)));
   return (
     <>
-      <input className="field shortcuts-search" type="search" placeholder="Search shortcuts" aria-label="Search shortcuts" value={query} onChange={(e) => setQuery(e.target.value)} />
-      <Group title="In every window" anchor="commands">
-        {shown.length === 0 && <Row label={`No command matches “${query}”`} />}
+      <input className="field shortcuts-search" type="search" placeholder={text.search} aria-label={text.search} value={query} onChange={(e) => setQuery(e.target.value)} />
+      <Group title={text.everyWindow} anchor="commands">
+        {shown.length === 0 && <Row label={text.noMatch(query)} />}
         {shown.map((command) => (
           <ShortcutRow key={command.id} command={command} />
         ))}
       </Group>
-      {PAGE_KEYS.map((group) => (
+      {pageKeys(text).map((group) => (
         <Group key={group.anchor} title={group.page} anchor={group.anchor}>
           {group.keys.map((k) => (
             <Row key={k.label} label={k.label}>

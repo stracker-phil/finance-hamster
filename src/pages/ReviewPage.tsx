@@ -6,6 +6,7 @@ import { useReviewQueue } from "../queries/review";
 import { lineChoices, planChoices, type Choice } from "../review/choices";
 import { NEW_SUBSCRIPTION, ReviewCard } from "../review/ReviewCard";
 import { useStore } from "../state/store";
+import { t, useT } from "../i18n";
 import { changePlan, newSubscriptionFrom } from "../subscriptions/flow";
 
 const SKIP_KEY = "J";
@@ -14,26 +15,27 @@ const undo = () => {
   const { showToast } = useStore.getState();
   api
     .undo()
-    .then((label) => label && showToast("success", `Undid ${label}`))
+    .then((label) => label && showToast("success", t().pages.review.undid(label)))
     .catch((e: unknown) => showToast("error", toAppError(e).message));
 };
 
 function AllReviewed({ decided, rules }: { decided: number; rules: number }) {
   const navigate = useStore((s) => s.navigate);
-  const line = decided === 0 ? "No line is waiting for a decision." : `${decided} decided · ${rules} new ${rules === 1 ? "rule" : "rules"}`;
+  const text = useT().pages.review;
+  const line = decided === 0 ? text.noneWaiting : text.decided(decided, rules);
   return (
     <div className="empty-page">
       <span className="review-done__tile">
         <Check size={22} strokeWidth={2.6} />
       </span>
-      <div className="empty-page__title">All reviewed</div>
+      <div className="empty-page__title">{text.allReviewed}</div>
       <div>{line}</div>
       <div className="review-done__actions">
         <button className="btn" onClick={() => navigate({ page: "statements" })}>
-          Back to Statements
+          {text.backToStatements}
         </button>
         <button className="btn btn--primary" onClick={() => navigate({ page: "today" })}>
-          Back to Today
+          {text.backToToday}
         </button>
       </div>
     </div>
@@ -54,6 +56,7 @@ export function ReviewPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const itemSelect = useRef<HTMLButtonElement>(null);
+  const text = useT().pages.review;
   const lines = data?.lines ?? [];
   const index = Math.min(position, Math.max(lines.length - 1, 0));
   const line = lines[index] as ReviewLine | undefined;
@@ -77,7 +80,7 @@ export function ReviewPage() {
       .reviewDecide(current.id, action, itemOf(current) || null, subscriptionId, rule, chosenTerm)
       .then((label) => {
         setSession((s) => ({ decided: s.decided + 1, rules: s.rules + (rule ? 1 : 0) }));
-        useStore.getState().showToast("success", label, { label: "Undo", run: undo });
+        useStore.getState().showToast("success", label, { label: t().pages.review.undo, run: undo });
       })
       .catch((e: unknown) => {
         const failure = toAppError(e);
@@ -143,12 +146,12 @@ export function ReviewPage() {
   const total = session.decided + lines.length;
   return (
     <div className="page-scroll review">
-      <div className="review__progress" role="progressbar" aria-label="Reviewed" aria-valuenow={session.decided} aria-valuemax={total}>
+      <div className="review__progress" role="progressbar" aria-label={text.reviewed} aria-valuenow={session.decided} aria-valuemax={total}>
         <div className="review__bar" style={{ width: `${(session.decided / total) * 100}%` }} />
       </div>
       <div className="review__column">
         <div className="review__count">
-          {lines.length} {lines.length === 1 ? "line needs" : "lines need"} your decision
+          {text.count(lines.length)}
         </div>
         <ReviewCard
           line={current}
@@ -176,7 +179,7 @@ export function ReviewPage() {
         />
         <div className="review__nav">
           <button className="link-btn" onClick={previous} disabled={index === 0}>
-            ← Previous
+            {text.previous}
           </button>
           <span className="review__keys">
             {shown.map((c) => (
@@ -184,10 +187,10 @@ export function ReviewPage() {
                 {c.key}
               </span>
             ))}{" "}
-            pick · <span className="kbd">↩</span> confirm · <span className="kbd">{SKIP_KEY}</span> skip
+            {text.pick} · <span className="kbd">↩</span> {text.confirm} · <span className="kbd">{SKIP_KEY}</span> {text.skipKey}
           </span>
           <button className="link-btn" onClick={skip} disabled={lines.length < 2}>
-            Skip →
+            {text.skip}
           </button>
         </div>
       </div>

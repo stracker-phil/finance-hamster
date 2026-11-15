@@ -3,11 +3,12 @@ import type { DocState } from "../api";
 import { useDocuments } from "../queries/documents";
 import { useStore } from "../state/store";
 import { EmptyPage } from "./EmptyPage";
+import { useT } from "../i18n";
 
-const STATE_PILL: Record<DocState, { label: string; className: string }> = {
-  draft: { label: "Draft", className: "pill pill--dashed" },
-  finished: { label: "Finished", className: "pill pill--blue" },
-  excluded: { label: "Excluded", className: "pill" },
+const STATE_PILL: Record<DocState, string> = {
+  draft: "pill pill--dashed",
+  finished: "pill pill--blue",
+  excluded: "pill",
 };
 
 /** Documents: "Is it already here?", then every document by tax year, the undated ones in the Inbox. The big field
@@ -17,18 +18,19 @@ export function DocumentsPage() {
   const setQuery = useStore((s) => s.setFilter);
   const { data: groups } = useDocuments(query);
   const navigate = useStore((s) => s.navigate);
+  const text = useT().pages.documents;
   return (
     <div className="page-scroll">
       <div className="docs-page">
         <label className="big-search">
           <Search size={17} />
-          <input placeholder="Is it already here? Search vendor, invoice number or amount" aria-label="Search documents" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <input placeholder={text.searchPlaceholder} aria-label={text.searchLabel} value={query} onChange={(e) => setQuery(e.target.value)} />
         </label>
         {groups?.length === 0 &&
           (query.trim() ? (
-            <p className="docs-page__none">Nothing matches “{query.trim()}”, so it isn&apos;t here yet.</p>
+            <p className="docs-page__none">{text.noMatch(query.trim())}</p>
           ) : (
-            <EmptyPage title="No documents" text="Drop an invoice PDF onto the window to add it." />
+            <EmptyPage title={text.emptyTitle} text={text.emptyText} />
           ))}
         {groups?.map((group) => (
           <section key={group.title} className="docs-group" aria-label={group.title}>
@@ -44,15 +46,15 @@ export function DocumentsPage() {
               {group.year && (
                 <>
                   <button className="link-btn docs-group__link" onClick={() => group.year && navigate({ page: "log", year: group.year })}>
-                    Log
+                    {text.log}
                   </button>
                   <button className="link-btn docs-group__link" onClick={() => group.year && navigate({ page: "archive", year: group.year })}>
-                    Archive
+                    {text.archive}
                   </button>
                 </>
               )}
               {group.total && (
-                <span className="docs-group__total" title="What these documents cost; the tax year page shows what counts">
+                <span className="docs-group__total" title={text.totalTip}>
                   {group.total}
                 </span>
               )}
@@ -64,7 +66,7 @@ export function DocumentsPage() {
                   <span className="docs-row__title">{doc.title}</span>
                   <span className="add-doc__hint">{doc.sub}</span>
                 </span>
-                <span className={STATE_PILL[doc.state].className}>{STATE_PILL[doc.state].label}</span>
+                <span className={STATE_PILL[doc.state]}>{text[doc.state]}</span>
                 <span className="docs-row__anv">{doc.anv}</span>
               </button>
             ))}

@@ -5,20 +5,18 @@ import { openMenu, useMenuOpenOn, type MenuEntry } from "../components/menu";
 import { showError, undoToast } from "../lib/undoToast";
 import { useStore } from "../state/store";
 import { CloseYearSheet } from "./CloseYearSheet";
+import { t, useT } from "../i18n";
 
 async function reopen(year: number) {
-  const confirmed = await useStore.getState().confirm({
-    title: `Reopen Tax Year ${year}?`,
-    text: "Its documents and answers can change again. The snapshot taken when it was closed stays.",
-    action: "Reopen",
-  });
+  const text = t().year.menu;
+  const confirmed = await useStore.getState().confirm({ title: text.reopenTitle(year), text: text.reopenText, action: text.reopenAction });
   if (confirmed) api.yearReopen(year).then(undoToast).catch(showError);
 }
 
 function exportSummary(year: number) {
   api
     .yearExportSummary(year)
-    .then((saved) => saved && useStore.getState().showToast("success", `Exported the Tax Year ${year} summary`))
+    .then((saved) => saved && useStore.getState().showToast("success", t().year.menu.exported(year)))
     .catch(showError);
 }
 
@@ -27,26 +25,27 @@ export function YearMenu({ year, archived, closed }: { year: number; archived: n
   const [closing, setClosing] = useState(false);
   const open = useMenuOpenOn(button);
   const navigate = useStore((s) => s.navigate);
+  const text = useT().year.menu;
   const show = () => {
     if (!button) return;
     const entries: MenuEntry[] = [
-      { text: "Log", run: () => navigate({ page: "log", year }) },
-      { text: "Archive", hint: String(archived), run: () => navigate({ page: "archive", year }) },
-      { text: "Export Summary PDF…", run: () => exportSummary(year) },
-      { text: "Open Ruleset JSON", run: () => void api.rulesOpen(year).catch(showError) },
+      { text: text.log, run: () => navigate({ page: "log", year }) },
+      { text: text.archive, hint: String(archived), run: () => navigate({ page: "archive", year }) },
+      { text: text.export, run: () => exportSummary(year) },
+      { text: text.ruleset, run: () => void api.rulesOpen(year).catch(showError) },
       "separator",
       ...(closed
         ? [
-            { text: "Open Snapshot PDF", run: () => void api.yearOpenSnapshot(year).catch(showError) },
-            { text: "Reopen Year…", run: () => void reopen(year) },
+            { text: text.snapshot, run: () => void api.yearOpenSnapshot(year).catch(showError) },
+            { text: text.reopen, run: () => void reopen(year) },
           ]
-        : [{ text: "Close Year…", run: () => setClosing(true) }]),
+        : [{ text: text.close, run: () => setClosing(true) }]),
     ];
-    openMenu(entries, button, `Tax Year ${year}`);
+    openMenu(entries, button, text.title(year));
   };
   return (
     <div className="year-menu">
-      <button ref={setButton} className="icon-btn" aria-label="More" aria-haspopup="menu" aria-expanded={open} onClick={show}>
+      <button ref={setButton} className="icon-btn" aria-label={text.more} aria-haspopup="menu" aria-expanded={open} onClick={show}>
         <MoreHorizontal size={16} />
       </button>
       {closing && <CloseYearSheet year={year} onClose={() => setClosing(false)} />}

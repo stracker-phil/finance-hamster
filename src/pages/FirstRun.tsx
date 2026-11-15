@@ -2,6 +2,7 @@ import { useState } from "react";
 import { AccountForm } from "../accounts/AccountForm";
 import { useTaxYears } from "../queries/taxYears";
 import { startImport } from "../statements/importFlow";
+import { useT } from "../i18n";
 
 interface Props {
   onAccountAdded: () => void;
@@ -13,17 +14,18 @@ export function FirstRun({ onAccountAdded, onDone }: Props) {
   const [step, setStep] = useState<"account" | "statement">("account");
   const { data: years = [] } = useTaxYears();
   const year = years.find((y) => y.state === "open");
+  const text = useT().pages.firstRun;
   return (
     <div className="first-run">
       <div className="first-run__titlebar" data-tauri-drag-region />
       <div className="first-run__card">
-        <div className="first-run__step">Step {step === "account" ? 1 : 2} of 2</div>
+        <div className="first-run__step">{text.step(step === "account" ? 1 : 2)}</div>
         {step === "account" ? (
           <>
-            <h1>Add your first account</h1>
-            <p>The bank account whose statements you import. Hamster keeps every statement and asks only about lines it can&apos;t sort itself.</p>
+            <h1>{text.accountTitle}</h1>
+            <p>{text.accountText}</p>
             <AccountForm
-              submitLabel="Continue"
+              submitLabel={text.continue}
               onSaved={() => {
                 onAccountAdded();
                 setStep("statement");
@@ -32,19 +34,17 @@ export function FirstRun({ onAccountAdded, onDone }: Props) {
           </>
         ) : (
           <>
-            <h1>Import your first statement</h1>
-            <p>Choose a text PDF statement from your bank. You can also do this later from + New.</p>
+            <h1>{text.statementTitle}</h1>
+            <p>{text.statementText}</p>
             {year && (
-              <p>
-                Tax year {year.year} is ready with the rules {year.ruleset}.
-              </p>
+              <p>{text.ready(year.year, year.ruleset)}</p>
             )}
             <div className="actions">
               <button type="button" className="btn" onClick={onDone}>
-                Skip for Now
+                {text.skip}
               </button>
               <button type="button" className="btn btn--primary" onClick={startImport}>
-                Import Statement…
+                {text.import}
               </button>
             </div>
           </>

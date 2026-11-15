@@ -5,6 +5,7 @@ import { accountTone } from "../lib/accountTone";
 import { useToday } from "../queries/today";
 import { startImport } from "../statements/importFlow";
 import { useStore } from "../state/store";
+import { useT } from "../i18n";
 
 function go(target: StepTarget) {
   const { navigate } = useStore.getState();
@@ -34,13 +35,14 @@ function QuietRow({ step }: { step: Step }) {
 }
 
 function NextStep({ next }: { next: Step | null }) {
+  const text = useT().pages.today;
   if (!next)
     return (
       <div className="today__done">
         <img src={hamster} alt="" className="today__hamster" />
         <div>
-          <h2 className="today__headline">You’re up to date.</h2>
-          <p className="today__line">Nothing to review or attach.</p>
+          <h2 className="today__headline">{text.upToDate}</h2>
+          <p className="today__line">{text.nothingToDo}</p>
         </div>
       </div>
     );
@@ -56,15 +58,16 @@ function NextStep({ next }: { next: Step | null }) {
 }
 
 function UpcomingCharges({ charges }: { charges: UpcomingCharge[] }) {
+  const text = useT().pages.today;
   return (
-    <section className="today__upcoming" aria-label="Coming up">
+    <section className="today__upcoming" aria-label={text.comingUp}>
       <h3 className="sub-sheet__heading today__heading">
-        Coming up
+        {text.comingUp}
         <button className="link-btn today__more" onClick={() => useStore.getState().navigate({ page: "subscriptions" })}>
-          All subscriptions
+          {text.allSubscriptions}
         </button>
       </h3>
-      {charges.length === 0 && <p className="add-doc__hint">No subscription charges ahead.</p>}
+      {charges.length === 0 && <p className="add-doc__hint">{text.noCharges}</p>}
       {charges.map((charge) => (
         <button key={charge.id} className="sub-line today__charge" onClick={() => useStore.getState().navigate({ page: "subscriptions", subscriptionId: charge.id })}>
           <span className={`tile tile--small ${accountTone(charge.tone)}`}>{charge.letter}</span>
@@ -81,18 +84,19 @@ function UpcomingCharges({ charges }: { charges: UpcomingCharge[] }) {
 }
 
 function YearColumn({ year, statements }: { year: YearSummary | null; statements: StatementReach[] }) {
+  const text = useT().pages.today;
   return (
-    <section className="today__year" aria-label={year ? `Tax year ${year.year}` : "Statements"}>
+    <section className="today__year" aria-label={year ? text.taxYear(year.year) : text.statements}>
       {year && (
         <>
           <h3 className="sub-sheet__heading today__heading">
-            Tax year {year.year}
+            {text.taxYear(year.year)}
             <button className="link-btn today__more" onClick={() => useStore.getState().navigate({ page: "year", year: year.year })}>
-              Show Tax Year
+              {text.showTaxYear}
             </button>
           </h3>
           <div className="today__total">{year.total}</div>
-          <div className="add-doc__hint">Werbungskosten so far</div>
+          <div className="add-doc__hint">{text.soFar}</div>
           <div className="year-bar today__bar">
             <span style={{ width: `${year.progressPercent}%` }} />
           </div>
@@ -101,7 +105,7 @@ function YearColumn({ year, statements }: { year: YearSummary | null; statements
       )}
       {statements.length > 0 && (
         <p className="today__statements">
-          Statements:{" "}
+          {text.statementsLead}{" "}
           {statements.map((part, i) => (
             <span key={i} className={part.behind ? "today__behind" : undefined}>
               {i > 0 && " · "}
@@ -117,6 +121,7 @@ function YearColumn({ year, statements }: { year: YearSummary | null; statements
 /** The single most useful next step with one button, the other open ones, and what's coming up. */
 export function TodayPage() {
   const { data } = useToday();
+  const text = useT().pages.today;
   if (!data) return null;
   return (
     <div className="page-scroll">
@@ -124,7 +129,7 @@ export function TodayPage() {
         <div className="today__date">{data.date}</div>
         <NextStep next={data.next} />
         {data.also.length > 0 && (
-          <div className="today__also" aria-label="Also open" role="group">
+          <div className="today__also" aria-label={text.alsoOpen} role="group">
             {data.also.map((step) => (
               <QuietRow key={step.key} step={step} />
             ))}

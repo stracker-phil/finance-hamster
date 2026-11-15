@@ -1,5 +1,6 @@
 import { useId, useState, type FormEvent } from "react";
 import { api, toAppError, type Account } from "../api";
+import { useT } from "../i18n";
 
 export interface AccountValues {
   name: string;
@@ -24,6 +25,8 @@ interface Props {
  *  under their field. */
 export function AccountForm({ account, submitLabel, onCancel, onSaved }: Props) {
   const id = useId();
+  const text = useT().statements.account;
+  const cancel = useT().components.cancel;
   const [values, setValues] = useState<AccountValues>(
     account ? { name: account.name, bank: account.bank, iban: account.ibanMasked, own: account.own, statementName: account.statementName ?? "" } : EMPTY,
   );
@@ -73,20 +76,20 @@ export function AccountForm({ account, submitLabel, onCancel, onSaved }: Props) 
 
   return (
     <form className="account-form" onSubmit={submit}>
-      {field("name", "Name", { placeholder: "Private", autoFocus: true })}
-      {field("bank", "Bank", { placeholder: "Example Bank" })}
-      {field("iban", "IBAN", { placeholder: "AT00 0000 0000 0000 0000", disabled: !!account })}
+      {field("name", text.name, { placeholder: text.namePlaceholder, autoFocus: true })}
+      {field("bank", text.bank, { placeholder: text.bankPlaceholder })}
+      {field("iban", text.iban, { placeholder: "AT00 0000 0000 0000 0000", disabled: !!account })}
       <label className="form-check">
         <input type="checkbox" className="switch" role="switch" checked={values.own} onChange={(e) => set({ own: e.target.checked })} />
         <span>
-          One of my accounts
-          <span className="form-check__desc">Transfers between your own accounts show as Transfer.</span>
+          {text.own}
+          <span className="form-check__desc">{text.ownDescription}</span>
         </span>
       </label>
-      {field("statementName", "Name on other statements", {
+      {field("statementName", text.statementName, {
         placeholder: "Haushaltskonto",
         disabled: !values.own,
-        hint: "How your other accounts' statements name this one. Many bank statements print no IBAN for a transfer, so the name tells it.",
+        hint: text.statementNameHint,
       })}
       <div className="form-field__error" role={errors.form ? "alert" : undefined}>
         {errors.form ?? ""}
@@ -94,7 +97,7 @@ export function AccountForm({ account, submitLabel, onCancel, onSaved }: Props) 
       <div className="actions">
         {onCancel && (
           <button type="button" className="btn" onClick={onCancel}>
-            Cancel
+            {cancel}
           </button>
         )}
         <button type="submit" className="btn btn--primary" disabled={busy || !values.name.trim() || (!account && !values.iban.trim())}>

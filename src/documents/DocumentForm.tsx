@@ -6,6 +6,7 @@ import { useStore } from "../state/store";
 import { DepreciationBlock } from "./DepreciationBlock";
 import { runStep } from "./lifecycle";
 import { LinePicker } from "./LinePicker";
+import { useT } from "../i18n";
 
 type Errors = Record<string, string>;
 
@@ -56,13 +57,14 @@ function SavedInput({ id, value, onSave, className, ...props }: { id: string; va
 function NoteField({ value, onSave }: { value: string; onSave: (text: string) => void }) {
   const { text, setText, commit } = useDraftText(value, onSave);
   const ref = useRef<HTMLTextAreaElement>(null);
+  const label = useT().documents.form.note;
   useEffect(() => {
     const area = ref.current;
     if (!area) return;
     area.style.height = "auto";
     area.style.height = `${area.scrollHeight}px`;
   }, [text]);
-  return <textarea ref={ref} className="field note-field" rows={2} aria-label="Note" value={text} onChange={(e) => setText(e.target.value)} onBlur={commit} />;
+  return <textarea ref={ref} className="field note-field" rows={2} aria-label={label} value={text} onChange={(e) => setText(e.target.value)} onBlur={commit} />;
 }
 
 function FieldError({ message }: { message?: string }) {
@@ -81,32 +83,33 @@ export function DocumentForm({ doc, onExclude }: { doc: DocumentView; onExclude:
   const [moreOpen, setMoreOpen] = useState(doc.invoiceAmount !== null);
   const [shareOpen, setShareOpen] = useState(doc.workShare !== 100);
   const locked = doc.state !== "draft";
+  const text = useT().documents.form;
   return (
     <div className="doc-form">
       <fieldset className="doc-form__fields" disabled={locked}>
         <div className="doc-form__top">
-          <div className="doc-form__status">{doc.missing.length === 0 ? "Every required fact is set" : `Missing: ${doc.missing.join(", ")}`}</div>
+          <div className="doc-form__status">{doc.missing.length === 0 ? text.complete : text.missing(doc.missing.join(", "))}</div>
           {doc.state === "draft" && (
-            <button type="button" className="btn btn--primary" disabled={doc.missing.length > 0} title={doc.missing.length > 0 ? `Set the ${doc.missing.join(", ")} first` : undefined} onClick={() => void runStep(doc.id, { kind: "finish" })}>
-              <Check size={14} strokeWidth={2.4} /> Mark Finished
+            <button type="button" className="btn btn--primary" disabled={doc.missing.length > 0} title={doc.missing.length > 0 ? text.setFirst(doc.missing.join(", ")) : undefined} onClick={() => void runStep(doc.id, { kind: "finish" })}>
+              <Check size={14} strokeWidth={2.4} /> {text.finish}
             </button>
           )}
         </div>
 
-        <h3 className="doc-form__heading">Payment</h3>
+        <h3 className="doc-form__heading">{text.payment}</h3>
         <div className="doc-form__grid">
           <label htmlFor={`${id}-date`} className="doc-form__key">
-            Date
+            {text.date}
           </label>
           <div>
             <div className="doc-form__row">
               <SavedInput id={`${id}-date`} type="date" className="doc-form__date" value={doc.payDate ?? ""} onSave={(text) => save({ field: "payDate", value: text || null })} />
-              {doc.year && <span className="add-doc__hint">Tax year {doc.year}</span>}
+              {doc.year && <span className="add-doc__hint">{text.taxYear(doc.year)}</span>}
             </div>
             <FieldError message={errors["document.payDate"]} />
           </div>
 
-          <span>Bank line</span>
+          <span>{text.bankLine}</span>
           <div className="doc-form__lines">
             {doc.lines.map((line) => (
               <div key={line.id} className="doc-form__line">
@@ -115,14 +118,14 @@ export function DocumentForm({ doc, onExclude }: { doc: DocumentView; onExclude:
                   <span className="add-doc__hint">{line.detail}</span>
                 </span>
                 <span className="choice__amount">{line.amount}</span>
-                <button type="button" className="icon-btn" aria-label={`Unlink ${line.title}`} onClick={() => save({ field: "unlink", line: line.id })}>
+                <button type="button" className="icon-btn" aria-label={text.unlink(line.title)} onClick={() => save({ field: "unlink", line: line.id })}>
                   <X size={14} />
                 </button>
               </div>
             ))}
             <div className="doc-form__picker">
               <button type="button" className="btn btn--small" onClick={() => setPicking(true)}>
-                <Link2 size={13} /> {doc.lines.length === 0 ? "Link a Bank Line…" : "Link Another Payment…"}
+                <Link2 size={13} /> {doc.lines.length === 0 ? text.linkLine : text.linkAnother}
               </button>
               {picking && (
                 <LinePicker
@@ -137,12 +140,12 @@ export function DocumentForm({ doc, onExclude }: { doc: DocumentView; onExclude:
             </div>
           </div>
 
-          <label htmlFor={`${id}-paid`}>Paid</label>
+          <label htmlFor={`${id}-paid`}>{text.paid}</label>
           <div>
             {doc.paidFromLines ? (
               <div className="doc-form__row">
                 <span className="doc-form__amount">{doc.paid}</span>
-                <span className="add-doc__hint">from the bank {doc.lines.length === 1 ? "line" : "lines"}</span>
+                <span className="add-doc__hint">{text.fromLines(doc.lines.length)}</span>
               </div>
             ) : (
               <SavedInput id={`${id}-paid`} value={doc.paidText ?? ""} placeholder="0.00" inputMode="decimal" className="doc-form__money" onSave={(text) => save({ field: "paid", value: text || null })} />
@@ -151,11 +154,11 @@ export function DocumentForm({ doc, onExclude }: { doc: DocumentView; onExclude:
           </div>
         </div>
 
-        <h3 className="doc-form__heading">Classification</h3>
+        <h3 className="doc-form__heading">{text.classification}</h3>
         <div className="doc-form__grid">
-          <label htmlFor={`${id}-vendor`}>Vendor</label>
+          <label htmlFor={`${id}-vendor`}>{text.vendor}</label>
           <div>
-            <SavedInput id={`${id}-vendor`} value={doc.vendor ?? ""} list={`${id}-vendors`} placeholder="Who sent the invoice" onSave={(name) => save({ field: "vendor", name })} />
+            <SavedInput id={`${id}-vendor`} value={doc.vendor ?? ""} list={`${id}-vendors`} placeholder={text.vendorPlaceholder} onSave={(name) => save({ field: "vendor", name })} />
             <datalist id={`${id}-vendors`}>
               {doc.vendors.map((v) => (
                 <option key={v.name} value={v.name}>
@@ -166,13 +169,13 @@ export function DocumentForm({ doc, onExclude }: { doc: DocumentView; onExclude:
             <FieldError message={errors["document.vendor"]} />
           </div>
 
-          <label htmlFor={`${id}-item`}>Item</label>
+          <label htmlFor={`${id}-item`}>{text.item}</label>
           <div>
             <PopUpButton
               id={`${id}-item`}
               value={doc.itemKey ?? ""}
               disabled={locked || !doc.payDate}
-              options={[{ value: "", label: doc.payDate ? "Choose an item" : "Set the payment date first" }, ...doc.items.map((i) => ({ value: i.key, label: i.label }))]}
+              options={[{ value: "", label: doc.payDate ? text.chooseItem : text.dateFirst }, ...doc.items.map((i) => ({ value: i.key, label: i.label }))]}
               onChange={(key) => save({ field: "item", key: key || null })}
             />
             <FieldError message={errors["document.item"]} />
@@ -182,7 +185,7 @@ export function DocumentForm({ doc, onExclude }: { doc: DocumentView; onExclude:
         {doc.estimate && (
           <div className="anv-result">
             <div className="anv-result__main">
-              <div className="add-doc__hint">{doc.year ? `Counts in Tax year ${doc.year}` : "Counts as"}</div>
+              <div className="add-doc__hint">{doc.year ? text.countsIn(doc.year) : text.countsAs}</div>
               <div className="anv-result__amount">{doc.estimate.anv}</div>
               <div className="add-doc__hint">{doc.estimate.formula}</div>
             </div>
@@ -190,7 +193,7 @@ export function DocumentForm({ doc, onExclude }: { doc: DocumentView; onExclude:
               <div className="anv-result__share">
                 <div className="doc-form__row">
                   <label htmlFor={`${id}-share`} className="add-doc__hint">
-                    Work share
+                    {text.workShare}
                   </label>
                   <SavedInput id={`${id}-share`} value={String(doc.workShare)} inputMode="numeric" className="anv-result__input" onSave={(text) => save({ field: "workShare", value: text })} />
                   <span className="add-doc__hint">%</span>
@@ -200,7 +203,7 @@ export function DocumentForm({ doc, onExclude }: { doc: DocumentView; onExclude:
               </div>
             ) : (
               <button type="button" className="link-btn" onClick={() => setShareOpen(true)}>
-                Partly private use…
+                {text.partlyPrivate}
               </button>
             )}
           </div>
@@ -214,20 +217,20 @@ export function DocumentForm({ doc, onExclude }: { doc: DocumentView; onExclude:
         {doc.depreciation && <DepreciationBlock depreciation={doc.depreciation} disabled={locked} onYears={(years) => save({ field: "usefulLife", years })} />}
         <FieldError message={errors["document.usefulLife"]} />
 
-        <h3 className="doc-form__heading">Note</h3>
+        <h3 className="doc-form__heading">{text.note}</h3>
         <NoteField value={doc.note} onSave={(text) => save({ field: "note", text })} />
 
         <button type="button" className="link-btn doc-form__more" aria-expanded={moreOpen} onClick={() => setMoreOpen((open) => !open)}>
-          More: invoice amount
+          {text.more}
         </button>
         {moreOpen && (
           <div className="doc-form__row doc-form__invoice">
             <label htmlFor={`${id}-invoice`} className="add-doc__hint">
-              Invoice amount
+              {text.invoiceAmount}
             </label>
             <SavedInput id={`${id}-invoice`} value={doc.invoiceAmount ?? ""} inputMode="decimal" className="doc-form__money" onSave={(text) => save({ field: "invoice", amount: text || null, currency: doc.invoiceCurrency })} />
-            <SavedInput id={`${id}-currency`} aria-label="Currency" value={doc.invoiceCurrency} className="doc-form__currency" onSave={(currency) => save({ field: "invoice", amount: doc.invoiceAmount, currency })} />
-            <span className="add-doc__hint">optional, for reference</span>
+            <SavedInput id={`${id}-currency`} aria-label={text.currency} value={doc.invoiceCurrency} className="doc-form__currency" onSave={(currency) => save({ field: "invoice", amount: doc.invoiceAmount, currency })} />
+            <span className="add-doc__hint">{text.optional}</span>
             <FieldError message={errors["document.invoice"]} />
           </div>
         )}
@@ -235,7 +238,7 @@ export function DocumentForm({ doc, onExclude }: { doc: DocumentView; onExclude:
       {doc.state !== "excluded" && (
         <div className="doc-form__exclude">
           <button type="button" className="link-btn" onClick={onExclude}>
-            Exclude Document…
+            {text.exclude}
           </button>
         </div>
       )}

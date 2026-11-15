@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Icon } from "../components/icons";
+import { useT } from "../i18n";
 import { SETTINGS_PAGES } from "./pages";
 import { RevealTarget } from "./controls";
 import { groupsOf, resolvePage, searchSettings, type SettingsMatch } from "./registry";
@@ -31,17 +32,18 @@ function NavButton({ page, row, current, onOpen }: SettingsMatch & { current: st
 
 /** The page list under its group headings; a search replaces it with every matching page and row, best first. */
 function SettingsNav({ current, onOpen }: { current: string; onOpen: (id: string) => void }) {
+  const text = useT().settings.window;
   const [query, setQuery] = useState("");
   const searching = query.trim() !== "";
   const results = searching ? searchSettings(SETTINGS_PAGES, query) : [];
   return (
-    <nav className="settings-nav" aria-label="Settings pages">
+    <nav className="settings-nav" aria-label={text.nav}>
       <div className="settings-nav__titlebar" data-tauri-drag-region />
       <input
         className="field settings-nav__search"
         type="search"
-        aria-label="Search settings"
-        placeholder="Search"
+        aria-label={text.search}
+        placeholder={text.searchPlaceholder}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         onKeyDown={(e) => {
@@ -51,7 +53,7 @@ function SettingsNav({ current, onOpen }: { current: string; onOpen: (id: string
       <div className="settings-nav__list scroller">
         {searching ? (
           results.length === 0 ? (
-            <p className="settings-nav__empty">No Results</p>
+            <p className="settings-nav__empty">{text.noResults}</p>
           ) : (
             results.map((match) => <NavButton key={targetOf(match)} {...match} current={current} onOpen={onOpen} />)
           )
@@ -74,6 +76,8 @@ function SettingsNav({ current, onOpen }: { current: string; onOpen: (id: string
 
 /** `request.id` may name a row: its page opens scrolled to it, washed in the accent once. */
 export function SettingsWindow({ request, onOpen }: { request: SettingsRequest; onOpen: (id: string) => void }) {
+  // Page labels and intros read the language; this re-renders them when it changes.
+  useT();
   const page = resolvePage(SETTINGS_PAGES, request.id);
   const target = useMemo(() => (request.id && request.id !== page.id ? { id: request.id } : undefined), [request, page]);
   const { Body } = page;

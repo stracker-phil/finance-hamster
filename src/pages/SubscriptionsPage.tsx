@@ -6,6 +6,7 @@ import { useStore } from "../state/store";
 import { newSubscription, resumeSubscription } from "../subscriptions/flow";
 import { SubscriptionPanel } from "../subscriptions/SubscriptionPanel";
 import { EmptyPage } from "./EmptyPage";
+import { useT } from "../i18n";
 
 /** Every subscription by next charge, the ended ones folded away at the bottom, and the selected one's panel. */
 export function SubscriptionsPage({ open = null }: { open?: string | null }) {
@@ -13,6 +14,7 @@ export function SubscriptionsPage({ open = null }: { open?: string | null }) {
   const { data } = useSubscriptions(filter);
   const [selected, setSelected] = useState<string | null>(open);
   const [endedOpen, setEndedOpen] = useState(false);
+  const text = useT().pages.subscriptions;
   useEffect(() => {
     if (!selected) return;
     const close = (e: KeyboardEvent) => {
@@ -24,9 +26,9 @@ export function SubscriptionsPage({ open = null }: { open?: string | null }) {
   if (!data) return null;
   if (data.empty)
     return (
-      <EmptyPage title="No subscriptions" text="Add one with New Subscription (⌘N), or choose Subscription for a line in Review.">
+      <EmptyPage title={text.emptyTitle} text={text.emptyText}>
         <button className="btn btn--primary" onClick={newSubscription}>
-          New Subscription
+          {text.new}
         </button>
       </EmptyPage>
     );
@@ -35,7 +37,7 @@ export function SubscriptionsPage({ open = null }: { open?: string | null }) {
     <div className="subs">
       <div className="page-scroll">
         <div className="subs__summary add-doc__hint">{data.summary}</div>
-        {nothingShown && <p className="subs__none">No subscription matches “{filter}”.</p>}
+        {nothingShown && <p className="subs__none">{text.noMatch(filter)}</p>}
         {data.groups.map((group) => (
           <section key={group.label} aria-label={group.label}>
             <div className="line-head">
@@ -58,13 +60,13 @@ export function SubscriptionsPage({ open = null }: { open?: string | null }) {
           </section>
         ))}
         {data.ended.length > 0 && (
-          <section aria-label="Ended">
+          <section aria-label={text.ended}>
             <div className="line-head">
               <button className="link-btn sub-ended__toggle" aria-expanded={endedOpen} onClick={() => setEndedOpen((o) => !o)}>
                 {endedOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-                Ended · {data.ended.length}
+                {text.endedToggle(data.ended.length)}
               </button>
-              <span className="line-head__count">kept for history, never charged again</span>
+              <span className="line-head__count">{text.endedNote}</span>
             </div>
             {endedOpen &&
               data.ended.map((row) => (
@@ -75,7 +77,7 @@ export function SubscriptionsPage({ open = null }: { open?: string | null }) {
                   <span className="add-doc__hint">{row.interval}</span>
                   <span className="add-doc__hint sub-row__next">{row.ended}</span>
                   <button className="btn btn--small sub-row__resume" onClick={() => resumeSubscription(row.id)}>
-                    Resume
+                    {text.resume}
                   </button>
                 </div>
               ))}

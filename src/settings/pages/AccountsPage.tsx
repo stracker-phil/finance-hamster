@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Account } from "../../api";
 import { AccountSheet } from "../../accounts/AccountSheet";
+import { useT } from "../../i18n";
 import { useAccounts } from "../../queries/accounts";
 import { useSettings, useUpdateSettings } from "../../queries/settings";
 import { useCoverage } from "../../queries/statements";
@@ -13,36 +14,37 @@ export function AccountsPage() {
   const lastOf = (id: string) => coverage?.accounts.find((a) => a.id === id)?.last;
   const { data: settings } = useSettings();
   const { mutate } = useUpdateSettings();
+  const { accounts: text, common } = useT().settings;
   // `null` adds an account; an account edits it.
   const [editing, setEditing] = useState<Account | null | undefined>(undefined);
   return (
     <>
-      <Group title="Bank accounts" anchor="bank-accounts">
-        {accounts?.length === 0 && <Row label="No accounts yet" description="Add the account whose statements you import." />}
+      <Group title={text.bankAccounts} anchor="bank-accounts">
+        {accounts?.length === 0 && <Row label={text.none} description={text.noneDescription} />}
         {accounts?.map((account) => (
-          <Row key={account.id} label={account.name} description={[account.bank, account.ibanMasked, lastOf(account.id) ?? "no statement yet"].filter(Boolean).join(" · ")}>
+          <Row key={account.id} label={account.name} description={[account.bank, account.ibanMasked, lastOf(account.id) ?? text.noStatement].filter(Boolean).join(" · ")}>
             <button className="btn btn--small" onClick={() => setEditing(account)}>
-              Edit…
+              {common.edit}
             </button>
           </Row>
         ))}
       </Group>
-      <Group title="Importing" anchor="importing">
+      <Group title={text.importing} anchor="importing">
         <Switch
-          label="Hide transfers between my accounts"
-          description="They show as Transfer and never count twice."
+          label={text.ownTransfers}
+          description={text.ownTransfersDescription}
           anchor="own-transfers"
           checked={settings?.hideOwnTransfers ?? true}
           onChange={(hideOwnTransfers) => mutate({ hideOwnTransfers })}
         />
-        <Row label="Statement format" description="Text-based PDF from the bank, checked by its printed balances.">
+        <Row label={text.format} description={text.formatDescription}>
           <span className="settings-value">PDF</span>
         </Row>
       </Group>
-      <Group title="Add" anchor="add-account">
-        <Row label="Another bank account">
+      <Group title={common.add} anchor="add-account">
+        <Row label={text.another}>
           <button className="btn btn--small" onClick={() => setEditing(null)}>
-            Add Account…
+            {text.addButton}
           </button>
         </Row>
       </Group>

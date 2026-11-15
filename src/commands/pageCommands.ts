@@ -5,13 +5,14 @@ import { FILTER_FIELD_ID } from "../shell/Header";
 import { startAddDocument } from "../documents/addFlow";
 import { startImport } from "../statements/importFlow";
 import { newSubscription } from "../subscriptions/flow";
+import { t } from "../i18n";
 import { useStore } from "../state/store";
 
 type Handler = () => void;
 
 const UNDO_WORDS = {
-  undo: { done: "Undid", none: "Nothing to undo" },
-  redo: { done: "Redid", none: "Nothing to redo" },
+  undo: { done: (label: string) => t().components.undid(label), none: () => t().components.nothingToUndo },
+  redo: { done: (label: string) => t().components.redid(label), none: () => t().components.nothingToRedo },
 };
 
 /** ⌘Z in a text field undoes the typing; elsewhere the newest change, as a new journaled op. */
@@ -23,8 +24,8 @@ function undoOrRedo(which: keyof typeof UNDO_WORDS) {
   const { showToast } = useStore.getState();
   api[which]()
     .then((label) => {
-      if (label) showToast("success", `${UNDO_WORDS[which].done} ${label}`);
-      else showToast("info", UNDO_WORDS[which].none);
+      if (label) showToast("success", UNDO_WORDS[which].done(label));
+      else showToast("info", UNDO_WORDS[which].none());
     })
     .catch((e: unknown) => showToast("error", toAppError(e).message));
 }

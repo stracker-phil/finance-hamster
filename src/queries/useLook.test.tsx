@@ -13,7 +13,7 @@ const mocked = vi.mocked(api, true);
 
 function Probe() {
   useLook();
-  return <p>{useT().appearance.languageGroup}</p>;
+  return <p>{useT().settings.appearance.languageGroup}</p>;
 }
 
 describe("useLook", () => {

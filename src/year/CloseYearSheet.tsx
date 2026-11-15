@@ -4,27 +4,29 @@ import { Modal } from "../components/Modal";
 import { showError, undoToast } from "../lib/undoToast";
 import { useYearCheck } from "../queries/yearCheck";
 import { useStore } from "../state/store";
+import { useT } from "../i18n";
 
 /** Asked before Close Year while no year check ran after 31 Dec. */
 function RunCheckFirst({ year, prompt, onSkip, onClose }: { year: number; prompt: string; onSkip: () => void; onClose: () => void }) {
   const titleId = useId();
+  const text = useT().year.close;
   const start = () => {
     onClose();
     useStore.getState().navigate({ page: "yearCheck", year });
   };
   return (
     <Modal labelledBy={titleId} className="sheet--narrow" onClose={onClose}>
-      <h2 id={titleId}>Run the year check first?</h2>
+      <h2 id={titleId}>{text.checkFirst}</h2>
       <p>{prompt}</p>
       <div className="actions">
         <button type="button" className="btn" onClick={onClose}>
-          Cancel
+          {text.cancel}
         </button>
         <button type="button" className="btn" onClick={onSkip}>
-          Close Without Check…
+          {text.withoutCheck}
         </button>
         <button type="button" className="btn btn--primary" autoFocus onClick={start}>
-          Start Year Check
+          {text.startCheck}
         </button>
       </div>
     </Modal>
@@ -46,6 +48,7 @@ function CloseSheet({ year, onClose }: { year: number; onClose: () => void }) {
   const [check, setCheck] = useState<CloseCheck | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const text = useT().year.close;
   useEffect(() => {
     api.yearCloseCheck(year).then(setCheck).catch(showError);
   }, [year]);
@@ -65,10 +68,10 @@ function CloseSheet({ year, onClose }: { year: number; onClose: () => void }) {
   };
   return (
     <Modal labelledBy={titleId} className="sheet--narrow" onClose={onClose}>
-      <h2 id={titleId}>Close Tax Year {year}?</h2>
-      <p>Hamster keeps a snapshot of every Kennzahl and a summary PDF. The year is then read-only until you reopen it.</p>
+      <h2 id={titleId}>{text.title(year)}</h2>
+      <p>{text.text}</p>
       {check && (
-        <ul className="close-list" aria-label="Before closing">
+        <ul className="close-list" aria-label={text.before}>
           {check.blockers.map((b) => (
             <li key={b} className="close-list__item close-list__item--blocker">
               <span className="year-dot year-dot--warn" />
@@ -84,20 +87,20 @@ function CloseSheet({ year, onClose }: { year: number; onClose: () => void }) {
           {check.blockers.length === 0 && check.warnings.length === 0 && (
             <li className="close-list__item">
               <span className="year-dot year-dot--done" />
-              Everything is in place
+              {text.inPlace}
             </li>
           )}
         </ul>
       )}
       <div className="form-field__error" role={error ? "alert" : undefined}>
-        {error ?? (blocked ? "Finish these first, then close the year." : "")}
+        {error ?? (blocked ? text.finishFirst : "")}
       </div>
       <div className="actions">
         <button type="button" className="btn" onClick={onClose}>
-          Cancel
+          {text.cancel}
         </button>
         <button type="button" className="btn btn--primary" disabled={!check || blocked || busy} onClick={close}>
-          Close Year
+          {text.close}
         </button>
       </div>
     </Modal>

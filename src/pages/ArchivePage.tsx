@@ -6,20 +6,20 @@ import { runStep } from "../documents/lifecycle";
 import { useArchive } from "../queries/documents";
 import { useSettings } from "../queries/settings";
 import { EmptyPage } from "./EmptyPage";
+import { useT } from "../i18n";
 
 /** The year's excluded documents, each restored or deleted from here. */
 export function ArchivePage({ year }: { year: number }) {
   const { data: docs } = useArchive(year);
   const { data: settings } = useSettings();
   const [deleting, setDeleting] = useState<ArchivedDocument | null>(null);
+  const text = useT().pages.archive;
   if (!settings) return null;
   const days = settings.archiveDays;
-  if (docs?.length === 0) return <EmptyPage title="Nothing excluded" text={`Excluded documents of ${year} show here.`} />;
+  if (docs?.length === 0) return <EmptyPage title={text.emptyTitle} text={text.emptyText(year)} />;
   return (
     <div className="page-scroll">
-      <p className="archive-page__intro">
-        Excluded documents never count and never show in other views. Nothing here is removed automatically. Deleting is possible {days} {days === 1 ? "day" : "days"} after excluding, and every deletion is written to the Log.
-      </p>
+      <p className="archive-page__intro">{text.intro(days)}</p>
       {docs?.map((doc) => (
         <div key={doc.id} className="archive-row">
           <FileText size={18} strokeWidth={1.8} className="docs-row__icon" />
@@ -31,10 +31,10 @@ export function ArchivePage({ year }: { year: number }) {
           </div>
           {doc.deletableNote && <span className="add-doc__hint">{doc.deletableNote}</span>}
           <button className="btn btn--small" onClick={() => void runStep(doc.id, { kind: "restore" })}>
-            Restore
+            {text.restore}
           </button>
           <button className="btn btn--small btn--danger-text" disabled={!doc.deletable} onClick={() => setDeleting(doc)}>
-            Delete…
+            {text.delete}
           </button>
         </div>
       ))}

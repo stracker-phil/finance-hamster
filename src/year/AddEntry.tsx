@@ -4,6 +4,7 @@ import { api, toAppError, type KennzahlView, type NewEntry } from "../api";
 import { useStore } from "../state/store";
 import { showError, undoToast } from "../lib/undoToast";
 import { today } from "../lib/today";
+import { useT } from "../i18n";
 
 /** A date in `year`: today while it is that year, else the year's last day. */
 const startDate = (year: number) => (today().startsWith(String(year)) ? today() : `${year}-12-31`);
@@ -20,6 +21,7 @@ export function AddEntry({ year, item, onDone, onAdded }: { year: number; item: 
   const [value, setValue] = useState("");
   const [evidence, setEvidence] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const words = useT().year.entry;
 
   const entry = (): NewEntry =>
     trip ? { kind: "trip", itemKey: item.key, date, km: value, text } : { kind: "amount", itemKey: item.key, date, amount: value, text, evidence };
@@ -51,33 +53,33 @@ export function AddEntry({ year, item, onDone, onAdded }: { year: number; item: 
   };
 
   return (
-    <div className="entry-add" role="group" aria-label={trip ? `Add a trip to KZ ${item.kz}` : `Add an amount to KZ ${item.kz}`}>
+    <div className="entry-add" role="group" aria-label={trip ? words.addTrip(item.kz) : words.addAmount(item.kz)}>
       <div className="entry-add__row" onKeyDown={onKey}>
         <span className="year-dot year-dot--accent" />
-        <input type="date" className="field entry-add__date" aria-label="Date" value={date} onChange={(e) => setDate(e.target.value)} />
+        <input type="date" className="field entry-add__date" aria-label={words.date} value={date} onChange={(e) => setDate(e.target.value)} />
         <input
           className="field entry-add__text"
-          aria-label={trip ? "Destination and purpose" : "Note"}
-          placeholder={trip ? "Destination and purpose, e.g. Linz · client workshop" : "What it is"}
+          aria-label={trip ? words.destination : words.note}
+          placeholder={trip ? words.destinationPlaceholder : words.notePlaceholder}
           value={text}
           autoFocus
           onChange={(e) => setText(e.target.value)}
         />
-        <input className="field entry-add__value" aria-label={trip ? "Kilometres" : "Amount"} placeholder={trip ? "km" : "€"} inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} />
+        <input className="field entry-add__value" aria-label={trip ? words.km : words.amount} placeholder={trip ? words.kmPlaceholder : "€"} inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} />
         {trip ? (
           <span className="add-doc__hint entry-add__rate">{item.rate}</span>
         ) : (
           <button className="btn btn--small entry-add__pdf" onClick={choose} title={evidence ?? undefined}>
             <FileText size={13} />
-            {evidence ? fileName(evidence) : "PDF…"}
+            {evidence ? fileName(evidence) : words.pdf}
           </button>
         )}
         <button className="btn btn--small btn--primary" onClick={add}>
-          Add
+          {words.add}
         </button>
       </div>
       <div className={error ? "add-doc__hint entry-add__note entry-add__note--error" : "add-doc__hint entry-add__note"} role={error ? "alert" : undefined}>
-        {error ?? (trip ? "Round trip kilometres; the rate comes from the year's rules." : "The evidence PDF is kept with the amount.")}
+        {error ?? (trip ? words.tripHint : words.amountHint)}
       </div>
     </div>
   );
@@ -85,8 +87,9 @@ export function AddEntry({ year, item, onDone, onAdded }: { year: number; item: 
 
 /** The "+ Add" button in a Kennzahl's head: a document opens the add flow, an amount or a trip the inline row. */
 export function AddButton({ item, adding, onToggle }: { item: KennzahlView; adding: boolean; onToggle: () => void }) {
+  const text = useT().year.entry;
   if (!item.add || item.reported) return null;
-  const label = { document: "Document", amount: "Amount", trip: "Trip" }[item.add];
+  const label = { document: text.document, amount: text.amountKind, trip: text.trip }[item.add];
   const click = () => {
     if (item.add === "document") void startDocument(item.key);
     else onToggle();

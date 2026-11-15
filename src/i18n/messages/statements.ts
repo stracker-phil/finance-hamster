@@ -1,0 +1,58 @@
+import { both } from "../both";
+
+export const statements = both(
+  {
+    importSheet: {
+      title: "Import statement",
+      read: (n: number) => `Read ${n} ${n === 1 ? "line" : "lines"}`,
+      recognized: "Account recognized from the IBAN on page 1.",
+      balance: "Balance adds up",
+      balanceDetail: (balance: string) => `${balance} · matches the printed new balance`,
+      copiedTo: "The PDF is copied unchanged to",
+      import: "Import",
+    },
+    account: {
+      edit: "Edit Account",
+      add: "Add Account",
+      save: "Save",
+      saved: (name: string) => `Saved ${name}`,
+      added: (name: string) => `Added ${name}`,
+      name: "Name",
+      namePlaceholder: "Private",
+      bank: "Bank",
+      bankPlaceholder: "Example Bank",
+      iban: "IBAN",
+      own: "One of my accounts",
+      ownDescription: "Transfers between your own accounts show as Transfer.",
+      statementName: "Name on other statements",
+      statementNameHint: "How your other accounts' statements name this one. Many bank statements print no IBAN for a transfer, so the name tells it.",
+    },
+  },
+  {
+    importSheet: {
+      title: "Kontoauszug importieren",
+      read: (n: number) => `${n} ${n === 1 ? "Buchung" : "Buchungen"} gelesen`,
+      recognized: "Konto an der IBAN auf Seite 1 erkannt.",
+      balance: "Saldo stimmt",
+      balanceDetail: (balance: string) => `${balance} · entspricht dem gedruckten neuen Saldo`,
+      copiedTo: "Das PDF wird unverändert kopiert nach",
+      import: "Importieren",
+    },
+    account: {
+      edit: "Konto bearbeiten",
+      add: "Konto hinzufügen",
+      save: "Sichern",
+      saved: (name: string) => `${name} gespeichert`,
+      added: (name: string) => `${name} hinzugefügt`,
+      name: "Name",
+      namePlaceholder: "Privat",
+      bank: "Bank",
+      bankPlaceholder: "Beispielbank",
+      iban: "IBAN",
+      own: "Eines meiner Konten",
+      ownDescription: "Überweisungen zwischen deinen eigenen Konten erscheinen als Umbuchung.",
+      statementName: "Name auf anderen Kontoauszügen",
+      statementNameHint: "Wie die Kontoauszüge deiner anderen Konten dieses nennen. Viele Kontoauszüge drucken bei einer Überweisung keine IBAN, daher verrät es der Name.",
+    },
+  },
+);

@@ -1,36 +1,38 @@
+import { t } from "../i18n";
 import type { Route } from "../state/route";
 import type { HeaderTitle } from "./Header";
 
 /** The header title of a page before its data loads. */
 export function titleFor(route: Route): HeaderTitle {
+  const text = t().shell.titles;
   switch (route.page) {
     case "today":
-      return { title: "Today" };
+      return { title: text.today };
     case "subscriptions":
-      return { title: "Subscriptions" };
+      return { title: text.subscriptions };
     case "statements":
-      return { title: "Statements" };
+      return { title: text.statements };
     case "documents":
-      return { title: "Documents" };
+      return { title: text.documents };
     case "review":
-      return { title: "Review", crumb: { label: "Statements", to: { page: "statements" } } };
+      return { title: text.review, crumb: { label: text.statements, to: { page: "statements" } } };
     case "account":
-      return { title: "Account", crumb: { label: "Statements", to: { page: "statements" } } };
+      return { title: text.account, crumb: { label: text.statements, to: { page: "statements" } } };
     case "year":
-      return { title: `Tax year ${route.year}` };
+      return { title: text.taxYear(route.year) };
     case "document":
       return {
-        title: "Document",
+        title: text.document,
         crumb:
           route.year === null
-            ? { label: "Documents", to: { page: "documents" } }
-            : { label: `Tax year ${route.year}`, to: { page: "year", year: route.year } },
+            ? { label: text.documents, to: { page: "documents" } }
+            : { label: text.taxYear(route.year), to: { page: "year", year: route.year } },
       };
     case "log":
-      return { title: "Log", sub: "Every change to a document, written once", crumb: { label: `Tax year ${route.year}`, to: { page: "year", year: route.year } } };
+      return { title: text.log, sub: text.logSub, crumb: { label: text.taxYear(route.year), to: { page: "year", year: route.year } } };
     case "archive":
-      return { title: "Archive", crumb: { label: `Tax year ${route.year}`, to: { page: "year", year: route.year } } };
+      return { title: text.archive, crumb: { label: text.taxYear(route.year), to: { page: "year", year: route.year } } };
     case "yearCheck":
-      return { title: "Year check", crumb: { label: `Tax year ${route.year}`, to: { page: "year", year: route.year } } };
+      return { title: text.yearCheck, crumb: { label: text.taxYear(route.year), to: { page: "year", year: route.year } } };
   }
 }

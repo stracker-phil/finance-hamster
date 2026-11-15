@@ -2,6 +2,7 @@ import { api, type ReviewLine, type SubscriptionDetail } from "../api";
 import { showError, undoToast } from "../lib/undoToast";
 import { useStore } from "../state/store";
 import { today } from "../lib/today";
+import { t } from "../i18n";
 
 /** Opens the New sheet, empty. */
 export function newSubscription() {
@@ -42,11 +43,8 @@ export function changePlan(detail: SubscriptionDetail, from?: { amount: string; 
 
 /** Ends the subscription today after asking; nothing is deleted. */
 export async function endSubscription(id: string, name: string) {
-  const confirmed = await useStore.getState().confirm({
-    title: `End ${name}?`,
-    text: "It ends today. Its plans and charges stay as history, and Resume brings it back.",
-    action: "End Subscription",
-  });
+  const text = t().subscriptions.flow;
+  const confirmed = await useStore.getState().confirm({ title: text.endTitle(name), text: text.endText, action: text.endAction });
   if (confirmed) api.subscriptionSetEnded(id, today()).then(undoToast).catch(showError);
 }
 
@@ -56,11 +54,8 @@ export function resumeSubscription(id: string) {
 
 /** Deletes the subscription after asking; its charges go back to Review. */
 export async function deleteSubscription(id: string, name: string) {
-  const confirmed = await useStore.getState().confirm({
-    title: `Delete ${name}?`,
-    text: "Its plans go, and its charges wait in Review again. To keep the history, end it instead.",
-    action: "Delete",
-  });
+  const text = t().subscriptions.flow;
+  const confirmed = await useStore.getState().confirm({ title: text.deleteTitle(name), text: text.deleteText, action: text.deleteAction });
   if (!confirmed) return false;
   try {
     undoToast(await api.subscriptionDelete(id));

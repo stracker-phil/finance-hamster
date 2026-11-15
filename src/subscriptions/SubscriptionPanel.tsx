@@ -2,6 +2,7 @@ import { CreditCard, X } from "lucide-react";
 import { accountTone } from "../lib/accountTone";
 import { useSubscription } from "../queries/subscriptions";
 import { changePlan, editSubscription, endSubscription, resumeSubscription } from "./flow";
+import { useT } from "../i18n";
 
 /** How many timeline colours there are (`.plan-tone-N`); later plans reuse them. */
 const PLAN_TONES = 4;
@@ -9,11 +10,12 @@ const PLAN_TONES = 4;
 /** The detail panel beside the list: amount, next charge, the year's plans, ANV, reminder, rule and charges. */
 export function SubscriptionPanel({ id, onClose }: { id: string; onClose: () => void }) {
   const { data: detail } = useSubscription(id);
+  const text = useT().subscriptions.panel;
   return (
-    <aside className="sub-panel" aria-label="Subscription">
+    <aside className="sub-panel" aria-label={text.subscription}>
       <div className="sub-panel__bar">
-        <span className="sub-panel__caption">Subscription</span>
-        <button className="icon-btn" aria-label="Close (Esc)" onClick={onClose}>
+        <span className="sub-panel__caption">{text.subscription}</span>
+        <button className="icon-btn" aria-label={text.close} onClick={onClose}>
           <X size={15} />
         </button>
       </div>
@@ -27,11 +29,11 @@ export function SubscriptionPanel({ id, onClose }: { id: string; onClose: () => 
             </div>
           </div>
           <div className="sub-panel__amount">{detail.amount}</div>
-          <div className="add-doc__hint">{detail.next ? `Next charge ${detail.next}` : detail.ended}</div>
+          <div className="add-doc__hint">{detail.next ? text.next(detail.next) : detail.ended}</div>
 
           {detail.plans.length > 0 && (
-            <section aria-label={`Plans in ${detail.year}`}>
-              <h3 className="sub-sheet__heading">Plans in {detail.year}</h3>
+            <section aria-label={text.plansIn(detail.year)}>
+              <h3 className="sub-sheet__heading">{text.plansIn(detail.year)}</h3>
               <div className="plan-timeline">
                 {detail.timeline.map((month, i) => (
                   <span key={i} className={month.plan === null ? "plan-seg" : `plan-seg plan-tone-${month.plan % PLAN_TONES}`} title={month.tip} />
@@ -56,17 +58,17 @@ export function SubscriptionPanel({ id, onClose }: { id: string; onClose: () => 
           )}
 
           <dl className="sub-facts">
-            <dt>Counts for ANV</dt>
+            <dt>{text.countsForAnv}</dt>
             <dd>{detail.anv}</dd>
-            <dt>Reminder</dt>
+            <dt>{text.reminder}</dt>
             <dd>{detail.reminder}</dd>
-            <dt>Found by rule</dt>
+            <dt>{text.rule}</dt>
             <dd className="mono">{detail.rule}</dd>
           </dl>
 
-          <section aria-label="Charges found in statements">
-            <h3 className="sub-sheet__heading">Charges found in statements</h3>
-            {detail.charges.length === 0 && <p className="add-doc__hint">No charge found yet.</p>}
+          <section aria-label={text.charges}>
+            <h3 className="sub-sheet__heading">{text.charges}</h3>
+            {detail.charges.length === 0 && <p className="add-doc__hint">{text.noCharge}</p>}
             {detail.charges.map((charge) => (
               <div key={charge.id} className="sub-line">
                 <CreditCard size={14} className="docs-row__icon" />
@@ -80,24 +82,24 @@ export function SubscriptionPanel({ id, onClose }: { id: string; onClose: () => 
           <div className="sub-panel__actions">
             {detail.ended ? (
               <button className="btn btn--small" onClick={() => resumeSubscription(detail.id)}>
-                Resume
+                {text.resume}
               </button>
             ) : (
               <button className="btn btn--small" onClick={() => changePlan(detail)}>
-                Change Plan…
+                {text.changePlan}
               </button>
             )}
             <button className="btn btn--small" onClick={() => editSubscription(detail)}>
-              Edit…
+              {text.edit}
             </button>
             <span className="sub-panel__spacer" />
             {!detail.ended && (
               <button className="link-btn" onClick={() => void endSubscription(detail.id, detail.name)}>
-                End Subscription…
+                {text.end}
               </button>
             )}
           </div>
-          <p className="add-doc__hint sub-panel__note">Change Plan keeps the history: the old plan ends, the new one starts. Edit only fixes mistakes.</p>
+          <p className="add-doc__hint sub-panel__note">{text.note}</p>
         </div>
       )}
     </aside>

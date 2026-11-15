@@ -1,5 +1,6 @@
 import { TriangleAlert } from "lucide-react";
 import { api, toAppError } from "../api";
+import { useT } from "../i18n";
 import { useLastFileCheck } from "../queries/integrity";
 import { useStore } from "../state/store";
 
@@ -9,13 +10,14 @@ const showVerify = () => api.settingsShow("verify-files").catch((e: unknown) => 
 export function FilesBanner() {
   const { data: check } = useLastFileCheck();
   const count = check?.problems.length ?? 0;
+  const text = useT().shell.filesBanner;
   if (count === 0) return null;
   return (
     <div className="files-banner" role="alert">
       <TriangleAlert size={15} />
-      <span>{count === 1 ? "1 stored file is missing or changed." : `${count} stored files are missing or changed.`}</span>
+      <span>{text.problems(count)}</span>
       <button className="link-btn" onClick={() => void showVerify()}>
-        Show Files
+        {text.show}
       </button>
     </div>
   );

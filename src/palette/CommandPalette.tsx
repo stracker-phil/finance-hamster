@@ -2,6 +2,7 @@ import { useState, type KeyboardEvent } from "react";
 import { Search } from "lucide-react";
 import { api, toAppError, type CommandInfo } from "../api";
 import { Modal } from "../components/Modal";
+import { useT } from "../i18n";
 import { ranked } from "../lib/rank";
 import { routeOf } from "../lib/targets";
 import { useCommands } from "../queries/commands";
@@ -27,6 +28,7 @@ interface Option {
 /** ⌘K command palette, ranked by name (ADR 0031), followed by the documents and bank lines the text matches. */
 function Palette() {
   const { data = [] } = useCommands();
+  const text = useT().shell.palette;
   const [query, setQuery] = useState(() => useStore.getState().paletteQuery);
   const [active, setActive] = useState(0);
   const { data: elsewhere = [] } = useElsewhere(query);
@@ -61,8 +63,8 @@ function Palette() {
         <input
           id="palette-input"
           autoFocus
-          placeholder="Search commands, documents and bank lines"
-          aria-label="Search everywhere"
+          placeholder={text.placeholder}
+          aria-label={text.search}
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
@@ -71,8 +73,8 @@ function Palette() {
           onKeyDown={onKeyDown}
         />
       </label>
-      <div className="palette__list scroller" role="listbox" aria-label="Commands">
-        {results.length === 0 && <div className="palette__empty">Nothing matches</div>}
+      <div className="palette__list scroller" role="listbox" aria-label={text.commands}>
+        {results.length === 0 && <div className="palette__empty">{text.empty}</div>}
         {results.map((option, i) => (
           <button key={option.key} className="menu-row" role="option" aria-selected={i === picked} onMouseMove={() => setActive(i)} onClick={option.go}>
             {option.label}

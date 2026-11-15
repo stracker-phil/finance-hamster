@@ -4,12 +4,11 @@ import { useSettings, useUpdateSettings } from "../../queries/settings";
 import { Group, Row, Segmented, Switch } from "../controls";
 
 const ACCENTS: Accent[] = ["system", "orange", "gold", "red", "magenta", "purple", "indigo", "blue", "teal", "graphite"];
-const capitalize = (s: string) => s[0].toUpperCase() + s.slice(1);
 
 export function AppearancePage() {
   const { data: settings } = useSettings();
   const { mutate } = useUpdateSettings();
-  const text = useT().appearance;
+  const text = useT().settings.appearance;
   return (
     <>
       <Group title={text.languageGroup} anchor="language-group">
@@ -25,29 +24,29 @@ export function AppearancePage() {
           />
         </Row>
       </Group>
-      <Group title="Theme" anchor="theme">
-        <Row label="Mode" anchor="mode">
+      <Group title={text.theme} anchor="theme">
+        <Row label={text.mode} anchor="mode">
           <Segmented<Appearance>
-            label="Mode"
+            label={text.mode}
             options={[
-              { value: "system", label: "Automatic" },
-              { value: "light", label: "Light" },
-              { value: "dark", label: "Dark" },
+              { value: "system", label: text.automatic },
+              { value: "light", label: text.light },
+              { value: "dark", label: text.dark },
             ]}
             value={settings?.appearance}
             onChange={(appearance) => mutate({ appearance })}
           />
         </Row>
-        <Row label="Accent" description="Used for selection, links and the main button." anchor="accent">
-          <div className="accent-dots" role="radiogroup" aria-label="Accent">
+        <Row label={text.accent} description={text.accentDescription} anchor="accent">
+          <div className="accent-dots" role="radiogroup" aria-label={text.accent}>
             {ACCENTS.map((accent) => (
               <button
                 key={accent}
                 type="button"
                 role="radio"
                 aria-checked={settings?.accent === accent}
-                aria-label={capitalize(accent)}
-                title={capitalize(accent)}
+                aria-label={text.accents[accent]}
+                title={text.accents[accent]}
                 className={`accent-dot accent-dot--${accent}`}
                 onClick={() => mutate({ accent })}
               />
@@ -55,10 +54,10 @@ export function AppearancePage() {
           </div>
         </Row>
       </Group>
-      <Group title="Amounts" anchor="amounts">
-        <Row label="Number format" anchor="number-format">
+      <Group title={text.amounts} anchor="amounts">
+        <Row label={text.numberFormat} anchor="number-format">
           <Segmented<NumberFormat>
-            label="Number format"
+            label={text.numberFormat}
             options={[
               { value: "dot_decimal", label: "1,234.56" },
               { value: "comma_decimal", label: "1.234,56" },
@@ -68,8 +67,8 @@ export function AppearancePage() {
           />
         </Row>
         <Switch
-          label="Show foreign currency next to amounts"
-          description="For example USD 24.00 beside the euro amount."
+          label={text.originalCurrency}
+          description={text.originalCurrencyDescription}
           anchor="original-currency"
           checked={settings?.showOriginalCurrency ?? true}
           onChange={(showOriginalCurrency) => mutate({ showOriginalCurrency })}

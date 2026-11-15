@@ -12,8 +12,11 @@ export interface SettingsRow {
 
 export interface SettingsPage {
   id: string;
-  group: "Finance" | "App";
+  /** The heading it is listed under; pages with the same group stand together. */
+  group: string;
   label: string;
+  /** More words the search finds the page by: its label and group in the other language. */
+  aliases?: string[];
   icon: IconName;
   intro?: ReactNode;
   Body: ComponentType;
@@ -34,7 +37,7 @@ export function resolvePage(pages: SettingsPage[], id: string | undefined): Sett
 /** Every page and row matching `query`, best first, ranked like the palette. */
 export function searchSettings(pages: SettingsPage[], query: string): SettingsMatch[] {
   const entries = pages.flatMap((page): SettingsMatch[] => [{ page }, ...page.rows.map((row) => ({ page, row }))]);
-  return ranked(entries, query, ({ page, row }) => (row ? [row.title, (row.keywords ?? []).join(" ")] : [page.label, page.group]));
+  return ranked(entries, query, ({ page, row }) => (row ? [row.title, (row.keywords ?? []).join(" ")] : [page.label, [page.group, ...(page.aliases ?? [])].join(" ")]));
 }
 
 /** The pages in their order, in runs that share a group. */
