@@ -4,6 +4,7 @@ import { ArchivePage } from "./ArchivePage";
 import { DocumentPage } from "./DocumentPage";
 import { DocumentsPage } from "./DocumentsPage";
 import { LogPage } from "./LogPage";
+import { PayslipPage } from "./PayslipPage";
 import { ReviewPage } from "./ReviewPage";
 import { StatementsPage } from "./StatementsPage";
 import { SubscriptionsPage } from "./SubscriptionsPage";
@@ -29,6 +30,8 @@ export function PageBody({ route }: { route: Route }) {
       return <YearPage year={route.year} attention={route.attention} />;
     case "document":
       return <DocumentPage documentId={route.documentId} />;
+    case "payslip":
+      return <PayslipPage payslipId={route.payslipId} />;
     case "log":
       return <LogPage year={route.year} />;
     case "archive":

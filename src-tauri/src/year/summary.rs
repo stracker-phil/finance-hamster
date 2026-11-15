@@ -33,6 +33,7 @@ pub fn question_views(
                 help: q.display_help().map(str::to_string),
                 unit: q.display_unit().map(str::to_string),
                 answered: value.is_some(),
+                source: None,
                 value: value.unwrap_or_default(),
             }
         })

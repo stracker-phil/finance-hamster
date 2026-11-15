@@ -12,6 +12,7 @@ import { ELSEWHERE_KEY, YEAR_CATEGORIES_KEY, YEAR_KEY } from "./year";
 import { MATCH_COUNT_KEY, SUBSCRIPTION_KEY, SUBSCRIPTIONS_KEY } from "./subscriptions";
 import { ACCOUNT_LINES_KEY, COVERAGE_KEY } from "./statements";
 import { RULES_KEY, TAX_YEARS_KEY } from "./taxYears";
+import { PAYSLIP_KEY, PAYSLIPS_KEY } from "./payslips";
 
 /** The query keys each Rust event makes stale; a feature adds its event here, or its table to `TABLE_KEYS`. */
 export const INVALIDATIONS: Partial<Record<EventName, QueryKey[]>> = {
@@ -35,6 +36,7 @@ export const TABLE_KEYS: Record<string, QueryKey[]> = {
   answers: [YEAR_KEY, TODAY_KEY, STATUS_KEY],
   hidden_items: [YEAR_KEY, YEAR_CATEGORIES_KEY],
   entries: [YEAR_KEY, TODAY_KEY, STATUS_KEY],
+  payslips: [PAYSLIPS_KEY, PAYSLIP_KEY, YEAR_KEY, TODAY_KEY, STATUS_KEY],
   subscriptions: [SUBSCRIPTIONS_KEY, SUBSCRIPTION_KEY, MATCH_COUNT_KEY, REVIEW_KEY, ACCOUNT_LINES_KEY, YEAR_KEY, TODAY_KEY, STATUS_KEY],
   plans: [SUBSCRIPTIONS_KEY, SUBSCRIPTION_KEY, MATCH_COUNT_KEY, REVIEW_KEY, ACCOUNT_LINES_KEY, TODAY_KEY, STATUS_KEY],
   tax_years: [YEAR_CATEGORIES_KEY, TAX_YEARS_KEY, RULES_KEY, LINE_RULES_KEY, REVIEW_KEY, ACCOUNT_LINES_KEY, DOCUMENT_KEY, DOCUMENTS_KEY, VENDORS_KEY, YEAR_KEY, ELSEWHERE_KEY, TODAY_KEY, STATUS_KEY],

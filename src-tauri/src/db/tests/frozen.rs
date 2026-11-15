@@ -68,6 +68,12 @@ fn answer(id: &str, year: i32) -> Value {
     json!({ "id": id, "year": year, "question": "home-office-days", "value": 10, "answered_at": 1 })
 }
 
+fn payslip(id: &str, year: i32, month: u32, gross: i64) -> Value {
+    json!({
+        "id": id, "year": year, "month": month, "gross": gross, "note": "", "created_at": 1
+    })
+}
+
 fn link(id: &str, document: &str, line: &str) -> Value {
     json!({ "id": id, "document_id": document, "transaction_id": line, "created_at": 1 })
 }
@@ -201,6 +207,79 @@ fn a_closed_year_refuses_every_row_that_counts_in_it() {
         assert_eq!(count(&db, table), rows, "{name}");
         assert_eq!(journal_rows(&db), journal, "{name}");
     }
+}
+
+#[test]
+fn a_closed_year_refuses_adding_changing_and_deleting_its_payslips() {
+    let (_dir, db) = world();
+    let march = payslip("payslip-march", 2025, 3, 300_000);
+    db.write(insert("payslips", &march), Source::Ui).unwrap();
+    close(&db, 2025);
+
+    for (name, op) in [
+        (
+            "adding one",
+            insert("payslips", &payslip("payslip-april", 2025, 4, 310_000)),
+        ),
+        (
+            "changing one",
+            update(
+                "payslips",
+                &march,
+                &payslip("payslip-march", 2025, 3, 320_000),
+            ),
+        ),
+        ("deleting one", delete("payslips", &march)),
+    ] {
+        assert_eq!(refusal(db.write(op, Source::Ui)), CLOSED_2025, "{name}");
+    }
+    assert_eq!(count(&db, "payslips"), 1);
+}
+
+#[test]
+fn an_open_year_allows_adding_changing_and_deleting_its_payslips() {
+    let (_dir, db) = world();
+    close(&db, 2025);
+    let march = payslip("payslip-march", 2026, 3, 300_000);
+
+    db.write(insert("payslips", &march), Source::Ui).unwrap();
+    assert_eq!(count(&db, "payslips"), 1);
+
+    db.write(
+        update(
+            "payslips",
+            &march,
+            &payslip("payslip-march", 2026, 3, 320_000),
+        ),
+        Source::Ui,
+    )
+    .unwrap();
+    let gross: i64 = db
+        .read(|c| Ok(c.query_row("SELECT gross FROM payslips", [], |r| r.get(0))?))
+        .unwrap();
+    assert_eq!(gross, 320_000);
+
+    db.write(
+        delete("payslips", &payslip("payslip-march", 2026, 3, 320_000)),
+        Source::Ui,
+    )
+    .unwrap();
+    assert_eq!(count(&db, "payslips"), 0);
+}
+
+#[test]
+fn a_payslip_moving_between_years_is_refused_when_either_year_is_closed() {
+    let (_dir, db) = world();
+    let december = payslip("payslip-dec", 2026, 12, 300_000);
+    db.write(insert("payslips", &december), Source::Ui).unwrap();
+    close(&db, 2025);
+
+    let moved = payslip("payslip-dec", 2025, 12, 300_000);
+
+    assert_eq!(
+        refusal(db.write(update("payslips", &december, &moved), Source::Ui)),
+        CLOSED_2025
+    );
 }
 
 #[test]

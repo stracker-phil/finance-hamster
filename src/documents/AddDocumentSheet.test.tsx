@@ -8,7 +8,8 @@ import { api } from "../api";
 import { Toasts } from "../components/Toasts";
 import { useStore } from "../state/store";
 import { addPreview, estimate } from "../test/documents";
-import { choose, popUpValue, withMenus } from "../test/popup";
+import { payslipsYear } from "../test/payslips";
+import { choose, popUpOptions, popUpValue, withMenus } from "../test/popup";
 import { renderWithQuery as render } from "../test/renderWithQuery";
 import { AddDocumentSheet } from "./AddDocumentSheet";
 
@@ -51,7 +52,7 @@ describe("AddDocumentSheet", () => {
     it("leaves out the invoice row when the PDF gave neither a number nor an amount", () => {
       renderSheet(addPreview({ invoice: null, invoiceAmount: null }));
 
-      expect(screen.queryByText("Invoice")).toBeNull();
+      expect(screen.queryAllByText("Invoice").filter((el) => el.tagName !== "BUTTON")).toEqual([]);
     });
 
     it("says nothing similar was added before", () => {
@@ -288,6 +289,190 @@ describe("AddDocumentSheet", () => {
       await userEvent.click(addButton());
 
       expect(addButton()).toBeDisabled();
+    });
+  });
+
+  describe("Payslip", () => {
+    const kindButton = (name: "Invoice" | "Payslip") => screen.getByRole("button", { name });
+    const addPayslip = () => screen.getByRole("button", { name: "Add Payslip" });
+    const toastMessages = () => useStore.getState().toasts.map((t) => t.message);
+    const years = [
+      { year: 2027, state: "open" as const, ruleset: "2027 v1" },
+      { year: 2026, state: "open" as const, ruleset: "2026 v1" },
+      { year: 2025, state: "closed" as const, ruleset: "2025 v1" },
+    ];
+    const showPayslip = async (guess: [number, number] | null = [2026, 7], year = payslipsYear()) => {
+      mocked.payslipGuess.mockResolvedValue(guess);
+      mocked.payslipsYear.mockResolvedValue(year);
+      renderSheet();
+      await userEvent.click(kindButton("Payslip"));
+      await waitFor(() => expect(popUpValue("Month")).not.toBe(""));
+      if (guess) await screen.findByText("from the PDF");
+    };
+
+    beforeEach(() => {
+      useStore.setState({ route: { page: "today" }, back: [], forward: [] });
+      mocked.listTaxYears.mockResolvedValue(years);
+      mocked.payslipAddWaiting.mockResolvedValue({ id: "ps-new", label: "Add Payslip July 2026" });
+    });
+
+    it("starts on Invoice and shows the invoice fields", () => {
+      renderSheet();
+
+      expect(kindButton("Invoice").getAttribute("aria-pressed")).toBe("true");
+      expect(kindButton("Payslip").getAttribute("aria-pressed")).toBe("false");
+      expect(vendor()).toBeTruthy();
+    });
+
+    it("swaps the invoice fields for the payslip fields when Payslip is chosen", async () => {
+      await showPayslip(null);
+
+      expect(kindButton("Payslip").getAttribute("aria-pressed")).toBe("true");
+      expect(screen.queryByRole("textbox", { name: "Vendor" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Add Document" })).toBeNull();
+      expect(screen.getByRole("button", { name: "Tax year" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Month" })).toBeTruthy();
+      expect(addPayslip()).toBeTruthy();
+    });
+
+    it("brings the invoice fields back when Invoice is chosen again", async () => {
+      await showPayslip(null);
+
+      await userEvent.click(kindButton("Invoice"));
+
+      expect(vendor()).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "Add Payslip" })).toBeNull();
+    });
+
+    it("offers the open tax years only", async () => {
+      await showPayslip(null);
+      await waitFor(() => expect(popUpValue("Tax year")).not.toBe(""));
+
+      expect(await popUpOptions(userEvent, "Tax year")).toEqual(["2027", "2026"]);
+    });
+
+    it("offers the twelve months and labels one that already has a payslip", async () => {
+      await showPayslip([2026, 3], payslipsYear({ filled: { 5: {} } }));
+
+      const options = await popUpOptions(userEvent, "Month");
+      expect(options).toHaveLength(12);
+      expect(options[4]).toBe("May · already has one");
+      expect(options[5]).toBe("June");
+    });
+
+    it("preselects the newest open tax year when the PDF gives no guess", async () => {
+      mocked.listTaxYears.mockResolvedValue([
+        { year: 2026, state: "open", ruleset: "2026 v1" },
+        { year: 2025, state: "open", ruleset: "2025 v1" },
+      ]);
+      await showPayslip(null);
+
+      await waitFor(() => expect(mocked.payslipsYear).toHaveBeenCalledWith(2026));
+      expect(popUpValue("Tax year")).toBe("2026");
+      expect(mocked.payslipsYear).not.toHaveBeenCalledWith(2025);
+    });
+
+    describe("the guess from the PDF", () => {
+      it("preselects the guessed year and month and says so", async () => {
+        await showPayslip([2026, 7]);
+
+        expect(mocked.payslipGuess).toHaveBeenCalledWith("add-1");
+        expect(popUpValue("Tax year")).toBe("2026");
+        expect(popUpValue("Month")).toBe("July");
+        expect(screen.getByText("from the PDF")).toBeTruthy();
+      });
+
+      it("shows no hint when the PDF gives no guess", async () => {
+        await showPayslip(null);
+
+        await waitFor(() => expect(mocked.payslipGuess).toHaveBeenCalled());
+        expect(screen.queryByText("from the PDF")).toBeNull();
+      });
+
+      it("keeps the sheet usable when the guess cannot be read", async () => {
+        mocked.payslipGuess.mockRejectedValue({ kind: "io", message: "Unreadable", code: null });
+        mocked.payslipsYear.mockResolvedValue(payslipsYear());
+        renderSheet();
+
+        await userEvent.click(kindButton("Payslip"));
+
+        await waitFor(() => expect(mocked.payslipGuess).toHaveBeenCalled());
+        expect(screen.queryByRole("alert")).toBeNull();
+        expect(screen.queryByText("from the PDF")).toBeNull();
+        expect(addPayslip()).toBeTruthy();
+      });
+    });
+
+    describe("a month that already has a payslip", () => {
+      it("disables Add Payslip until another month is chosen", async () => {
+        await showPayslip([2026, 7], payslipsYear({ filled: { 7: {} } }));
+        expect(addPayslip()).toBeDisabled();
+
+        await choose(userEvent, "Month", "August");
+        await waitFor(() => expect(addPayslip()).toBeEnabled());
+
+        await choose(userEvent, "Month", "July · already has one");
+        expect(addPayslip()).toBeDisabled();
+      });
+    });
+
+    describe("Add Payslip", () => {
+      it("adds the waiting PDF as the month's payslip, closes the sheet, says so and opens the payslip", async () => {
+        await showPayslip([2026, 7]);
+        await waitFor(() => expect(addPayslip()).toBeEnabled());
+
+        await userEvent.click(addPayslip());
+
+        expect(mocked.payslipAddWaiting).toHaveBeenCalledWith("add-1", 2026, 7);
+        await waitFor(() => expect(useStore.getState().addPreview).toBeNull());
+        expect(useStore.getState().route).toEqual({ page: "payslip", payslipId: "ps-new", year: 2026 });
+        expect(toastMessages()).toEqual(["Add Payslip July 2026"]);
+        expect(useStore.getState().toasts[0].action?.label).toBe("Undo");
+      });
+
+      it("adds for the month and year chosen by hand", async () => {
+        await showPayslip(null);
+        await choose(userEvent, "Tax year", "2027");
+        await choose(userEvent, "Month", "March");
+        await waitFor(() => expect(addPayslip()).toBeEnabled());
+
+        await userEvent.click(addPayslip());
+
+        await waitFor(() => expect(mocked.payslipAddWaiting).toHaveBeenCalledWith("add-1", 2027, 3));
+      });
+
+      it("keeps the sheet, reports an error toast and enables the button again when refused", async () => {
+        mocked.payslipAddWaiting.mockRejectedValue({ kind: "conflict", message: "July already has a payslip", code: null });
+        await showPayslip([2026, 7]);
+        await waitFor(() => expect(addPayslip()).toBeEnabled());
+
+        await userEvent.click(addPayslip());
+
+        await waitFor(() => expect(toastMessages()).toEqual(["July already has a payslip"]));
+        expect(useStore.getState().addPreview).toEqual(preview);
+        expect(useStore.getState().route).toEqual({ page: "today" });
+        expect(addPayslip()).toBeEnabled();
+      });
+
+      it("is disabled while the add runs", async () => {
+        mocked.payslipAddWaiting.mockReturnValue(new Promise(() => {}));
+        await showPayslip([2026, 7]);
+        await waitFor(() => expect(addPayslip()).toBeEnabled());
+
+        await userEvent.click(addPayslip());
+
+        expect(addPayslip()).toBeDisabled();
+      });
+    });
+
+    it("discards the waiting PDF by its token on Cancel", async () => {
+      await showPayslip(null);
+
+      await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+      expect(mocked.documentAddCancel).toHaveBeenCalledWith("add-1");
+      expect(mocked.payslipAddWaiting).not.toHaveBeenCalled();
+      expect(useStore.getState().addPreview).toBeNull();
     });
   });
 

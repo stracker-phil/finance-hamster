@@ -175,6 +175,7 @@ mod tests {
             unit: unit.map(String::from),
             value: value.into(),
             answered,
+            source: None,
         }
     }
 

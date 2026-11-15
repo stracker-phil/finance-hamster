@@ -917,6 +917,98 @@ fn notes_follow_the_answers_of_the_year() {
     );
 }
 
+fn payslip_with_days(db: &Db, dir: &std::path::Path, month: u32, days: &str) {
+    use crate::payslips::edit::{self as payslip_edit, PayslipEdit};
+
+    let (_, id) = payslip_edit::add(db, dir, 2026, month, None, NOW).unwrap();
+    let change = PayslipEdit::TeleworkDays { value: days.into() };
+    payslip_edit::edit(db, &id, &change).unwrap();
+}
+
+fn telework_question(page: &YearPage) -> &super::page::QuestionView {
+    page.questions
+        .iter()
+        .find(|q| q.id == "telearbeitstage")
+        .unwrap()
+}
+
+#[test]
+fn the_latest_payslips_days_answer_the_telework_question_over_a_typed_answer() {
+    let (dir, db) = open_year();
+    answer_with(&db, "telearbeitstage", "12");
+    payslip_with_days(&db, dir.path(), 3, "20");
+    payslip_with_days(&db, dir.path(), 7, "30");
+
+    let page = year_page(&db);
+
+    let question = telework_question(&page);
+    assert_eq!(
+        (
+            question.value.as_str(),
+            question.answered,
+            question.source.as_deref()
+        ),
+        ("30", true, Some("From the July payslip, year to date"))
+    );
+}
+
+#[test]
+fn the_payslip_source_reads_in_german() {
+    let (dir, db) = open_year();
+    payslip_with_days(&db, dir.path(), 7, "30");
+
+    let page = crate::i18n::with_lang(crate::settings::Language::De, || year_page(&db));
+
+    assert_eq!(
+        telework_question(&page).source.as_deref(),
+        Some("Aus dem Lohnzettel Juli, Jahressumme")
+    );
+}
+
+#[test]
+fn without_payslip_days_the_typed_answer_stands_and_has_no_source() {
+    let (dir, db) = open_year();
+    answer_with(&db, "telearbeitstage", "12");
+    crate::payslips::edit::add(&db, dir.path(), 2026, 7, None, NOW).unwrap();
+
+    let page = year_page(&db);
+
+    let question = telework_question(&page);
+    assert_eq!(
+        (
+            question.value.as_str(),
+            question.answered,
+            question.source.as_deref()
+        ),
+        ("12", true, None)
+    );
+}
+
+#[test]
+fn payslip_days_feed_the_notes_that_need_the_telework_answer() {
+    let (dir, db) = counted_entries();
+    answer_with(&db, "telearbeitstage", "12");
+    payslip_with_days(&db, dir.path(), 7, "30");
+
+    let page = year_page(&db);
+
+    assert_eq!(page.kennzahlen[2].note, None);
+}
+
+#[test]
+fn a_payslip_with_few_days_triggers_the_note_over_a_typed_answer() {
+    let (dir, db) = counted_entries();
+    answer_with(&db, "telearbeitstage", "40");
+    payslip_with_days(&db, dir.path(), 7, "12");
+
+    let page = year_page(&db);
+
+    assert_eq!(
+        page.kennzahlen[2].note.as_deref(),
+        Some("Fewer than 26 Telearbeitstage: the tax office won't accept this.")
+    );
+}
+
 #[test]
 fn a_document_paid_over_several_payments_counts_only_its_lines_in_this_year() {
     let (_dir, db) = open_year();
@@ -1869,11 +1961,11 @@ fn an_unanswered_question_shows_empty_with_its_label_help_and_unit() {
         json!([
             {
                 "id": "telearbeitstage", "label": HOME_DAYS, "help": "Days worked from home",
-                "unit": "days", "value": "", "answered": false
+                "unit": "days", "value": "", "answered": false, "source": null
             },
             {
                 "id": "pauschale", "label": "Telearbeitspauschale (from the employer)", "help": null,
-                "unit": null, "value": "", "answered": false
+                "unit": null, "value": "", "answered": false, "source": null
             }
         ])
     );

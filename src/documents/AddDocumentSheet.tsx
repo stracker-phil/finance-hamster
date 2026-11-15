@@ -6,6 +6,8 @@ import { api, toAppError, type AddPreview, type LineChoice } from "../api";
 import { Modal } from "../components/Modal";
 import { useStore } from "../state/store";
 import { useT } from "../i18n";
+import { AddPayslipFields } from "../payslips/AddPayslipFields";
+import { Segmented } from "../settings/controls";
 
 function AddDocumentFile({ preview }: { preview: AddPreview }) {
   const text = useT().documents.add;
@@ -63,7 +65,9 @@ export function AddDocumentSheet({ preview }: { preview: AddPreview }) {
   const [lineId, setLineId] = useState<string | null>(preview.lines[0]?.id ?? null);
   const [error, setError] = useState<{ path?: string; message: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [kind, setKind] = useState<"invoice" | "payslip">("invoice");
   const text = useT().documents.add;
+  const payslipText = useT().payslips;
   const { data: estimate } = useQuery({
     queryKey: ["document-estimate", lineId, itemKey],
     queryFn: () => api.documentEstimate(lineId, itemKey || null),
@@ -95,6 +99,21 @@ export function AddDocumentSheet({ preview }: { preview: AddPreview }) {
     <Modal labelledBy={id} onClose={close}>
       <h2 id={id}>{text.title}</h2>
       <AddDocumentFile preview={preview} />
+      <div className="add-doc__kind">
+        <Segmented
+          label={payslipText.kind}
+          options={[
+            { value: "invoice", label: payslipText.invoice },
+            { value: "payslip", label: payslipText.payslip },
+          ]}
+          value={kind}
+          onChange={setKind}
+        />
+      </div>
+      {kind === "payslip" ? (
+        <AddPayslipFields token={preview.token} onCancel={close} />
+      ) : (
+        <>
       <div className="add-doc__grid">
         <label htmlFor={`${id}-vendor`}>{text.vendor}</label>
         <div className="add-doc__field">
@@ -150,6 +169,8 @@ export function AddDocumentSheet({ preview }: { preview: AddPreview }) {
           {text.add}
         </button>
       </div>
+        </>
+      )}
     </Modal>
   );
 }

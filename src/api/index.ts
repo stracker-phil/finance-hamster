@@ -1,7 +1,7 @@
 import { getName, getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { CategoryChoice, Account, AccountEdit, AccountLines, Action, Elsewhere, YearPage, NewEntry, TodayView, RulePreview, FileCheck, StatusGroup, CloseCheck, SubscriptionsView, SubscriptionDetail, SubscriptionForm, PlanForm, MatchCount, AddInput, AddPreview, ArchivedDocument, DeletionView, DocumentEdit, DocumentGroup, DocumentStep, DocumentView, HistoryEntry, VendorChange, VendorsView, Estimate, LineChoice, Coverage, ReviewQueue, RuleForm, RulesView, Frame, ImportPreview, PdfSource, AppError, AppInfo, CommandInfo, KeyConflict, ErrorKind, EventName, EventPayloads, JsonPreview, LaunchEvent, NewAccount, RulesImport, RulesOverview, RulesYearView, Settings, SettingsPatch, TaxYear } from "./types";
+import type { CategoryChoice, Account, AccountEdit, AccountLines, Action, Elsewhere, YearPage, NewEntry, TodayView, RulePreview, FileCheck, StatusGroup, CloseCheck, SubscriptionsView, SubscriptionDetail, SubscriptionForm, PlanForm, MatchCount, AddInput, AddPreview, ArchivedDocument, DeletionView, DocumentEdit, DocumentGroup, DocumentStep, DocumentView, HistoryEntry, VendorChange, VendorsView, Estimate, LineChoice, Coverage, ReviewQueue, RuleForm, RulesView, Frame, ImportPreview, PdfSource, AppError, AppInfo, CommandInfo, KeyConflict, ErrorKind, EventName, EventPayloads, JsonPreview, LaunchEvent, NewAccount, PayslipAdded, PayslipEdit, PayslipView, PayslipsYear, RulesImport, RulesOverview, RulesYearView, Settings, SettingsPatch, TaxYear } from "./types";
 
 export * from "./types";
 
@@ -43,6 +43,15 @@ export const api = {
   rulesStartNext: () => invoke<string>("rules_start_next"),
   rulesImportChoose: () => invoke<RulesImport | null>("rules_import_choose"),
   rulesImport: (text: string) => invoke<string>("rules_import", { text }),
+  payslipsYear: (year: number) => invoke<PayslipsYear>("payslips_year", { year }),
+  payslipView: (id: string) => invoke<PayslipView>("payslip_view", { id }),
+  payslipAdd: (year: number, month: number) => invoke<PayslipAdded>("payslip_add", { year, month }),
+  payslipAddPdf: (year: number, month: number) => invoke<PayslipAdded | null>("payslip_add_pdf", { year, month }),
+  payslipAttach: (id: string) => invoke<string | null>("payslip_attach", { id }),
+  payslipGuess: (token: string) => invoke<[number, number] | null>("payslip_guess", { token }),
+  payslipAddWaiting: (token: string, year: number, month: number) => invoke<PayslipAdded>("payslip_add_waiting", { token, year, month }),
+  payslipEdit: (id: string, change: PayslipEdit) => invoke<string | null>("payslip_edit", { id, change }),
+  payslipDelete: (id: string) => invoke<string>("payslip_delete", { id }),
   /** What happened to the rules while the app started; empty after the first call. */
   rulesTakeNotices: () => invoke<string[]>("rules_take_notices"),
   /** Asks for a statement PDF and reads it; null when the panel was cancelled. */

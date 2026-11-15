@@ -2,6 +2,7 @@ import { PopUpButton } from "../components/menu";
 import { useEffect, useId, useRef, useState } from "react";
 import { Check, Link2, X } from "lucide-react";
 import { api, toAppError, type DocumentEdit, type DocumentView } from "../api";
+import { SavedInput, useDraftText } from "../components/SavedInput";
 import { useStore } from "../state/store";
 import { DepreciationBlock } from "./DepreciationBlock";
 import { runStep } from "./lifecycle";
@@ -24,34 +25,6 @@ function useSave(documentId: string) {
       });
   };
   return { errors, save };
-}
-
-/** Keeps typing local so each keystroke doesn't save; follows the stored value when it changes. */
-function useDraftText(value: string, onSave: (text: string) => void) {
-  const [text, setText] = useState(value);
-  useEffect(() => setText(value), [value]);
-  const commit = () => {
-    if (text !== value) onSave(text);
-  };
-  return { text, setText, commit };
-}
-
-/** A text field that saves on leaving it or on Return. */
-function SavedInput({ id, value, onSave, className, ...props }: { id: string; value: string; onSave: (text: string) => void } & Omit<React.InputHTMLAttributes<HTMLInputElement>, "value" | "onChange">) {
-  const { text, setText, commit } = useDraftText(value, onSave);
-  return (
-    <input
-      id={id}
-      className={className ? `field ${className}` : "field"}
-      value={text}
-      onChange={(e) => setText(e.target.value)}
-      onBlur={commit}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") e.currentTarget.blur();
-      }}
-      {...props}
-    />
-  );
 }
 
 function NoteField({ value, onSave }: { value: string; onSave: (text: string) => void }) {

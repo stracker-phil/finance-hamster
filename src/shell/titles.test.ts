@@ -13,6 +13,13 @@ describe("titleFor", () => {
     });
   });
 
+  it("titles a payslip with a crumb back to its tax year", () => {
+    expect(titleFor({ page: "payslip", payslipId: "ps-1", year: 2026 })).toEqual({
+      title: "Payslip",
+      crumb: { label: "Tax year 2026", to: { page: "year", year: 2026 } },
+    });
+  });
+
   it("titles a document opened from Documents with a crumb back to Documents", () => {
     expect(titleFor({ page: "document", documentId: "doc-1", year: null }).crumb).toEqual({ label: "Documents", to: { page: "documents" } });
   });

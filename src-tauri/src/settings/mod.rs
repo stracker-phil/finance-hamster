@@ -87,6 +87,8 @@ pub struct Settings {
     pub remind_filing: bool,
     /// In December, a look at the open tax year before it ends (named for its first use, the year check).
     pub remind_questions: bool,
+    /// The payslip panel beside the tax year page is open.
+    pub payslip_panel: bool,
 }
 
 impl Default for Settings {
@@ -105,6 +107,7 @@ impl Default for Settings {
             remind_gaps: true,
             remind_filing: true,
             remind_questions: true,
+            payslip_panel: false,
         }
     }
 }
@@ -127,6 +130,7 @@ pub struct SettingsPatch {
     pub remind_gaps: Option<bool>,
     pub remind_filing: Option<bool>,
     pub remind_questions: Option<bool>,
+    pub payslip_panel: Option<bool>,
 }
 
 impl Settings {
@@ -169,6 +173,9 @@ impl Settings {
         }
         if let Some(on) = patch.remind_questions {
             self.remind_questions = on;
+        }
+        if let Some(open) = patch.payslip_panel {
+            self.payslip_panel = open;
         }
     }
 }
@@ -230,7 +237,8 @@ mod tests {
                 "importAfterDays": 30,
                 "remindGaps": true,
                 "remindFiling": true,
-                "remindQuestions": true
+                "remindQuestions": true,
+                "payslipPanel": false
             })
         );
     }
@@ -516,6 +524,41 @@ mod tests {
                 ..Settings::default()
             }
         );
+    }
+
+    #[test]
+    fn the_payslip_panel_starts_closed_can_be_patched_and_survives_reopening() {
+        let dir = temp_config_dir();
+        assert!(!store_in(&dir).get().payslip_panel);
+
+        let opened = store_in(&dir)
+            .update(SettingsPatch {
+                payslip_panel: Some(true),
+                ..SettingsPatch::default()
+            })
+            .unwrap();
+        assert!(opened.payslip_panel);
+        assert!(store_in(&dir).get().payslip_panel);
+
+        let unchanged = store_in(&dir)
+            .update(SettingsPatch {
+                archive_days: Some(3),
+                ..SettingsPatch::default()
+            })
+            .unwrap();
+        assert!(unchanged.payslip_panel);
+
+        let patch: SettingsPatch =
+            serde_json::from_value(json!({ "payslipPanel": false })).unwrap();
+        assert_eq!(patch.payslip_panel, Some(false));
+    }
+
+    #[test]
+    fn an_old_settings_file_without_the_payslip_panel_loads_it_closed() {
+        let dir = temp_config_dir();
+        std::fs::write(dir.path().join(FILE_NAME), r#"{"accent":"teal"}"#).unwrap();
+
+        assert!(!store_in(&dir).get().payslip_panel);
     }
 
     #[test]

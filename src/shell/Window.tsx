@@ -9,6 +9,7 @@ import { FirstRun } from "../pages/FirstRun";
 import { PageBody } from "../pages/PageBody";
 import { useAccounts } from "../queries/accounts";
 import { useDocument } from "../queries/documents";
+import { usePayslip } from "../queries/payslips";
 import { useTaxYears } from "../queries/taxYears";
 import { AddDocumentSheet } from "../documents/AddDocumentSheet";
 import { ImportSheet } from "../statements/ImportSheet";
@@ -30,6 +31,8 @@ export function Window() {
   const addPreview = useStore((s) => s.addPreview);
   const { data: openDocument } = useDocument(route.page === "document" ? route.documentId : "", route.page === "document");
   const documentTitle = route.page === "document" ? openDocument?.title : undefined;
+  const { data: openPayslip } = usePayslip(route.page === "payslip" ? route.payslipId : "", route.page === "payslip");
+  const payslipTitle = route.page === "payslip" ? openPayslip?.title : undefined;
   // Tax rules taken on before the window opened (a newer built-in version) are told once.
   useEffect(() => {
     api
@@ -50,7 +53,7 @@ export function Window() {
     );
   }
   const accountName = route.page === "account" ? accounts?.find((a) => a.id === route.accountId)?.name : undefined;
-  const pageName = accountName ?? documentTitle;
+  const pageName = accountName ?? documentTitle ?? payslipTitle;
   const title = pageName ? { ...titleFor(route), title: pageName } : titleFor(route);
   return (
     <div className="window">

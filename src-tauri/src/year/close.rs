@@ -296,6 +296,7 @@ mod tests {
                     unit: None,
                     value: String::new(),
                     answered: *answered,
+                    source: None,
                 })
                 .collect(),
             attention: attention

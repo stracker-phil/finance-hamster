@@ -44,7 +44,7 @@ export function categoryChoice(patch: Partial<CategoryChoice> = {}): CategoryCho
 
 /** A demo question of an open year, with `patch` applied. */
 export function questionView(patch: Partial<QuestionView> = {}): QuestionView {
-  return { id: "commute", label: "Days worked from home", help: "Count whole days", unit: "days", value: "", answered: false, ...patch };
+  return { id: "commute", label: "Days worked from home", help: "Count whole days", unit: "days", value: "", answered: false, source: null, ...patch };
 }
 
 /** A demo attention entry, with `patch` applied. */

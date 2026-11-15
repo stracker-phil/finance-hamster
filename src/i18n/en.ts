@@ -7,6 +7,7 @@ import { documents } from "./messages/documents";
 import { subscriptions } from "./messages/subscriptions";
 import { year } from "./messages/year";
 import { settings } from "./messages/settings";
+import { payslips } from "./messages/payslips";
 
 /** The English texts, one area per file in `messages/`; each holds both languages (ADR 0050). */
 export const en = {
@@ -19,6 +20,7 @@ export const en = {
   subscriptions: subscriptions.en,
   year: year.en,
   settings: settings.en,
+  payslips: payslips.en,
 };
 
 export type Messages = typeof en;

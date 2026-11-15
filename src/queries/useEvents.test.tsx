@@ -8,6 +8,7 @@ import { account } from "../test/accounts";
 import { renderWithQuery } from "../test/renderWithQuery";
 import { archivedDocument, deletionView, documentGroup, documentRow, documentView, historyEntry, lineChoice, vendorView, vendorsView } from "../test/documents";
 import { fileCheck, fileProblem, statusGroup } from "../test/integrity";
+import { payslipView, payslipsYear } from "../test/payslips";
 import { ruleView, rulesView } from "../test/lineRules";
 import { reviewLine, reviewQueue } from "../test/review";
 import { accountCoverage, accountLines, coverage, lineView, statementGroup } from "../test/statements";
@@ -19,6 +20,7 @@ import { useCommands } from "./commands";
 import { useArchive, useDeletions, useDocument, useDocumentHistory, useDocumentLineOptions, useDocuments, useVendors, useYearLog } from "./documents";
 import { useLastFileCheck, useStatus } from "./integrity";
 import { useLineRules } from "./lineRules";
+import { usePayslip, usePayslipsYear } from "./payslips";
 import { useReviewQueue } from "./review";
 import { useAccountLines, useCoverage } from "./statements";
 import { useMatchCount, useSubscription, useSubscriptions } from "./subscriptions";
@@ -363,6 +365,53 @@ describe("useEvents", () => {
       for (const [old] of Object.values(shown)) await screen.findByText(old);
       mocked.yearPage.mockResolvedValue(yearPage({ total: "€200.00" }));
       mocked.searchElsewhere.mockResolvedValue([elsewhere({ label: "New match" })]);
+
+      await emitDataChanged([table]);
+
+      for (const key of refreshed) expect(await screen.findByText(shown[key][1])).toBeTruthy();
+      for (const key of Object.keys(shown) as (keyof typeof shown)[]) {
+        if (!(refreshed as readonly string[]).includes(key)) expect(screen.getByText(shown[key][0])).toBeTruthy();
+      }
+    });
+  });
+
+  describe("payslips", () => {
+    function PayslipsProbe() {
+      useEvents();
+      const { data: panel } = usePayslipsYear(2026);
+      const { data: payslip } = usePayslip("ps-7");
+      const { data: page } = useYearPage(2026, "");
+      return (
+        <>
+          <p>Panel: {panel?.telework}</p>
+          <p>Payslip: {payslip?.title}</p>
+          <p>Year: {page?.total}</p>
+        </>
+      );
+    }
+
+    const shown = {
+      panel: ["Panel: Old days", "Panel: New days"],
+      payslip: ["Payslip: Old title", "Payslip: New title"],
+      year: ["Year: €100.00", "Year: €200.00"],
+    } as const;
+
+    beforeEach(() => {
+      mocked.payslipsYear.mockResolvedValue(payslipsYear({ telework: "Old days" }));
+      mocked.payslipView.mockResolvedValue(payslipView({ title: "Old title" }));
+      mocked.yearPage.mockResolvedValue(yearPage({ total: "€100.00" }));
+    });
+
+    it.each([
+      ["payslips", ["panel", "payslip", "year"]],
+      ["tax_years", ["year"]],
+      ["accounts", []],
+    ] as const)("when data_changed names the %s table, refetches %j and keeps the rest", async (table, refreshed) => {
+      renderWithQuery(<PayslipsProbe />);
+      for (const [old] of Object.values(shown)) await screen.findByText(old);
+      mocked.payslipsYear.mockResolvedValue(payslipsYear({ telework: "New days" }));
+      mocked.payslipView.mockResolvedValue(payslipView({ title: "New title" }));
+      mocked.yearPage.mockResolvedValue(yearPage({ total: "€200.00" }));
 
       await emitDataChanged([table]);
 

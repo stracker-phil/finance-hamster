@@ -253,6 +253,24 @@ pub const MIGRATIONS: &[&str] = &[
         item_key TEXT NOT NULL,
         UNIQUE (year, item_key)
     );",
+    // 18: monthly payslips with the numbers the bank line doesn't show (ADR 0055).
+    "CREATE TABLE payslips (
+        id TEXT PRIMARY KEY,
+        year INTEGER NOT NULL,
+        month INTEGER NOT NULL,
+        file TEXT,
+        file_hash TEXT,
+        gross INTEGER,
+        social INTEGER,
+        tax INTEGER,
+        net INTEGER,
+        payout INTEGER,
+        home_office_pay INTEGER,
+        telework_days INTEGER,
+        note TEXT NOT NULL DEFAULT '',
+        created_at INTEGER NOT NULL,
+        UNIQUE (year, month)
+    );",
 ];
 
 pub fn version(conn: &Connection) -> AppResult<usize> {
@@ -316,6 +334,7 @@ mod tests {
             "entries",
             "hidden_items",
             "journal",
+            "payslips",
             "plans",
             "rules",
             "snapshots",
@@ -328,6 +347,34 @@ mod tests {
         ]
         .map(String::from)
         .to_vec()
+    }
+
+    #[test]
+    fn a_file_at_version_seventeen_gains_the_payslips_table_and_keeps_its_hidden_categories() {
+        let dir = temp_config_dir();
+        let mut conn = Connection::open(dir.path().join("v17.sqlite")).unwrap();
+        for sql in &MIGRATIONS[..17] {
+            conn.execute_batch(sql).unwrap();
+        }
+        conn.pragma_update(None, "user_version", 17i64).unwrap();
+        conn.execute(
+            "INSERT INTO hidden_items (id, year, item_key) VALUES ('hidden-1', 2026, 'books')",
+            [],
+        )
+        .unwrap();
+        assert!(!tables(&conn).contains(&"payslips".to_string()));
+
+        migrate(&mut conn).unwrap();
+
+        assert_eq!(version(&conn).unwrap(), MIGRATIONS.len());
+        assert_eq!(tables(&conn), all_tables());
+        let hidden: i64 = conn
+            .query_row("SELECT COUNT(*) FROM hidden_items", [], |r| r.get(0))
+            .unwrap();
+        let payslips: i64 = conn
+            .query_row("SELECT COUNT(*) FROM payslips", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!((hidden, payslips), (1, 0));
     }
 
     #[test]

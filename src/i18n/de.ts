@@ -8,6 +8,7 @@ import { documents } from "./messages/documents";
 import { subscriptions } from "./messages/subscriptions";
 import { year } from "./messages/year";
 import { settings } from "./messages/settings";
+import { payslips } from "./messages/payslips";
 
 /** Die deutschen Texte, Du-Form, de-DE (ADR 0050). */
 export const de: Messages = {
@@ -20,4 +21,5 @@ export const de: Messages = {
   subscriptions: subscriptions.de,
   year: year.de,
   settings: settings.de,
+  payslips: payslips.de,
 };

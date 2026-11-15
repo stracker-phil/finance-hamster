@@ -9,7 +9,9 @@ import { MenuHost } from "../components/menu";
 import { HOME } from "../state/route";
 import { useStore } from "../state/store";
 import { addPreview } from "../test/documents";
+import { payslipsYear } from "../test/payslips";
 import { renderWithQuery } from "../test/renderWithQuery";
+import { settings } from "../test/settings";
 import { attentionView, categoryChoice, kennzahlView, monthView, questionView, yearPage, yearRow } from "../test/year";
 import { YearPage } from "./YearPage";
 
@@ -42,6 +44,9 @@ beforeEach(() => {
   mocked.yearExportSummary.mockResolvedValue(false);
   mocked.yearCloseCheck.mockResolvedValue({ blockers: [], warnings: [] });
   mocked.yearCategories.mockResolvedValue([]);
+  mocked.getSettings.mockResolvedValue(settings());
+  mocked.updateSettings.mockResolvedValue(settings());
+  mocked.payslipsYear.mockResolvedValue(payslipsYear());
 });
 
 describe("YearPage", () => {
@@ -137,6 +142,81 @@ describe("YearPage", () => {
       await userEvent.type(screen.getByRole("textbox", { name: "Days worked from home" }), "x{Enter}");
 
       await vi.waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toEqual(["Enter a number"]));
+    });
+  });
+
+  describe("questions filled from payslips", () => {
+    const fromPayslips = () => questionView({ help: "Count whole days", source: "From your payslips · as of July", value: "122", answered: true });
+
+    it("shows the source in place of the help", async () => {
+      await show({ questions: [fromPayslips()] });
+
+      const section = within(screen.getByRole("region", { name: "Your year" }));
+      expect(section.getByText("From your payslips · as of July")).toBeTruthy();
+      expect(section.queryByText("Count whole days")).toBeNull();
+    });
+
+    it("shows the value in a read-only field that saves nothing", async () => {
+      await show({ questions: [fromPayslips()] });
+      const input = screen.getByRole<HTMLInputElement>("textbox", { name: "Days worked from home" });
+
+      await userEvent.type(input, "5{Enter}");
+
+      expect(input.readOnly).toBe(true);
+      expect(input.value).toBe("122");
+      expect(mocked.yearAnswer).not.toHaveBeenCalled();
+    });
+
+    it("keeps the field of a question without a source editable", async () => {
+      await show({ questions: [questionView()] });
+
+      expect(screen.getByRole<HTMLInputElement>("textbox", { name: "Days worked from home" }).readOnly).toBe(false);
+    });
+  });
+
+  describe("payslip panel", () => {
+    const toggle = () => screen.getByRole("button", { name: "Show or hide payslips" });
+
+    it("is hidden while the setting is off, and the toggle is not pressed", async () => {
+      await show();
+
+      expect(toggle().getAttribute("aria-pressed")).toBe("false");
+      expect(screen.queryByRole("complementary", { name: "Payslips" })).toBeNull();
+    });
+
+    it("shows the year's payslips beside the page while the setting is on, and the toggle is pressed", async () => {
+      mocked.getSettings.mockResolvedValue(settings({ payslipPanel: true }));
+      await show();
+
+      expect(await screen.findByRole("complementary", { name: "Payslips" })).toBeTruthy();
+      await vi.waitFor(() => expect(toggle().getAttribute("aria-pressed")).toBe("true"));
+      expect(mocked.payslipsYear).toHaveBeenCalledWith(2026);
+    });
+
+    it("turns the setting on when the toggle is clicked while it is off", async () => {
+      await show();
+
+      await userEvent.click(toggle());
+
+      await vi.waitFor(() => expect(mocked.updateSettings).toHaveBeenCalledWith({ payslipPanel: true }));
+    });
+
+    it("turns the setting off when the toggle is clicked while it is on", async () => {
+      mocked.getSettings.mockResolvedValue(settings({ payslipPanel: true }));
+      await show();
+
+      await userEvent.click(toggle());
+
+      await vi.waitFor(() => expect(mocked.updateSettings).toHaveBeenCalledWith({ payslipPanel: false }));
+    });
+
+    it("reports a setting that cannot be saved as an error toast", async () => {
+      mocked.updateSettings.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
+      await show();
+
+      await userEvent.click(toggle());
+
+      await vi.waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toEqual(["Disk full"]));
     });
   });
 

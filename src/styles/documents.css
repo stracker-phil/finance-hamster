@@ -101,3 +101,11 @@
 .slice--frozen { background: var(--fill-subtle); }
 .slice__year { color: var(--text-muted); }
 .slice__amount { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text); }
+
+/* A payslip: its PDF beside the numbers typed from it. */
+.payslip-page__title { margin: 0 0 18px; font-size: 17px; font-weight: 700; }
+.payslip-page__empty { align-items: center; justify-content: center; padding: 20px; text-align: center; border-style: dashed; }
+.payslip-form { margin: 0; padding: 0; border: 0; min-width: 0; }
+.payslip-form__grid { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 16px; row-gap: 2px; align-items: start; }
+.payslip-form__label { display: flex; flex-direction: column; gap: 2px; padding-top: 5px; font-size: 13px; }
+.add-doc__kind { margin: 14px 0 4px; }

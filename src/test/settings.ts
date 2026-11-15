@@ -9,6 +9,7 @@ export function settings(patch: Partial<Settings> = {}): Settings {
     remindGaps: true,
     remindFiling: true,
     remindQuestions: true,
+    payslipPanel: false,
     ...patch,
   };
 }

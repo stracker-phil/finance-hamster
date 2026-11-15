@@ -10,6 +10,7 @@ use crate::error::AppResult;
 
 mod documents;
 mod entries;
+mod payslips;
 mod statements;
 mod subscriptions;
 
@@ -112,6 +113,7 @@ pub fn seed_if_empty(db: &Db, config_dir: &Path, today: chrono::NaiveDate) -> Ap
         .unwrap_or_default();
     count += entries::seed(db, config_dir, chrono::Datelike::year(&today), now)?;
     count += subscriptions::seed(db, today, now)?;
+    count += payslips::seed(db, chrono::Datelike::year(&today), now)?;
     Ok(count)
 }
 
@@ -201,7 +203,17 @@ mod tests {
         let db = Db::open(dir.path()).unwrap();
         assert_eq!(
             seed_if_empty(&db, dir.path(), today()).unwrap(),
-            2 + 24 + 1 + 4 + 2 + 1 + 3 + 4
+            2 + 24 + 1 + 4 + 2 + 1 + 3 + 4 + 1
+        );
+        let payslips = db.read(|c| crate::payslips::payslips(c, 2026)).unwrap();
+        assert_eq!(
+            payslips.iter().map(|p| p.month).collect::<Vec<_>>(),
+            [1, 2, 3, 4, 5, 6]
+        );
+        assert_eq!(
+            db.read(|c| crate::payslips::telework_days(c, 2026))
+                .unwrap(),
+            Some((6, 50))
         );
         let kinds: Vec<_> = crate::year::entries::entries(&db, 2026)
             .unwrap()

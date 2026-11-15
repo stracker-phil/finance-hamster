@@ -543,6 +543,64 @@ evidence: string | null, } | { "kind": "trip", itemKey: string, date: string, km
 export type NumberFormat = "dot_decimal" | "comma_decimal";
 
 /**
+ * A new payslip's id and the label of the change.
+ */
+export type PayslipAdded = { id: string, label: string, };
+
+/**
+ * The amounts a payslip records.
+ */
+export type PayslipAmount = "gross" | "social" | "tax" | "net" | "payout" | "homeOfficePay";
+
+/**
+ * One change to a payslip; blank text clears a value.
+ */
+export type PayslipEdit = { "field": "amount", name: PayslipAmount, value: string, } | { "field": "teleworkDays", value: string, } | { "field": "note", text: string, } | { "field": "month", month: number, };
+
+/**
+ * One amount field of the payslip form.
+ */
+export type PayslipField = { name: PayslipAmount, label: string, 
+/**
+ * Where on the payslip the value is printed.
+ */
+hint: string, 
+/**
+ * As the field shows it; empty while not typed.
+ */
+value: string, };
+
+/**
+ * One month of the year's payslip panel.
+ */
+export type PayslipMonth = { month: number, name: string, 
+/**
+ * None while the month has no payslip.
+ */
+id: string | null, payout: string | null, hasPdf: boolean, };
+
+/**
+ * A labelled sum of the year.
+ */
+export type PayslipTotal = { label: string, value: string, };
+
+export type PayslipView = { id: string, year: number, month: number, 
+/**
+ * `Payslip July 2026`.
+ */
+title: string, open: boolean, hasPdf: boolean, amounts: Array<PayslipField>, teleworkDays: string, note: string, };
+
+export type PayslipsYear = { year: number, open: boolean, 
+/**
+ * January to December, always twelve.
+ */
+months: Array<PayslipMonth>, totals: Array<PayslipTotal>, 
+/**
+ * `122 days · as of July`; None while no payslip prints them.
+ */
+telework: string | null, };
+
+/**
  * A PDF the app keeps, named by what it belongs to; the page never sends paths.
  */
 export type PdfSource = { kind: SourceKind, id: string, };
@@ -580,7 +638,11 @@ export type QuestionView = { id: string, label: string, help: string | null, uni
 /**
  * The answer as the field shows it; empty while unanswered.
  */
-value: string, answered: boolean, };
+value: string, answered: boolean, 
+/**
+ * Where an answer the owner doesn't type comes from (`From the July payslip`); the field is then read-only.
+ */
+source: string | null, };
 
 /**
  * How long before a charge the reminder comes.
@@ -773,12 +835,16 @@ remindFiling: boolean,
 /**
  * In December, a look at the open tax year before it ends (named for its first use, the year check).
  */
-remindQuestions: boolean, };
+remindQuestions: boolean, 
+/**
+ * The payslip panel beside the tax year page is open.
+ */
+payslipPanel: boolean, };
 
 /**
  * The fields to change; absent ones keep their value.
  */
-export type SettingsPatch = { language?: Language, appearance?: Appearance, accent?: Accent, numberFormat?: NumberFormat, showOriginalCurrency?: boolean, hideOwnTransfers?: boolean, archiveDays?: number, defaultReminder?: Reminder, remindPriceChanges?: boolean, importAfterDays?: number, remindGaps?: boolean, remindFiling?: boolean, remindQuestions?: boolean, };
+export type SettingsPatch = { language?: Language, appearance?: Appearance, accent?: Accent, numberFormat?: NumberFormat, showOriginalCurrency?: boolean, hideOwnTransfers?: boolean, archiveDays?: number, defaultReminder?: Reminder, remindPriceChanges?: boolean, importAfterDays?: number, remindGaps?: boolean, remindFiling?: boolean, remindQuestions?: boolean, payslipPanel?: boolean, };
 
 export type SliceView = { year: number, amount: string, 
 /**
@@ -790,7 +856,7 @@ note: string | null,
  */
 frozen: boolean, };
 
-export type SourceKind = "document" | "statement";
+export type SourceKind = "document" | "statement" | "payslip";
 
 export type StatementGroup = { id: string, 
 /**

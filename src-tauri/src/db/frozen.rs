@@ -43,7 +43,7 @@ fn years_of(tx: &Transaction, table: &str, row: &Row) -> AppResult<Vec<i32>> {
         "decisions" if counts_as_anv(tx, text("kind"), text("subscription_id"))? => {
             line_year(tx, text("id"))?.into_iter().collect()
         }
-        "entries" | "answers" => row
+        "entries" | "answers" | "payslips" => row
             .get("year")
             .and_then(Value::as_i64)
             .and_then(|y| i32::try_from(y).ok())

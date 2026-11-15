@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import { Car, Copy, Euro, FileText, Landmark, Trash2 } from "lucide-react";
+import { Car, Copy, Euro, FileText, Landmark, PanelRight, Trash2 } from "lucide-react";
 import { api, type AttentionKind, type AttentionView, type KennzahlView, type MonthView, type QuestionView, type YearRow } from "../api";
 import { attachInvoiceTo, startAddDocument } from "../documents/addFlow";
 import { copyText } from "../lib/clipboard";
 import { showError } from "../lib/undoToast";
+import { togglePayslipPanel } from "../payslips/flow";
+import { useSettings } from "../queries/settings";
 import { useYearPage } from "../queries/year";
 import { useStore } from "../state/store";
 import { AddButton, AddEntry } from "../year/AddEntry";
+import { PayslipPanel } from "../year/PayslipPanel";
 import { YearMenu } from "../year/YearMenu";
 import { attachEvidence, deleteEntry, openEvidence } from "../year/entryActions";
 import { EmptyPage } from "./EmptyPage";
@@ -24,11 +27,12 @@ function QuestionRow({ year, question }: { year: number; question: QuestionView 
       <span className={question.answered ? "year-dot year-dot--done" : "year-dot"} />
       <span className="year-line__text">
         {question.label}
-        {question.help && <span className="add-doc__hint year-line__help">{question.help}</span>}
+        {(question.source ?? question.help) && <span className="add-doc__hint year-line__help">{question.source ?? question.help}</span>}
       </span>
       <label className={question.answered ? "year-answer" : "year-answer year-answer--empty"}>
         <input
           value={text}
+          readOnly={question.source !== null}
           inputMode="decimal"
           aria-label={question.label}
           onChange={(e) => setText(e.target.value)}
@@ -276,7 +280,9 @@ export function YearPage({ year, attention }: { year: number; attention?: Attent
   const filter = useStore((s) => s.filter);
   const [chosen, setChosen] = useState<View | null>(null);
   const { data, isError } = useYearPage(year, filter);
+  const panelOpen = useSettings().data?.payslipPanel ?? false;
   const text = useT().pages.year;
+  const payslipText = useT().payslips;
   if (isError) return <EmptyPage title={text.missingTitle(year)} text={text.missingText} />;
   if (!data) return null;
   const open = data.state === "open";
@@ -287,7 +293,7 @@ export function YearPage({ year, attention }: { year: number; attention?: Attent
     { value: "finanzonline", label: text.finanzOnline },
   ];
   return (
-    <div className="page-scroll">
+    <div className={panelOpen ? "page-scroll year-layout year-layout--panel" : "page-scroll year-layout"}>
       <div className="year-page">
         <div className="year-hero">
           <div className="year-hero__main">
@@ -303,6 +309,9 @@ export function YearPage({ year, attention }: { year: number; attention?: Attent
             </div>
             <div className="add-doc__hint">{data.progress}</div>
           </div>
+          <button type="button" className="icon-btn year-panel-toggle" aria-label={payslipText.toggle} aria-pressed={panelOpen} title={payslipText.toggle} onClick={togglePayslipPanel}>
+            <PanelRight size={16} />
+          </button>
           <YearMenu year={data.year} archived={data.archived} closed={!open} />
         </div>
 
@@ -329,6 +338,7 @@ export function YearPage({ year, attention }: { year: number; attention?: Attent
         {view === "months" && <MonthList year={data.year} months={data.months} open={open} />}
         {view === "finanzonline" && <FinanzOnline year={data.year} items={data.kennzahlen} pauschaleNote={data.pauschaleNote} />}
       </div>
+      {panelOpen && <PayslipPanel year={data.year} />}
     </div>
   );
 }

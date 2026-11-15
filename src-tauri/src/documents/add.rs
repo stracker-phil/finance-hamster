@@ -95,7 +95,7 @@ pub(super) fn currency_of(g: &Guess) -> String {
     g.currency.clone().unwrap_or_else(|| "EUR".into())
 }
 
-fn text_of(bytes: &[u8]) -> Vec<String> {
+pub(crate) fn text_of(bytes: &[u8]) -> Vec<String> {
     Pdf::from_bytes(bytes)
         .and_then(|pdf| pdf.text_pages())
         .map(|pages| pages.into_iter().flatten().collect())

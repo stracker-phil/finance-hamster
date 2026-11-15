@@ -28,6 +28,8 @@ export function titleFor(route: Route): HeaderTitle {
             ? { label: text.documents, to: { page: "documents" } }
             : { label: text.taxYear(route.year), to: { page: "year", year: route.year } },
       };
+    case "payslip":
+      return { title: text.payslip, crumb: { label: text.taxYear(route.year), to: { page: "year", year: route.year } } };
     case "log":
       return { title: text.log, sub: text.logSub, crumb: { label: text.taxYear(route.year), to: { page: "year", year: route.year } } };
     case "archive":

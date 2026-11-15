@@ -5,6 +5,7 @@ import { FILTER_FIELD_ID } from "../shell/Header";
 import { startAddDocument } from "../documents/addFlow";
 import { startImport } from "../statements/importFlow";
 import { newSubscription } from "../subscriptions/flow";
+import { togglePayslipPanel } from "../payslips/flow";
 import { t } from "../i18n";
 import { useStore } from "../state/store";
 
@@ -46,6 +47,7 @@ const HANDLERS: Record<string, Handler> = {
   "document:add": startAddDocument,
   "subscription:new": newSubscription,
   "filter:focus": () => document.getElementById(FILTER_FIELD_ID)?.focus(),
+  "view:payslips": togglePayslipPanel,
 };
 
 export function runPageCommand(id: string) {

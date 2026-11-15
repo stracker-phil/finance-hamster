@@ -13,6 +13,7 @@ export type Route =
   | { page: "year"; year: number; attention?: AttentionKind }
   /** `year` is the tax year it was opened from; null when opened from Documents. */
   | { page: "document"; documentId: string; year: number | null }
+  | { page: "payslip"; payslipId: string; year: number }
   | { page: "log"; year: number }
   | { page: "archive"; year: number };
 
@@ -30,6 +31,7 @@ export function sidebarKey(route: Route): string {
       return route.year === null ? "documents" : `year:${route.year}`;
     case "log":
     case "archive":
+    case "payslip":
     case "year":
       return `year:${route.year}`;
     default:

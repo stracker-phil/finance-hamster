@@ -9,6 +9,7 @@ use super::{answers, drift, hidden, summary};
 use crate::date::DateOrder;
 use crate::db::Db;
 use crate::error::{AppError, AppResult};
+use crate::payslips;
 use crate::settings::NumberFormat;
 use crate::taxrules::model::{Item, Ruleset};
 use crate::taxyears::{self, YearState};
@@ -24,6 +25,8 @@ pub struct QuestionView {
     /// The answer as the field shows it; empty while unanswered.
     pub value: String,
     pub answered: bool,
+    /// Where an answer the owner doesn't type comes from (`From the July payslip`); the field is then read-only.
+    pub source: Option<String>,
 }
 
 #[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq, TS)]
@@ -168,7 +171,11 @@ pub fn page(
         AppError::NotFound(crate::tr!("No tax year {year}", "Kein Steuerjahr {year}"))
     })?;
     let ruleset: Ruleset = serde_json::from_str(&row.rules)?;
-    let given = answers::answers(db, year)?;
+    let mut given = answers::answers(db, year)?;
+    let telework = db.read(|c| payslips::telework_days(c, year))?;
+    if let Some((_, days)) = telework {
+        given.insert(payslips::TELEWORK_QUESTION.to_string(), days);
+    }
     let facts = facts::gather(db, year, &ruleset, format, order)?;
     let needle = query.trim().to_lowercase();
     let shown = |p: &Placed, item: &Item| {
@@ -188,7 +195,19 @@ pub fn page(
         .iter()
         .filter(|p| ruleset.items.iter().any(|i| i.key == p.item && shown(p, i)))
         .collect();
-    let questions = summary::question_views(&ruleset, &given, format);
+    let mut questions = summary::question_views(&ruleset, &given, format);
+    if let Some((month, _)) = telework {
+        for q in questions
+            .iter_mut()
+            .filter(|q| q.id == payslips::TELEWORK_QUESTION)
+        {
+            q.source = Some(crate::tr!(
+                "From the {} payslip, year to date",
+                "Aus dem Lohnzettel {}, Jahressumme",
+                crate::date::month_name(month)
+            ));
+        }
+    }
     let unanswered = questions.iter().filter(|q| !q.answered).count();
     let over = year < chrono::Datelike::year(&chrono::Local::now());
     let (progress, progress_percent) =

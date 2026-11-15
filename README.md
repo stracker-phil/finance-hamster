@@ -39,6 +39,9 @@ support. To build it or port it, point a coding agent at [AGENTS.md](AGENTS.md).
   home office days as one number, and a FinanzOnline view that turns them into one copy value per Kennzahl and
   works out what the tax office makes of them. The rules are built into the app for each year (kept up to date,
   changeable in Settings, frozen with a closed year).
+- **Payslips:** the numbers the salary line doesn't show (gross, social insurance, income tax), typed from each
+  month's payslip with its PDF beside it. A panel next to the tax year shows the months and the year's sums,
+  and the latest payslip's home office days answer the tax year's question.
 - **Keyboard first:** ⌘K finds anything and runs any command, every action has a menu item and a shortcut, and
   the `hamster` command line drives the running app.
 

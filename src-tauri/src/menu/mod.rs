@@ -12,7 +12,7 @@ use crate::tr;
 const MENUS: &[(Text, &[&[&str]])] = &[
     (
         Text::new("View", "Darstellung"),
-        &[&["palette:open", "filter:focus"]],
+        &[&["palette:open", "filter:focus"], &["view:payslips"]],
     ),
     (
         Text::new("Go", "Gehe zu"),

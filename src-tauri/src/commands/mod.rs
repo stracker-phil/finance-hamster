@@ -103,6 +103,11 @@ pub const COMMANDS: &[CommandDef] = &[
         Text::new("Filter This Page", "Diese Seite filtern"),
         Some("CmdOrCtrl+F"),
     ),
+    page(
+        "view:payslips",
+        Text::new("Show or Hide Payslips", "Lohnzettel ein- oder ausblenden"),
+        Some("CmdOrCtrl+Alt+L"),
+    ),
     CommandDef {
         id: "app:settings",
         title: Text::new("Settings…", "Einstellungen …"),

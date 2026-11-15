@@ -1,4 +1,4 @@
-//! PDF previews by id (ADR 0018, ADR 0037): the page names a document or statement, Rust finds its file. The
+//! PDF previews by id (ADR 0018, ADR 0037): the page names a document, statement or payslip, Rust finds its file. The
 //! native view shows it over the page; the `pdf-page` URI scheme serves its pages as PNG.
 
 pub mod commands;
@@ -19,6 +19,7 @@ use crate::tr;
 pub enum SourceKind {
     Document,
     Statement,
+    Payslip,
 }
 
 impl SourceKind {
@@ -26,6 +27,7 @@ impl SourceKind {
         match text {
             "document" => Some(SourceKind::Document),
             "statement" => Some(SourceKind::Statement),
+            "payslip" => Some(SourceKind::Payslip),
             _ => None,
         }
     }
@@ -56,6 +58,9 @@ pub fn resolve(db: &Db, config_dir: &Path, source: &PdfSource) -> AppResult<Path
         SourceKind::Statement => db
             .read(|c| crate::statements::store::statement_by_id(c, &source.id))?
             .map(|s| s.file),
+        SourceKind::Payslip => db
+            .read(|c| crate::payslips::payslip(c, &source.id))?
+            .and_then(|p| p.file),
     };
     file.map(|f| config_dir.join(f)).ok_or_else(|| {
         AppError::NotFound(tr!(
@@ -85,6 +90,7 @@ mod tests {
         for (text, expected) in [
             ("document", Some(SourceKind::Document)),
             ("statement", Some(SourceKind::Statement)),
+            ("payslip", Some(SourceKind::Payslip)),
             ("Document", None),
             ("", None),
         ] {
@@ -174,6 +180,30 @@ mod tests {
             resolve(&db, dir.path(), &source(SourceKind::Statement, &id)),
             Err(AppError::NotFound(_))
         ));
+    }
+
+    #[test]
+    fn a_payslip_with_a_file_resolves_to_it_and_one_without_is_not_found() {
+        use crate::payslips::edit;
+
+        let dir = temp_config_dir();
+        let db = Db::open(dir.path()).expect("db");
+        let (_, with_file) = edit::add(&db, dir.path(), 2026, 7, Some(b"%PDF demo"), 1).unwrap();
+        let (_, without_file) = edit::add(&db, dir.path(), 2026, 8, None, 1).unwrap();
+
+        assert_eq!(
+            resolve(&db, dir.path(), &source(SourceKind::Payslip, &with_file)).unwrap(),
+            dir.path().join("docs/2026/payslips/2026-07.pdf")
+        );
+        for id in [without_file.as_str(), "missing"] {
+            assert!(
+                matches!(
+                    resolve(&db, dir.path(), &source(SourceKind::Payslip, id)),
+                    Err(AppError::NotFound(_))
+                ),
+                "{id}"
+            );
+        }
     }
 
     #[test]
