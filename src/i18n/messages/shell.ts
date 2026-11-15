@@ -13,7 +13,6 @@ export const shell = both(
       log: "Log",
       logSub: "Every change to a document, written once",
       archive: "Archive",
-      yearCheck: "Year check",
       taxYear: (year: number) => `Tax year ${year}`,
     },
     sidebar: {
@@ -62,7 +61,6 @@ export const shell = both(
       log: "Protokoll",
       logSub: "Jede Änderung an einem Beleg, einmal geschrieben",
       archive: "Archiv",
-      yearCheck: "Jahrescheck",
       taxYear: (year: number) => `Steuerjahr ${year}`,
     },
     sidebar: {

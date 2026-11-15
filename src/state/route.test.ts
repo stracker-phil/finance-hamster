@@ -54,7 +54,6 @@ describe("sidebarKey", () => {
     ["a year", { page: "year", year: 2026 }, "year:2026"],
     ["a year's log under its year", { page: "log", year: 2025 }, "year:2025"],
     ["a year's archive under its year", { page: "archive", year: 2025 }, "year:2025"],
-    ["a year's check under its year", { page: "yearCheck", year: 2026 }, "year:2026"],
     ["a document opened from a year under that year", { page: "document", documentId: "doc-1", year: 2026 }, "year:2026"],
     ["a document opened from Documents under Documents", { page: "document", documentId: "doc-1", year: null }, "documents"],
   ])("selects the row for %s", (_name, route, key) => {

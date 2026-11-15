@@ -52,7 +52,7 @@ Why Hamster is built the way it is. One record per decision, in Nygard format, a
 | [0040](0040-tax-rules-live-in-a-json-file-per-year.md) | Tax rules live in a JSON file per year; the tax year shows one copy value per Kennzahl | Accepted (2026-11-13); file handling superseded by 0051 |
 | [0041](0041-subscriptions-match-their-own-charges.md) | Subscriptions match their own charges, by plan period | Accepted (2026-11-13); tolerance superseded by 0045 |
 | [0042](0042-reminders-are-told-by-the-running-app.md) | Reminders are told by the running app | Accepted (2026-11-13) |
-| [0043](0043-the-year-check-stores-only-its-date.md) | The year check asks from the ruleset and stores only its date | Accepted (2026-11-14) |
+| [0043](0043-the-year-check-stores-only-its-date.md) | The year check asks from the ruleset and stores only its date | Superseded by 0052 |
 | [0044](0044-subscription-tolerance-is-a-percentage.md) | A subscription's amount tolerance is a percentage | Accepted (2026-11-14); superseded by 0045 |
 | [0045](0045-subscriptions-ask-about-another-amount.md) | Subscriptions ask about another amount and take one charge per period | Accepted (2026-11-14) |
 | [0046](0046-commands-are-a-catalog-with-colon-ids.md) | Commands are a catalog with colon ids; page keys are fixed | Accepted (2026-11-15) |
@@ -61,3 +61,4 @@ Why Hamster is built the way it is. One record per decision, in Nygard format, a
 | [0049](0049-refunds-net-against-charges.md) | Refunds net against charges; one line pays one document | Accepted (2026-11-15) |
 | [0050](0050-german-as-a-second-ui-language.md) | German as a second UI language | Accepted (2026-11-15) |
 | [0051](0051-tax-rules-are-built-in-and-edited-in-the-app.md) | Tax rules are built into the app and edited in the app | Accepted (2026-11-15) |
+| [0052](0052-record-in-plain-words-file-in-finanzonline-terms.md) | Record in plain words, file in FinanzOnline terms; no year check | Accepted (2026-11-15) |

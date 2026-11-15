@@ -1,6 +1,6 @@
 //! The Today page against a temp database with the demo accounts, a 2026 tax year and statements up to date.
 
-use serde_json::{Value, json};
+use serde_json::json;
 use tempfile::TempDir;
 
 use super::*;
@@ -10,7 +10,7 @@ use crate::rules::store::{Action, DECISIONS, DecisionRow};
 use crate::statements::import_tests::open_with_accounts;
 use crate::statements::store::{STATEMENTS, StatementRow, TRANSACTIONS, TransactionRow};
 use crate::subscriptions::store::SubscriptionRow;
-use crate::test_support::rules::{local_millis, minimal_rules, minimal_text, set};
+use crate::test_support::rules::{minimal_rules, minimal_text};
 use crate::test_support::subscriptions::{day, insert_rows, plan_row, subscription_row, today};
 use crate::year::tests::{add_document, debit, insert, open_year_with, rules, ruleset};
 
@@ -374,7 +374,7 @@ fn questions_lists_the_unanswered_ones_of_the_newest_open_year() {
             key: "questions".into(),
             title: "2 questions for Tax year 2026".into(),
             detail: format!("{HOME_DAYS} · {PAUSCHALE}"),
-            line: "Numbers from your year, such as the Lohnzettel. They decide what the tax office accepts."
+            line: "Numbers from your payslip (Lohnzettel). Hamster works out what they change."
                 .into(),
             button: "Answer in Tax Year 2026".into(),
             target: StepTarget::Year {
@@ -400,129 +400,59 @@ fn an_answered_question_drops_out_of_the_questions_step() {
     assert_eq!(step.detail, HOME_DAYS);
 }
 
-/// The year rules asking about books, and about Telearbeitstage when `with_days` is set.
-fn asking_rules(with_days: bool) -> Value {
-    let mut rules = rules();
-    set(
-        &mut rules,
-        "/items/0/ask",
-        json!({ "order": 1, "question": "Did you buy books?" }),
-    );
-    if with_days {
-        set(
-            &mut rules,
-            "/questions/0/ask",
-            json!({ "order": 2, "question": "How many days did you work from home?" }),
-        );
-    }
-    rules
-}
-
-fn asking_year(with_days: bool, end: &str) -> (TempDir, Db) {
-    let (dir, db) = open_year_with(&asking_rules(with_days));
-    for account in ACCOUNTS {
-        statement_ending(&db, account, end);
-    }
-    (dir, db)
-}
-
-fn ran_on(db: &Db, (y, m, d): (i32, u32, u32)) {
-    crate::yearcheck::complete(db, 2026, local_millis(y, m, d), Source::Ui).unwrap();
-}
-
 #[test]
-fn a_year_check_that_never_ran_is_offered_from_the_first_of_november() {
-    let (_dir, db) = asking_year(true, "2026-11-10");
-
-    let step = view(&db).next.unwrap();
-
-    assert_eq!(
-        step,
-        Step {
-            key: "check".into(),
-            title: "Year check for 2026".into(),
-            detail: "Not run yet · 2 quick questions".into(),
-            line: "Things you might forget to claim. Most are a quick No.".into(),
-            button: "Start Year Check".into(),
-            target: StepTarget::YearCheck { year: 2026 },
+fn the_questions_step_is_offered_on_any_date_while_a_question_is_unanswered() {
+    for (on, end) in [
+        (day(2026, 10, 31), "2026-10-30"),
+        (day(2026, 11, 15), "2026-11-10"),
+        (day(2026, 12, 31), "2026-12-30"),
+        (day(2027, 1, 9), "2027-01-05"),
+    ] {
+        let (_dir, db) = open_year_with(&rules());
+        for account in ACCOUNTS {
+            statement_ending(&db, account, end);
         }
-    );
+
+        let view = today_view(
+            &db,
+            on,
+            NumberFormat::DotDecimal,
+            DateOrder::DayFirst,
+            BEHIND_AFTER_DAYS,
+        )
+        .unwrap();
+
+        assert_eq!(keys(&view), ["questions"], "{on}");
+    }
 }
 
 #[test]
-fn a_year_check_run_before_november_names_its_date_and_counts_one_question_in_the_singular() {
-    let (_dir, db) = asking_year(false, "2026-11-10");
-    ran_on(&db, (2026, 6, 2));
-
-    let step = view(&db).next.unwrap();
-
-    assert_eq!(step.key, "check");
-    assert_eq!(step.detail, "Last run 2 Jun 2026 · 1 quick question");
-}
-
-#[test]
-fn the_year_check_takes_the_place_of_the_questions_step() {
-    let (_dir, db) = asking_year(true, "2026-11-10");
+fn the_questions_step_comes_before_a_draft() {
+    let (_dir, db) = open_year_with(&rules());
+    for account in ACCOUNTS {
+        statement_ending(&db, account, "2026-11-10");
+    }
     add_document(&db, "doc-d1", |d| {
         d.state = DocState::Draft;
         d.item_key = Some("books".into());
         d.pay_date = Some("2026-03-03".into());
     });
 
-    assert_eq!(keys(&view(&db)), ["check", "draft"]);
+    assert_eq!(keys(&view(&db)), ["questions", "draft"]);
 }
 
 #[test]
-fn the_questions_step_returns_once_the_year_check_ran_in_november_or_before_it_is_due() {
-    let (_ran_dir, ran) = asking_year(true, "2026-11-10");
-    ran_on(&ran, (2026, 11, 10));
-    let (_early_dir, early) = asking_year(true, "2026-10-30");
-
-    let early_view = today_view(
-        &early,
-        day(2026, 10, 31),
-        NumberFormat::DotDecimal,
-        DateOrder::DayFirst,
-        BEHIND_AFTER_DAYS,
-    )
-    .unwrap();
-
-    assert_eq!(keys(&view(&ran)), ["questions"]);
-    assert_eq!(keys(&early_view), ["questions"]);
-}
-
-#[test]
-fn after_the_year_the_check_is_offered_again_until_it_ran_after_31_dec() {
-    let (_dir, db) = asking_year(true, "2027-01-05");
-    ran_on(&db, (2026, 11, 10));
-    let on = |db: &Db| {
-        today_view(
-            db,
-            day(2027, 1, 9),
-            NumberFormat::DotDecimal,
-            DateOrder::DayFirst,
-            BEHIND_AFTER_DAYS,
-        )
-        .unwrap()
-    };
-
-    let before = on(&db).next.unwrap();
-    ran_on(&db, (2027, 1, 9));
-
-    assert_eq!(before.key, "check");
-    assert_eq!(before.detail, "Last run 10 Nov 2026 · 2 quick questions");
-    assert_eq!(on(&db).next.map(|s| s.key), Some("questions".to_string()));
-}
-
-#[test]
-fn the_year_check_target_is_tagged_with_its_year() {
-    let (_dir, db) = asking_year(true, "2026-11-10");
+fn the_questions_target_is_tagged_with_its_year() {
+    let (_dir, db) = open_year_with(&rules());
+    for account in ACCOUNTS {
+        statement_ending(&db, account, "2026-11-10");
+    }
 
     let value = serde_json::to_value(view(&db)).unwrap();
 
     assert_eq!(
         value["next"]["target"],
-        json!({ "kind": "yearCheck", "year": 2026 })
+        json!({ "kind": "year", "year": 2026, "attention": null })
     );
 }
 

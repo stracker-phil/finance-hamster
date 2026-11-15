@@ -78,7 +78,6 @@ describe("sidebarKey", () => {
     [{ page: "log", year: 2025 }, "year:2025"],
     [{ page: "archive", year: 2024 }, "year:2024"],
     [{ page: "year", year: 2023 }, "year:2023"],
-    [{ page: "yearCheck", year: 2026 }, "year:2026"],
   ])("maps %j to %s", (route, key) => {
     expect(sidebarKey(route)).toBe(key);
   });

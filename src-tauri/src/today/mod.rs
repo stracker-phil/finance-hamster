@@ -21,9 +21,7 @@ use crate::subscriptions::view::{Format, letter};
 use crate::taxyears::{self, YearState};
 use crate::tr;
 use crate::year::page::{self as year_page, AttentionKind, YearPage};
-use steps::{
-    attach_step, draft_step, import_step, joined, questions_step, review_step, year_check_step,
-};
+use steps::{attach_step, draft_step, import_step, joined, questions_step, review_step};
 
 /// Where a step's button leads.
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
@@ -39,9 +37,6 @@ pub enum StepTarget {
     Import,
     Document {
         id: String,
-        year: i32,
-    },
-    YearCheck {
         year: i32,
     },
 }
@@ -210,19 +205,11 @@ pub fn today_view(
         .map(|year| year_page::page(db, year, "", number, order))
         .transpose()?;
     let from_year = |step: fn(&YearPage) -> Option<Step>| page.as_ref().and_then(step);
-    // The year check asks the year's questions too, so its step takes their place.
-    let check = year_check_step(db, today, number, order)?;
-    let questions = if check.is_some() {
-        None
-    } else {
-        from_year(questions_step)
-    };
     let mut steps = [
         review_step(db)?,
         from_year(attach_step),
         import_step(db, &statements_view, order)?,
-        check,
-        questions,
+        from_year(questions_step),
         from_year(draft_step),
     ]
     .into_iter()

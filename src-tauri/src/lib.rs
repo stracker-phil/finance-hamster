@@ -40,7 +40,6 @@ pub mod test_support;
 pub mod today;
 pub mod window;
 pub mod year;
-pub mod yearcheck;
 
 use std::path::PathBuf;
 

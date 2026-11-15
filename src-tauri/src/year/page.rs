@@ -100,9 +100,16 @@ pub struct YearRow {
 pub struct KennzahlView {
     pub key: String,
     pub kz: String,
+    /// The legal name, as FinanzOnline shows it.
     pub name: String,
+    /// The plain name shown while recording.
+    pub label: String,
+    /// What belongs here, as examples.
+    pub examples: Option<String>,
     /// The plain number to copy into FinanzOnline, `1228,40`.
     pub copy: String,
+    /// The same value as money, `€1,228.40`.
+    pub total: String,
     pub rows: Vec<YearRow>,
     pub note: Option<String>,
     /// None for an item others report, which never counts.

@@ -179,31 +179,17 @@ fn tax_years(db: &Db, settings: &Settings, today: NaiveDate) -> AppResult<Vec<Du
         }
     }
     for &year in &open {
-        if settings.remind_questions && crate::yearcheck::due_on(db, year, today)? {
-            let (phase, body) = if today.year() > year {
-                (
-                    "after",
-                    tr!(
-                        "The year is over: run the year check once more before closing it.",
-                        "Das Jahr ist vorbei: Mach den Jahrescheck noch einmal, bevor du es abschließt."
-                    ),
-                )
-            } else {
-                (
-                    "november",
-                    tr!(
-                        "A few quick questions about things you might forget to claim.",
-                        "Ein paar kurze Fragen zu Dingen, die du vielleicht vergisst."
-                    ),
-                )
-            };
+        if settings.remind_questions && today.year() == year && today.month() == 12 {
             out.push(due(
-                format!("yearcheck:{year}:{phase}"),
+                format!("yearend:{year}"),
                 tr!(
-                    "Year check for Tax year {year}",
-                    "Jahrescheck für das Steuerjahr {year}"
+                    "Tax year {year} ends soon",
+                    "Das Steuerjahr {year} endet bald"
                 ),
-                body,
+                tr!(
+                    "Anything bought for work this year? Add it before the year ends.",
+                    "Etwas für die Arbeit gekauft? Trag es ein, bevor das Jahr endet."
+                ),
             ));
         }
     }
@@ -259,17 +245,15 @@ mod tests {
     use std::cell::RefCell;
 
     use super::*;
-    use crate::db::Source;
-    use crate::statements::import_tests::open_with_accounts;
     use crate::subscriptions::edit::SubscriptionForm;
     use crate::subscriptions::store::{PlanRow, SubscriptionRow};
     use crate::taxyears::TaxYearRow;
-    use crate::test_support::rules::{local_millis, minimal_rules, minimal_text, rules_text, set};
+    use crate::test_support::rules::minimal_text;
     use crate::test_support::statements::demo_month;
     use crate::test_support::subscriptions::{
         add, day, form, imported, insert_rows, plan_row, subscription_row, today,
     };
-    use crate::year::tests::{insert, open_year};
+    use crate::year::tests::insert;
 
     const ORDER: DateOrder = DateOrder::DayFirst;
 
@@ -597,14 +581,14 @@ mod tests {
     fn reminders_read_in_german_when_the_language_is_german() {
         use crate::i18n::with_lang;
         use crate::settings::Language;
-        let (_dir, db) = asking_year(YearState::Open);
+        let (_dir, db) = imported(&[]);
         insert(&db, crate::taxyears::TABLE, &year_row(2025, false));
 
         let filing = with_lang(Language::De, || {
             due_with(&db, &Settings::default(), today(), "filing:")
         });
-        let check = with_lang(Language::De, || {
-            due_with(&db, &Settings::default(), day(2027, 1, 9), "yearcheck:")
+        let year_end = with_lang(Language::De, || {
+            due_with(&db, &Settings::default(), day(2026, 12, 5), "yearend:")
         });
 
         assert_eq!(
@@ -618,12 +602,12 @@ mod tests {
             }]
         );
         assert_eq!(
-            check,
+            year_end,
             vec![Due {
-                key: "yearcheck:2026:after".into(),
+                key: "yearend:2026".into(),
                 notification: notification(
-                    "Jahrescheck für das Steuerjahr 2026",
-                    "Das Jahr ist vorbei: Mach den Jahrescheck noch einmal, bevor du es abschließt."
+                    "Das Steuerjahr 2026 endet bald",
+                    "Etwas für die Arbeit gekauft? Trag es ein, bevor das Jahr endet."
                 ),
             }]
         );
@@ -652,123 +636,59 @@ mod tests {
         assert_eq!(due_with(&db, &settings, today(), "filing:"), vec![]);
     }
 
-    fn asking_rules() -> serde_json::Value {
-        let mut rules = minimal_rules(2026);
-        set(
-            &mut rules,
-            "/items/0/ask",
-            serde_json::json!({ "order": 1, "question": "Did you buy books?" }),
-        );
-        rules
-    }
-
-    fn asking_year(state: YearState) -> (tempfile::TempDir, Db) {
-        let (dir, db) = open_with_accounts();
-        insert(
-            &db,
-            crate::taxyears::TABLE,
-            &TaxYearRow {
-                state,
-                closed_at: (state == YearState::Closed).then_some(2),
-                ..TaxYearRow::new(2026, "2026 v1".into(), rules_text(&asking_rules()), 1)
-            },
-        );
-        (dir, db)
-    }
-
-    fn ran_on(db: &Db, (y, m, d): (i32, u32, u32)) {
-        crate::yearcheck::complete(db, 2026, local_millis(y, m, d), Source::Ui).unwrap();
-    }
-
     #[test]
-    fn the_year_check_is_reminded_in_november_and_december_and_again_after_the_year() {
-        let (_dir, db) = asking_year(YearState::Open);
+    fn the_year_end_reminder_is_due_during_december_of_an_open_year_only() {
+        let (_dir, db) = imported(&[]);
 
         for (on, expected) in [
-            (day(2026, 10, 31), vec![]),
-            (day(2026, 11, 1), vec!["yearcheck:2026:november"]),
-            (day(2026, 12, 31), vec!["yearcheck:2026:november"]),
-            (day(2027, 1, 1), vec!["yearcheck:2026:after"]),
+            (day(2026, 11, 30), vec![]),
+            (day(2026, 12, 1), vec!["yearend:2026"]),
+            (day(2026, 12, 31), vec!["yearend:2026"]),
+            (day(2027, 1, 1), vec![]),
         ] {
-            let dues = due_with(&db, &Settings::default(), on, "yearcheck:");
+            let dues = due_with(&db, &Settings::default(), on, "yearend:");
             assert_eq!(keys(&dues), expected, "{on}");
         }
     }
 
     #[test]
-    fn the_year_check_reminders_name_the_year_and_say_what_to_do() {
-        let (_dir, db) = asking_year(YearState::Open);
-        let settings = Settings::default();
+    fn the_year_end_reminder_names_the_year_and_says_what_to_do() {
+        let (_dir, db) = imported(&[]);
+
+        let dues = due_with(&db, &Settings::default(), day(2026, 12, 5), "yearend:");
 
         assert_eq!(
-            due_with(&db, &settings, today(), "yearcheck:"),
+            dues,
             vec![Due {
-                key: "yearcheck:2026:november".into(),
+                key: "yearend:2026".into(),
                 notification: notification(
-                    "Year check for Tax year 2026",
-                    "A few quick questions about things you might forget to claim."
-                ),
-            }]
-        );
-        assert_eq!(
-            due_with(&db, &settings, day(2027, 1, 9), "yearcheck:"),
-            vec![Due {
-                key: "yearcheck:2026:after".into(),
-                notification: notification(
-                    "Year check for Tax year 2026",
-                    "The year is over: run the year check once more before closing it."
+                    "Tax year 2026 ends soon",
+                    "Anything bought for work this year? Add it before the year ends."
                 ),
             }]
         );
     }
 
     #[test]
-    fn a_completed_run_silences_the_reminder_until_the_year_is_over() {
-        let (_dir, db) = asking_year(YearState::Open);
-        let settings = Settings::default();
-        ran_on(&db, (2026, 11, 10));
+    fn the_year_end_reminder_is_never_due_for_a_closed_year() {
+        let (_dir, db) = imported(&[]);
+        insert(&db, crate::taxyears::TABLE, &year_row(2025, true));
 
-        assert_eq!(due_with(&db, &settings, today(), "yearcheck:"), vec![]);
         assert_eq!(
-            keys(&due_with(&db, &settings, day(2027, 1, 9), "yearcheck:")),
-            ["yearcheck:2026:after"]
-        );
-
-        ran_on(&db, (2027, 1, 9));
-        assert_eq!(
-            due_with(&db, &settings, day(2027, 1, 9), "yearcheck:"),
+            due_with(&db, &Settings::default(), day(2025, 12, 5), "yearend:"),
             vec![]
         );
     }
 
     #[test]
-    fn year_check_reminders_can_be_turned_off() {
-        let (_dir, db) = asking_year(YearState::Open);
+    fn the_year_end_reminder_can_be_turned_off() {
+        let (_dir, db) = imported(&[]);
         let settings = settings_with(|s| s.remind_questions = false);
 
-        for on in [today(), day(2027, 1, 9)] {
-            assert_eq!(due_with(&db, &settings, on, "yearcheck:"), vec![], "{on}");
-        }
-    }
-
-    #[test]
-    fn a_closed_year_and_a_ruleset_without_ask_are_never_reminded() {
-        let (_closed_dir, closed) = asking_year(YearState::Closed);
-        let (_plain_dir, plain) = open_year();
-
-        for on in [today(), day(2027, 1, 9)] {
-            let settings = Settings::default();
-            assert_eq!(
-                due_with(&closed, &settings, on, "yearcheck:"),
-                vec![],
-                "closed {on}"
-            );
-            assert_eq!(
-                due_with(&plain, &settings, on, "yearcheck:"),
-                vec![],
-                "plain {on}"
-            );
-        }
+        assert_eq!(
+            due_with(&db, &settings, day(2026, 12, 5), "yearend:"),
+            vec![]
+        );
     }
 
     #[test]

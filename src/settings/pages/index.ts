@@ -109,7 +109,7 @@ export const SETTINGS_PAGES: SettingsPage[] = [
         row("import-after", (s) => s.reminders.importAfter, ["statement", "overdue", "kontoauszug"]),
         row("gaps", (s) => s.reminders.gaps, ["statement", "missing", "lücke"]),
         row("filing", (s) => s.reminders.filing, ["tax year", "march", "close", "steuerjahr", "märz"]),
-        row("year-check", (s) => s.reminders.yearCheck, ["november", "questions", "year check", "fragen"]),
+        row("year-end", (s) => s.reminders.yearEnd, ["december", "dezember", "year end", "jahresende"]),
       ],
     },
     { group: app, label: (s) => s.reminders.label, intro: (s) => s.reminders.intro },
@@ -153,7 +153,6 @@ export const SETTINGS_PAGES: SettingsPage[] = [
       rows: [
         row("commands", (s) => s.shortcuts.everyWindow, ["commands", "keys", "rebind", "keyboard", "reassign", "befehle", "tasten"]),
         row("review-keys", (s) => s.shortcuts.reviewPage, ["review keys", "anv", "skip"]),
-        row("year-check-keys", (s) => s.shortcuts.yearCheckPage, ["yes", "no", "later", "ja", "nein", "später"]),
       ],
     },
     { group: app, label: (s) => s.shortcuts.label, intro: (s) => s.shortcuts.intro },

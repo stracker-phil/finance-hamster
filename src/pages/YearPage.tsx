@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { Car, Copy, Euro, FileText, Landmark, ListChecks, Trash2 } from "lucide-react";
+import { Car, Copy, Euro, FileText, Landmark, Trash2 } from "lucide-react";
 import { api, type AttentionKind, type AttentionView, type KennzahlView, type MonthView, type QuestionView, type YearRow } from "../api";
 import { attachInvoiceTo, startAddDocument } from "../documents/addFlow";
 import { copyText } from "../lib/clipboard";
 import { showError } from "../lib/undoToast";
 import { useYearPage } from "../queries/year";
-import { useYearCheck } from "../queries/yearCheck";
 import { useStore } from "../state/store";
 import { AddButton, AddEntry } from "../year/AddEntry";
 import { YearMenu } from "../year/YearMenu";
@@ -88,8 +87,30 @@ function Row({ row, year, withAmount, open }: { row: YearRow; year: number; with
   );
 }
 
-function Kennzahl({ item, year, open }: { item: KennzahlView; year: number; open: boolean }) {
+/** One category while recording: its plain name and examples, its entries and "+ Add"; no Kennzahl. */
+function Category({ item, year, open }: { item: KennzahlView; year: number; open: boolean }) {
   const [adding, setAdding] = useState(false);
+  const empty = item.rows.length === 0;
+  return (
+    <section className={empty ? "kennzahl kennzahl--empty" : "kennzahl"} aria-label={item.label}>
+      <div className="kennzahl__head">
+        <span className="kennzahl__name category__text">
+          {item.label}
+          {item.examples && <span className="add-doc__hint category__examples">{item.examples}</span>}
+        </span>
+        {open && <AddButton item={item} adding={adding} onToggle={() => setAdding((a) => !a)} />}
+        {!empty && <span className="year-row__amount">{item.total}</span>}
+      </div>
+      {item.rows.map((row) => (
+        <Row key={row.id} row={row} year={year} withAmount={item.rows.length > 1} open={open} />
+      ))}
+      {open && adding && <AddEntry year={year} item={item} onDone={() => setAdding(false)} />}
+    </section>
+  );
+}
+
+/** One Kennzahl as FinanzOnline wants it: number, legal name, the value to copy and what the tax office does with it. */
+function Kennzahl({ item, year }: { item: KennzahlView; year: number }) {
   const text = useT().pages.year;
   const copy = () =>
     copyText(item.copy)
@@ -100,7 +121,6 @@ function Kennzahl({ item, year, open }: { item: KennzahlView; year: number; open
       <div className="kennzahl__head">
         <span className="mono kennzahl__kz">KZ {item.kz}</span>
         <span className="kennzahl__name">{item.name}</span>
-        {open && <AddButton item={item} adding={adding} onToggle={() => setAdding((a) => !a)} />}
         {item.reported ? (
           <span className="pill">{text.notCounted}</span>
         ) : (
@@ -111,9 +131,8 @@ function Kennzahl({ item, year, open }: { item: KennzahlView; year: number; open
         )}
       </div>
       {item.rows.map((row) => (
-        <Row key={row.id} row={row} year={year} withAmount={item.rows.length > 1} open={open} />
+        <Row key={row.id} row={row} year={year} withAmount={item.rows.length > 1} open={false} />
       ))}
-      {open && adding && <AddEntry year={year} item={item} onDone={() => setAdding(false)} />}
       {item.note && <div className="kennzahl__note">{item.note}</div>}
     </section>
   );
@@ -204,42 +223,44 @@ function MonthList({ year, months, open }: { year: number; months: MonthView[]; 
   );
 }
 
-/** "Year check: last run …" with its button, on an open year. */
-function CheckLine({ year }: { year: number }) {
-  const { data } = useYearCheck(year);
-  const navigate = useStore((s) => s.navigate);
+/** The Kennzahlen with something to enter, in number order. */
+function FinanzOnline({ year, items, pauschaleNote }: { year: number; items: KennzahlView[]; pauschaleNote: string | null }) {
   const text = useT().pages.year;
-  if (!data?.open) return null;
+  const shown = items.filter((i) => i.rows.length > 0).sort((a, b) => parseInt(a.kz, 10) - parseInt(b.kz, 10));
   return (
-    <div className="check-line">
-      <ListChecks size={15} />
-      <span>{data.line}</span>
-      <button className="btn btn--small" onClick={() => navigate({ page: "yearCheck", year })}>
-        {text.startCheck}
-      </button>
-    </div>
+    <>
+      {pauschaleNote && <p className="add-doc__hint year-pauschale">{pauschaleNote}</p>}
+      {shown.length === 0 ? <p className="add-doc__hint">{text.nothingToEnter(year)}</p> : shown.map((item) => <Kennzahl key={item.key} item={item} year={year} />)}
+    </>
   );
 }
 
+type View = "categories" | "months" | "finanzonline";
+
 export function YearPage({ year, attention }: { year: number; attention?: AttentionKind }) {
   const filter = useStore((s) => s.filter);
-  const [view, setView] = useState<"kennzahl" | "month">("kennzahl");
+  const [chosen, setChosen] = useState<View | null>(null);
   const { data, isError } = useYearPage(year, filter);
   const text = useT().pages.year;
   if (isError) return <EmptyPage title={text.missingTitle(year)} text={text.missingText} />;
   if (!data) return null;
   const open = data.state === "open";
+  const view = chosen ?? (open ? "categories" : "finanzonline");
+  const views: { value: View; label: string }[] = [
+    { value: "categories", label: text.categories },
+    { value: "months", label: text.months },
+    { value: "finanzonline", label: text.finanzOnline },
+  ];
   return (
     <div className="page-scroll">
       <div className="year-page">
         <div className="year-hero">
           <div className="year-hero__main">
             <div className="add-doc__hint">
-              {text.totalFor(data.year, data.ruleset)}
+              {view === "finanzonline" ? text.totalFor(data.year, data.ruleset) : text.workCosts(data.year)}
               {!open && <span>{text.closed}</span>}
             </div>
             <div className="year-hero__total">{data.total}</div>
-            {data.pauschaleNote && <div className="add-doc__hint">{data.pauschaleNote}</div>}
           </div>
           <div className="year-hero__progress">
             <div className="year-bar">
@@ -250,11 +271,9 @@ export function YearPage({ year, attention }: { year: number; attention?: Attent
           <YearMenu year={data.year} archived={data.archived} closed={!open} />
         </div>
 
-        {open && <CheckLine year={data.year} />}
-
         {open && data.questions.length > 0 && (
-          <section aria-label={text.questionsFor(data.year)}>
-            <h3 className="year-heading">{text.questionsFor(data.year)}</h3>
+          <section aria-label={text.yourYear}>
+            <h3 className="year-heading">{text.yourYear}</h3>
             {data.questions.map((q) => (
               <QuestionRow key={q.id} year={data.year} question={q} />
             ))}
@@ -264,19 +283,16 @@ export function YearPage({ year, attention }: { year: number; attention?: Attent
         <AttentionList key={attention ?? "all"} year={data.year} items={data.attention} focus={attention} />
 
         <div className="year-switch" role="group" aria-label={text.show}>
-          <button className="seg-btn" aria-pressed={view === "kennzahl"} onClick={() => setView("kennzahl")}>
-            {text.byKennzahl}
-          </button>
-          <button className="seg-btn" aria-pressed={view === "month"} onClick={() => setView("month")}>
-            {text.byMonth}
-          </button>
+          {views.map((v) => (
+            <button key={v.value} className="seg-btn" aria-pressed={view === v.value} onClick={() => setChosen(v.value)}>
+              {v.label}
+            </button>
+          ))}
         </div>
 
-        {view === "kennzahl" ? (
-          data.kennzahlen.map((item) => <Kennzahl key={item.key} item={item} year={data.year} open={open} />)
-        ) : (
-          <MonthList year={data.year} months={data.months} open={open} />
-        )}
+        {view === "categories" && data.kennzahlen.map((item) => <Category key={item.key} item={item} year={data.year} open={open} />)}
+        {view === "months" && <MonthList year={data.year} months={data.months} open={open} />}
+        {view === "finanzonline" && <FinanzOnline year={data.year} items={data.kennzahlen} pauschaleNote={data.pauschaleNote} />}
       </div>
     </div>
   );

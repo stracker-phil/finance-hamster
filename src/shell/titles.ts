@@ -32,7 +32,5 @@ export function titleFor(route: Route): HeaderTitle {
       return { title: text.log, sub: text.logSub, crumb: { label: text.taxYear(route.year), to: { page: "year", year: route.year } } };
     case "archive":
       return { title: text.archive, crumb: { label: text.taxYear(route.year), to: { page: "year", year: route.year } } };
-    case "yearCheck":
-      return { title: text.yearCheck, crumb: { label: text.taxYear(route.year), to: { page: "year", year: route.year } } };
   }
 }

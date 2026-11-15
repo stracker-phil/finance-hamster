@@ -116,7 +116,10 @@ pub fn kennzahlen(
                 key: item.key.clone(),
                 kz: item.kz.clone(),
                 name: item.display_name().to_string(),
+                label: item.display_label().to_string(),
+                examples: item.display_examples().map(str::to_string),
                 copy: copy_value(total),
+                total: eur(total, format),
                 note: if is_countable(item) {
                     (!own.is_empty())
                         .then(|| notes::note(item, &ruleset.questions, given, total, format))

@@ -14,8 +14,7 @@
 .today-dot--review { background: var(--accent-blue); }
 .today-dot--attach { background: var(--warning); }
 .today-dot--import { background: var(--warning-text); }
-.today-dot--questions,
-.today-dot--check { background: var(--accent-purple); }
+.today-dot--questions { background: var(--accent-purple); }
 .today-dot--draft { background: var(--text-muted); }
 .today__columns { display: flex; align-items: flex-start; gap: 48px; margin-top: 48px; }
 .today__upcoming { flex: 1.3; min-width: 0; }

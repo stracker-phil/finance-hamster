@@ -18,8 +18,6 @@ function go(target: StepTarget) {
       return startImport();
     case "document":
       return navigate({ page: "document", documentId: target.id, year: target.year });
-    case "yearCheck":
-      return navigate({ page: "yearCheck", year: target.year });
   }
 }
 

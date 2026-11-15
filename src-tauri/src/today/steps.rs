@@ -1,13 +1,10 @@
 //! The Today steps, one builder per kind of open work; `today_view` orders them.
 
-use chrono::NaiveDate;
-
 use super::{Step, StepTarget, last_statement_end};
 use crate::accounts;
 use crate::date::{self, DateOrder};
 use crate::db::Db;
 use crate::error::AppResult;
-use crate::settings::NumberFormat;
 use crate::statements::view::{AccountState, Coverage};
 use crate::year::page::{AttentionKind, YearPage};
 use crate::{tr, tr_plural};
@@ -204,50 +201,18 @@ pub(super) fn questions_step(page: &YearPage) -> Option<Step> {
         ),
         detail: open.join(" · "),
         line: tr!(
-            "Numbers from your year, such as the Lohnzettel. They decide what the tax office accepts.",
-            "Zahlen aus deinem Jahr, etwa vom Lohnzettel. Sie entscheiden, was das Finanzamt anerkennt."
+            "Numbers from your payslip (Lohnzettel). Hamster works out what they change.",
+            "Zahlen von deinem Lohnzettel. Hamster rechnet aus, was sie ändern."
         ),
-        button: tr!("Answer in Tax Year {year}", "Im Steuerjahr {year} beantworten"),
+        button: tr!(
+            "Answer in Tax Year {year}",
+            "Im Steuerjahr {year} beantworten"
+        ),
         target: StepTarget::Year {
             year,
             attention: None,
         },
     })
-}
-
-pub(super) fn year_check_step(
-    db: &Db,
-    today: NaiveDate,
-    number: NumberFormat,
-    order: DateOrder,
-) -> AppResult<Option<Step>> {
-    let Some(&year) = crate::yearcheck::due_years(db, today)?.first() else {
-        return Ok(None);
-    };
-    let view = crate::yearcheck::view(db, year, today, number, order)?;
-    let count = view.questions.len();
-    let run = view.last_run.map_or_else(
-        || tr!("Not run yet", "Noch nicht gelaufen"),
-        |d| tr!("Last run {d}", "Zuletzt am {d}"),
-    );
-    let questions = tr_plural!(
-        count,
-        "{count} quick question",
-        "{count} quick questions",
-        "{count} kurze Frage",
-        "{count} kurze Fragen"
-    );
-    Ok(Some(Step {
-        key: "check".into(),
-        title: tr!("Year check for {year}", "Jahrescheck für {year}"),
-        detail: format!("{run} · {questions}"),
-        line: tr!(
-            "Things you might forget to claim. Most are a quick No.",
-            "Dinge, die du vielleicht vergisst. Meist ein schnelles Nein."
-        ),
-        button: tr!("Start Year Check", "Jahrescheck starten"),
-        target: StepTarget::YearCheck { year },
-    }))
 }
 
 pub(super) fn draft_step(page: &YearPage) -> Option<Step> {

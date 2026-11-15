@@ -37,7 +37,6 @@ describe("TodayPage", () => {
       ["the tax year", step({ button: "Open tax year", target: { kind: "year", year: 2026, attention: null } }), { page: "year", year: 2026 }],
       ["the missing invoices of the tax year", step({ button: "Attach invoices", target: { kind: "year", year: 2026, attention: "missing_invoice" } }), { page: "year", year: 2026, attention: "missing_invoice" }],
       ["a document", step({ button: "Attach PDF", target: { kind: "document", id: "doc-7", year: 2026 } }), { page: "document", documentId: "doc-7", year: 2026 }],
-      ["the year check", step({ button: "Start year check", target: { kind: "yearCheck", year: 2026 } }), { page: "yearCheck", year: 2026 }],
     ])("sends the button to %s", async (_name, next, route) => {
       mocked.todayView.mockResolvedValue(todayView({ next }));
       renderWithQuery(<TodayPage />);

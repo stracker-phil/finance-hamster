@@ -45,8 +45,6 @@ describe("SETTINGS_PAGES", () => {
     ["On the Review page", "shortcuts/review-keys"],
     ["Review keys", "shortcuts/review-keys"],
     ["skip", "shortcuts/review-keys"],
-    ["On the Year Check page", "shortcuts/year-check-keys"],
-    ["later", "shortcuts/year-check-keys"],
     ["Data folder", "about/about-data-folder"],
     ["finder", "about/about-data-folder"],
     ["Log folder", "about/about-log-folder"],
@@ -66,9 +64,15 @@ describe("SETTINGS_PAGES", () => {
     ["overdue", "reminders/import-after"],
     ["gaps", "reminders/gaps"],
     ["Filing reminder", "reminders/filing"],
-    ["november", "reminders/year-check"],
+    ["Before the year ends", "reminders/year-end"],
+    ["december", "reminders/year-end"],
+    ["Jahresende", "reminders/year-end"],
   ])("finds the Reminders row for %s", (query, hit) => {
     expect(found(query)).toContain(hit);
+  });
+
+  it("finds no year check row any more", () => {
+    expect(found("year check").filter((hit) => hit.includes("year-check"))).toEqual([]);
   });
 
   it.each(["sprache", "deutsch", "german", "englisch"])("finds the Appearance language row for %s", (query) => {

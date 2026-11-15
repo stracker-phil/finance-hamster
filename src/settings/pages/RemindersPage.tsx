@@ -59,9 +59,9 @@ export function RemindersPage() {
           onChange={(remindFiling) => mutate({ remindFiling })}
         />
         <Switch
-          label={text.yearCheck}
-          description={text.yearCheckDescription}
-          anchor="year-check"
+          label={text.yearEnd}
+          description={text.yearEndDescription}
+          anchor="year-end"
           checked={settings?.remindQuestions ?? true}
           onChange={(remindQuestions) => mutate({ remindQuestions })}
         />

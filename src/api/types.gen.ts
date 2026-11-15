@@ -136,24 +136,6 @@ export type ChargeView = { id: string,
  */
 date: string, account: string, amount: string, };
 
-export type CheckQuestion = { 
-/**
- * The item key or the question id.
- */
-key: string, 
-/**
- * The item's Kennzahl, `721`; None for a question to answer with a number.
- */
-kz: string | null, question: string, hint: string | null, 
-/**
- * What Yes opens; None for a number question.
- */
-add: AddKind | null, unit: string | null, 
-/**
- * A number question's answer as the tax year page shows it; empty while unanswered.
- */
-value: string, };
-
 export type CloseCheck = { 
 /**
  * What has to be done first: drafts, undated documents.
@@ -417,11 +399,27 @@ label: string, kz: string, };
  */
 export type JsonPreview = { problems: Array<string>, changes: Array<string>, };
 
-export type KennzahlView = { key: string, kz: string, name: string, 
+export type KennzahlView = { key: string, kz: string, 
+/**
+ * The legal name, as FinanzOnline shows it.
+ */
+name: string, 
+/**
+ * The plain name shown while recording.
+ */
+label: string, 
+/**
+ * What belongs here, as examples.
+ */
+examples: string | null, 
 /**
  * The plain number to copy into FinanzOnline, `1228,40`.
  */
-copy: string, rows: Array<YearRow>, note: string | null, 
+copy: string, 
+/**
+ * The same value as money, `€1,228.40`.
+ */
+total: string, rows: Array<YearRow>, note: string | null, 
 /**
  * None for an item others report, which never counts.
  */
@@ -743,7 +741,7 @@ remindGaps: boolean,
  */
 remindFiling: boolean, 
 /**
- * The year check, from 1 November and again after 31 Dec until a run (named for its first use).
+ * In December, a look at the open tax year before it ends (named for its first use, the year check).
  */
 remindQuestions: boolean, };
 
@@ -824,7 +822,7 @@ line: string, button: string, target: StepTarget, };
 /**
  * Where a step's button leads.
  */
-export type StepTarget = { "kind": "review" } | { "kind": "year", year: number, attention: AttentionKind | null, } | { "kind": "import" } | { "kind": "document", id: string, year: number, } | { "kind": "yearCheck", year: number, };
+export type StepTarget = { "kind": "review" } | { "kind": "year", year: number, attention: AttentionKind | null, } | { "kind": "import" } | { "kind": "document", id: string, year: number, };
 
 export type SubscriptionDetail = { id: string, name: string, letter: string, tone: number, interval: string, 
 /**
@@ -987,28 +985,6 @@ detail: string, defaultItemKey: string | null,
 unused: boolean, };
 
 export type VendorsView = { vendors: Array<VendorView>, items: Array<ItemOption>, };
-
-export type YearCheckView = { year: number, open: boolean, 
-/**
- * In the order a run asks them.
- */
-questions: Array<CheckQuestion>, 
-/**
- * `14 Nov 2026`; None before the first completed run.
- */
-lastRun: string | null, 
-/**
- * 31 Dec of the year has passed.
- */
-yearOver: boolean, 
-/**
- * `Year check: last run 2 Jun 2026 · run it again after 31 Dec`, for the tax year page.
- */
-line: string, 
-/**
- * What Close Year asks first; None when a run after 31 Dec is done or there is nothing to ask.
- */
-closePrompt: string | null, };
 
 export type YearPage = { year: number, ruleset: string, state: YearState, 
 /**

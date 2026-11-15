@@ -66,15 +66,12 @@ describe("ShortcutsPage", () => {
     expect(screen.queryByRole("button", { name: "Shortcut for Skip" })).toBeNull();
   });
 
-  it("lists the Year Check page's single keys as read-only", async () => {
+  it("lists no Year Check page keys any more", async () => {
     renderWithQuery(<ShortcutsPage />);
+    await screen.findByRole("heading", { name: "On the Review page" });
 
-    expect(await screen.findByRole("heading", { name: "On the Year Check page" })).toBeTruthy();
-    expect(screen.getByText("Yes / No / Later")).toBeTruthy();
-    expect(screen.getByText(/^Y\s+N\s+L$/)).toBeTruthy();
-    expect(screen.getByText("Previous / Next question")).toBeTruthy();
-    expect(screen.getByText(/^↑\s+↓$/)).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Shortcut for Yes / No / Later" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "On the Year Check page" })).toBeNull();
+    expect(screen.queryByText("Yes / No / Later")).toBeNull();
   });
 
   describe("search", () => {

@@ -21,7 +21,7 @@ support. To build it or port it, point a coding agent at [AGENTS.md](AGENTS.md).
 ## What it does
 
 - **Today:** the single most useful next step with one button (review new lines, attach invoices, import an
-  overdue or missing statement, run the year check, finish drafts), the rest as quiet rows, the next charges
+  overdue or missing statement, answer the year's numbers, finish drafts), the rest as quiet rows, the next charges
   and the tax year so far.
 - **Statements:** drop a PDF anywhere in the window and the account is found by its IBAN. Nothing is stored
   until the balances add up. A coverage bar per account shows each month as imported, partly imported or
@@ -35,9 +35,10 @@ support. To build it or port it, point a coding agent at [AGENTS.md](AGENTS.md).
   charge per period, so a second charge the next day isn't mistaken for it.
 - **Documents:** drop an invoice PDF and Hamster reads the vendor, amount and date, and finds the bank line
   that paid it. Finished documents are locked; deleting one needs a reason and is logged.
-- **The tax year:** one copy value per Kennzahl with the documents, amounts and trips behind it, rules built into
-  the app for each year (kept up to date, changeable in Settings, frozen with a closed year), and a year check in November that
-  asks about the deductions people forget.
+- **The tax year:** expenses recorded in plain categories with examples ("Computer, phone & software"), the
+  home office days as one number, and a FinanzOnline view that turns them into one copy value per Kennzahl and
+  works out what the tax office makes of them. The rules are built into the app for each year (kept up to date,
+  changeable in Settings, frozen with a closed year).
 - **Keyboard first:** ⌘K finds anything and runs any command, every action has a menu item and a shortcut, and
   the `hamster` command line drives the running app.
 

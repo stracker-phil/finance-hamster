@@ -711,6 +711,124 @@ fn a_large_total_is_copied_with_a_decimal_comma_and_no_grouping() {
 }
 
 #[test]
+fn a_kennzahl_carries_the_plain_label_the_examples_and_the_total_as_money() {
+    let mut labelled = rules();
+    set(&mut labelled, "/items/0/label", json!("Reading"));
+    set(&mut labelled, "/items/0/examples", json!("Books, e-books"));
+    let (_dir, db) = open_year_with(&labelled);
+    finished(&db, "doc-big", "books", "2026-03-03", 122_840, 100);
+
+    let page = year_page(&db);
+
+    let books = &page.kennzahlen[0];
+    assert_eq!(books.name, "Books");
+    assert_eq!(books.label, "Reading");
+    assert_eq!(books.examples.as_deref(), Some("Books, e-books"));
+    assert_eq!(books.copy, "1228,40");
+    assert_eq!(books.total, "€1,228.40");
+}
+
+#[test]
+fn a_kennzahl_without_a_label_shows_its_name_and_without_examples_none() {
+    let (_dir, db) = counted_entries();
+
+    let page = year_page(&db);
+
+    let shown: Vec<(&str, &str, Option<&str>, &str)> = page
+        .kennzahlen
+        .iter()
+        .map(|k| {
+            (
+                k.name.as_str(),
+                k.label.as_str(),
+                k.examples.as_deref(),
+                k.total.as_str(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        shown,
+        [
+            ("Books", "Books", None, "€46.90"),
+            ("Phone", "Phone", None, "€72.00"),
+            ("Tips", "Tips", None, "€40.00"),
+            ("Parking", "Parking", None, "€25.00"),
+            ("Employer", "Employer", None, "€0.00")
+        ]
+    );
+}
+
+#[test]
+fn an_old_ask_hint_stands_in_for_missing_examples_and_examples_win_when_present() {
+    let mut older = rules();
+    set(
+        &mut older,
+        "/items/0/ask",
+        json!({ "order": 1, "question": "Did you buy books?", "hint": "Novels, manuals" }),
+    );
+    set(
+        &mut older,
+        "/items/1/ask",
+        json!({ "order": 2, "question": "Did you buy a phone?", "hint": "Old hint" }),
+    );
+    set(&mut older, "/items/1/examples", json!("Phone, case"));
+    let (_dir, db) = open_year_with(&older);
+
+    let page = year_page(&db);
+
+    assert_eq!(
+        page.kennzahlen[0].examples.as_deref(),
+        Some("Novels, manuals")
+    );
+    assert_eq!(page.kennzahlen[1].examples.as_deref(), Some("Phone, case"));
+}
+
+#[test]
+fn a_kennzahl_reads_its_label_examples_and_hint_in_german_when_the_language_is_german() {
+    let mut german = rules();
+    set(&mut german, "/items/0/label", json!("Reading"));
+    set(&mut german, "/items/0/examples", json!("Books"));
+    set(
+        &mut german,
+        "/items/0/de",
+        json!({ "name": "Bücher", "label": "Lesen", "examples": "Bücher, E-Books" }),
+    );
+    set(
+        &mut german,
+        "/items/1/ask",
+        json!({
+            "order": 1, "question": "Did you buy a phone?", "hint": "Phone",
+            "de": { "hint": "Handy, Hülle" }
+        }),
+    );
+    let (_dir, db) = open_year_with(&german);
+
+    let page = crate::i18n::with_lang(crate::settings::Language::De, || year_page(&db));
+
+    let books = &page.kennzahlen[0];
+    assert_eq!(
+        (
+            books.name.as_str(),
+            books.label.as_str(),
+            books.examples.as_deref()
+        ),
+        ("Bücher", "Lesen", Some("Bücher, E-Books"))
+    );
+    assert_eq!(page.kennzahlen[1].examples.as_deref(), Some("Handy, Hülle"));
+}
+
+#[test]
+fn a_kennzahl_serializes_its_label_examples_and_total_in_camel_case() {
+    let (_dir, db) = open_year();
+
+    let value = serde_json::to_value(&year_page(&db).kennzahlen[0]).unwrap();
+
+    assert_eq!(value["label"], json!("Books"));
+    assert_eq!(value["examples"], json!(null));
+    assert_eq!(value["total"], json!("€0.00"));
+}
+
+#[test]
 fn a_kennzahl_has_a_note_only_when_it_has_rows() {
     let (_dir, db) = counted_entries();
 

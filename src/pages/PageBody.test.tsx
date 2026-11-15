@@ -77,7 +77,7 @@ describe("PageBody", () => {
     renderWithQuery(<PageBody route={{ page: "year", year: 2026 }} />);
 
     expect(await screen.findByText("€1,228.40")).toBeTruthy();
-    expect(screen.getByText("Total to enter for 2026 · ruleset 2026 v1")).toBeTruthy();
+    expect(screen.getByText("Work costs 2026")).toBeTruthy();
   });
 
   it("shows the Archive of the year on the archive route", async () => {

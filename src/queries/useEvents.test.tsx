@@ -13,8 +13,7 @@ import { reviewLine, reviewQueue } from "../test/review";
 import { accountCoverage, accountLines, coverage, lineView, statementGroup } from "../test/statements";
 import { subscriptionDetail, subscriptionForm, subscriptionsView } from "../test/subscriptions";
 import { step, todayView } from "../test/today";
-import { elsewhere, yearCheckView, yearPage } from "../test/year";
-import { useYearCheck } from "./yearCheck";
+import { elsewhere, yearPage } from "../test/year";
 import { useAccounts } from "./accounts";
 import { useCommands } from "./commands";
 import { useArchive, useDeletions, useDocument, useDocumentHistory, useDocumentLineOptions, useDocuments, useVendors, useYearLog } from "./documents";
@@ -374,47 +373,25 @@ describe("useEvents", () => {
     });
   });
 
-  describe("year check", () => {
-    function YearCheckProbe() {
+  describe("today", () => {
+    function TodayProbe() {
       useEvents();
-      const { data: check } = useYearCheck(2026);
       const { data: today } = useToday();
-      return (
-        <>
-          <p>Check: {check?.line}</p>
-          <p>Today: {today?.next?.title ?? "nothing open"}</p>
-        </>
-      );
+      return <p>Today: {today?.next?.title ?? "nothing open"}</p>;
     }
 
-    const shown = {
-      check: ["Check: Old line", "Check: New line"],
-      today: ["Today: Old step", "Today: New step"],
-    } as const;
-
     beforeEach(() => {
-      mocked.yearCheckView.mockResolvedValue(yearCheckView({ line: "Old line" }));
       mocked.todayView.mockResolvedValue(todayView({ next: step({ title: "Old step" }) }));
     });
 
-    it.each([
-      ["year_checks", ["check", "today"]],
-      ["answers", ["check", "today"]],
-      ["tax_years", ["check", "today"]],
-      ["accounts", ["today"]],
-      ["vendors", ["today"]],
-    ] as const)("when data_changed names the %s table, refetches %j and keeps the rest", async (table, refreshed) => {
-      renderWithQuery(<YearCheckProbe />);
-      for (const [old] of Object.values(shown)) await screen.findByText(old);
-      mocked.yearCheckView.mockResolvedValue(yearCheckView({ line: "New line" }));
+    it.each(["answers", "tax_years", "accounts", "vendors"])("refetches the next step when data_changed names the %s table", async (table) => {
+      renderWithQuery(<TodayProbe />);
+      await screen.findByText("Today: Old step");
       mocked.todayView.mockResolvedValue(todayView({ next: step({ title: "New step" }) }));
 
       await emitDataChanged([table]);
 
-      for (const key of refreshed) expect(await screen.findByText(shown[key][1])).toBeTruthy();
-      for (const key of Object.keys(shown) as (keyof typeof shown)[]) {
-        if (!(refreshed as readonly string[]).includes(key)) expect(screen.getByText(shown[key][0])).toBeTruthy();
-      }
+      expect(await screen.findByText("Today: New step")).toBeTruthy();
     });
   });
 

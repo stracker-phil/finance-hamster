@@ -10,7 +10,7 @@ import { HOME } from "../state/route";
 import { useStore } from "../state/store";
 import { addPreview } from "../test/documents";
 import { renderWithQuery } from "../test/renderWithQuery";
-import { attentionView, kennzahlView, monthView, questionView, yearCheckView, yearPage, yearRow } from "../test/year";
+import { attentionView, kennzahlView, monthView, questionView, yearPage, yearRow } from "../test/year";
 import { YearPage } from "./YearPage";
 
 const mocked = vi.mocked(api, true);
@@ -23,33 +23,51 @@ const show = async (patch: Parameters<typeof yearPage>[0] = {}) => {
       <MenuHost />
     </>,
   );
-  await screen.findByText("Total to enter for 2026 · ruleset 2026 v1");
+  await screen.findByText("Draft · 1 invoice missing");
 };
+
+const showView = (name: "Categories" | "Months" | "FinanzOnline") => userEvent.click(screen.getByRole("button", { name }));
 
 beforeEach(() => {
   vi.clearAllMocks();
   useStore.setState({ route: HOME, back: [], forward: [], filter: "", toasts: [], addPreview: null, pdfCovers: 0, menu: null });
+  mocked.yearPage.mockRejectedValue({ kind: "not_found", message: "No tax year", code: null });
+  mocked.documentAddChoose.mockResolvedValue(null);
+  mocked.documentLineChoice.mockResolvedValue(null);
+  mocked.yearAnswer.mockResolvedValue(null);
+  mocked.yearEvidenceChoose.mockResolvedValue(null);
+  mocked.yearEntryAdd.mockResolvedValue("Add entry");
+  mocked.yearEntryDelete.mockResolvedValue("Delete entry");
+  mocked.yearEntryAttach.mockResolvedValue("Attach PDF");
+  mocked.yearExportSummary.mockResolvedValue(false);
+  mocked.yearCloseCheck.mockResolvedValue({ blockers: [], warnings: [] });
 });
 
 describe("YearPage", () => {
   describe("hero", () => {
-    it("shows the total, the ruleset and the progress", async () => {
+    it("shows the total and the progress", async () => {
       await show();
 
       expect(screen.getByText("€1,228.40")).toBeTruthy();
       expect(screen.getByText("Draft · 1 invoice missing")).toBeTruthy();
     });
 
-    it("shows the Pauschale note only when the year has one", async () => {
-      await show({ pauschaleNote: "Below the Werbungskostenpauschale of €132" });
-
-      expect(screen.getByText("Below the Werbungskostenpauschale of €132")).toBeTruthy();
-    });
-
-    it("shows no Pauschale note otherwise", async () => {
+    it.each(["Categories", "Months"] as const)("labels the total as work costs in the %s view", async (view) => {
       await show();
 
-      expect(screen.queryByText(/Pauschale/)).toBeNull();
+      await showView(view);
+
+      expect(screen.getByText("Work costs 2026")).toBeTruthy();
+      expect(screen.queryByText(/Total to enter in FinanzOnline/)).toBeNull();
+    });
+
+    it("labels the total with the year and ruleset in the FinanzOnline view", async () => {
+      await show();
+
+      await showView("FinanzOnline");
+
+      expect(screen.getByText("Total to enter in FinanzOnline for 2026 · rules 2026 v1")).toBeTruthy();
+      expect(screen.queryByText("Work costs 2026")).toBeNull();
     });
 
     it("says there is no tax year when its page cannot be read", async () => {
@@ -73,7 +91,7 @@ describe("YearPage", () => {
     it("shows each question with its help, unit and the answer prefilled", async () => {
       await show({ questions: [questionView({ value: "42", answered: true })] });
 
-      const section = screen.getByRole("region", { name: "Questions for 2026" });
+      const section = screen.getByRole("region", { name: "Your year" });
       expect(within(section).getByText("Count whole days")).toBeTruthy();
       expect(within(section).getByText("days")).toBeTruthy();
       expect(within(section).getByRole<HTMLInputElement>("textbox", { name: "Days worked from home" }).value).toBe("42");
@@ -82,7 +100,7 @@ describe("YearPage", () => {
     it("hides the questions of a closed year", async () => {
       await show({ state: "closed", questions: [questionView()] });
 
-      expect(screen.queryByRole("region", { name: "Questions for 2026" })).toBeNull();
+      expect(screen.queryByRole("region", { name: "Your year" })).toBeNull();
     });
 
     it("saves the typed answer on blur", async () => {
@@ -210,7 +228,7 @@ describe("YearPage", () => {
         Element.prototype.scrollIntoView = vi.fn();
         mocked.yearPage.mockResolvedValue(yearPage({ attention }));
         renderWithQuery(<YearPage year={2026} attention={kind} />);
-        await screen.findByText("Total to enter for 2026 · ruleset 2026 v1");
+        await screen.findByText("Draft · 1 invoice missing");
       };
 
       it.each([
@@ -254,16 +272,169 @@ describe("YearPage", () => {
     });
   });
 
-  describe("by Kennzahl", () => {
-    it("is the default view", async () => {
+  describe("views", () => {
+    const pressed = (name: string) => screen.getByRole("button", { name }).getAttribute("aria-pressed");
+
+    it("starts an open year on Categories", async () => {
       await show();
 
-      expect(screen.getByRole("button", { name: "By Kennzahl" }).getAttribute("aria-pressed")).toBe("true");
+      expect(pressed("Categories")).toBe("true");
+      expect(pressed("Months")).toBe("false");
+      expect(pressed("FinanzOnline")).toBe("false");
+    });
+
+    it("starts a closed year on FinanzOnline", async () => {
+      await show({ state: "closed" });
+
+      expect(pressed("FinanzOnline")).toBe("true");
+      expect(pressed("Categories")).toBe("false");
       expect(screen.getByRole("region", { name: "KZ 720 Fachliteratur" })).toBeTruthy();
     });
 
-    it("copies a Kennzahl's plain number and says so", async () => {
+    it("switches to the chosen view", async () => {
       await show();
+
+      await showView("Months");
+
+      expect(pressed("Months")).toBe("true");
+    });
+  });
+
+  describe("Categories", () => {
+    it("lists each category by its plain label with its examples and total, and no Kennzahl", async () => {
+      await show();
+
+      const category = within(screen.getByRole("region", { name: "Work books" }));
+      expect(category.getByText("Books, journals")).toBeTruthy();
+      expect(category.getByText("€1,000.00")).toBeTruthy();
+      expect(screen.queryByText(/KZ 720/)).toBeNull();
+      expect(screen.queryByText("Fachliteratur")).toBeNull();
+      expect(screen.queryByRole("button", { name: /^Copy / })).toBeNull();
+    });
+
+    it("lists a category without entries with its examples, no total and its add button", async () => {
+      await show({ kennzahlen: [kennzahlView({ rows: [], total: "€0.00", add: "amount" })] });
+
+      const category = within(screen.getByRole("region", { name: "Work books" }));
+      expect(category.getByText("Books, journals")).toBeTruthy();
+      expect(category.queryByText("€0.00")).toBeNull();
+      expect(category.getByRole("button", { name: "+ Amount" })).toBeTruthy();
+    });
+
+    it("shows no examples hint for a category that has none", async () => {
+      await show({ kennzahlen: [kennzahlView({ examples: null })] });
+
+      expect(within(screen.getByRole("region", { name: "Work books" })).queryByText("Books, journals")).toBeNull();
+    });
+
+    it("shows no note", async () => {
+      await show({ kennzahlen: [kennzahlView({ note: "Estimated from 3 documents" })] });
+
+      expect(screen.queryByText("Estimated from 3 documents")).toBeNull();
+    });
+
+    it("keeps the data's order", async () => {
+      await show({
+        kennzahlen: [
+          kennzahlView({ key: "b", kz: "724", label: "Other costs" }),
+          kennzahlView({ key: "a", kz: "720", label: "Work books" }),
+        ],
+      });
+
+      expect(screen.getAllByRole("region", { name: /^(Other costs|Work books)$/ }).map((r) => r.getAttribute("aria-label"))).toEqual(["Other costs", "Work books"]);
+    });
+  });
+
+  describe("FinanzOnline", () => {
+    const pauschale = "Below the Werbungskostenpauschale of €132";
+    const names = () => screen.getAllByRole("region", { name: /^KZ / }).map((r) => r.getAttribute("aria-label"));
+
+    it("lists only items with entries, in Kennzahl number order, with KZ and legal name", async () => {
+      await show({
+        state: "closed",
+        kennzahlen: [
+          kennzahlView({ key: "other", kz: "724", name: "Sonstige Werbungskosten" }),
+          kennzahlView({ key: "empty", kz: "300", name: "Leere Position", rows: [] }),
+          kennzahlView({ key: "books", kz: "720", name: "Fachliteratur" }),
+          kennzahlView({ key: "equipment", kz: "169", name: "Arbeitsmittel" }),
+        ],
+      });
+
+      expect(names()).toEqual(["KZ 169 Arbeitsmittel", "KZ 720 Fachliteratur", "KZ 724 Sonstige Werbungskosten"]);
+      expect(screen.getByText("KZ 720")).toBeTruthy();
+      expect(screen.queryByText("Leere Position")).toBeNull();
+    });
+
+    it("sorts numerically, not as text", async () => {
+      await show({ state: "closed", kennzahlen: [kennzahlView({ key: "a", kz: "1000", name: "Tausend" }), kennzahlView({ key: "b", kz: "169", name: "Hundert" })] });
+
+      expect(names()).toEqual(["KZ 169 Hundert", "KZ 1000 Tausend"]);
+    });
+
+    it("shows the legal name and no plain label or examples", async () => {
+      await show({ state: "closed" });
+
+      expect(screen.getByText("Fachliteratur")).toBeTruthy();
+      expect(screen.queryByText("Work books")).toBeNull();
+      expect(screen.queryByText("Books, journals")).toBeNull();
+    });
+
+    it("shows an item's note", async () => {
+      await show({ state: "closed", kennzahlen: [kennzahlView({ note: "About €928.40 counts" })] });
+
+      expect(screen.getByText("About €928.40 counts")).toBeTruthy();
+    });
+
+    it("shows Not counted instead of a copy button for a reported item", async () => {
+      await show({ state: "closed", kennzahlen: [kennzahlView({ reported: true })] });
+
+      expect(screen.getByText("Not counted")).toBeTruthy();
+      expect(screen.queryByRole("button", { name: /^Copy / })).toBeNull();
+    });
+
+    it("says there is nothing to enter when no item has entries", async () => {
+      await show({ state: "closed", kennzahlen: [kennzahlView({ rows: [] })] });
+
+      expect(screen.getByText("Nothing to enter for 2026 yet.")).toBeTruthy();
+      expect(screen.queryByRole("region", { name: /^KZ / })).toBeNull();
+    });
+
+    it("is reachable in an open year with the same filter and order", async () => {
+      await show({ kennzahlen: [kennzahlView({ key: "b", kz: "724", name: "Sonstige" }), kennzahlView({ key: "a", kz: "720", name: "Fachliteratur", rows: [] })] });
+
+      await showView("FinanzOnline");
+
+      expect(names()).toEqual(["KZ 724 Sonstige"]);
+    });
+
+    it("puts the Pauschale note above the items and shows it in no other view", async () => {
+      await show({ state: "closed", pauschaleNote: pauschale });
+
+      const note = screen.getByText(pauschale);
+      const firstItem = screen.getByRole("region", { name: "KZ 720 Fachliteratur" });
+      expect(note.compareDocumentPosition(firstItem) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+      await showView("Categories");
+      expect(screen.queryByText(pauschale)).toBeNull();
+      await showView("Months");
+      expect(screen.queryByText(pauschale)).toBeNull();
+    });
+
+    it("shows the Pauschale note above the empty message", async () => {
+      await show({ state: "closed", pauschaleNote: pauschale, kennzahlen: [] });
+
+      expect(screen.getByText(pauschale)).toBeTruthy();
+      expect(screen.getByText("Nothing to enter for 2026 yet.")).toBeTruthy();
+    });
+
+    it("shows no Pauschale note when the year has none", async () => {
+      await show({ state: "closed" });
+
+      expect(screen.queryByText(/Pauschale/)).toBeNull();
+    });
+
+    it("copies a Kennzahl's plain number and says so", async () => {
+      await show({ state: "closed" });
 
       await userEvent.click(screen.getByRole("button", { name: "Copy 1228,40 for KZ 720" }));
 
@@ -273,12 +444,25 @@ describe("YearPage", () => {
 
     it("reports a failed copy as an error toast", async () => {
       vi.mocked(navigator.clipboard.writeText).mockRejectedValueOnce({ kind: "io", message: "Clipboard unavailable", code: null });
-      await show();
+      await show({ state: "closed" });
 
       await userEvent.click(screen.getByRole("button", { name: "Copy 1228,40 for KZ 720" }));
 
       await vi.waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toEqual(["Clipboard unavailable"]));
     });
+
+    it("offers neither Delete, Attach PDF nor an add button on its rows", async () => {
+      await show({ kennzahlen: [kennzahlView({ add: "amount", rows: [yearRow({ id: "e1", kind: "amount", title: "Example Desk Lamp", attach: true })] })] });
+
+      await showView("FinanzOnline");
+
+      expect(screen.queryByRole("button", { name: /^Delete / })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Attach PDF…" })).toBeNull();
+      expect(screen.queryByRole("button", { name: /^\+ / })).toBeNull();
+    });
+  });
+
+  describe("rows", () => {
 
     it("shows a row's title, Draft pill and detail", async () => {
       await show({ kennzahlen: [kennzahlView({ rows: [yearRow({ draft: true })] })] });
@@ -304,20 +488,14 @@ describe("YearPage", () => {
       await show({
         kennzahlen: [
           kennzahlView({ rows: [yearRow({ id: "d1", title: "Demo Books Ltd", amount: "€13.49" })] }),
-          kennzahlView({ key: "169", kz: "169", name: "Digital work equipment", copy: "100,00", rows: [yearRow({ id: "d2", title: "Sample Laptop", amount: "€60.00" }), yearRow({ id: "d3", title: "Sample Monitor", amount: "€40.00" })] }),
+          kennzahlView({ key: "169", kz: "169", name: "Digital work equipment", label: "Work equipment", copy: "100,00", rows:[yearRow({ id: "d2", title: "Sample Laptop", amount: "€60.00" }), yearRow({ id: "d3", title: "Sample Monitor", amount: "€40.00" })] }),
         ],
       });
 
-      expect(within(screen.getByRole("region", { name: "KZ 720 Fachliteratur" })).queryByText("€13.49")).toBeNull();
-      const multi = within(screen.getByRole("region", { name: "KZ 169 Digital work equipment" }));
+      expect(within(screen.getByRole("region", { name: "Work books" })).queryByText("€13.49")).toBeNull();
+      const multi = within(screen.getByRole("region", { name: "Work equipment" }));
       expect(multi.getByText("€60.00")).toBeTruthy();
       expect(multi.getByText("€40.00")).toBeTruthy();
-    });
-
-    it("shows a Kennzahl's note", async () => {
-      await show({ kennzahlen: [kennzahlView({ note: "Estimated from 3 documents" })] });
-
-      expect(screen.getByText("Estimated from 3 documents")).toBeTruthy();
     });
 
     it("opens the document of a document row with the year", async () => {
@@ -367,15 +545,14 @@ describe("YearPage", () => {
 
       it("shows no add button in a closed year", async () => {
         await show({ state: "closed", kennzahlen: [kennzahlView({ add: "amount" })] });
+        await showView("Categories");
 
         expect(screen.queryByRole("button", { name: /^\+ / })).toBeNull();
       });
 
-      it("shows Not counted instead of the copy button and no add button for a reported item", async () => {
+      it("shows no add button for a reported item", async () => {
         await show({ kennzahlen: [kennzahlView({ add: "amount", reported: true })] });
 
-        expect(screen.getByText("Not counted")).toBeTruthy();
-        expect(screen.queryByRole("button", { name: /^Copy / })).toBeNull();
         expect(screen.queryByRole("button", { name: /^\+ / })).toBeNull();
       });
     });
@@ -559,7 +736,9 @@ describe("YearPage", () => {
 
       it("offers neither Delete nor Attach PDF in a closed year", async () => {
         await show({ state: "closed", kennzahlen: [kennzahlView({ rows: [amountRow({ attach: true }), tripRow()] })] });
+        await showView("Categories");
 
+        expect(screen.getAllByRole("button", { name: /^Example Desk Lamp|^Linz/ })).toHaveLength(2);
         expect(screen.queryByRole("button", { name: /^Delete / })).toBeNull();
         expect(screen.queryByRole("button", { name: "Attach PDF…" })).toBeNull();
       });
@@ -628,37 +807,16 @@ describe("YearPage", () => {
     });
   });
 
-  describe("year check", () => {
-    it("shows the last run line of an open year and starts the year check from its button", async () => {
-      mocked.yearCheckView.mockResolvedValue(yearCheckView({ line: "Year check: last run 2 Jun 2026 · run it again after 31 Dec" }));
-      await show();
+  describe("Months", () => {
+    const byMonth = () => showView("Months");
 
-      expect(await screen.findByText("Year check: last run 2 Jun 2026 · run it again after 31 Dec")).toBeTruthy();
-      await userEvent.click(screen.getByRole("button", { name: "Start Year Check" }));
-
-      expect(useStore.getState().route).toEqual({ page: "yearCheck", year: 2026 });
-    });
-
-    it("shows neither the line nor the button for a closed year", async () => {
-      mocked.yearCheckView.mockResolvedValue(yearCheckView({ open: false, line: "Year check: closed line" }));
-      await show({ state: "closed" });
-
-      expect(await screen.findByText(/Closed, read-only/)).toBeTruthy();
-      expect(screen.queryByText("Year check: closed line")).toBeNull();
-      expect(screen.queryByRole("button", { name: "Start Year Check" })).toBeNull();
-    });
-  });
-
-  describe("by month", () => {
-    const byMonth = () => userEvent.click(screen.getByRole("button", { name: "By month" }));
-
-    it("shows each month with its total and rows in place of the Kennzahlen", async () => {
+    it("shows each month with its total and rows in place of the categories", async () => {
       await show({ months: [monthView({ label: "November", total: "€13.49" }), monthView({ label: "Whole year", total: "€100.00", rows: [yearRow({ id: "d2", title: "Sample Laptop", amount: "€100.00" })] })] });
 
       await byMonth();
 
-      expect(screen.getByRole("button", { name: "By month" }).getAttribute("aria-pressed")).toBe("true");
-      expect(screen.queryByRole("region", { name: "KZ 720 Fachliteratur" })).toBeNull();
+      expect(screen.getByRole("button", { name: "Months" }).getAttribute("aria-pressed")).toBe("true");
+      expect(screen.queryByRole("region", { name: "Work books" })).toBeNull();
       const november = within(screen.getByRole("region", { name: "November" }));
       expect(november.getAllByText("€13.49")).toHaveLength(2);
       expect(november.getByRole("button", { name: /Demo Books Ltd/ })).toBeTruthy();
@@ -675,13 +833,13 @@ describe("YearPage", () => {
       expect(screen.getByText("Nothing counts in 2026 yet.")).toBeTruthy();
     });
 
-    it("goes back to the Kennzahlen", async () => {
+    it("goes back to the categories", async () => {
       await show();
       await byMonth();
 
-      await userEvent.click(screen.getByRole("button", { name: "By Kennzahl" }));
+      await showView("Categories");
 
-      expect(screen.getByRole("region", { name: "KZ 720 Fachliteratur" })).toBeTruthy();
+      expect(screen.getByRole("region", { name: "Work books" })).toBeTruthy();
     });
   });
 
@@ -720,7 +878,7 @@ describe("YearPage", () => {
       await show();
       await openMenu();
 
-      await userEvent.click(screen.getByText("Total to enter for 2026 · ruleset 2026 v1"));
+      await userEvent.click(screen.getByText("Work costs 2026"));
 
       expect(screen.queryByRole("menu")).toBeNull();
     });

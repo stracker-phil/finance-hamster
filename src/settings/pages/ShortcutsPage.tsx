@@ -17,14 +17,6 @@ const pageKeys = (text: Messages["settings"]["shortcuts"]) => [
       { label: text.skip, keys: "J" },
     ],
   },
-  {
-    page: text.yearCheckPage,
-    anchor: "year-check-keys",
-    keys: [
-      { label: text.yesNoLater, keys: "Y  N  L" },
-      { label: text.previousNext, keys: "↑  ↓" },
-    ],
-  },
 ];
 
 function ShortcutRow({ command }: { command: CommandInfo }) {

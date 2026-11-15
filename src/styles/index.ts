@@ -15,4 +15,3 @@ import "./documents.css";
 import "./year.css";
 import "./subscriptions.css";
 import "./today.css";
-import "./yearcheck.css";

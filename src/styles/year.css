@@ -59,3 +59,6 @@
 .close-list__item { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-secondary); }
 .close-list__item--blocker { color: var(--text); font-weight: 500; }
 .year-attention { scroll-margin-top: 24px; }
+.category__text { display: flex; flex-direction: column; gap: 2px; }
+.category__examples { font-weight: 400; }
+.year-pauschale { margin: 18px 0 0; }

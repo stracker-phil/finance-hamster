@@ -32,7 +32,7 @@ on Documents it and the big search field are one search)
 | Subscriptions | grouped by next charge (next 7 days · next 30 days · later, Ended collapsed); header: active count and cost per month; a detail panel with a 12-month plan timeline |
 | Statements | one coverage bar per account over 12 months (imported, partly, missing, before the first statement) and a status tag per account (Up to date, N to review, Statement missing, N days behind) |
 | Account | the account's lines grouped by statement, with a note where a statement is missing between two groups |
-| Tax year | hero with the copy total, ruleset version and progress; **Questions for <year>** (number fields from the rules file; empty = unanswered); Needs attention (missing invoices, drafts, undated scans); By Kennzahl: one copy value per Kennzahl with a copy button, its rows below (documents, amounts, trips, slices with a "From 2025" pill; row amounts only when a Kennzahl has several rows), one note line from estimate rules, "+ Add" (Document, Amount or Trip) in an open year, trips added inline (date, destination and purpose, km); By month: Every month, Whole year (amounts and earlier slices), then months with trips in theirs; … menu: Log, Archive, Export Summary PDF, Tax Rules… (Settings); Close Year… / Open Snapshot PDF |
+| Tax year | recording first, filing last (ADR 0052). Hero with the total and progress ("Work costs 2026"; the FinanzOnline view says "Total to enter in FinanzOnline" with the rules version); **Your year** (number fields such as Home office days; empty = unanswered); Needs attention (missing invoices, drafts, undated scans); Categories / Months / FinanzOnline. Categories (default while open): each item by its plain label with examples, its rows (documents, amounts, trips, slices with a "From 2025" pill; row amounts only when it has several rows), its total and "+ Add" (Document, Amount or Trip); no Kennzahl and no rules text. Months: Whole year (amounts and earlier slices), then each month. FinanzOnline (default once closed): the Werbungskostenpauschale note, then every Kennzahl with something to enter in number order, its legal name, a copy button, the item's note and one worked-out line from its estimate rules ("About €928.40 counts: …"); … menu: Log, Archive, Export Summary PDF, Tax Rules… (Settings); Close Year… / Open Snapshot PDF |
 | Document | the edit form (Payment → Classification with the item picker and work share → Result → Notes → More), a GWG line or the Depreciation block (cost, useful life, slices per year, frozen ones marked), PDF preview, History column; breadcrumb "Documents /" or the tax year it was opened from |
 | Documents | sidebar entry; a large "Is it already here?" field, documents by tax year plus Inbox |
 | Log, Archive | a tax year's journal entries; its excluded documents and the delete flow |
@@ -150,8 +150,7 @@ About has Show Data Folder and Open Log Folder. Shortcuts groups rows by where t
 window", then each page's fixed keys) and asks before taking a key another command holds (Reassign).
 
 ## Keys
-App actions are Rust commands with colon ids (ADR 0046); page keys (Review's A, S, I, J, the Year Check's Y,
-N, L) are fixed, printed on their buttons and never fire in text fields. Menus in Mac order; View holds window appearance only; Help holds Open Log Folder and Show Data
+App actions are Rust commands with colon ids (ADR 0046); page keys (Review's A, S, I, J) are fixed, printed on their buttons and never fire in text fields. Menus in Mac order; View holds window appearance only; Help holds Open Log Folder and Show Data
 Folder. One binding per command.
 
 ## Palette checks
