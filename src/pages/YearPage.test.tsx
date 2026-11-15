@@ -356,14 +356,14 @@ describe("YearPage", () => {
 
       expect(screen.getByRole("region", { name: "Work books" })).toBeTruthy();
       expect(screen.queryByRole("region", { name: "Union dues" })).toBeNull();
-      expect(hiddenNote(/1 category hidden/)).toBeTruthy();
+      expect(hiddenNote(/1 hidden category/)).toBeTruthy();
       expect(screen.getByRole("button", { name: "Show" })).toBeTruthy();
     });
 
     it("counts several hidden categories in the plural", async () => {
       await show({ kennzahlen: [kennzahlView(), union(), { ...union(), key: "other", label: "Other costs" }] });
 
-      expect(hiddenNote(/2 categories hidden/)).toBeTruthy();
+      expect(hiddenNote(/2 hidden categories/)).toBeTruthy();
     });
 
     it("lists the hidden categories after Show and hides them again after Hide again", async () => {
@@ -386,7 +386,7 @@ describe("YearPage", () => {
 
       await userEvent.click(screen.getByRole("button", { name: "Show" }));
 
-      const line = screen.getByText(/1 category hidden/);
+      const line = screen.getByText(/1 hidden category/);
       expect(follows(screen.getByRole("region", { name: "Work books" }), line)).toBe(true);
       expect(follows(line, screen.getByRole("region", { name: "Union dues" }))).toBe(true);
     });
@@ -406,7 +406,7 @@ describe("YearPage", () => {
 
       await userEvent.click(screen.getByRole("button", { name: "Show" }));
 
-      expect(screen.getByText(/1 category hidden/)).toBeTruthy();
+      expect(screen.getByText(/1 hidden category/)).toBeTruthy();
       expect(screen.getByRole("button", { name: "Hide again" })).toBeTruthy();
     });
 
@@ -415,7 +415,7 @@ describe("YearPage", () => {
 
       await userEvent.click(screen.getByRole("button", { name: "Show" }));
 
-      const line = screen.getByText(/1 category hidden/);
+      const line = screen.getByText(/1 hidden category/);
       expect(follows(screen.getByRole("region", { name: "Other costs" }), line)).toBe(true);
       expect(follows(line, screen.getByRole("region", { name: "Union dues" }))).toBe(true);
     });
