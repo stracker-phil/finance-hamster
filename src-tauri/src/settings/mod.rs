@@ -51,10 +51,21 @@ pub enum NumberFormat {
     CommaDecimal,
 }
 
+/// The language of the window, the menu and the notifications (ADR 0050).
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export, export_to = "src/api/types.gen.ts")]
+pub enum Language {
+    #[default]
+    En,
+    De,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, TS)]
 #[serde(default, rename_all = "camelCase")]
 #[ts(export, export_to = "src/api/types.gen.ts")]
 pub struct Settings {
+    pub language: Language,
     pub appearance: Appearance,
     pub accent: Accent,
     pub number_format: NumberFormat,
@@ -81,6 +92,7 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            language: Language::default(),
             appearance: Appearance::default(),
             accent: Accent::default(),
             number_format: NumberFormat::default(),
@@ -102,6 +114,7 @@ impl Default for Settings {
 #[serde(default, rename_all = "camelCase")]
 #[ts(export, export_to = "src/api/types.gen.ts", optional_fields)]
 pub struct SettingsPatch {
+    pub language: Option<Language>,
     pub appearance: Option<Appearance>,
     pub accent: Option<Accent>,
     pub number_format: Option<NumberFormat>,
@@ -118,6 +131,9 @@ pub struct SettingsPatch {
 
 impl Settings {
     pub fn apply(&mut self, patch: SettingsPatch) {
+        if let Some(language) = patch.language {
+            self.language = language;
+        }
         if let Some(appearance) = patch.appearance {
             self.appearance = appearance;
         }
@@ -202,6 +218,7 @@ mod tests {
         assert_eq!(
             serde_json::to_value(Settings::default()).unwrap(),
             json!({
+                "language": "en",
                 "appearance": "system",
                 "accent": "system",
                 "numberFormat": "dot_decimal",
@@ -355,6 +372,54 @@ mod tests {
         let patch: SettingsPatch =
             serde_json::from_value(json!({ "hideOwnTransfers": true })).unwrap();
         assert_eq!(patch.hide_own_transfers, Some(true));
+    }
+
+    #[test]
+    fn the_language_serializes_in_snake_case() {
+        for (language, text) in [(Language::En, "en"), (Language::De, "de")] {
+            assert_eq!(serde_json::to_value(language).unwrap(), json!(text));
+            assert_eq!(
+                serde_json::from_value::<Language>(json!(text)).unwrap(),
+                language
+            );
+        }
+    }
+
+    #[test]
+    fn the_language_can_be_patched_and_survives_reopening() {
+        let dir = temp_config_dir();
+        let updated = store_in(&dir)
+            .update(SettingsPatch {
+                language: Some(Language::De),
+                ..SettingsPatch::default()
+            })
+            .unwrap();
+        assert_eq!(updated.language, Language::De);
+        assert_eq!(store_in(&dir).get().language, Language::De);
+
+        let patch: SettingsPatch = serde_json::from_value(json!({ "language": "de" })).unwrap();
+        assert_eq!(patch.language, Some(Language::De));
+    }
+
+    #[test]
+    fn a_patch_without_language_keeps_the_chosen_language() {
+        let mut settings = Settings {
+            language: Language::De,
+            ..Settings::default()
+        };
+        settings.apply(SettingsPatch {
+            archive_days: Some(3),
+            ..SettingsPatch::default()
+        });
+        assert_eq!(settings.language, Language::De);
+    }
+
+    #[test]
+    fn an_old_settings_file_without_language_loads_english() {
+        let dir = temp_config_dir();
+        std::fs::write(dir.path().join(FILE_NAME), r#"{"appearance":"dark"}"#).unwrap();
+
+        assert_eq!(store_in(&dir).get().language, Language::En);
     }
 
     #[test]

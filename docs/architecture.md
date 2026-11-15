@@ -91,9 +91,10 @@ Rust (`src-tauri/src/`):
 | `app.rs` | the Tauri builder: plugins, window events, setup, run loop, logging |
 | `cli/` | the `hamster` command line (`parse`) and how replies print (`reply`); `commands` answers without the app |
 | `commands/` | the catalog (ADR 0046): `COMMANDS` (colon id, title, accelerator, who runs it: the page, Settings or Rust), `run`, `list`, `shortcut_label`; page commands go to the main window as `run_command`; `handlers.rs` (the Tauri commands, Open Log Folder, Show Data Folder); `keys.rs` (the owner's shortcuts in `keybindings.json` through `JsonFile`, old dotted ids carried over, `conflict` and `reassign`; the menu bar is rebuilt and `commands_changed` sent) |
-| `menu/` | the menu bar: macOS's standard items around `MENUS` and `HELP` (command ids); a menu item's id is its command |
+| `i18n.rs` | the UI language (ADR 0050): `lang()` (set at launch and by `update_settings`, `with_lang` per thread for tests), `tr!`/`tr_plural!` with both texts at the call site, `Text` for compile-time tables |
+| `menu/` | the menu bar: macOS's standard items (texts in the UI language) around `MENUS` and `HELP` (command ids); a menu item's id is its command; rebuilt on a new language |
 | `db/` | `hamster.sqlite`: `migrations.rs` (numbered, `user_version`), `change.rs` (row changes over JSON rows with inverses and field-level journal entries), `journal.rs` (the `journal` table and its `journal.jsonl` mirror, caught up at every write and at launch; `compare` finds lines edited by hand), `undo.rs`, `frozen.rs` (every change refused when its row counts in a closed tax year, ADR 0048), `Db::write`/`undo`/`redo`, `commands.rs` (`undo`, `redo`, the `data_changed` event) |
-| `money.rs`, `date.rs` | cents plus currency, amount labels by the number format, the FinanzOnline copy value, typed amounts; `YYYY-MM-DD` dates and their labels in the region's order |
+| `money.rs`, `date.rs` | cents plus currency, amount labels by the number format, the FinanzOnline copy value, typed amounts; `YYYY-MM-DD` dates and their labels: English in the region's order, German day first |
 | `accounts/` | bank accounts: IBAN check and mask, the name other statements print for an account (`statement_name`, since real statements often print no counterparty IBAN), `add`/`edit`/`list` and their commands; changing an own account or its statement name decides the lines again in the same op |
 | `taxyears/` | the `tax_years` rows (state, applied rules text), `start_from_rules` at launch, `list_tax_years`, `refuse_closed` (no document change with a payment date in a closed year) |
 | `taxrules/` | the rules files: `model.rs` (typed file, unknown fields fail), `check.rs` (schema constraints and Reload checks), `files.rs` (the `rules/` folder, seed, backups, next year's draft), `diff.rs` (the Reload preview lines), `overview`/`preview`/`apply`/`import`/`duplicate`, `commands.rs` (Settings → Tax Rules) |
@@ -112,7 +113,7 @@ Rust (`src-tauri/src/`):
 | `review/` | Review: `queue` (undecided lines newest first, with the key, suggestion and last item for it), `plan_changed` and the active subscriptions for the Subscription choice; `decide`/`decide_as` (a hand decision, optionally with an "Always do this" rule applied to the other lines in the same op; the rule matches `rule_term`: text the owner selected on the card, which must be in the line, else the title's key), `undecided_by_account` |
 | `preview/` | PDFs by id (`PdfSource`, `resolve`), the `pdf_view_*` commands and the `pdf-page://` scheme serving page PNGs (in the CSP's `img-src`) |
 | `notify.rs` | `Notifier`: records every notification; `deliver` also shows it in the notification center in release builds |
-| `settings/` | `settings.json`: appearance, accent, number format, original currency, own transfers, days in the Archive (`SettingsStore`, `get_settings`, `update_settings`) |
+| `settings/` | `settings.json`: language, appearance, accent, number format, original currency, own transfers, days in the Archive (`SettingsStore`, `get_settings`, `update_settings`) |
 | `instance.rs`, `ipc/` | single instance: lock file, Unix socket, one JSON line per request |
 | `remote/` | handles each `IpcMessage` from another process |
 | `launch.rs` | launch events queued for the page (`take_launch_events`) |
@@ -140,6 +141,7 @@ Frontend (`src/`):
 | `commands/` | `pageCommands.ts` (what the main window does for each page command), `pageKeys.ts` (single keys a page answers to) |
 | `palette/` | the ⌘K palette: commands, then the documents and bank lines the text matches |
 | `queries/` | TanStack Query: the client, `useEvents` (event → stale keys, `data_changed` table → stale keys), settings, commands, accounts, tax years and rules, statements (coverage, account lines), line rules (`lineRules.ts`), the review queue (`review.ts`), `useLook` |
+| `i18n/` | `en.ts` and `de.ts` (typed as the English catalog), `useT()` in components, `t()` elsewhere; `useLook` sets the language from the settings (ADR 0050) |
 | `settings/`, `windows/settings/` | the Settings window: page registry and search, row controls, the pages (`RulesPage` with `RuleSheet`, `VendorsPage`) |
 | `components/` | `menu/` (the one in-page menu, ADR 0030: `openMenu`/`openContextMenu` put it in the store's `menu`, `MenuHost` (once per window) draws it portaled and covers the native PDF preview while open, `PopUpButton` in place of every `<select>`, which ESLint forbids), `PdfPreview` (the placeholder the native preview follows), `Modal`, `ConfirmSheet`, `Toasts`, `TooltipHost`, `ErrorBoundary`, `icons.tsx` (lucide icons by role) |
 | `lib/` | `pdfCover.ts` (overlays hide the native preview: `useCoversPdf`, `usePdfCovers`), `theme.ts` (scheme and accent on `<html>`), `motion.ts` (`usePresence`, `useGlide`, `useFlash`, `useListGlide`) |

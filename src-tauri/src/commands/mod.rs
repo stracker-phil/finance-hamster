@@ -7,6 +7,7 @@ use ts_rs::TS;
 
 use crate::error::{AppError, AppResult};
 use crate::events::RUN_COMMAND_EVENT;
+use crate::i18n::Text;
 use crate::window;
 
 pub mod handlers;
@@ -24,17 +25,13 @@ pub enum Runs {
 
 pub struct CommandDef {
     pub id: &'static str,
-    pub title: &'static str,
+    pub title: Text,
     /// The menu accelerator, in Tauri's notation (`CmdOrCtrl+Shift+K`).
     pub accelerator: Option<&'static str>,
     pub runs: Runs,
 }
 
-const fn page(
-    id: &'static str,
-    title: &'static str,
-    accelerator: Option<&'static str>,
-) -> CommandDef {
+const fn page(id: &'static str, title: Text, accelerator: Option<&'static str>) -> CommandDef {
     CommandDef {
         id,
         title,
@@ -44,35 +41,83 @@ const fn page(
 }
 
 pub const COMMANDS: &[CommandDef] = &[
-    page("edit:undo", "Undo", Some("CmdOrCtrl+Z")),
-    page("edit:redo", "Redo", Some("CmdOrCtrl+Shift+Z")),
-    page("go:today", "Today", Some("CmdOrCtrl+1")),
-    page("go:subscriptions", "Subscriptions", Some("CmdOrCtrl+2")),
-    page("go:statements", "Statements", Some("CmdOrCtrl+3")),
-    page("go:documents", "Documents", Some("CmdOrCtrl+4")),
-    page("go:review", "Review Lines", None),
-    page("go:back", "Back", Some("CmdOrCtrl+[")),
-    page("go:forward", "Forward", Some("CmdOrCtrl+]")),
-    page("palette:open", "Command Palette…", Some("CmdOrCtrl+K")),
-    page("statement:import", "Import Statement…", Some("CmdOrCtrl+I")),
-    page("document:add", "Add Invoice PDF…", Some("CmdOrCtrl+O")),
-    page("subscription:new", "New Subscription", Some("CmdOrCtrl+N")),
-    page("filter:focus", "Filter This Page", Some("CmdOrCtrl+F")),
+    page(
+        "edit:undo",
+        Text::new("Undo", "Widerrufen"),
+        Some("CmdOrCtrl+Z"),
+    ),
+    page(
+        "edit:redo",
+        Text::new("Redo", "Wiederholen"),
+        Some("CmdOrCtrl+Shift+Z"),
+    ),
+    page("go:today", Text::new("Today", "Heute"), Some("CmdOrCtrl+1")),
+    page(
+        "go:subscriptions",
+        Text::new("Subscriptions", "Abos"),
+        Some("CmdOrCtrl+2"),
+    ),
+    page(
+        "go:statements",
+        Text::new("Statements", "Kontoauszüge"),
+        Some("CmdOrCtrl+3"),
+    ),
+    page(
+        "go:documents",
+        Text::new("Documents", "Belege"),
+        Some("CmdOrCtrl+4"),
+    ),
+    page(
+        "go:review",
+        Text::new("Review Lines", "Buchungen prüfen"),
+        None,
+    ),
+    page("go:back", Text::new("Back", "Zurück"), Some("CmdOrCtrl+[")),
+    page(
+        "go:forward",
+        Text::new("Forward", "Vorwärts"),
+        Some("CmdOrCtrl+]"),
+    ),
+    page(
+        "palette:open",
+        Text::new("Command Palette…", "Befehlspalette …"),
+        Some("CmdOrCtrl+K"),
+    ),
+    page(
+        "statement:import",
+        Text::new("Import Statement…", "Kontoauszug importieren …"),
+        Some("CmdOrCtrl+I"),
+    ),
+    page(
+        "document:add",
+        Text::new("Add Invoice PDF…", "Rechnungs-PDF hinzufügen …"),
+        Some("CmdOrCtrl+O"),
+    ),
+    page(
+        "subscription:new",
+        Text::new("New Subscription", "Neues Abo"),
+        Some("CmdOrCtrl+N"),
+    ),
+    page(
+        "filter:focus",
+        Text::new("Filter This Page", "Diese Seite filtern"),
+        Some("CmdOrCtrl+F"),
+    ),
     CommandDef {
         id: "app:settings",
-        title: "Settings…",
+        title: Text::new("Settings…", "Einstellungen …"),
         accelerator: Some("CmdOrCtrl+,"),
         runs: Runs::Settings,
     },
     CommandDef {
         id: "app:logs",
-        title: "Open Log Folder",
+        title: Text::new("Open Log Folder", "Log-Ordner öffnen"),
         accelerator: None,
         runs: Runs::Rust(handlers::open_log_folder),
     },
     CommandDef {
         id: "app:data",
-        title: "Show Data Folder",
+        title: Text::new("Show Data Folder", "Datenordner anzeigen"),
         accelerator: None,
         runs: Runs::Rust(handlers::show_data_folder),
     },
@@ -121,7 +166,7 @@ pub fn list() -> Vec<CommandInfo> {
         .iter()
         .map(|command| CommandInfo {
             id: command.id.to_string(),
-            title: command.title.to_string(),
+            title: command.title.get().to_string(),
             shortcut: keys::effective(command, &overrides).map(|a| shortcut_label(&a)),
             custom: overrides.contains_key(command.id),
         })
@@ -147,7 +192,36 @@ pub fn run(app: &AppHandle, id: &str) -> AppResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::i18n::with_lang;
+    use crate::settings::Language;
     use std::collections::HashSet;
+
+    #[test]
+    fn titles_are_listed_in_the_current_language() {
+        let title = |language, id: &str| {
+            with_lang(language, list)
+                .into_iter()
+                .find(|c| c.id == id)
+                .map(|c| c.title)
+        };
+        assert_eq!(title(Language::En, "edit:undo").as_deref(), Some("Undo"));
+        assert_eq!(
+            title(Language::De, "edit:undo").as_deref(),
+            Some("Widerrufen")
+        );
+        assert_eq!(
+            title(Language::De, "app:settings").as_deref(),
+            Some("Einstellungen …")
+        );
+    }
+
+    #[test]
+    fn every_command_has_a_title_in_both_languages() {
+        for command in COMMANDS {
+            assert!(!command.title.en.is_empty(), "{}", command.id);
+            assert!(!command.title.de.is_empty(), "{}", command.id);
+        }
+    }
 
     #[test]
     fn command_ids_are_unique() {
@@ -165,7 +239,7 @@ mod tests {
     #[test]
     fn find_returns_the_command_by_id_and_none_for_an_unknown_id() {
         assert_eq!(
-            find("palette:open").map(|c| c.title),
+            find("palette:open").map(|c| c.title.en),
             Some("Command Palette…")
         );
         assert!(find("no.such.command").is_none());
@@ -173,11 +247,11 @@ mod tests {
 
     #[test]
     fn list_has_one_entry_per_command_with_its_shortcut_label() {
-        let listed = list();
+        let listed = with_lang(Language::En, list);
         assert_eq!(listed.len(), COMMANDS.len());
         for (info, command) in listed.iter().zip(COMMANDS) {
             assert_eq!(info.id, command.id);
-            assert_eq!(info.title, command.title);
+            assert_eq!(info.title, command.title.en);
             assert_eq!(
                 info.shortcut,
                 command.accelerator.map(shortcut_label),
@@ -191,7 +265,7 @@ mod tests {
 
     #[test]
     fn undo_and_redo_are_listed_with_their_shortcuts() {
-        let listed = list();
+        let listed = with_lang(Language::En, list);
         let shortcut = |id: &str| {
             listed
                 .iter()
@@ -204,7 +278,7 @@ mod tests {
 
     #[test]
     fn import_statement_is_listed_with_its_shortcut() {
-        let listed = list();
+        let listed = with_lang(Language::En, list);
         let import = listed.iter().find(|c| c.id == "statement:import").unwrap();
         assert_eq!(import.title, "Import Statement…");
         assert_eq!(import.shortcut.as_deref(), Some("⌘I"));
@@ -212,7 +286,7 @@ mod tests {
 
     #[test]
     fn add_invoice_is_listed_with_its_shortcut() {
-        let listed = list();
+        let listed = with_lang(Language::En, list);
         let add = listed.iter().find(|c| c.id == "document:add").unwrap();
         assert_eq!(add.title, "Add Invoice PDF…");
         assert_eq!(add.shortcut.as_deref(), Some("⌘O"));
@@ -220,7 +294,7 @@ mod tests {
 
     #[test]
     fn review_lines_is_a_page_command_without_a_shortcut() {
-        let listed = list();
+        let listed = with_lang(Language::En, list);
         let review = listed.iter().find(|c| c.id == "go:review").unwrap();
         assert_eq!(review.title, "Review Lines");
         assert_eq!(review.shortcut, None);
@@ -228,7 +302,7 @@ mod tests {
 
     #[test]
     fn the_folder_commands_are_listed_without_a_shortcut() {
-        let listed = list();
+        let listed = with_lang(Language::En, list);
         for (id, title) in [
             ("app:logs", "Open Log Folder"),
             ("app:data", "Show Data Folder"),

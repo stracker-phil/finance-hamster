@@ -1,10 +1,14 @@
 import "@testing-library/jest-dom/vitest";
 import { afterEach, vi } from "vitest";
 import { cleanup, configure } from "@testing-library/react";
+import { setLanguage } from "./i18n";
 
 configure({ asyncUtilTimeout: 3000 });
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setLanguage("en");
+});
 
 class ResizeObserverStub {
   observe() {}

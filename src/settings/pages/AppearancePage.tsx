@@ -1,4 +1,5 @@
-import type { Accent, Appearance, NumberFormat } from "../../api";
+import type { Accent, Appearance, Language, NumberFormat } from "../../api";
+import { useT } from "../../i18n";
 import { useSettings, useUpdateSettings } from "../../queries/settings";
 import { Group, Row, Segmented, Switch } from "../controls";
 
@@ -8,8 +9,22 @@ const capitalize = (s: string) => s[0].toUpperCase() + s.slice(1);
 export function AppearancePage() {
   const { data: settings } = useSettings();
   const { mutate } = useUpdateSettings();
+  const text = useT().appearance;
   return (
     <>
+      <Group title={text.languageGroup} anchor="language-group">
+        <Row label={text.language} description={text.languageDescription} anchor="language">
+          <Segmented<Language>
+            label={text.language}
+            options={[
+              { value: "en", label: "English" },
+              { value: "de", label: "Deutsch" },
+            ]}
+            value={settings?.language}
+            onChange={(language) => mutate({ language })}
+          />
+        </Row>
+      </Group>
       <Group title="Theme" anchor="theme">
         <Row label="Mode" anchor="mode">
           <Segmented<Appearance>

@@ -69,6 +69,10 @@ describe("SETTINGS_PAGES", () => {
     expect(found(query)).toContain(hit);
   });
 
+  it.each(["sprache", "deutsch", "german", "englisch"])("finds the Appearance language row for %s", (query) => {
+    expect(found(query)).toContain("appearance/language");
+  });
+
   it("finds the Finance pages by their group name", () => {
     expect(found("finance")).toEqual(expect.arrayContaining(["rules", "vendors", "accounts", "taxrules"]));
   });

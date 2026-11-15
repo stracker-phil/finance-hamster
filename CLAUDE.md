@@ -67,6 +67,8 @@ Document by file and symbol, never by line number.
 - Commands live in a Rust bus; menus, shortcuts, palette, CLI and links run them by id
   (ADR 0008).
 - The CLI is the same binary and asks the running app over a Unix socket (ADR 0009).
+- Two UI languages, English and German (ADR 0050): every visible text is written in both (`tr!` in Rust,
+  `src/i18n/` with `useT()` in React). German is de-DE with du. CLI and logs stay English.
 - No color literal outside `src/styles/palettes/` (ADR 0025); the look is native
   (ADR 0024, `docs/ux.md`).
 - Debug builds: `Hamster (Debug)`, `com.philippstracker.hamster.debug`, own data and socket, demo seed, dev

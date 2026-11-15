@@ -117,7 +117,7 @@ fn ensure_available(
         return Err(AppError::InvalidInput(format!(
             "{} is already used by {}",
             shortcut_label(accelerator),
-            other.title
+            other.title.get()
         )));
     }
     Ok(())
@@ -158,7 +158,7 @@ pub fn conflict(config_dir: &Path, id: &str, accelerator: &str) -> AppResult<Opt
     Ok(
         holder(command, accelerator, &load(config_dir)).map(|other| KeyConflict {
             shortcut: shortcut_label(accelerator),
-            holder: other.title.to_string(),
+            holder: other.title.get().to_string(),
         }),
     )
 }

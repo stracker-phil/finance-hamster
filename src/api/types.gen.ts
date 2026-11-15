@@ -452,6 +452,11 @@ shortcut: string,
 holder: string, };
 
 /**
+ * The language of the window, the menu and the notifications (ADR 0050).
+ */
+export type Language = "en" | "de";
+
+/**
  * Something the page acts on once it listens: from the launch that started the app or a later one.
  */
 export type LaunchEvent = { "type": "error", message: string, } | { "type": "activate" };
@@ -684,7 +689,7 @@ export type RulesState = "draft" | "open" | "closed";
 
 export type RulesView = { groups: Array<RuleGroup>, items: Array<ItemOption>, };
 
-export type Settings = { appearance: Appearance, accent: Accent, numberFormat: NumberFormat, 
+export type Settings = { language: Language, appearance: Appearance, accent: Accent, numberFormat: NumberFormat, 
 /**
  * Shows a card payment's original amount (`USD 24.00`) beside the euro amount.
  */
@@ -725,7 +730,7 @@ remindQuestions: boolean, };
 /**
  * The fields to change; absent ones keep their value.
  */
-export type SettingsPatch = { appearance?: Appearance, accent?: Accent, numberFormat?: NumberFormat, showOriginalCurrency?: boolean, hideOwnTransfers?: boolean, archiveDays?: number, defaultReminder?: Reminder, remindPriceChanges?: boolean, importAfterDays?: number, remindGaps?: boolean, remindFiling?: boolean, remindQuestions?: boolean, };
+export type SettingsPatch = { language?: Language, appearance?: Appearance, accent?: Accent, numberFormat?: NumberFormat, showOriginalCurrency?: boolean, hideOwnTransfers?: boolean, archiveDays?: number, defaultReminder?: Reminder, remindPriceChanges?: boolean, importAfterDays?: number, remindGaps?: boolean, remindFiling?: boolean, remindQuestions?: boolean, };
 
 export type SliceView = { year: number, amount: string, 
 /**

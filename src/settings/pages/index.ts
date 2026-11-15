@@ -102,6 +102,7 @@ export const SETTINGS_PAGES: SettingsPage[] = [
     icon: "appearance",
     Body: AppearancePage,
     rows: [
+      { id: "language", title: "Language", keywords: ["sprache", "deutsch", "german", "english", "englisch"] },
       { id: "mode", title: "Mode", keywords: ["dark", "light", "automatic", "theme"] },
       { id: "accent", title: "Accent", keywords: ["color"] },
       { id: "number-format", title: "Number format", keywords: ["decimal", "comma"] },

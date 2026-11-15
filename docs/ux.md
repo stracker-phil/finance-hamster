@@ -50,6 +50,13 @@ on Documents it and the big search field are one search)
 - The mascot from the app icon appears only in empty and success states.
 - A missing or changed PDF shows a red banner at the top of the content until resolved.
 
+## Language (ADR 0050)
+- English or German (Settings → Appearance). German is de-DE, addresses the owner as du, and uses macOS's
+  German for standard terms (Ablage, Bearbeiten, Einstellungen …, a space before the ellipsis).
+- Bank and FinanzOnline terms stay as those sources write them in both languages (Kennzahl, Werbungskosten,
+  Buchungstag); English glosses after them are dropped in German.
+- Every visible text exists in both languages: `tr!` in Rust, `useT()`/`t()` in React.
+
 ## Principles
 - Calm, light and native: it looks like the Mac apps beside it. The window opens at once; nothing animates
   for show.

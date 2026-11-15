@@ -12,6 +12,8 @@ As shipped it builds and runs on **macOS on Apple Silicon** only; everything els
   code, and the page of the layer you touch ([docs/README.md](docs/README.md) is the index).
 - [CLAUDE.md](CLAUDE.md) and [.claude/rules/](.claude/rules/) are the maintainer's conventions (tests,
   commits, demo data). Follow them in this repo; in a fork, keep what serves you.
+- The UI is English or German (ADR 0050): every visible text is written in both, `tr!` in Rust and
+  `src/i18n/` in React. The CLI and logs stay English.
 - IPC types in `src/api/types.gen.ts` are generated from Rust with ts-rs (`bun run types`); never edit them.
 
 ## Prerequisites (macOS)

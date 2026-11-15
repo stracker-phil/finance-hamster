@@ -10,9 +10,22 @@ fn url(page: Option<&str>) -> WebviewUrl {
     WebviewUrl::App(format!("src/windows/settings/index.html{query}").into())
 }
 
+fn title() -> String {
+    crate::tr!("Settings", "Einstellungen")
+}
+
+/// Follows a new language; the title shows in the Window menu and in Mission Control.
+pub fn retitle(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window(super::SETTINGS)
+        && let Err(e) = window.set_title(&title())
+    {
+        log::warn!("Couldn't retitle Settings: {e}");
+    }
+}
+
 fn build(app: &AppHandle, page: Option<&str>) -> tauri::Result<WebviewWindow> {
     WebviewWindowBuilder::new(app, super::SETTINGS, url(page))
-        .title("Settings")
+        .title(title())
         .inner_size(880.0, 720.0)
         .min_inner_size(760.0, 560.0)
         .maximizable(false)

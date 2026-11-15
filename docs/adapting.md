@@ -19,6 +19,7 @@ the subagents for tests, suites and reviews. Every new name-, path- or platform-
 | Env vars | `HAMSTER_SIGN_IDENTITY` | adds `HAMSTER_WINDOW_FRAME`, `HAMSTER_BACKGROUND`, `HAMSTER_DEV_TERMINAL` | `dev.rs`, `scripts/dev/` |
 | Dev store | — | `window.hamster` (`VITE_DEV_HOOKS=1`) | `src/main.tsx` |
 | Data | the owner's | the demo seed | `src-tauri/src/test_support/` |
+| UI languages | English, German (de-DE, du) | same | `settings::Language`, `src-tauri/src/i18n.rs`, `src/i18n/` (ADR 0050); a third language is a new enum value plus one text per call site and catalog key |
 | Author, license | Philipp Stracker <info@philippstracker.com>, MIT | | `Cargo.toml`, `LICENSE` |
 
 ## Network hosts

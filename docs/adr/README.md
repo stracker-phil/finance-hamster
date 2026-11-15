@@ -59,3 +59,4 @@ Why Hamster is built the way it is. One record per decision, in Nygard format, a
 | [0047](0047-no-links.md) | No links | Accepted (2026-11-15) |
 | [0048](0048-closed-years-are-frozen-in-the-write-path.md) | Closed years are frozen in the write path and show what was filed | Accepted (2026-11-15) |
 | [0049](0049-refunds-net-against-charges.md) | Refunds net against charges; one line pays one document | Accepted (2026-11-15) |
+| [0050](0050-german-as-a-second-ui-language.md) | German as a second UI language | Accepted (2026-11-15) |

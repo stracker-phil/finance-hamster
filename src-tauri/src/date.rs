@@ -1,7 +1,11 @@
-//! Calendar dates (`YYYY-MM-DD`, never timestamps, ADR 0010) and how the window labels them: English month and
-//! weekday names, day and month in the order of the macOS region.
+//! Calendar dates (`YYYY-MM-DD`, never timestamps, ADR 0010) and how the window labels them: month and weekday
+//! names in the UI language (ADR 0050); English follows the macOS region's day and month order, German is
+//! always day first.
 
 use chrono::{Datelike, NaiveDate};
+
+use crate::i18n::lang;
+use crate::settings::Language;
 
 /// Parses `YYYY-MM-DD`.
 pub fn parse(text: &str) -> Option<NaiveDate> {
@@ -67,6 +71,34 @@ const MONTHS: [&str; 12] = [
     "November",
     "December",
 ];
+const MONTHS_DE: [&str; 12] = [
+    "Januar",
+    "Februar",
+    "März",
+    "April",
+    "Mai",
+    "Juni",
+    "Juli",
+    "August",
+    "September",
+    "Oktober",
+    "November",
+    "Dezember",
+];
+/// As macOS abbreviates them for de_DE.
+const SHORT_MONTHS_DE: [&str; 12] = [
+    "Jan.", "Feb.", "März", "Apr.", "Mai", "Juni", "Juli", "Aug.", "Sept.", "Okt.", "Nov.", "Dez.",
+];
+const WEEKDAYS_DE: [&str; 7] = [
+    "Montag",
+    "Dienstag",
+    "Mittwoch",
+    "Donnerstag",
+    "Freitag",
+    "Samstag",
+    "Sonntag",
+];
+const SHORT_WEEKDAYS_DE: [&str; 7] = ["Mo.", "Di.", "Mi.", "Do.", "Fr.", "Sa.", "So."];
 const WEEKDAYS: [&str; 7] = [
     "Monday",
     "Tuesday",
@@ -77,44 +109,77 @@ const WEEKDAYS: [&str; 7] = [
     "Sunday",
 ];
 
+/// The order a date is written in: German is day first whatever the region.
+fn effective(order: DateOrder) -> DateOrder {
+    match lang() {
+        Language::En => order,
+        Language::De => DateOrder::DayFirst,
+    }
+}
+
+fn weekday_index(date: NaiveDate) -> usize {
+    date.weekday().num_days_from_monday() as usize
+}
+
 /// `November`.
 pub fn month(date: NaiveDate) -> &'static str {
-    MONTHS[date.month0() as usize]
+    let index = date.month0() as usize;
+    match lang() {
+        Language::En => MONTHS[index],
+        Language::De => MONTHS_DE[index],
+    }
 }
 
-/// `Nov`.
+/// `Nov`, `Nov.`.
 pub fn short_month(date: NaiveDate) -> &'static str {
-    &month(date)[..3]
+    match lang() {
+        Language::En => &MONTHS[date.month0() as usize][..3],
+        Language::De => SHORT_MONTHS_DE[date.month0() as usize],
+    }
 }
 
-/// `13 Nov` / `Nov 13`.
+/// The day number as it stands before a month: `13`, `13.`.
+fn day(date: NaiveDate) -> String {
+    match lang() {
+        Language::En => date.day().to_string(),
+        Language::De => format!("{}.", date.day()),
+    }
+}
+
+/// `13 Nov` / `Nov 13` / `13. Nov.`.
 pub fn day_month(date: NaiveDate, order: DateOrder) -> String {
-    match order {
-        DateOrder::DayFirst => format!("{} {}", date.day(), short_month(date)),
+    match effective(order) {
+        DateOrder::DayFirst => format!("{} {}", day(date), short_month(date)),
         DateOrder::MonthFirst => format!("{} {}", short_month(date), date.day()),
     }
 }
 
-/// `13 Nov 2026` / `Nov 13, 2026`.
+/// `13 Nov 2026` / `Nov 13, 2026` / `13. Nov. 2026`.
 pub fn day_month_year(date: NaiveDate, order: DateOrder) -> String {
-    match order {
-        DateOrder::DayFirst => format!("{} {} {}", date.day(), short_month(date), date.year()),
+    match effective(order) {
+        DateOrder::DayFirst => format!("{} {} {}", day(date), short_month(date), date.year()),
         DateOrder::MonthFirst => format!("{} {}, {}", short_month(date), date.day(), date.year()),
     }
 }
 
-/// `Friday, 13 November` / `Friday, November 13`, the Today page's line.
+/// `Friday, 13 November` / `Friday, November 13` / `Freitag, 13. November`, the Today page's line.
 pub fn weekday_long(date: NaiveDate, order: DateOrder) -> String {
-    let weekday = WEEKDAYS[date.weekday().num_days_from_monday() as usize];
-    match order {
-        DateOrder::DayFirst => format!("{weekday}, {} {}", date.day(), month(date)),
+    let weekday = match lang() {
+        Language::En => WEEKDAYS[weekday_index(date)],
+        Language::De => WEEKDAYS_DE[weekday_index(date)],
+    };
+    match effective(order) {
+        DateOrder::DayFirst => format!("{weekday}, {} {}", day(date), month(date)),
         DateOrder::MonthFirst => format!("{weekday}, {} {}", month(date), date.day()),
     }
 }
 
-/// `Tue, 10 Nov` / `Tue, Nov 10`, a bank line's day.
+/// `Tue, 10 Nov` / `Tue, Nov 10` / `Di., 10. Nov.`, a bank line's day.
 pub fn weekday_short(date: NaiveDate, order: DateOrder) -> String {
-    let weekday = &WEEKDAYS[date.weekday().num_days_from_monday() as usize][..3];
+    let weekday = match lang() {
+        Language::En => &WEEKDAYS[weekday_index(date)][..3],
+        Language::De => SHORT_WEEKDAYS_DE[weekday_index(date)],
+    };
     format!("{weekday}, {}", day_month(date, order))
 }
 
@@ -131,6 +196,7 @@ pub fn month_year(date: NaiveDate) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::i18n::with_lang;
 
     fn day(y: i32, m: u32, d: u32) -> NaiveDate {
         NaiveDate::from_ymd_opt(y, m, d).unwrap()
@@ -283,5 +349,47 @@ mod tests {
     #[test]
     fn a_month_heading_names_month_and_year() {
         assert_eq!(month_year(day(2026, 11, 13)), "November 2026");
+    }
+
+    #[test]
+    fn german_month_names_are_written_in_full_and_abbreviated() {
+        with_lang(Language::De, || {
+            assert_eq!(month(day(2026, 11, 13)), "November");
+            assert_eq!(month(day(2026, 3, 1)), "März");
+            for (date, short) in [
+                (day(2026, 11, 13), "Nov."),
+                (day(2026, 3, 1), "März"),
+                (day(2026, 9, 1), "Sept."),
+            ] {
+                assert_eq!(short_month(date), short, "{date}");
+            }
+            assert_eq!(month_name(3), "März");
+            assert_eq!(month_name(0), "Januar");
+            assert_eq!(month_name(13), "Dezember");
+        });
+    }
+
+    #[test]
+    fn german_dates_are_day_first_whatever_the_region_order() {
+        with_lang(Language::De, || {
+            let date = day(2026, 11, 13);
+            for order in [DateOrder::DayFirst, DateOrder::MonthFirst] {
+                assert_eq!(day_month(date, order), "13. Nov.", "{order:?}");
+                assert_eq!(day_month_year(date, order), "13. Nov. 2026", "{order:?}");
+                assert_eq!(
+                    weekday_long(date, order),
+                    "Freitag, 13. November",
+                    "{order:?}"
+                );
+                assert_eq!(weekday_short(date, order), "Fr., 13. Nov.", "{order:?}");
+            }
+        });
+    }
+
+    #[test]
+    fn a_german_month_heading_names_month_and_year() {
+        with_lang(Language::De, || {
+            assert_eq!(month_year(day(2026, 11, 13)), "November 2026");
+        });
     }
 }

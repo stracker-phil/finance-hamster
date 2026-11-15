@@ -12,6 +12,7 @@ pub mod documents;
 pub mod error;
 pub mod events;
 mod handlers;
+pub mod i18n;
 mod instance;
 pub mod integrity;
 pub mod ipc;
@@ -130,6 +131,7 @@ pub fn run() {
         Ok(state) => state,
         Err(e) => fail(&format!("Hamster can't open its data: {e}")),
     };
+    i18n::set(state.settings.get().language);
     app::start(
         state,
         socket,

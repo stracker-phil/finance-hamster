@@ -10,14 +10,14 @@ import { REVIEW_KEY } from "./review";
 import { TODAY_KEY } from "./today";
 import { YEAR_CHECK_KEY } from "./yearCheck";
 import { ELSEWHERE_KEY, YEAR_KEY } from "./year";
-import { SETTINGS_KEY } from "./settings";
 import { MATCH_COUNT_KEY, SUBSCRIPTION_KEY, SUBSCRIPTIONS_KEY } from "./subscriptions";
 import { ACCOUNT_LINES_KEY, COVERAGE_KEY } from "./statements";
 import { RULES_KEY, TAX_YEARS_KEY } from "./taxYears";
 
 /** The query keys each Rust event makes stale; a feature adds its event here, or its table to `TABLE_KEYS`. */
 export const INVALIDATIONS: Partial<Record<EventName, QueryKey[]>> = {
-  settings_changed: [SETTINGS_KEY, TODAY_KEY, STATUS_KEY],
+  // Every view Rust formats follows the number format and the language.
+  settings_changed: [[]],
   files_checked: [FILE_CHECK_KEY, STATUS_KEY],
   commands_changed: [COMMANDS_KEY],
 };

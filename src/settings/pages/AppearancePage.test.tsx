@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../../test/apiMock")).createApiMock() }));
 
 import { api } from "../../api";
+import { setLanguage } from "../../i18n";
 import { useStore } from "../../state/store";
 import { renderWithQuery } from "../../test/renderWithQuery";
 import { settings } from "../../test/settings";
@@ -20,6 +21,39 @@ describe("AppearancePage", () => {
     useStore.setState({ toasts: [] });
     mocked.getSettings.mockResolvedValue(settings({ appearance: "light", accent: "blue", numberFormat: "comma_decimal", showOriginalCurrency: false }));
     mocked.updateSettings.mockResolvedValue(settings());
+  });
+
+  describe("language", () => {
+    it("presses the saved language", async () => {
+      mocked.getSettings.mockResolvedValue(settings({ language: "de" }));
+      renderWithQuery(<AppearancePage />);
+
+      await loaded("Deutsch");
+      expect(screen.getByRole("button", { name: "English" }).getAttribute("aria-pressed")).toBe("false");
+    });
+
+    it.each([
+      ["Deutsch", "de"],
+      ["English", "en"],
+    ])("saves %s as the language", async (name, language) => {
+      mocked.getSettings.mockResolvedValue(settings({ language: language === "de" ? "en" : "de" }));
+      renderWithQuery(<AppearancePage />);
+      await loaded(language === "de" ? "English" : "Deutsch");
+
+      await userEvent.click(screen.getByRole("button", { name }));
+
+      expect(mocked.updateSettings).toHaveBeenCalledWith({ language });
+    });
+
+    it("reads Sprache for the group and the row in German", () => {
+      setLanguage("de");
+
+      renderWithQuery(<AppearancePage />);
+
+      expect(screen.getByRole("heading", { name: "Sprache" })).toBeTruthy();
+      expect(screen.getByRole("group", { name: "Sprache" })).toBeTruthy();
+      expect(screen.queryByText("Language")).toBeNull();
+    });
   });
 
   describe("mode", () => {

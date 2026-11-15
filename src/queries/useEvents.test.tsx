@@ -488,17 +488,38 @@ describe("useEvents", () => {
       expect(await screen.findByText("Today: New step")).toBeTruthy();
     });
 
-    it("refetches Today when the settings change", async () => {
+    it("refetches Today and every other query when the settings change", async () => {
+      function EverythingProbe() {
+        useEvents();
+        const { data: today } = useToday();
+        const { data: subscriptions } = useSubscriptions("");
+        const { data: year } = useYearPage(2026, "");
+        return (
+          <>
+            <p>Today: {today?.next?.title ?? "nothing open"}</p>
+            <p>Subscriptions: {subscriptions?.summary}</p>
+            <p>Year: {year?.total}</p>
+          </>
+        );
+      }
       open("Old step");
-      renderWithQuery(<TodayProbe />);
+      mocked.subscriptionsView.mockResolvedValue(subscriptionsView({ summary: "Old summary" }));
+      mocked.yearPage.mockResolvedValue(yearPage({ total: "€100.00" }));
+      renderWithQuery(<EverythingProbe />);
       await screen.findByText("Today: Old step");
+      await screen.findByText("Subscriptions: Old summary");
+      await screen.findByText("Year: €100.00");
       open("New step");
+      mocked.subscriptionsView.mockResolvedValue(subscriptionsView({ summary: "New summary" }));
+      mocked.yearPage.mockResolvedValue(yearPage({ total: "€200.00" }));
       await waitFor(() => expect(mocked.listen.mock.calls.some(([name]) => name === "settings_changed")).toBe(true));
       const handler = mocked.listen.mock.calls.find(([name]) => name === "settings_changed")![1] as (payload: null) => void;
 
       await act(async () => handler(null));
 
       expect(await screen.findByText("Today: New step")).toBeTruthy();
+      expect(await screen.findByText("Subscriptions: New summary")).toBeTruthy();
+      expect(await screen.findByText("Year: €200.00")).toBeTruthy();
     });
   });
 
