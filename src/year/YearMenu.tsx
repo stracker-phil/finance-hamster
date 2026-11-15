@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { MoreHorizontal } from "lucide-react";
 import { api } from "../api";
-import { useCoversPdf } from "../lib/pdfCover";
+import { openMenu, useMenuOpenOn, type MenuEntry } from "../components/menu";
 import { showError, undoToast } from "../lib/undoToast";
 import { useStore } from "../state/store";
 import { CloseYearSheet } from "./CloseYearSheet";
@@ -23,51 +23,32 @@ function exportSummary(year: number) {
 }
 
 export function YearMenu({ year, archived, closed }: { year: number; archived: number; closed: boolean }) {
-  const [open, setOpen] = useState(false);
+  const [button, setButton] = useState<HTMLButtonElement | null>(null);
   const [closing, setClosing] = useState(false);
+  const open = useMenuOpenOn(button);
   const navigate = useStore((s) => s.navigate);
-  useCoversPdf(open);
-  const go = (fn: () => void) => () => {
-    setOpen(false);
-    fn();
+  const show = () => {
+    if (!button) return;
+    const entries: MenuEntry[] = [
+      { text: "Log", run: () => navigate({ page: "log", year }) },
+      { text: "Archive", hint: String(archived), run: () => navigate({ page: "archive", year }) },
+      { text: "Export Summary PDF…", run: () => exportSummary(year) },
+      { text: "Open Ruleset JSON", run: () => void api.rulesOpen(year).catch(showError) },
+      "separator",
+      ...(closed
+        ? [
+            { text: "Open Snapshot PDF", run: () => void api.yearOpenSnapshot(year).catch(showError) },
+            { text: "Reopen Year…", run: () => void reopen(year) },
+          ]
+        : [{ text: "Close Year…", run: () => setClosing(true) }]),
+    ];
+    openMenu(entries, button, `Tax Year ${year}`);
   };
   return (
     <div className="year-menu">
-      <button className="icon-btn" aria-label="More" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+      <button ref={setButton} className="icon-btn" aria-label="More" aria-haspopup="menu" aria-expanded={open} onClick={show}>
         <MoreHorizontal size={16} />
       </button>
-      {open && (
-        <div className="menu year-menu__list" role="menu">
-          <button className="menu-row" role="menuitem" onClick={go(() => navigate({ page: "log", year }))}>
-            Log
-          </button>
-          <button className="menu-row" role="menuitem" onClick={go(() => navigate({ page: "archive", year }))}>
-            Archive
-            <span className="menu-row__key">{archived}</span>
-          </button>
-          <button className="menu-row" role="menuitem" onClick={go(() => exportSummary(year))}>
-            Export Summary PDF…
-          </button>
-          <button className="menu-row" role="menuitem" onClick={go(() => void api.rulesOpen(year).catch(showError))}>
-            Open Ruleset JSON
-          </button>
-          <div className="menu-sep" />
-          {closed ? (
-            <>
-              <button className="menu-row" role="menuitem" onClick={go(() => void api.yearOpenSnapshot(year).catch(showError))}>
-                Open Snapshot PDF
-              </button>
-              <button className="menu-row" role="menuitem" onClick={go(() => void reopen(year))}>
-                Reopen Year…
-              </button>
-            </>
-          ) : (
-            <button className="menu-row" role="menuitem" onClick={go(() => setClosing(true))}>
-              Close Year…
-            </button>
-          )}
-        </div>
-      )}
       {closing && <CloseYearSheet year={year} onClose={() => setClosing(false)} />}
     </div>
   );

@@ -36,7 +36,7 @@ impl Running<'_> {
         Some(if start > next { start } else { next })
     }
 
-    /// Euro cents per month: the plan's amount in euros, else its last charge's euro amount.
+    /// Euro cents per month, rounded to the cent: the plan's amount in euros, else its last charge's euro amount.
     pub fn monthly_cents(&self, today: NaiveDate) -> Option<i64> {
         let plan = self.current(today)?;
         let cents = if plan.currency == "EUR" {
@@ -44,7 +44,8 @@ impl Running<'_> {
         } else {
             self.charges.last()?.cents.abs()
         };
-        Some(cents / i64::from(plan.interval.months()))
+        let months = i64::from(plan.interval.months());
+        Some((cents + months / 2) / months)
     }
 
     /// What one charge costs in euros: the plan's amount, else its last charge's.

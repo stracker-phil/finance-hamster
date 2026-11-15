@@ -49,8 +49,12 @@ pub fn amount(text: &str) -> Option<i64> {
         _ => (false, text.strip_prefix('+').unwrap_or(text)),
     };
     let (whole, fraction) = digits.split_once(',')?;
-    let whole: String = whole.chars().filter(|&c| c != '.').collect();
-    let valid = !whole.is_empty()
+    let groups: Vec<&str> = whole.split('.').collect();
+    // Dots only group thousands; a misread like `12.34,56` is no amount.
+    let grouped = (1..=3).contains(&groups[0].len()) && groups[1..].iter().all(|g| g.len() == 3);
+    let whole = groups.concat();
+    let valid = (groups.len() == 1 || grouped)
+        && !whole.is_empty()
         && whole.chars().all(|c| c.is_ascii_digit())
         && fraction.len() == 2
         && fraction.chars().all(|c| c.is_ascii_digit());

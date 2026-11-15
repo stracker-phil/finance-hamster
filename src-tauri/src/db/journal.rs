@@ -111,6 +111,55 @@ fn ends_mid_line(path: &Path) -> AppResult<bool> {
     Ok(last[0] != b'\n')
 }
 
+/// How `journal.jsonl` compares with the `journal` table.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Mirror {
+    /// Rows in the table.
+    pub rows: usize,
+    /// Rows the file holds exactly as the table does.
+    pub matching: usize,
+    /// Rows whose line says something else, or that the file lacks before its last line: the file was edited.
+    pub edited: Vec<i64>,
+}
+
+impl Mirror {
+    /// Rows still to append after the file's last line; the next write or launch adds them.
+    pub fn behind(&self) -> usize {
+        self.rows - self.matching - self.edited.len()
+    }
+}
+
+/// Compares every row of the table with its line in the file.
+pub fn compare(conn: &Connection, path: &Path) -> AppResult<Mirror> {
+    // Compared as JSON: a field set to `null` reads back from the table as `Some(Null)` but from the file as `None`.
+    let mut lines = std::collections::HashMap::new();
+    if let Ok(file) = std::fs::File::open(path) {
+        for line in BufReader::new(file).lines() {
+            if let Ok(value) = serde_json::from_str::<Value>(&line?)
+                && let Some(seq) = value.get("seq").and_then(Value::as_i64)
+            {
+                lines.insert(seq, value);
+            }
+        }
+    }
+    let last = lines.keys().copied().max().unwrap_or(0);
+    let rows = entries_after(conn, 0)?;
+    let mut matching = 0;
+    let mut edited = Vec::new();
+    for row in &rows {
+        match lines.get(&row.seq) {
+            Some(line) if *line == serde_json::to_value(row)? => matching += 1,
+            None if row.seq > last => {}
+            _ => edited.push(row.seq),
+        }
+    }
+    Ok(Mirror {
+        rows: rows.len(),
+        matching,
+        edited,
+    })
+}
+
 /// Appends every row the file lacks and syncs it.
 pub fn catch_up(conn: &Connection, path: &Path) -> AppResult<usize> {
     let missing = entries_after(conn, last_mirrored(path)?)?;
@@ -360,6 +409,125 @@ mod tests {
         let path = dir.path().join(FILE_NAME);
         assert_eq!(catch_up(&connection(), &path).unwrap(), 0);
         assert!(!path.exists());
+    }
+
+    fn three_rows_with_lines() -> (tempfile::TempDir, Connection, Vec<String>) {
+        let dir = temp_config_dir();
+        let mut conn = connection();
+        record_op(
+            &mut conn,
+            "Add",
+            &[
+                field("a", None, Some(json!(1))),
+                field("b", None, Some(json!(2))),
+                field("c", None, Some(json!(3))),
+            ],
+        );
+        let lines = entries_after(&conn, 0)
+            .unwrap()
+            .iter()
+            .map(|e| serde_json::to_string(e).unwrap())
+            .collect();
+        (dir, conn, lines)
+    }
+
+    #[test]
+    fn a_file_that_mirrors_every_row_compares_clean() {
+        let (dir, conn, lines) = three_rows_with_lines();
+        let path = dir.path().join(FILE_NAME);
+        std::fs::write(&path, format!("{}\n", lines.join("\n"))).unwrap();
+        let mirror = compare(&conn, &path).unwrap();
+        assert_eq!(
+            mirror,
+            Mirror {
+                rows: 3,
+                matching: 3,
+                edited: vec![]
+            }
+        );
+        assert_eq!(mirror.behind(), 0);
+    }
+
+    #[test]
+    fn a_missing_file_leaves_every_row_behind_and_nothing_edited() {
+        let (dir, conn, _) = three_rows_with_lines();
+        let mirror = compare(&conn, &dir.path().join(FILE_NAME)).unwrap();
+        assert_eq!(
+            mirror,
+            Mirror {
+                rows: 3,
+                matching: 0,
+                edited: vec![]
+            }
+        );
+        assert_eq!(mirror.behind(), 3);
+    }
+
+    #[test]
+    fn rows_after_the_files_last_line_are_behind_not_edited() {
+        let (dir, conn, lines) = three_rows_with_lines();
+        let path = dir.path().join(FILE_NAME);
+        std::fs::write(&path, format!("{}\n", lines[0])).unwrap();
+        let mirror = compare(&conn, &path).unwrap();
+        assert_eq!(mirror.matching, 1);
+        assert!(mirror.edited.is_empty());
+        assert_eq!(mirror.behind(), 2);
+    }
+
+    #[test]
+    fn a_line_whose_content_differs_from_its_row_is_edited() {
+        let (dir, conn, lines) = three_rows_with_lines();
+        let path = dir.path().join(FILE_NAME);
+        let changed = lines[1].replace("\"new\":2", "\"new\":20");
+        assert_ne!(changed, lines[1]);
+        std::fs::write(&path, format!("{}\n{}\n{}\n", lines[0], changed, lines[2])).unwrap();
+        let mirror = compare(&conn, &path).unwrap();
+        assert_eq!(
+            mirror,
+            Mirror {
+                rows: 3,
+                matching: 2,
+                edited: vec![2]
+            }
+        );
+        assert_eq!(mirror.behind(), 0);
+    }
+
+    #[test]
+    fn a_row_missing_before_the_files_last_line_is_edited() {
+        let (dir, conn, lines) = three_rows_with_lines();
+        let path = dir.path().join(FILE_NAME);
+        std::fs::write(&path, format!("{}\n{}\n", lines[0], lines[2])).unwrap();
+        let mirror = compare(&conn, &path).unwrap();
+        assert_eq!(
+            mirror,
+            Mirror {
+                rows: 3,
+                matching: 2,
+                edited: vec![2]
+            }
+        );
+    }
+
+    #[test]
+    fn a_torn_last_line_is_skipped_and_its_row_counts_as_behind() {
+        let (dir, conn, lines) = three_rows_with_lines();
+        let path = dir.path().join(FILE_NAME);
+        std::fs::write(
+            &path,
+            format!("{}\n{}\n{{\"seq\":3,\"op\"", lines[0], lines[1]),
+        )
+        .unwrap();
+        let mirror = compare(&conn, &path).unwrap();
+        assert_eq!(
+            mirror,
+            Mirror {
+                rows: 3,
+                matching: 2,
+                edited: vec![]
+            }
+        );
+        assert_eq!(mirror.behind(), 1);
     }
 
     #[test]

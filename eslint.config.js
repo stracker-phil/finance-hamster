@@ -18,6 +18,10 @@ export default tseslint.config(
         "error",
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_", ignoreRestSiblings: true },
       ],
+      "no-restricted-syntax": [
+        "error",
+        { selector: "JSXOpeningElement[name.name='select']", message: "Use PopUpButton from components/menu (ADR 0030)." },
+      ],
     },
   },
   {

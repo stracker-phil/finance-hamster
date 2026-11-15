@@ -1,3 +1,4 @@
+import { MenuHost } from "../../components/menu";
 import { useCallback, useEffect, useState } from "react";
 import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import { api } from "../../api";
@@ -28,6 +29,7 @@ function SettingsRoot() {
       <SettingsWindow request={request} onOpen={open} />
       <Toasts />
       <ConfirmHost />
+      <MenuHost />
       <TooltipHost />
     </>
   );

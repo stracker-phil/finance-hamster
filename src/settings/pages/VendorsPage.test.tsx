@@ -8,18 +8,22 @@ import { api } from "../../api";
 import { ConfirmHost } from "../../components/ConfirmSheet";
 import { useStore } from "../../state/store";
 import { vendorView, vendorsView } from "../../test/documents";
+import { choose, popUpOptions, popUpValue, withMenus } from "../../test/popup";
 import { renderWithQuery } from "../../test/renderWithQuery";
 import { VendorsPage } from "./VendorsPage";
 
 const mocked = vi.mocked(api, true);
+const ITEM_720 = "KZ 720 · Training";
 const toasts = () => useStore.getState().toasts.map((t) => [t.kind, t.message]);
 
 const renderPage = () =>
   renderWithQuery(
-    <>
-      <VendorsPage />
-      <ConfirmHost />
-    </>,
+    withMenus(
+      <>
+        <VendorsPage />
+        <ConfirmHost />
+      </>,
+    ),
   );
 
 const openSheet = async (name = "Demo Cloud Ltd") => {
@@ -66,7 +70,26 @@ describe("VendorsPage", () => {
       await openSheet();
 
       expect(screen.getByLabelText<HTMLInputElement>("Name").value).toBe("Demo Cloud Ltd");
-      expect(screen.getByLabelText<HTMLSelectElement>("Default item").value).toBe("kz-720");
+      expect(popUpValue("Default item")).toBe(ITEM_720);
+    });
+
+    it("shows the empty default item as the item of its last document", async () => {
+      renderPage();
+
+      await openSheet();
+
+      expect(popUpValue("Default item")).toBe("The item of its last document");
+    });
+
+    it("saves nothing when the current default item is chosen again", async () => {
+      mocked.vendorsView.mockResolvedValue(vendorsView({ vendors: [vendorView({ defaultItemKey: "kz-720" })] }));
+      renderPage();
+      await openSheet();
+
+      await choose(userEvent, "Default item", ITEM_720);
+      await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+      expect(mocked.vendorChange).not.toHaveBeenCalled();
     });
 
     it("saves a rename and a new default item as two changes in order, and toasts both labels", async () => {
@@ -76,7 +99,7 @@ describe("VendorsPage", () => {
 
       await userEvent.clear(screen.getByLabelText("Name"));
       await userEvent.type(screen.getByLabelText("Name"), "Demo Cloud");
-      await userEvent.selectOptions(screen.getByLabelText("Default item"), "kz-720");
+      await choose(userEvent, "Default item", ITEM_720);
       await userEvent.click(screen.getByRole("button", { name: "Save" }));
 
       expect(mocked.vendorChange.mock.calls).toEqual([
@@ -92,7 +115,7 @@ describe("VendorsPage", () => {
       renderPage();
       await openSheet();
 
-      await userEvent.selectOptions(screen.getByLabelText("Default item"), "The item of its last document");
+      await choose(userEvent, "Default item", "The item of its last document");
       await userEvent.click(screen.getByRole("button", { name: "Save" }));
 
       expect(mocked.vendorChange).toHaveBeenCalledWith("ven-1", { kind: "defaultItem", key: null });
@@ -149,12 +172,13 @@ describe("VendorsPage", () => {
     it("offers the other vendors, and enables Merge… once one is chosen", async () => {
       renderPage();
       await openSheet();
-      const target = screen.getByLabelText("Merge into");
 
-      expect(within(target).getAllByRole("option").map((o) => o.textContent)).toEqual(["Choose a vendor", "Example Market"]);
+      expect(popUpValue("Merge into")).toBe("Choose a vendor");
+      expect(await popUpOptions(userEvent, "Merge into")).toEqual(["Choose a vendor", "Example Market"]);
       expect(screen.getByRole("button", { name: "Merge…" })).toBeDisabled();
 
-      await userEvent.selectOptions(target, "ven-2");
+      await choose(userEvent, "Merge into", "Example Market");
+      expect(popUpValue("Merge into")).toBe("Example Market");
       expect(screen.getByRole("button", { name: "Merge…" })).toBeEnabled();
     });
 
@@ -162,7 +186,7 @@ describe("VendorsPage", () => {
       mocked.vendorChange.mockResolvedValue("Merged Demo Cloud Ltd into Example Market");
       renderPage();
       await openSheet();
-      await userEvent.selectOptions(screen.getByLabelText("Merge into"), "ven-2");
+      await choose(userEvent, "Merge into", "Example Market");
 
       await userEvent.click(screen.getByRole("button", { name: "Merge…" }));
       const confirm = await screen.findByRole("alertdialog", { name: "Merge Demo Cloud Ltd into Example Market?" });
@@ -177,7 +201,7 @@ describe("VendorsPage", () => {
     it("merges nothing when the confirmation is cancelled", async () => {
       renderPage();
       await openSheet();
-      await userEvent.selectOptions(screen.getByLabelText("Merge into"), "ven-2");
+      await choose(userEvent, "Merge into", "Example Market");
       await userEvent.click(screen.getByRole("button", { name: "Merge…" }));
       const confirm = await screen.findByRole("alertdialog");
 

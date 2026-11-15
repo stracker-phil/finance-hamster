@@ -1,5 +1,6 @@
 import { useId, useState } from "react";
 import { api, toAppError, type VendorChange, type VendorView } from "../../api";
+import { PopUpButton } from "../../components/menu";
 import { Modal } from "../../components/Modal";
 import { useVendors } from "../../queries/documents";
 import { useStore } from "../../state/store";
@@ -61,27 +62,23 @@ function VendorSheet({ vendor, others, items, onClose }: VendorSheetProps) {
         </div>
         <div className="form-field">
           <label htmlFor={`${id}-item`}>Default item</label>
-          <select id={`${id}-item`} className="field" value={item} onChange={(e) => setItem(e.target.value)}>
-            <option value="">The item of its last document</option>
-            {items.map((i) => (
-              <option key={i.key} value={i.key}>
-                {i.label}
-              </option>
-            ))}
-          </select>
+          <PopUpButton
+            id={`${id}-item`}
+            value={item}
+            options={[{ value: "", label: "The item of its last document" }, ...items.map((i) => ({ value: i.key, label: i.label }))]}
+            onChange={setItem}
+          />
         </div>
         {others.length > 0 && (
           <div className="form-field">
             <label htmlFor={`${id}-merge`}>Merge into</label>
             <div className="add-doc__field">
-              <select id={`${id}-merge`} className="field" value={into} onChange={(e) => setInto(e.target.value)}>
-                <option value="">Choose a vendor</option>
-                {others.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.name}
-                  </option>
-                ))}
-              </select>
+              <PopUpButton
+                id={`${id}-merge`}
+                value={into}
+                options={[{ value: "", label: "Choose a vendor" }, ...others.map((o) => ({ value: o.id, label: o.name }))]}
+                onChange={setInto}
+              />
               <button type="button" className="btn" disabled={!into} onClick={() => void merge()}>
                 Merge…
               </button>

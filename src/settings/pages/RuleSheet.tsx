@@ -1,3 +1,4 @@
+import { PopUpButton } from "../../components/menu";
 import { useQuery } from "@tanstack/react-query";
 import { useId, useState, type FormEvent } from "react";
 import { api, toAppError, type ItemOption, type RuleForm, type RuleView } from "../../api";
@@ -88,14 +89,13 @@ export function RuleSheet({ rule, items, onClose }: { rule?: RuleView; items: It
         </div>
         <div className="form-field">
           <label htmlFor={`${id}-account`}>Account</label>
-          <select id={`${id}-account`} className="field" aria-invalid={!!fieldError("account")} value={form.accountId ?? ""} onChange={(e) => set({ accountId: text(e.target.value) })}>
-            <option value="">Any account</option>
-            {accounts.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </select>
+          <PopUpButton
+            id={`${id}-account`}
+            aria-invalid={!!fieldError("account")}
+            value={form.accountId ?? ""}
+            options={[{ value: "", label: "Any account" }, ...accounts.map((a) => ({ value: a.id, label: a.name }))]}
+            onChange={(v) => set({ accountId: text(v) })}
+          />
           {error("account")}
         </div>
         <label className="form-check">
@@ -120,14 +120,13 @@ export function RuleSheet({ rule, items, onClose }: { rule?: RuleView; items: It
         {form.action === "anv" && (
           <div className="form-field">
             <label htmlFor={`${id}-item`}>Item</label>
-            <select id={`${id}-item`} className="field" value={form.itemKey ?? ""} aria-invalid={!!fieldError("item")} onChange={(e) => set({ itemKey: text(e.target.value) })}>
-              <option value="">Choose…</option>
-              {items.map((i) => (
-                <option key={i.key} value={i.key}>
-                  {i.label}
-                </option>
-              ))}
-            </select>
+            <PopUpButton
+              id={`${id}-item`}
+              aria-invalid={!!fieldError("item")}
+              value={form.itemKey ?? ""}
+              options={[{ value: "", label: "Choose…" }, ...items.map((i) => ({ value: i.key, label: i.label }))]}
+              onChange={(v) => set({ itemKey: text(v) })}
+            />
             {error("item")}
           </div>
         )}

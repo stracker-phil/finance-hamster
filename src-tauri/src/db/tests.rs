@@ -314,6 +314,117 @@ fn a_new_write_clears_redo() {
 }
 
 #[test]
+fn the_undo_history_keeps_only_the_newest_hundred_changes() {
+    let (_dir, db) = open();
+    for n in 0..101 {
+        db.write(insert(&format!("r{n:03}"), "Rent", 100), Source::Ui)
+            .unwrap();
+    }
+    for _ in 0..100 {
+        assert!(db.undo().unwrap().is_some());
+    }
+    assert_eq!(db.undo().unwrap(), None);
+    assert_eq!(things(&db), vec![row("r000", "Rent", 100)]);
+}
+
+#[test]
+fn a_new_write_after_undo_drops_every_undone_change_from_redo() {
+    let (_dir, db) = open();
+    db.write(insert("a", "Rent", 100), Source::Ui).unwrap();
+    db.write(insert("b", "Gym", 200), Source::Ui).unwrap();
+    db.undo().unwrap();
+    db.undo().unwrap();
+    db.write(insert("c", "Bike", 300), Source::Ui).unwrap();
+    assert_eq!(db.redo().unwrap(), None);
+    assert_eq!(things(&db), vec![row("c", "Bike", 300)]);
+}
+
+#[test]
+fn an_undo_whose_row_was_deleted_meanwhile_fails_and_changes_nothing() {
+    let (_dir, db) = open();
+    db.write(insert("a", "Rent", 100), Source::Ui).unwrap();
+    let delete = Op::new(
+        "Remove Rent",
+        vec![Change::delete("things", &thing("a", "Rent", 100)).unwrap()],
+    );
+    db.write(delete, Source::App).unwrap();
+    let journal_before = journal_rows(&db);
+
+    let err = db.undo().unwrap_err();
+    assert!(matches!(err, AppError::NotFound(_)), "{err:?}");
+    assert_eq!(things(&db), vec![]);
+    assert_eq!(journal_rows(&db), journal_before);
+}
+
+#[test]
+fn a_write_still_succeeds_when_the_journal_file_cannot_be_appended_and_the_next_write_catches_up() {
+    use std::os::unix::fs::PermissionsExt;
+    let (dir, db) = open();
+    let path = dir.path().join(journal::FILE_NAME);
+    db.write(insert("a", "Rent", 100), Source::Ui).unwrap();
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o400)).unwrap();
+
+    db.write(rename("a", "Rent", "Flat"), Source::Ui).unwrap();
+    assert_eq!(things(&db), vec![row("a", "Flat", 100)]);
+    let behind = db.read(|conn| journal::compare(conn, &path)).unwrap();
+    assert_eq!(behind.rows, 5);
+    assert_eq!(behind.behind(), 1);
+    assert_eq!(journal_lines(dir.path()).len(), 4);
+
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+    db.write(insert("b", "Gym", 200), Source::Ui).unwrap();
+    let mirror = db.read(|conn| journal::compare(conn, &path)).unwrap();
+    assert_eq!(
+        mirror,
+        journal::Mirror {
+            rows: 9,
+            matching: 9,
+            edited: vec![]
+        }
+    );
+    assert_eq!(journal_lines(dir.path()).len(), 9);
+}
+
+#[test]
+fn null_fields_mirrored_to_the_journal_file_compare_as_matching() {
+    let (dir, db) = open();
+    let path = dir.path().join(journal::FILE_NAME);
+    let without_name = json!({ "id": "a", "name": null, "cents": null, "done": false });
+    let with_name = json!({ "id": "a", "name": "x", "cents": null, "done": false });
+    db.write(
+        Op::new(
+            "Add",
+            vec![Change::insert("things", &without_name).unwrap()],
+        ),
+        Source::Ui,
+    )
+    .unwrap();
+    db.write(
+        Op::new(
+            "Name it",
+            vec![Change::update("things", &without_name, &with_name).unwrap()],
+        ),
+        Source::Ui,
+    )
+    .unwrap();
+    db.write(
+        Op::new(
+            "Clear name",
+            vec![Change::update("things", &with_name, &without_name).unwrap()],
+        ),
+        Source::Ui,
+    )
+    .unwrap();
+
+    let mirror = db.read(|conn| journal::compare(conn, &path)).unwrap();
+
+    assert_eq!(mirror.matching, mirror.rows);
+    assert_eq!(mirror.edited, Vec::<i64>::new());
+    assert_eq!(mirror.behind(), 0);
+    assert!(mirror.rows > 0);
+}
+
+#[test]
 fn imports_and_cli_writes_are_undoable() {
     let (_dir, db) = open();
     db.write(insert("a", "Rent", 100), Source::Import).unwrap();

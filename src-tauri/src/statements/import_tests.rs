@@ -410,6 +410,39 @@ fn committing_over_a_leftover_file_with_the_same_content_does_not_rewrite_it() {
 }
 
 #[test]
+fn a_failed_import_removes_the_pdf_it_just_copied() {
+    let (dir, db) = open_with_accounts();
+    let statement = october();
+    let first = prepared(&db, dir.path(), &statement);
+    let again = Pending {
+        file: "statements/2026/private-010-copy.pdf".into(),
+        ..first.clone()
+    };
+    let copy = dir.path().join(&again.file);
+    import::commit(&db, dir.path(), first, NOW, Source::Import).unwrap();
+
+    assert!(import::commit(&db, dir.path(), again, NOW, Source::Import).is_err());
+
+    assert!(!copy.exists());
+    assert_eq!(count(&db, store::STATEMENTS), 1);
+}
+
+#[test]
+fn a_failed_import_keeps_a_pdf_that_was_already_there() {
+    let (dir, db) = open_with_accounts();
+    let statement = october();
+    let first = prepared(&db, dir.path(), &statement);
+    let second = first.clone();
+    let path = dir.path().join(&first.file);
+    import::commit(&db, dir.path(), first, NOW, Source::Import).unwrap();
+
+    assert!(import::commit(&db, dir.path(), second, NOW, Source::Import).is_err());
+
+    assert_eq!(std::fs::read(&path).unwrap(), statement.pdf());
+    assert_eq!(count(&db, store::STATEMENTS), 1);
+}
+
+#[test]
 fn committing_stores_one_transaction_per_line_in_printed_order() {
     let (dir, db) = open_with_accounts();
     let row = imported(&db, dir.path(), &october());

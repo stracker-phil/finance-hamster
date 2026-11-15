@@ -8,6 +8,7 @@ import { api } from "../api";
 import { Toasts } from "../components/Toasts";
 import { useStore } from "../state/store";
 import { addPreview, estimate } from "../test/documents";
+import { choose, popUpValue, withMenus } from "../test/popup";
 import { renderWithQuery as render } from "../test/renderWithQuery";
 import { AddDocumentSheet } from "./AddDocumentSheet";
 
@@ -23,14 +24,16 @@ beforeEach(() => {
 
 const renderSheet = (shown = preview) =>
   render(
-    <>
-      <AddDocumentSheet preview={shown} />
-      <Toasts />
-    </>,
+    withMenus(
+      <>
+        <AddDocumentSheet preview={shown} />
+        <Toasts />
+      </>,
+    ),
   );
 
 const vendor = () => screen.getByRole("textbox", { name: "Vendor" });
-const item = () => screen.getByRole("combobox", { name: "Item" });
+const chooseItem = (option: string) => choose(userEvent, "Item", option);
 const lineRadio = (name: string | RegExp) => screen.getByRole("radio", { name });
 const addButton = () => screen.getByRole("button", { name: "Add Document" });
 
@@ -103,23 +106,31 @@ describe("AddDocumentSheet", () => {
     it("is prefilled with the reason for it", () => {
       renderSheet();
 
-      expect((item() as HTMLSelectElement).value).toBe("kz-169");
+      expect(popUpValue("Item")).toBe("KZ 169 · Digital work equipment");
       expect(screen.getByText("last used for Demo Cloud Ltd")).toBeTruthy();
     });
 
     it("loses the reason once another item is chosen", async () => {
       renderSheet();
 
-      await userEvent.selectOptions(item(), "KZ 720 · Training");
+      await chooseItem("KZ 720 · Training");
 
+      expect(popUpValue("Item")).toBe("KZ 720 · Training");
       expect(screen.queryByText("last used for Demo Cloud Ltd")).toBeNull();
     });
 
-    it("offers Choose later when no item is known", () => {
+    it("keeps the reason when the current item is chosen again", async () => {
+      renderSheet();
+
+      await chooseItem("KZ 169 · Digital work equipment");
+
+      expect(screen.getByText("last used for Demo Cloud Ltd")).toBeTruthy();
+    });
+
+    it("shows Choose later when no item is known", () => {
       renderSheet(addPreview({ itemKey: null, itemWhy: null }));
 
-      expect((item() as HTMLSelectElement).value).toBe("");
-      expect(screen.getByRole("option", { name: "Choose later" })).toBeTruthy();
+      expect(popUpValue("Item")).toBe("Choose later");
     });
   });
 
@@ -173,7 +184,7 @@ describe("AddDocumentSheet", () => {
 
     it("asks again with no line and no item when both are cleared", async () => {
       renderSheet();
-      await userEvent.selectOptions(item(), "Choose later");
+      await chooseItem("Choose later");
       await userEvent.click(lineRadio("Not imported yet, link later"));
 
       await waitFor(() => expect(mocked.documentEstimate).toHaveBeenLastCalledWith(null, null));
@@ -204,7 +215,7 @@ describe("AddDocumentSheet", () => {
       renderSheet();
       await userEvent.clear(vendor());
       await userEvent.type(vendor(), "Demo Vendor");
-      await userEvent.selectOptions(item(), "Choose later");
+      await chooseItem("Choose later");
       await userEvent.click(lineRadio(/Example Market/));
 
       await userEvent.click(addButton());

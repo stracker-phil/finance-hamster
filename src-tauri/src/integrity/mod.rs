@@ -291,6 +291,44 @@ mod tests {
     }
 
     #[test]
+    fn only_the_overwritten_statement_is_reported_and_a_deleted_one_is_missing() {
+        let (dir, db) = open_with_accounts();
+        let september = import_statement(&db, dir.path(), 1, 9);
+        let october = import_statement(&db, dir.path(), 2, 10);
+        write_file(dir.path(), &september.file, b"%PDF other bytes");
+
+        let check = verify(&db, dir.path(), NOW).unwrap();
+        assert_eq!(check.checked, 2);
+        assert_eq!(
+            check.problems,
+            vec![problem(
+                FileTrouble::Changed,
+                &september.file,
+                "Statement · Private Nr. 001/2026"
+            )]
+        );
+
+        std::fs::remove_file(dir.path().join(&october.file)).unwrap();
+        let mut problems = verify(&db, dir.path(), NOW).unwrap().problems;
+        problems.sort_by(|a, b| a.file.cmp(&b.file));
+        assert_eq!(
+            problems,
+            vec![
+                problem(
+                    FileTrouble::Changed,
+                    &september.file,
+                    "Statement · Private Nr. 001/2026"
+                ),
+                problem(
+                    FileTrouble::Missing,
+                    &october.file,
+                    "Statement · Private Nr. 002/2026"
+                ),
+            ]
+        );
+    }
+
+    #[test]
     fn a_statement_file_moved_elsewhere_counts_as_missing() {
         let (dir, db) = open_with_accounts();
         let statement = import_statement(&db, dir.path(), 3, 10);

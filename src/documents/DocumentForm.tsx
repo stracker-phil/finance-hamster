@@ -1,3 +1,4 @@
+import { PopUpButton } from "../components/menu";
 import { useEffect, useId, useRef, useState } from "react";
 import { Check, Link2, X } from "lucide-react";
 import { api, toAppError, type DocumentEdit, type DocumentView } from "../api";
@@ -167,14 +168,13 @@ export function DocumentForm({ doc, onExclude }: { doc: DocumentView; onExclude:
 
           <label htmlFor={`${id}-item`}>Item</label>
           <div>
-            <select id={`${id}-item`} className="field" value={doc.itemKey ?? ""} disabled={locked || !doc.payDate} onChange={(e) => save({ field: "item", key: e.target.value || null })}>
-              <option value="">{doc.payDate ? "Choose an item" : "Set the payment date first"}</option>
-              {doc.items.map((i) => (
-                <option key={i.key} value={i.key}>
-                  {i.label}
-                </option>
-              ))}
-            </select>
+            <PopUpButton
+              id={`${id}-item`}
+              value={doc.itemKey ?? ""}
+              disabled={locked || !doc.payDate}
+              options={[{ value: "", label: doc.payDate ? "Choose an item" : "Set the payment date first" }, ...doc.items.map((i) => ({ value: i.key, label: i.label }))]}
+              onChange={(key) => save({ field: "item", key: key || null })}
+            />
             <FieldError message={errors["document.item"]} />
           </div>
         </div>
@@ -192,7 +192,7 @@ export function DocumentForm({ doc, onExclude }: { doc: DocumentView; onExclude:
                   <label htmlFor={`${id}-share`} className="add-doc__hint">
                     Work share
                   </label>
-                  <SavedInput id={`${id}-share`} value={String(doc.workShare)} inputMode="numeric" className="anv-result__input" onSave={(text) => save({ field: "workShare", value: Number(text) })} />
+                  <SavedInput id={`${id}-share`} value={String(doc.workShare)} inputMode="numeric" className="anv-result__input" onSave={(text) => save({ field: "workShare", value: text })} />
                   <span className="add-doc__hint">%</span>
                 </div>
                 {doc.estimate.shareHint && <span className="add-doc__hint">{doc.estimate.shareHint}</span>}

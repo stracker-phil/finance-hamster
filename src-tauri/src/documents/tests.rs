@@ -1978,21 +1978,33 @@ fn an_item_needs_a_payment_date_and_must_be_one_of_the_years_items() {
 
 #[test]
 fn the_work_share_is_a_percent_between_zero_and_one_hundred() {
-    for (value, ok) in [
-        (0, true),
-        (60, true),
-        (100, true),
-        (-1, false),
-        (101, false),
+    for (value, accepted) in [
+        ("0", Some(0)),
+        ("60", Some(60)),
+        (" 60 ", Some(60)),
+        ("60 %", Some(60)),
+        ("60%", Some(60)),
+        ("100", Some(100)),
+        ("-1", None),
+        ("101", None),
+        ("abc", None),
+        ("", None),
+        ("6.5", None),
     ] {
         let (_dir, db) = setup();
         draft(&db, "doc-a", |d| d.work_share = 50);
 
-        let result = apply(&db, "doc-a", DocumentEdit::WorkShare { value });
+        let result = apply(
+            &db,
+            "doc-a",
+            DocumentEdit::WorkShare {
+                value: value.into(),
+            },
+        );
 
-        if ok {
+        if let Some(share) = accepted {
             result.unwrap();
-            assert_eq!(document(&db, "doc-a").work_share, value);
+            assert_eq!(document(&db, "doc-a").work_share, share, "{value:?}");
         } else {
             assert_eq!(
                 rejected(result),
@@ -2000,7 +2012,7 @@ fn the_work_share_is_a_percent_between_zero_and_one_hundred() {
                     "document.workShare".into(),
                     "A share between 0 and 100 %".into()
                 ),
-                "{value}"
+                "{value:?}"
             );
             assert_eq!(document(&db, "doc-a").work_share, 50);
         }
@@ -2317,7 +2329,7 @@ fn an_edit_that_changes_nothing_writes_nothing() {
         DocumentEdit::Item {
             key: Some("phone".into()),
         },
-        DocumentEdit::WorkShare { value: 70 },
+        DocumentEdit::WorkShare { value: "70".into() },
         DocumentEdit::Note {
             text: "memo".into(),
         },
@@ -2378,8 +2390,8 @@ fn document_edits_are_read_from_the_pages_tagged_json() {
             DocumentEdit::Item { key: None },
         ),
         (
-            json!({ "field": "workShare", "value": 60 }),
-            DocumentEdit::WorkShare { value: 60 },
+            json!({ "field": "workShare", "value": "60" }),
+            DocumentEdit::WorkShare { value: "60".into() },
         ),
         (
             json!({ "field": "note", "text": "memo" }),
@@ -3798,7 +3810,7 @@ fn each_changed_field_reads_as_label_old_to_new_with_names_dates_and_amounts_res
             vec!["Item: — → books"],
         ),
         (
-            DocumentEdit::WorkShare { value: 50 },
+            DocumentEdit::WorkShare { value: "50".into() },
             vec!["Work share: 100 % → 50 %"],
         ),
         (

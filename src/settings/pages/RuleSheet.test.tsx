@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -9,6 +9,7 @@ import { ConfirmHost } from "../../components/ConfirmSheet";
 import { useStore } from "../../state/store";
 import { account } from "../../test/accounts";
 import { ITEMS, ruleForm, ruleView } from "../../test/lineRules";
+import { choose, popUpValue, withMenus } from "../../test/popup";
 import { renderWithQuery } from "../../test/renderWithQuery";
 import { RuleSheet } from "./RuleSheet";
 
@@ -18,11 +19,16 @@ const onClose = vi.fn();
 
 const renderSheet = (rule?: ReturnType<typeof ruleView>) =>
   renderWithQuery(
-    <>
-      <RuleSheet rule={rule} items={ITEMS} onClose={onClose} />
-      <ConfirmHost />
-    </>,
+    withMenus(
+      <>
+        <RuleSheet rule={rule} items={ITEMS} onClose={onClose} />
+        <ConfirmHost />
+      </>,
+    ),
   );
+
+/** The account list is a read; its menu is built from what has arrived when it opens. */
+const accountsLoaded = () => act(async () => void (await mocked.listAccounts.mock.results[0]?.value));
 
 const contains = () => screen.getByLabelText<HTMLInputElement>("Bank text contains");
 
@@ -59,14 +65,14 @@ describe("RuleSheet", () => {
 
     it("saves an assign-item rule with the amount, tolerance, account and own-counterparty flag", async () => {
       renderSheet();
-      await screen.findByRole("option", { name: "Savings" });
       await userEvent.type(contains(), "CLOUDBOX");
+      await accountsLoaded();
       await userEvent.type(screen.getByLabelText("Amount in €"), "25.95");
       await userEvent.type(screen.getByLabelText("Within ± €"), "0.50");
-      await userEvent.selectOptions(screen.getByLabelText("Account"), "Savings");
+      await choose(userEvent, "Account", "Savings");
       await userEvent.click(screen.getByRole("switch", { name: "Counterparty is one of my accounts" }));
       await userEvent.click(screen.getByRole("button", { name: "Assign item" }));
-      await userEvent.selectOptions(screen.getByLabelText("Item"), "KZ 169 · Digitale Arbeitsmittel");
+      await choose(userEvent, "Item", "KZ 169 · Digitale Arbeitsmittel");
 
       await userEvent.click(screen.getByRole("button", { name: "Add Rule" }));
 
@@ -104,11 +110,21 @@ describe("RuleSheet", () => {
       expect(contains().value).toBe("BILLA, SPAR");
       expect(screen.getByLabelText<HTMLInputElement>("Amount in €").value).toBe("12.00");
       expect(screen.getByLabelText<HTMLInputElement>("Within ± €").value).toBe("1.00");
-      await screen.findByRole("option", { name: "Savings" });
-      expect(screen.getByLabelText<HTMLSelectElement>("Account").value).toBe("acc-2");
+      await waitFor(() => expect(popUpValue("Account")).toBe("Savings"));
       expect(screen.getByRole("switch", { name: "Counterparty is one of my accounts" })).toBeChecked();
       expect(screen.getByRole("button", { name: "Assign item" }).getAttribute("aria-pressed")).toBe("true");
-      expect(screen.getByLabelText<HTMLSelectElement>("Item").value).toBe("books");
+      expect(popUpValue("Item")).toBe("KZ 720 · Fachliteratur");
+    });
+
+    it("saves nothing new when the current account and item are chosen again", async () => {
+      renderSheet(stored);
+      await waitFor(() => expect(popUpValue("Account")).toBe("Savings"));
+
+      await choose(userEvent, "Account", "Savings");
+      await choose(userEvent, "Item", "KZ 720 · Fachliteratur");
+      await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+      expect(mocked.ruleSave).toHaveBeenCalledWith("rule-1", expect.objectContaining({ accountId: "acc-2", itemKey: "books" }));
     });
 
     it("saves under the rule's id, then toasts Saved and closes", async () => {

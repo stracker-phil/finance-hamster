@@ -8,6 +8,7 @@ import { api } from "../api";
 import { useEvents } from "../queries/useEvents";
 import { HOME } from "../state/route";
 import { useStore } from "../state/store";
+import { choose as choosePopUp, popUpOptions, popUpValue, withMenus } from "../test/popup";
 import { renderWithQuery } from "../test/renderWithQuery";
 import { reviewLine, reviewQueue } from "../test/review";
 import { planChanged, subscriptionDetail, subscriptionForm } from "../test/subscriptions";
@@ -20,7 +21,7 @@ function Page() {
   return <ReviewPage />;
 }
 
-const render = () => renderWithQuery(<Page />);
+const render = () => renderWithQuery(withMenus(<Page />));
 
 async function emitDataChanged(tables: string[]) {
   await waitFor(() => expect(mocked.listen.mock.calls.some(([name]) => name === "data_changed")).toBe(true));
@@ -28,7 +29,11 @@ async function emitDataChanged(tables: string[]) {
   await act(async () => handler({ tables }));
 }
 
-const itemSelect = () => screen.getByLabelText<HTMLSelectElement>("Counts as");
+const itemPicker = () => screen.getByRole("button", { name: "Counts as" });
+const noPickers = () => {
+  expect(screen.queryByRole("button", { name: "Counts as" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Subscription" })).toBeNull();
+};
 const radio = (name: string) => screen.getByRole("radio", { name });
 const choose = (name: string) => userEvent.click(radio(name));
 const confirmButton = (label: string) => screen.getByRole<HTMLButtonElement>("button", { name: (name) => name.startsWith(label) });
@@ -117,7 +122,7 @@ describe("ReviewPage", () => {
       render();
 
       expect(await screen.findByText("last used for Example Bookshop")).toBeTruthy();
-      expect(itemSelect().value).toBe("kz-720");
+      expect(popUpValue("Counts as")).toBe("KZ 720 · Professional literature");
     });
 
     it("leaves the item unchosen when none was used before", async () => {
@@ -126,7 +131,7 @@ describe("ReviewPage", () => {
 
       await choose("ANV (A)");
 
-      expect(itemSelect().value).toBe("");
+      expect(popUpValue("Counts as")).toBe("Choose an item");
     });
   });
 
@@ -167,7 +172,8 @@ describe("ReviewPage", () => {
       await waitForLine();
 
       await choose("ANV (A)");
-      await userEvent.selectOptions(itemSelect(), "kz-169");
+      await choosePopUp(userEvent, "Counts as", "KZ 169 · Digital work equipment");
+      expect(popUpValue("Counts as")).toBe("KZ 169 · Digital work equipment");
       expect(screen.getByText("It counts for KZ 169 · Digital work equipment in its tax year.")).toBeTruthy();
       await confirm("Count as ANV");
 
@@ -196,22 +202,34 @@ describe("ReviewPage", () => {
       expect(mocked.reviewDecide).toHaveBeenCalledWith("line-1", "anv", "kz-720", null, false, null);
     });
 
-    it("shows the item select only for ANV and the Always checkbox only for ANV and Ignore", async () => {
+    it("keeps the prefilled item when it is chosen again in the picker", async () => {
+      mocked.reviewQueue.mockResolvedValue(reviewQueue({ lines: [reviewLine({ suggestion: "anv", itemKey: "kz-720", itemWhy: "last used for Example Bookshop" })] }));
       render();
       await waitForLine();
-      expect(screen.queryByRole("combobox")).toBeNull();
+
+      await choosePopUp(userEvent, "Counts as", "KZ 720 · Professional literature");
+
+      expect(screen.getByText("last used for Example Bookshop")).toBeTruthy();
+      await confirm("Count as ANV");
+      expect(mocked.reviewDecide).toHaveBeenCalledWith("line-1", "anv", "kz-720", null, false, null);
+    });
+
+    it("shows the item picker only for ANV and the Always checkbox only for ANV and Ignore", async () => {
+      render();
+      await waitForLine();
+      noPickers();
       expect(screen.queryByRole("checkbox")).toBeNull();
 
       await choose("ANV (A)");
-      expect(screen.getByLabelText("Counts as")).toBeTruthy();
+      expect(itemPicker()).toBeTruthy();
       expect(screen.getByRole("checkbox")).toBeTruthy();
 
       await choose("Ignore (I)");
-      expect(screen.queryByLabelText("Counts as")).toBeNull();
+      expect(screen.queryByRole("button", { name: "Counts as" })).toBeNull();
       expect(screen.getByRole("checkbox")).toBeTruthy();
 
       await choose("Subscription (S)");
-      expect(screen.queryByLabelText("Counts as")).toBeNull();
+      expect(screen.queryByRole("button", { name: "Counts as" })).toBeNull();
       expect(screen.queryByRole("checkbox")).toBeNull();
     });
 
@@ -279,7 +297,7 @@ describe("ReviewPage", () => {
       await confirm("Count as ANV");
 
       expect((await screen.findByRole("alert")).textContent).toBe("Choose an item for ANV.");
-      expect(document.activeElement).toBe(itemSelect());
+      expect(document.activeElement).toBe(itemPicker());
     });
 
     it("shows the message of any other error and keeps the line", async () => {
@@ -296,7 +314,7 @@ describe("ReviewPage", () => {
   });
 
   describe("deciding Subscription", () => {
-    const subscriptionPicker = () => screen.getByRole<HTMLSelectElement>("combobox", { name: "Subscription" });
+    const pickSubscription = (name: string) => choosePopUp(userEvent, "Subscription", name);
     const lumen = { id: "sub-1", name: "Lumen AI", letter: "L", tone: 1 };
 
     beforeEach(() => {
@@ -311,8 +329,8 @@ describe("ReviewPage", () => {
 
       await choose("Subscription (S)");
 
-      expect(subscriptionPicker().selectedOptions[0].textContent).toBe("A new subscription…");
-      expect(screen.getByRole("option", { name: "Lumen AI" })).toBeTruthy();
+      expect(popUpValue("Subscription")).toBe("A new subscription…");
+      expect(await popUpOptions(userEvent, "Subscription")).toEqual(["A new subscription…", "Lumen AI"]);
       expect(screen.getByText("Opens New Subscription with this line, to check before saving.")).toBeTruthy();
     });
 
@@ -365,7 +383,8 @@ describe("ReviewPage", () => {
       await waitForLine();
       await choose("Subscription (S)");
 
-      await userEvent.selectOptions(subscriptionPicker(), "sub-1");
+      await pickSubscription("Lumen AI");
+      expect(popUpValue("Subscription")).toBe("Lumen AI");
       expect(screen.getByText("It becomes a charge of Lumen AI.")).toBeTruthy();
       await confirm("Link to Lumen AI");
 
@@ -377,7 +396,7 @@ describe("ReviewPage", () => {
       render();
       await waitForLine();
       await choose("Subscription (S)");
-      await userEvent.selectOptions(subscriptionPicker(), "sub-1");
+      await pickSubscription("Lumen AI");
       await userEvent.click(screen.getByRole("heading", { name: "Example Bookshop" }));
 
       await userEvent.keyboard("{Enter}");
@@ -391,7 +410,7 @@ describe("ReviewPage", () => {
       await choose("ANV (A)");
       await userEvent.click(screen.getByRole("checkbox", { name: "Also decide every line containing EXAMPLEBOOKS this way" }));
       await choose("Subscription (S)");
-      await userEvent.selectOptions(subscriptionPicker(), "sub-1");
+      await pickSubscription("Lumen AI");
 
       await confirm("Link to Lumen AI");
       await waitFor(() => expect(mocked.reviewDecide).toHaveBeenCalledWith("line-1", "subscription", null, "sub-1", false, null));
@@ -405,10 +424,10 @@ describe("ReviewPage", () => {
       render();
       await waitForLine();
       await choose("Subscription (S)");
-      await userEvent.selectOptions(subscriptionPicker(), "sub-1");
+      await pickSubscription("Lumen AI");
 
       await choose("ANV (A)");
-      await userEvent.selectOptions(itemSelect(), "kz-169");
+      await choosePopUp(userEvent, "Counts as", "KZ 169 · Digital work equipment");
       await confirm("Count as ANV");
 
       expect(mocked.reviewDecide).toHaveBeenCalledWith("line-1", "anv", "kz-169", null, false, null);
@@ -609,8 +628,7 @@ describe("ReviewPage", () => {
       render();
 
       await waitForPlan();
-      expect(screen.queryByLabelText("Counts as")).toBeNull();
-      expect(screen.queryByRole("combobox")).toBeNull();
+      noPickers();
       expect(screen.queryByRole("checkbox")).toBeNull();
     });
 
@@ -729,7 +747,7 @@ describe("ReviewPage", () => {
         expect(radio("ANV (A)").getAttribute("aria-checked")).toBe("true");
         expect(radio("Subscription (S)").getAttribute("aria-checked")).toBe("false");
         expect(radio("Ignore (I)").getAttribute("aria-checked")).toBe("false");
-        expect(itemSelect()).toBeTruthy();
+        expect(itemPicker()).toBeTruthy();
       });
 
       it("opens the New sheet from the line with Subscription", async () => {

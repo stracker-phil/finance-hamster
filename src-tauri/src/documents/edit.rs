@@ -33,8 +33,9 @@ pub enum DocumentEdit {
         key: Option<String>,
     },
     /// Percent.
+    /// As typed: `60`, `60 %`.
     WorkShare {
-        value: i64,
+        value: String,
     },
     Note {
         text: String,
@@ -153,10 +154,14 @@ pub fn edit(
             }
         },
         DocumentEdit::WorkShare { value } => {
-            if !(0..=100).contains(value) {
-                return Err(invalid("workShare", "A share between 0 and 100 %"));
-            }
-            after.work_share = *value;
+            after.work_share = value
+                .trim()
+                .trim_end_matches('%')
+                .trim()
+                .parse::<i64>()
+                .ok()
+                .filter(|share| (0..=100).contains(share))
+                .ok_or_else(|| invalid("workShare", "A share between 0 and 100 %"))?;
         }
         DocumentEdit::Note { text } => after.note = text.clone(),
         DocumentEdit::Invoice { amount, currency } => {

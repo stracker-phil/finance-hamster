@@ -1,3 +1,4 @@
+import { useStore } from "../state/store";
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useCoversPdf } from "../lib/pdfCover";
@@ -20,6 +21,9 @@ const FOCUSABLE = 'a[href], button:not(:disabled), input:not(:disabled), select:
 function focusables(root: HTMLElement): HTMLElement[] {
   return [...root.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => !el.hidden);
 }
+
+/** The open sheets, oldest first. */
+const openSheets: object[] = [];
 
 /** A sheet over a scrim: Escape closes it, Tab stays inside, and focus returns to the element that opened it.
  *  The scrim over the toolbar still drags the window. */
@@ -44,14 +48,20 @@ export function Modal({ onClose, role = "dialog", labelledBy, describedBy, class
   }, [opener]);
 
   useEffect(() => {
-    // Capture phase, stopped here: the window's own Escape never also runs.
+    const self = {};
+    openSheets.push(self);
+    // Capture phase, stopped here: the window's own Escape never also runs. Every open sheet listens on the
+    // window, so only the topmost answers, and none while a menu is open (the menu closes first).
     const onKey = (e: globalThis.KeyboardEvent) => {
-      if (e.key !== "Escape") return;
+      if (e.key !== "Escape" || openSheets.at(-1) !== self || useStore.getState().menu) return;
       e.stopPropagation();
       onCloseRef.current();
     };
     window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
+    return () => {
+      window.removeEventListener("keydown", onKey, true);
+      openSheets.splice(openSheets.indexOf(self), 1);
+    };
   }, []);
 
   const trapTab = (e: KeyboardEvent) => {

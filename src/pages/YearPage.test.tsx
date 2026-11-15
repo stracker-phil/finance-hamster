@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
 
 import { api, type AttentionView } from "../api";
+import { MenuHost } from "../components/menu";
 import { HOME } from "../state/route";
 import { useStore } from "../state/store";
 import { addPreview } from "../test/documents";
@@ -16,13 +17,18 @@ const mocked = vi.mocked(api, true);
 
 const show = async (patch: Parameters<typeof yearPage>[0] = {}) => {
   mocked.yearPage.mockResolvedValue(yearPage(patch));
-  renderWithQuery(<YearPage year={2026} />);
+  renderWithQuery(
+    <>
+      <YearPage year={2026} />
+      <MenuHost />
+    </>,
+  );
   await screen.findByText("Total to enter for 2026 · ruleset 2026 v1");
 };
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useStore.setState({ route: HOME, back: [], forward: [], filter: "", toasts: [], addPreview: null, pdfCovers: 0 });
+  useStore.setState({ route: HOME, back: [], forward: [], filter: "", toasts: [], addPreview: null, pdfCovers: 0, menu: null });
 });
 
 describe("YearPage", () => {
@@ -689,6 +695,43 @@ describe("YearPage", () => {
       mocked.yearReopen.mockResolvedValue("Reopen Tax Year 2026");
       mocked.yearOpenSnapshot.mockResolvedValue(undefined);
       mocked.yearExportSummary.mockResolvedValue(false);
+    });
+
+    it("opens under the button as a menu named after the year", async () => {
+      await show();
+
+      await openMenu();
+
+      expect(screen.getByRole("menu", { name: "Tax Year 2026" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "More" }).getAttribute("aria-expanded")).toBe("true");
+    });
+
+    it("closes on Escape without choosing a row", async () => {
+      await show();
+      await openMenu();
+
+      await userEvent.keyboard("{Escape}");
+
+      expect(screen.queryByRole("menu")).toBeNull();
+      expect(useStore.getState().route).toEqual(HOME);
+    });
+
+    it("closes on a press outside the menu", async () => {
+      await show();
+      await openMenu();
+
+      await userEvent.click(screen.getByText("Total to enter for 2026 · ruleset 2026 v1"));
+
+      expect(screen.queryByRole("menu")).toBeNull();
+    });
+
+    it("closes when its button is clicked again", async () => {
+      await show();
+      await openMenu();
+
+      await openMenu();
+
+      expect(screen.queryByRole("menu")).toBeNull();
     });
 
     it("opens the Log of the year", async () => {

@@ -1,3 +1,4 @@
+import { PopUpButton } from "../components/menu";
 import type { RefObject } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Info } from "lucide-react";
@@ -24,7 +25,7 @@ interface Props {
   term: string;
   error: string | null;
   busy: boolean;
-  itemSelect: RefObject<HTMLSelectElement | null>;
+  itemSelect: RefObject<HTMLButtonElement | null>;
   onPick: (key: string) => void;
   onConfirm: () => void;
   onItem: (key: string) => void;
@@ -48,14 +49,13 @@ function LineDetails({ line, choice, items, item, itemChosen, subscriptions, sub
       return (
         <div className="review-card__item">
           <label htmlFor="review-item">Counts as</label>
-          <select id="review-item" ref={itemSelect} className="field" value={item} onChange={(e) => onItem(e.target.value)}>
-            <option value="">Choose an item</option>
-            {items.map((i) => (
-              <option key={i.key} value={i.key}>
-                {i.label}
-              </option>
-            ))}
-          </select>
+          <PopUpButton
+            id="review-item"
+            ref={itemSelect}
+            value={item}
+            options={[{ value: "", label: "Choose an item" }, ...items.map((i) => ({ value: i.key, label: i.label }))]}
+            onChange={onItem}
+          />
           {line.itemWhy && !itemChosen && <span className="review-card__why">{line.itemWhy}</span>}
         </div>
       );
@@ -63,14 +63,12 @@ function LineDetails({ line, choice, items, item, itemChosen, subscriptions, sub
       return (
         <div className="review-card__item">
           <label htmlFor="review-subscription">Subscription</label>
-          <select id="review-subscription" className="field" value={subscription} onChange={(e) => onSubscription(e.target.value)}>
-            <option value={NEW_SUBSCRIPTION}>A new subscription…</option>
-            {subscriptions.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
+          <PopUpButton
+            id="review-subscription"
+            value={subscription}
+            options={[{ value: NEW_SUBSCRIPTION, label: "A new subscription…" }, ...subscriptions.map((s) => ({ value: s.id, label: s.name }))]}
+            onChange={onSubscription}
+          />
         </div>
       );
     default:

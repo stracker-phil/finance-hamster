@@ -140,13 +140,16 @@ fn token_after<'a>(text: &'a str, label: &str) -> Option<&'a str> {
     text.split_once(label)?.1.split_whitespace().next()
 }
 
-/// `SPESEN: 0,49 KURS: 1,0912 VOM: 06.11.2026`.
+/// `SPESEN: 0,49 KURS: 1,0912 VOM: 06.11.2026`; a line without `SPESEN:` charged no fee.
 fn fx(text: &str) -> Option<Fx> {
-    let fee = token_after(text, "SPESEN:")?;
+    let fee = match token_after(text, "SPESEN:") {
+        Some(fee) => amount(fee)?,
+        None => 0,
+    };
     let rate = token_after(text, "KURS:")?;
     let day = token_after(text, "VOM:")?;
     Some(Fx {
-        fee: amount(fee)?,
+        fee,
         rate: rate.to_string(),
         rate_date: date(day)?,
     })

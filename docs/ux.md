@@ -108,8 +108,10 @@ None are styled; every scroll box has `.scroller` and starts below its title row
 12px radius, `--border`, `--shadow-popover`, 6px padding; rows 30px, 7px radius, 13px text; optional icon,
 hint or key (muted), check or ›; caps caption; hairline between groups; destructive rows in `--danger-text`.
 Opens at the mouse or under its button, flips, then shifts inside the window; closes on Esc, outside press,
-scroll, blur, resize or a choice; ↑↓, Home/End, ↩/Space, letters jump, →/← submenus. Pickers with long lists
-(bank line, vendor, subscription) get a search field.
+scroll, blur, resize or a choice; focus returns to its button; ↑↓ wrapping, Home/End, ↩/Space, letters jump.
+A button's menu starts on its checked row. Every menu (+ New, the tax year's …, pop-up buttons) is the one
+`MenuHost`; a `PopUpButton` replaces `<select>` and keeps the width of its widest choice. Pickers with long
+lists (bank line, vendor, subscription) get a search field.
 
 ## Tooltips (ADR 0029)
 One host per window; 450ms, instant within 600ms, on focus; below or above, ≤420px; ends with the current

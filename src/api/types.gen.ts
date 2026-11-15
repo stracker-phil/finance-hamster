@@ -218,7 +218,7 @@ export type DocState = "draft" | "finished" | "excluded";
 /**
  * One field of the Document page.
  */
-export type DocumentEdit = { "field": "payDate", value: string | null, } | { "field": "paid", value: string | null, } | { "field": "vendor", name: string, } | { "field": "item", key: string | null, } | { "field": "workShare", value: number, } | { "field": "note", text: string, } | { "field": "invoice", amount: string | null, currency: string, } | { "field": "usefulLife", years: number | null, } | { "field": "link", line: string, } | { "field": "unlink", line: string, };
+export type DocumentEdit = { "field": "payDate", value: string | null, } | { "field": "paid", value: string | null, } | { "field": "vendor", name: string, } | { "field": "item", key: string | null, } | { "field": "workShare", value: string, } | { "field": "note", text: string, } | { "field": "invoice", amount: string | null, currency: string, } | { "field": "usefulLife", years: number | null, } | { "field": "link", line: string, } | { "field": "unlink", line: string, };
 
 export type DocumentGroup = { 
 /**

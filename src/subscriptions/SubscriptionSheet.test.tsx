@@ -9,6 +9,7 @@ import { api, type SubscriptionForm } from "../api";
 import { createQueryClient } from "../queries/queryClient";
 import { SETTINGS_KEY } from "../queries/settings";
 import { useStore } from "../state/store";
+import { choose, popUpValue, withMenus } from "../test/popup";
 import { renderWithQuery } from "../test/renderWithQuery";
 import { reviewLine } from "../test/review";
 import { settings } from "../test/settings";
@@ -35,8 +36,10 @@ const EMPTY_FORM: SubscriptionForm = {
 };
 
 function renderSheet({ id = null, initial = null, onClose = vi.fn() }: { id?: string | null; initial?: SubscriptionForm | null; onClose?: () => void } = {}) {
-  return renderWithQuery(<SubscriptionSheet id={id} initial={initial} onClose={onClose} />);
+  return renderWithQuery(withMenus(<SubscriptionSheet id={id} initial={initial} onClose={onClose} />));
 }
+
+const itemLoaded = (label: string) => waitFor(() => expect(popUpValue("Item")).toBe(label));
 
 const submit = () => userEvent.click(screen.getByRole("button", { name: "Add Subscription" }));
 
@@ -83,7 +86,7 @@ describe("SubscriptionSheet", () => {
       await userEvent.type(screen.getByLabelText("Amount"), "5");
 
       await userEvent.click(screen.getByRole("button", { name: "Yearly" }));
-      await userEvent.selectOptions(screen.getByLabelText("Reminder"), "one_week");
+      await choose(userEvent, "Reminder", "1 week before");
       await userEvent.type(screen.getByLabelText("Category"), "Media");
       await userEvent.clear(screen.getByLabelText("Currency"));
       await userEvent.type(screen.getByLabelText("Currency"), "usd");
@@ -93,14 +96,27 @@ describe("SubscriptionSheet", () => {
       expect(mocked.subscriptionSave).toHaveBeenCalledWith(null, { ...EMPTY_FORM, name: "Lumen AI", amount: "5", interval: "yearly", reminder: "one_week", category: "Media", currency: "USD", matchText: "LUMEN" });
     });
 
+    it("shows the standard reminder and keeps it when chosen again", async () => {
+      renderSheet();
+      expect(popUpValue("Reminder")).toBe("3 days before");
+      await userEvent.type(screen.getByLabelText("Name"), "Lumen AI");
+      await userEvent.type(screen.getByLabelText("Amount"), "20.00");
+
+      await choose(userEvent, "Reminder", "3 days before");
+      await submit();
+
+      expect(mocked.subscriptionSave).toHaveBeenCalledWith(null, { ...EMPTY_FORM, name: "Lumen AI", amount: "20.00" });
+    });
+
     it("starts with the default reminder from Settings", async () => {
       const client = createQueryClient();
       client.setQueryData(SETTINGS_KEY, settings({ defaultReminder: "one_week" }));
       render(
         <QueryClientProvider client={client}>
-          <SubscriptionSheet id={null} initial={null} onClose={vi.fn()} />
+          {withMenus(<SubscriptionSheet id={null} initial={null} onClose={vi.fn()} />)}
         </QueryClientProvider>,
       );
+      await waitFor(() => expect(popUpValue("Reminder")).toBe("1 week before"));
       await userEvent.type(screen.getByLabelText("Name"), "Lumen AI");
       await userEvent.type(screen.getByLabelText("Amount"), "20.00");
 
@@ -190,7 +206,7 @@ describe("SubscriptionSheet", () => {
 
     it("reveals the Item select when the switch is turned on and sends the first item", async () => {
       renderSheet({ initial: subscriptionForm({ itemKey: "kz-720" }) });
-      await screen.findByRole("option", { name: "KZ 169 · Digital work equipment" });
+      await itemLoaded("KZ 720 · Professional literature");
       await userEvent.click(screen.getByRole("switch"));
       expect(screen.queryByLabelText("Item")).toBeNull();
 
@@ -203,12 +219,23 @@ describe("SubscriptionSheet", () => {
 
     it("sends the item that was chosen", async () => {
       renderSheet({ initial: subscriptionForm({ itemKey: "kz-169" }) });
-      await screen.findByRole("option", { name: "KZ 720 · Professional literature" });
+      await itemLoaded("KZ 169 · Digital work equipment");
 
-      await userEvent.selectOptions(screen.getByLabelText("Item"), "kz-720");
+      await choose(userEvent, "Item", "KZ 720 · Professional literature");
       await submit();
 
+      expect(popUpValue("Item")).toBe("KZ 720 · Professional literature");
       expect(mocked.subscriptionSave).toHaveBeenCalledWith(null, expect.objectContaining({ itemKey: "kz-720" }));
+    });
+
+    it("keeps the item when the current one is chosen again", async () => {
+      renderSheet({ initial: subscriptionForm({ itemKey: "kz-169" }) });
+      await itemLoaded("KZ 169 · Digital work equipment");
+
+      await choose(userEvent, "Item", "KZ 169 · Digital work equipment");
+      await submit();
+
+      expect(mocked.subscriptionSave).toHaveBeenCalledWith(null, expect.objectContaining({ itemKey: "kz-169" }));
     });
 
     it("hides the Item select and sends no item when the switch is turned off", async () => {

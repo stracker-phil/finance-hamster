@@ -1,5 +1,6 @@
 import type { AddPreview, ImportPreview, PlanForm, ReviewLine, SubscriptionForm } from "../api";
 import { create } from "zustand";
+import type { MenuAt, MenuEntry, OpenMenu } from "../components/menu/types";
 import { HOME, sameRoute, type Route } from "./route";
 
 export type ToastKind = "success" | "info" | "error";
@@ -67,6 +68,12 @@ export interface AppStore {
   coverPdf: () => void;
   uncoverPdf: () => void;
 
+  /** The one open menu (ADR 0030). */
+  menu: OpenMenu | null;
+  /** Shows a menu, replacing an open one; opening it again on the same element closes it. */
+  openMenu: (entries: MenuEntry[], at: MenuAt, label?: string) => void;
+  closeMenu: () => void;
+
   confirmation: Confirmation | null;
   /** Shows the sheet; resolves true when the owner confirms, false on Cancel or Escape. A new question
    *  replaces an open one, which resolves false. */
@@ -74,6 +81,7 @@ export interface AppStore {
 }
 
 let nextToastId = 1;
+let nextMenuId = 1;
 
 /** A plain toast equal to the last one adds to its count instead of stacking. */
 const repeats = (last: Toast, kind: ToastKind, message: string, action?: Toast["action"]) =>
@@ -132,6 +140,15 @@ export const useStore = create<AppStore>((set, get) => ({
   pdfCovers: 0,
   coverPdf: () => set({ pdfCovers: get().pdfCovers + 1 }),
   uncoverPdf: () => set({ pdfCovers: Math.max(0, get().pdfCovers - 1) }),
+
+  menu: null,
+  openMenu: (entries, at, label = "Menu") => {
+    if (at instanceof HTMLElement && get().menu?.at === at) return set({ menu: null });
+    const focused = document.activeElement;
+    const opener = at instanceof HTMLElement ? at : focused instanceof HTMLElement && focused !== document.body ? focused : null;
+    set({ menu: { id: nextMenuId++, entries, at, label, opener } });
+  },
+  closeMenu: () => set({ menu: null }),
 
   confirmation: null,
   confirm: (question) =>

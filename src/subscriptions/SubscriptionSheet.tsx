@@ -1,3 +1,4 @@
+import { PopUpButton } from "../components/menu";
 import { useId, useState, type FormEvent } from "react";
 import { api, toAppError, type Interval, type Reminder, type ReviewLine, type SubscriptionForm } from "../api";
 import { Modal } from "../components/Modal";
@@ -160,13 +161,7 @@ export function SubscriptionSheet({ id, initial, source, onClose }: { id: string
               </datalist>
             </div>
             <label htmlFor={field("reminder")}>Reminder</label>
-            <select id={field("reminder")} className="field" value={form.reminder} onChange={(e) => set({ reminder: e.target.value as Reminder })}>
-              {REMINDERS.map((r) => (
-                <option key={r.value} value={r.value}>
-                  {r.label}
-                </option>
-              ))}
-            </select>
+            <PopUpButton id={field("reminder")} value={form.reminder} options={REMINDERS} onChange={(reminder: Reminder) => set({ reminder })} />
           </div>
 
           <h3 className="sub-sheet__heading">ANV</h3>
@@ -183,13 +178,13 @@ export function SubscriptionSheet({ id, initial, source, onClose }: { id: string
                 <label htmlFor={field("item")} className="sub-group__text">
                   Item
                 </label>
-                <select id={field("item")} className="field" value={form.itemKey} aria-invalid={!!message("item")} onChange={(e) => set({ itemKey: e.target.value })}>
-                  {items.map((i) => (
-                    <option key={i.key} value={i.key}>
-                      {i.label}
-                    </option>
-                  ))}
-                </select>
+                <PopUpButton
+                  id={field("item")}
+                  aria-invalid={!!message("item")}
+                  value={form.itemKey}
+                  options={items.map((i) => ({ value: i.key, label: i.label }))}
+                  onChange={(itemKey) => set({ itemKey })}
+                />
               </div>
             )}
           </div>

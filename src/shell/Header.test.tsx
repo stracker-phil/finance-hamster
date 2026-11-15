@@ -1,10 +1,11 @@
-import { screen } from "@testing-library/react";
+import { act, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
 
 import { api } from "../api";
+import { MenuHost } from "../components/menu";
 import { HOME, type Route } from "../state/route";
 import { useStore } from "../state/store";
 import { renderWithQuery } from "../test/renderWithQuery";
@@ -18,13 +19,80 @@ const YEAR: Route = { page: "year", year: 2026 };
 const field = (name: string) => screen.getByRole("textbox", { name });
 
 function renderHeader(route: Route = YEAR) {
-  renderWithQuery(<Header route={route} title={{ title: "Header" }} />);
+  renderWithQuery(
+    <>
+      <Header route={route} title={{ title: "Header" }} />
+      <MenuHost />
+    </>,
+  );
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useStore.setState({ route: HOME, back: [], forward: [], filter: "", paletteOpen: false, paletteQuery: "", toasts: [], pdfCovers: 0 });
+  useStore.setState({ route: HOME, back: [], forward: [], filter: "", paletteOpen: false, paletteQuery: "", toasts: [], pdfCovers: 0, menu: null, subscriptionSheet: null });
   mocked.searchElsewhere.mockResolvedValue([]);
+  mocked.listCommands.mockResolvedValue([]);
+});
+
+describe("Header New menu", () => {
+  const newButton = () => screen.getByRole("button", { name: /New/ });
+  const openNew = async () => {
+    await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+    await userEvent.click(newButton());
+  };
+
+  it("lists the creation commands with the shortcut the command has now", async () => {
+    mocked.listCommands.mockResolvedValue([
+      { id: "statement:import", title: "Import Statement…", shortcut: "⌘I", custom: false },
+      { id: "document:add", title: "Add Invoice PDF…", shortcut: "⌥⌘O", custom: true },
+      { id: "subscription:new", title: "New Subscription", shortcut: null, custom: false },
+    ]);
+    renderHeader();
+
+    await openNew();
+
+    const menu = screen.getByRole("menu", { name: "New" });
+    expect(within(menu).getAllByRole("menuitem").map((i) => i.textContent)).toEqual(["Import Statement…⌘I", "Add Invoice PDF…⌥⌘O", "New Subscription"]);
+    expect(newButton().getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("shows no hints while the commands are unknown", async () => {
+    renderHeader();
+
+    await openNew();
+
+    expect(within(screen.getByRole("menu", { name: "New" })).getAllByRole("menuitem").map((i) => i.textContent)).toEqual(["Import Statement…", "Add Invoice PDF…", "New Subscription"]);
+  });
+
+  it("asks for a new subscription when its row is chosen, and closes the menu", async () => {
+    renderHeader();
+    await openNew();
+
+    await userEvent.click(screen.getByRole("menuitem", { name: "New Subscription" }));
+
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(useStore.getState().subscriptionSheet).not.toBeNull();
+  });
+
+  it("closes on Escape and returns the focus to the New button", async () => {
+    renderHeader();
+    await openNew();
+
+    await userEvent.keyboard("{Escape}");
+
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(document.activeElement).toBe(newButton());
+    expect(newButton().getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("closes on a press outside the menu", async () => {
+    renderHeader();
+    await openNew();
+
+    await userEvent.click(screen.getByRole("heading", { level: 1 }));
+
+    expect(screen.queryByRole("menu")).toBeNull();
+  });
 });
 
 describe("Header filter field", () => {

@@ -53,7 +53,7 @@ export function ReviewPage() {
   const [session, setSession] = useState({ decided: 0, rules: 0 });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const itemSelect = useRef<HTMLSelectElement>(null);
+  const itemSelect = useRef<HTMLButtonElement>(null);
   const lines = data?.lines ?? [];
   const index = Math.min(position, Math.max(lines.length - 1, 0));
   const line = lines[index] as ReviewLine | undefined;

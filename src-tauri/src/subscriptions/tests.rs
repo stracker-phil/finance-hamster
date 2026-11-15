@@ -693,6 +693,31 @@ fn a_charge_at_the_end_of_a_long_month_is_followed_by_the_end_of_the_short_one()
 }
 
 #[test]
+fn leap_day_and_month_end_charges_land_on_the_last_day_of_the_shorter_month() {
+    let sub = subscription_row("s", "S", "S");
+    let monthly = plan_row("p", "s", 1_000, "2026-01-01", None);
+    let yearly = plan_with(monthly.clone(), Interval::Yearly, "EUR");
+
+    for (plan, last_charge, expected) in [
+        (yearly.clone(), "2028-02-29", day(2029, 2, 28)),
+        (yearly, "2027-02-28", day(2028, 2, 28)),
+        (monthly.clone(), "2028-01-31", day(2028, 2, 29)),
+        (monthly, "2027-01-31", day(2027, 2, 28)),
+    ] {
+        assert_eq!(
+            next_charge(
+                &sub,
+                std::slice::from_ref(&plan),
+                &[line("l1", last_charge, -1_000, "S")]
+            ),
+            Some(expected),
+            "{:?} after {last_charge}",
+            plan.interval
+        );
+    }
+}
+
+#[test]
 fn without_a_charge_the_next_one_is_the_plans_start() {
     let sub = subscription_row("s", "S", "S");
 
@@ -757,6 +782,10 @@ fn the_monthly_cost_divides_the_plans_euro_amount_by_its_interval() {
         (1_299, Interval::Monthly, 1_299),
         (2_997, Interval::Quarterly, 999),
         (12_000, Interval::Yearly, 1_000),
+        (10_000, Interval::Yearly, 833),
+        (10_006, Interval::Yearly, 834),
+        (1_000, Interval::Quarterly, 333),
+        (2_000, Interval::Quarterly, 667),
     ] {
         let plan = plan_with(
             plan_row("p", "s", cents, "2026-01-01", None),

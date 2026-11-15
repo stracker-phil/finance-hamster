@@ -1,3 +1,4 @@
+import { PopUpButton } from "../components/menu";
 import { useId } from "react";
 import type { DepreciationView } from "../api";
 
@@ -12,14 +13,14 @@ export function DepreciationBlock({ depreciation, disabled, onYears }: { depreci
       <div className="doc-form__grid">
         <label htmlFor={`${id}-life`}>Useful life</label>
         <div className="doc-form__row">
-          <select id={`${id}-life`} className="field depreciation__life" value={depreciation.own ? depreciation.years : ""} disabled={disabled} onChange={(e) => onYears(e.target.value ? Number(e.target.value) : null)}>
-            <option value="">As the rules say</option>
-            {YEARS.map((y) => (
-              <option key={y} value={y}>
-                {y} {y === 1 ? "year" : "years"}
-              </option>
-            ))}
-          </select>
+          <PopUpButton
+            id={`${id}-life`}
+            className="depreciation__life"
+            value={depreciation.own ? depreciation.years : 0}
+            disabled={disabled}
+            options={[{ value: 0, label: "As the rules say" }, ...YEARS.map((y) => ({ value: y, label: `${y} ${y === 1 ? "year" : "years"}` }))]}
+            onChange={(years) => onYears(years || null)}
+          />
           <span className="add-doc__hint">{depreciation.rule}</span>
         </div>
         <span>Why</span>

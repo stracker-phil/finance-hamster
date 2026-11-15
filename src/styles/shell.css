@@ -53,7 +53,6 @@
 .header__sub { font-size: 13px; color: var(--text-muted); white-space: nowrap; }
 .header__slot { display: flex; align-items: center; gap: 8px; }
 .header__spacer { flex: 1; }
-.header__anchor { position: relative; flex: none; }
 .filter-field {
   width: 200px; height: 30px; flex: none; padding: 0 6px 0 9px; border: 1px solid var(--border); border-radius: 8px;
   background: var(--panel-subtle-bg); display: flex; align-items: center; gap: 7px; color: var(--text-muted); font-size: 13px;
@@ -70,7 +69,6 @@
   gap: 10px; padding: 24px; text-align: center; color: var(--text-muted); font-size: 13px;
 }
 .empty-page__title { font-size: 17px; font-weight: 700; color: var(--text); }
-.new-menu { top: 38px; right: 0; width: 240px; }
 
 /* First run: no sidebar, one card in the middle of the window. */
 .window--first-run { flex-direction: column; align-items: center; background: var(--panel-bg); }

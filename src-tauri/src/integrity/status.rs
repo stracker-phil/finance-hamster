@@ -117,33 +117,44 @@ fn statement_rows(db: &Db, today: NaiveDate, order: DateOrder) -> AppResult<Vec<
 }
 
 fn journal_row(db: &Db, config_dir: &Path) -> AppResult<StatusRow> {
-    let in_db: i64 =
-        db.read(|c| Ok(c.query_row("SELECT COUNT(*) FROM journal", [], |r| r.get(0))?))?;
-    let in_file = std::fs::read_to_string(config_dir.join(journal::FILE_NAME))
-        .map(|text| text.lines().filter(|l| !l.trim().is_empty()).count() as i64)
-        .unwrap_or(0);
-    let checked = if in_db == in_file {
+    let path = config_dir.join(journal::FILE_NAME);
+    let mirror = db.read(|c| journal::compare(c, &path))?;
+    let checked = if let Some(first) = mirror.edited.first() {
         row(
             "Journal",
             format!(
-                "{} · {in_db} entries · matches the database",
-                journal::FILE_NAME
+                "{} · {} entries differ from the database, the first is entry {first}",
+                journal::FILE_NAME,
+                mirror.edited.len()
             ),
-            "OK",
-            Tone::Ok,
+            "Edited",
+            Tone::Error,
+        )
+    } else if mirror.behind() > 0 {
+        row(
+            "Journal",
+            format!(
+                "{} · {} entries, the database has {}; caught up at the next write",
+                journal::FILE_NAME,
+                mirror.matching,
+                mirror.rows
+            ),
+            "Behind",
+            Tone::Warning,
         )
     } else {
         row(
             "Journal",
             format!(
-                "{} · {in_file} lines, the database has {in_db}; caught up at the next launch",
-                journal::FILE_NAME
+                "{} · {} entries · matches the database",
+                journal::FILE_NAME,
+                mirror.rows
             ),
-            "Behind",
-            Tone::Warning,
+            "OK",
+            Tone::Ok,
         )
     };
-    Ok(checked.copying(config_dir.join(journal::FILE_NAME).display().to_string()))
+    Ok(checked.copying(path.display().to_string()))
 }
 
 fn checksum_row(check: Option<&FileCheck>, order: DateOrder) -> StatusRow {
@@ -562,13 +573,66 @@ mod tests {
             row(
                 "Journal",
                 format!(
-                    "journal.jsonl · 0 lines, the database has {}; caught up at the next launch",
+                    "journal.jsonl · 0 entries, the database has {}; caught up at the next write",
                     journal_entries(&db)
                 ),
                 "Behind",
                 Tone::Warning
             )
             .copying(dir.path().join("journal.jsonl").display().to_string())
+        );
+    }
+
+    #[test]
+    fn a_journal_file_with_changed_lines_is_edited_and_names_the_first_entry() {
+        let (dir, db) = open_with_accounts_and_year();
+        let journal_path = dir.path().join(journal::FILE_NAME);
+        let text = std::fs::read_to_string(&journal_path).unwrap();
+        let mut lines: Vec<String> = text.lines().map(String::from).collect();
+        let first_seq = serde_json::from_str::<journal::Entry>(&lines[0])
+            .unwrap()
+            .seq;
+        for line in &mut lines[..2] {
+            *line = line.replacen("\"label\":\"", "\"label\":\"Edited ", 1);
+        }
+        std::fs::write(&journal_path, format!("{}\n", lines.join("\n"))).unwrap();
+
+        assert_eq!(
+            row_of(&groups(&db, dir.path(), None), "Files", "Journal"),
+            row(
+                "Journal",
+                format!(
+                    "journal.jsonl · 2 entries differ from the database, the first is entry {first_seq}"
+                ),
+                "Edited",
+                Tone::Error
+            )
+            .copying(journal_path.display().to_string())
+        );
+    }
+
+    #[test]
+    fn a_journal_file_missing_a_line_in_the_middle_is_edited() {
+        let (dir, db) = open_with_accounts_and_year();
+        let journal_path = dir.path().join(journal::FILE_NAME);
+        let text = std::fs::read_to_string(&journal_path).unwrap();
+        let mut lines: Vec<&str> = text.lines().collect();
+        let removed = serde_json::from_str::<journal::Entry>(lines.remove(1))
+            .unwrap()
+            .seq;
+        std::fs::write(&journal_path, format!("{}\n", lines.join("\n"))).unwrap();
+
+        assert_eq!(
+            row_of(&groups(&db, dir.path(), None), "Files", "Journal"),
+            row(
+                "Journal",
+                format!(
+                    "journal.jsonl · 1 entries differ from the database, the first is entry {removed}"
+                ),
+                "Edited",
+                Tone::Error
+            )
+            .copying(journal_path.display().to_string())
         );
     }
 

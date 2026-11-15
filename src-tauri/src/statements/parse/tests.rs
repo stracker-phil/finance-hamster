@@ -84,9 +84,48 @@ fn printed_amounts_read_as_signed_cents() {
         ("-", None),
         ("12,5x", None),
         ("99999999999999999999,00", None),
+        ("12.34,56", None),
+        ("1.2345,00", None),
+        (".123,00", None),
+        ("1..234,00", None),
+        ("1.234.56,00", None),
+        ("12.345.678,90", Some(1_234_567_890)),
+        ("5,00", Some(500)),
     ] {
         assert_eq!(amount(text), expected, "{text:?}");
     }
+}
+
+#[test]
+fn a_foreign_currency_line_without_a_fee_keeps_its_rate_and_date_with_fee_zero() {
+    let statement = with_lines(vec![booking(
+        "E-COMM 24,00 USD K1 08.10. 00:00",
+        &["LUMEN AI SAN FRANCISCO 840", "KURS: 1,0912 VOM: 06.10.2026"],
+        date(2026, 10, 10),
+        -2_200,
+    )]);
+    assert_eq!(
+        read(&statement).lines[0].fx,
+        Some(Fx {
+            fee: 0,
+            rate: "1,0912".into(),
+            rate_date: date(2026, 10, 6),
+        })
+    );
+}
+
+#[test]
+fn an_fx_line_with_an_unreadable_fee_is_not_taken_as_fx() {
+    let statement = with_lines(vec![booking(
+        "E-COMM 24,00 USD K1 08.10. 00:00",
+        &[
+            "LUMEN AI SAN FRANCISCO 840",
+            "SPESEN: x KURS: 1,0912 VOM: 06.10.2026",
+        ],
+        date(2026, 10, 10),
+        -2_200,
+    )]);
+    assert_eq!(read(&statement).lines[0].fx, None);
 }
 
 #[test]

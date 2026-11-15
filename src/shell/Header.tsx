@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { openMenu, useMenuOpenOn } from "../components/menu";
+import { useCommands } from "../queries/commands";
 import { ChevronDown, ChevronLeft, Plus, Search, X } from "lucide-react";
 import { startAddDocument } from "../documents/addFlow";
 import { FILTER_PLACEHOLDER } from "../pages/pages";
@@ -84,59 +86,32 @@ function FilterField({ page }: { page: Route["page"] }) {
   );
 }
 
-/** The + New menu; an item without `run` arrives with a later feature and stays in its slot, disabled. */
-const NEW_ITEMS: { label: string; key: string; run?: () => void }[] = [
-  { label: "Import Statement…", key: "⌘I", run: startImport },
-  { label: "Add Invoice PDF…", key: "⌘O", run: startAddDocument },
-  { label: "New Subscription", key: "⌘N", run: newSubscription },
+/** The + New menu's commands, with the shortcut each has now. */
+const NEW_ITEMS: { label: string; command: string; run: () => void }[] = [
+  { label: "Import Statement…", command: "statement:import", run: startImport },
+  { label: "Add Invoice PDF…", command: "document:add", run: startAddDocument },
+  { label: "New Subscription", command: "subscription:new", run: newSubscription },
 ];
 
 function NewMenu() {
-  const [open, setOpen] = useState(false);
-  useCoversPdf(open);
-  const anchor = useRef<HTMLSpanElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const onPointerDown = (e: PointerEvent) => {
-      if (!anchor.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    window.addEventListener("pointerdown", onPointerDown, true);
-    window.addEventListener("keydown", onKeyDown, true);
-    return () => {
-      window.removeEventListener("pointerdown", onPointerDown, true);
-      window.removeEventListener("keydown", onKeyDown, true);
-    };
-  }, [open]);
+  const [button, setButton] = useState<HTMLButtonElement | null>(null);
+  const open = useMenuOpenOn(button);
+  const { data: commands = [] } = useCommands();
+  const show = () => {
+    if (!button) return;
+    const entries = NEW_ITEMS.map((item) => ({
+      text: item.label,
+      hint: commands.find((c) => c.id === item.command)?.shortcut ?? undefined,
+      run: item.run,
+    }));
+    openMenu(entries, button, "New");
+  };
   return (
-    <span className="header__anchor" ref={anchor}>
-      <button className="btn new-btn" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
-        <Plus size={15} />
-        New
-        <ChevronDown size={12} />
-      </button>
-      {open && (
-        <div className="menu new-menu" role="menu">
-          {NEW_ITEMS.map((item) => (
-            <button
-              key={item.label}
-              className="menu-row"
-              role="menuitem"
-              disabled={!item.run}
-              onClick={() => {
-                setOpen(false);
-                item.run?.();
-              }}
-            >
-              {item.label}
-              <span className="menu-row__key">{item.key}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </span>
+    <button ref={setButton} className="btn new-btn" aria-haspopup="menu" aria-expanded={open} onClick={show}>
+      <Plus size={15} />
+      New
+      <ChevronDown size={12} />
+    </button>
   );
 }
 

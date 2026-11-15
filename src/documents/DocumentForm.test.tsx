@@ -7,13 +7,14 @@ vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await impo
 import { api } from "../api";
 import { useStore } from "../state/store";
 import { depreciationView, documentView, estimate, lineChoice } from "../test/documents";
+import { choose, popUpValue, withMenus } from "../test/popup";
 import { renderWithQuery } from "../test/renderWithQuery";
 import { DocumentForm } from "./DocumentForm";
 
 const mocked = vi.mocked(api, true);
 
 const onExclude = vi.fn();
-const renderForm = (patch: Parameters<typeof documentView>[0] = {}) => renderWithQuery(<DocumentForm doc={documentView(patch)} onExclude={onExclude} />);
+const renderForm = (patch: Parameters<typeof documentView>[0] = {}) => renderWithQuery(withMenus(<DocumentForm doc={documentView(patch)} onExclude={onExclude} />));
 const typeInto = async (label: string, text: string) => {
   const field = screen.getByLabelText(label);
   await userEvent.clear(field);
@@ -244,14 +245,23 @@ describe("DocumentForm", () => {
     it("is disabled and asks for the payment date first while there is none", () => {
       renderForm({ payDate: null, year: null, items: [], itemKey: null, estimate: null });
 
-      expect(screen.getByLabelText("Item")).toBeDisabled();
-      expect(screen.getByRole("option", { name: "Set the payment date first" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Item" })).toBeDisabled();
+      expect(popUpValue("Item")).toBe("Set the payment date first");
+    });
+
+    it("shows the current item, and the empty choice as Choose an item", () => {
+      const { unmount } = renderForm();
+      expect(popUpValue("Item")).toBe("KZ 169 · Digital work equipment");
+      unmount();
+
+      renderForm({ itemKey: null });
+      expect(popUpValue("Item")).toBe("Choose an item");
     });
 
     it("saves the chosen item", async () => {
       renderForm();
 
-      await userEvent.selectOptions(screen.getByLabelText("Item"), "kz-720");
+      await choose(userEvent, "Item", "KZ 720 · Training");
 
       expect(mocked.documentEdit).toHaveBeenCalledWith("doc-1", { field: "item", key: "kz-720" });
     });
@@ -259,9 +269,17 @@ describe("DocumentForm", () => {
     it("saves null when the empty choice is picked", async () => {
       renderForm();
 
-      await userEvent.selectOptions(screen.getByLabelText("Item"), "Choose an item");
+      await choose(userEvent, "Item", "Choose an item");
 
       expect(mocked.documentEdit).toHaveBeenCalledWith("doc-1", { field: "item", key: null });
+    });
+
+    it("saves nothing when the current item is chosen again", async () => {
+      renderForm();
+
+      await choose(userEvent, "Item", "KZ 169 · Digital work equipment");
+
+      expect(mocked.documentEdit).not.toHaveBeenCalled();
     });
   });
 
@@ -313,13 +331,24 @@ describe("DocumentForm", () => {
       expect(screen.queryByRole("button", { name: "Partly private use…" })).toBeNull();
     });
 
-    it("saves the typed work share as a number", async () => {
+    it("saves the typed work share as typed", async () => {
       renderForm({ workShare: 60, estimate: estimate() });
 
       await typeInto("Work share", "75");
       await userEvent.tab();
 
-      expect(mocked.documentEdit).toHaveBeenCalledWith("doc-1", { field: "workShare", value: 75 });
+      expect(mocked.documentEdit).toHaveBeenCalledWith("doc-1", { field: "workShare", value: "75" });
+    });
+
+    it("shows the field error of a refused work share", async () => {
+      mocked.documentEdit.mockRejectedValue({ kind: "invalid_input", message: "x", code: null, field: { path: "document.workShare", message: "A share between 0 and 100 %" } });
+      renderForm({ workShare: 60, estimate: estimate() });
+
+      await typeInto("Work share", "150");
+      await userEvent.tab();
+
+      expect((await screen.findByRole("alert")).textContent).toBe("A share between 0 and 100 %");
+      expect(useStore.getState().toasts).toEqual([]);
     });
   });
 
@@ -338,27 +367,41 @@ describe("DocumentForm", () => {
       expect(within(screen.getByRole("list", { name: "Slices" })).getAllByRole("listitem")).toHaveLength(4);
     });
 
+    it("shows the current useful life", () => {
+      renderForm({ depreciation: depreciationView({ own: true, years: 5 }) });
+
+      expect(popUpValue("Useful life")).toBe("5 years");
+    });
+
     it("saves the chosen useful life", async () => {
       renderForm({ depreciation: depreciationView() });
 
-      await userEvent.selectOptions(screen.getByLabelText("Useful life"), "5 years");
+      await choose(userEvent, "Useful life", "5 years");
 
       expect(mocked.documentEdit).toHaveBeenCalledWith("doc-1", { field: "usefulLife", years: 5 });
     });
 
-    it("saves null when the rules' years are chosen again", async () => {
+    it("saves null when the rules' years are chosen after own years", async () => {
       renderForm({ depreciation: depreciationView({ own: true, years: 5 }) });
 
-      await userEvent.selectOptions(screen.getByLabelText("Useful life"), "As the rules say");
+      await choose(userEvent, "Useful life", "As the rules say");
 
       expect(mocked.documentEdit).toHaveBeenCalledWith("doc-1", { field: "usefulLife", years: null });
+    });
+
+    it("saves nothing when the current useful life is chosen again", async () => {
+      renderForm({ depreciation: depreciationView({ own: true, years: 5 }) });
+
+      await choose(userEvent, "Useful life", "5 years");
+
+      expect(mocked.documentEdit).not.toHaveBeenCalled();
     });
 
     it("shows a field error of the useful life", async () => {
       mocked.documentEdit.mockRejectedValue({ kind: "invalid_input", message: "x", code: null, field: { path: "document.usefulLife", message: "Useful life must be 1 to 15 years" } });
       renderForm({ depreciation: depreciationView() });
 
-      await userEvent.selectOptions(screen.getByLabelText("Useful life"), "5 years");
+      await choose(userEvent, "Useful life", "5 years");
 
       expect((await screen.findByRole("alert")).textContent).toBe("Useful life must be 1 to 15 years");
       expect(useStore.getState().toasts).toEqual([]);
@@ -367,7 +410,7 @@ describe("DocumentForm", () => {
     it("is locked on a finished document", () => {
       renderForm({ state: "finished", depreciation: depreciationView() });
 
-      expect(screen.getByLabelText("Useful life")).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Useful life" })).toBeDisabled();
     });
   });
 

@@ -1,3 +1,4 @@
+import { PopUpButton } from "../components/menu";
 import { useId, useState } from "react";
 import { Check, FileText, TriangleAlert } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -107,14 +108,13 @@ export function AddDocumentSheet({ preview }: { preview: AddPreview }) {
         )}
         <label htmlFor={`${id}-item`}>Item</label>
         <div className="add-doc__field">
-          <select id={`${id}-item`} className="field" value={itemKey} aria-invalid={!!fieldError("document.item")} onChange={(e) => setItemKey(e.target.value)}>
-            <option value="">Choose later</option>
-            {preview.items.map((i) => (
-              <option key={i.key} value={i.key}>
-                {i.label}
-              </option>
-            ))}
-          </select>
+          <PopUpButton
+            id={`${id}-item`}
+            aria-invalid={!!fieldError("document.item")}
+            value={itemKey}
+            options={[{ value: "", label: "Choose later" }, ...preview.items.map((i) => ({ value: i.key, label: i.label }))]}
+            onChange={setItemKey}
+          />
           {preview.itemWhy && itemKey === preview.itemKey && <span className="add-doc__hint">{preview.itemWhy}</span>}
         </div>
         {estimate && (

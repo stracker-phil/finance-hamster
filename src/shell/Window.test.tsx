@@ -18,7 +18,7 @@ const mocked = vi.mocked(api, true);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useStore.setState({ route: HOME, back: [], forward: [], filter: "", toasts: [], confirmation: null, paletteOpen: false, pdfCovers: 0, importPreview: null, addPreview: null, subscriptionSheet: null });
+  useStore.setState({ route: HOME, back: [], forward: [], filter: "", toasts: [], confirmation: null, paletteOpen: false, pdfCovers: 0, menu: null, importPreview: null, addPreview: null, subscriptionSheet: null });
   mocked.runCommand.mockResolvedValue(undefined);
   mocked.listCommands.mockResolvedValue([]);
   mocked.listAccounts.mockResolvedValue([account()]);
@@ -418,15 +418,27 @@ describe("filter field", () => {
 });
 
 describe("New menu", () => {
-  const openMenu = () => userEvent.click(screen.getByRole("button", { name: /New/ }));
+  const openMenu = async () => {
+    await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+    await userEvent.click(screen.getByRole("button", { name: /New/ }));
+  };
 
-  it("lists the creation commands with their shortcuts", async () => {
+  beforeEach(() => {
+    mocked.listCommands.mockResolvedValue([
+      { id: "statement:import", title: "Import Statement…", shortcut: "⌘I", custom: false },
+      { id: "document:add", title: "Add Invoice PDF…", shortcut: "⌥⌘O", custom: true },
+      { id: "subscription:new", title: "New Subscription", shortcut: null, custom: false },
+    ]);
+  });
+
+  it("lists the creation commands with the shortcut each has now", async () => {
     render(<Window />);
 
     await openMenu();
 
-    const items = screen.getAllByRole("menuitem").map((i) => i.textContent);
-    expect(items).toEqual(["Import Statement…⌘I", "Add Invoice PDF…⌘O", "New Subscription⌘N"]);
+    const menu = screen.getByRole("menu", { name: "New" });
+    const items = within(menu).getAllByRole("menuitem").map((i) => i.textContent);
+    expect(items).toEqual(["Import Statement…⌘I", "Add Invoice PDF…⌥⌘O", "New Subscription"]);
   });
 
   it("covers the PDF preview while open and uncovers it once closed", async () => {
@@ -496,6 +508,15 @@ describe("New menu", () => {
     await openMenu();
 
     await userEvent.click(screen.getByRole("heading", { level: 1 }));
+
+    expect(screen.queryByRole("menu")).toBeNull();
+  });
+
+  it("closes when the New button is clicked again", async () => {
+    render(<Window />);
+    await openMenu();
+
+    await userEvent.click(screen.getByRole("button", { name: /New/ }));
 
     expect(screen.queryByRole("menu")).toBeNull();
   });

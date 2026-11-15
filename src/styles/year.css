@@ -9,7 +9,6 @@
 .year-bar { height: 5px; border-radius: 3px; background: var(--fill-subtle); overflow: hidden; }
 .year-bar span { display: block; height: 100%; background: var(--accent); }
 .year-menu { position: relative; padding-bottom: 8px; }
-.year-menu__list { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; width: 220px; padding: 4px; }
 .year-heading { margin: 36px 0 8px; font-size: 12px; font-weight: 600; color: var(--text-secondary); }
 .year-heading-row { display: flex; align-items: baseline; gap: 10px; }
 .year-heading__more { font-size: 12px; }

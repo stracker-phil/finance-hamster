@@ -1,3 +1,4 @@
+import { MenuHost } from "../components/menu";
 import { useState } from "react";
 import { ConfirmHost } from "../components/ConfirmSheet";
 import { Toasts } from "../components/Toasts";
@@ -62,6 +63,7 @@ export function Window() {
       <CommandPalette />
       <Toasts />
       <ConfirmHost />
+      <MenuHost />
       <TooltipHost />
     </div>
   );
