@@ -378,6 +378,48 @@ describe("YearPage", () => {
       expect(screen.getByRole("button", { name: "Show" })).toBeTruthy();
     });
 
+    const follows = (earlier: Element, later: Element) => Boolean(earlier.compareDocumentPosition(later) & Node.DOCUMENT_POSITION_FOLLOWING);
+    const regionNames = () => screen.getAllByRole("region", { name: /^(Work books|Other costs|Union dues)$/ }).map((r) => r.getAttribute("aria-label"));
+
+    it("lists the revealed categories below the hidden line, after the shown ones", async () => {
+      await show({ kennzahlen: [union(), kennzahlView()] });
+
+      await userEvent.click(screen.getByRole("button", { name: "Show" }));
+
+      const line = screen.getByText(/1 category hidden/);
+      expect(follows(screen.getByRole("region", { name: "Work books" }), line)).toBe(true);
+      expect(follows(line, screen.getByRole("region", { name: "Union dues" }))).toBe(true);
+    });
+
+    it("keeps the order of the shown categories the same before and after Show", async () => {
+      await show({ kennzahlen: [kennzahlView({ key: "b", kz: "724", label: "Other costs" }), union(), kennzahlView({ key: "a", kz: "720", label: "Work books" })] });
+      const before = regionNames();
+
+      await userEvent.click(screen.getByRole("button", { name: "Show" }));
+
+      expect(before).toEqual(["Other costs", "Work books"]);
+      expect(regionNames()).toEqual(["Other costs", "Work books", "Union dues"]);
+    });
+
+    it("keeps the hidden line while the categories are revealed", async () => {
+      await show({ kennzahlen: [kennzahlView(), union()] });
+
+      await userEvent.click(screen.getByRole("button", { name: "Show" }));
+
+      expect(screen.getByText(/1 category hidden/)).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Hide again" })).toBeTruthy();
+    });
+
+    it("keeps a not-shown category with entries above the hidden line when another one is revealed", async () => {
+      await show({ kennzahlen: [kennzahlView({ key: "b", kz: "724", label: "Other costs", shown: false }), union(), kennzahlView()] });
+
+      await userEvent.click(screen.getByRole("button", { name: "Show" }));
+
+      const line = screen.getByText(/1 category hidden/);
+      expect(follows(screen.getByRole("region", { name: "Other costs" }), line)).toBe(true);
+      expect(follows(line, screen.getByRole("region", { name: "Union dues" }))).toBe(true);
+    });
+
     it("keeps a hidden category that has entries in the list and counts it as not hidden", async () => {
       await show({ kennzahlen: [kennzahlView({ shown: false })] });
 

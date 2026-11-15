@@ -226,22 +226,32 @@ function MonthList({ year, months, open }: { year: number; months: MonthView[]; 
 
 /** The categories the owner records; hidden ones without entries wait behind "Show". */
 function Categories({ year, items, open }: { year: number; items: KennzahlView[]; open: boolean }) {
-  const [all, setAll] = useState(false);
+  const [revealed, setRevealed] = useState(false);
   const text = useT().pages.year;
-  const hidden = items.filter((i) => !i.shown && i.rows.length === 0);
-  const shown = all ? items : items.filter((i) => !hidden.includes(i));
+  const isHidden = (i: KennzahlView) => !i.shown && i.rows.length === 0;
+  const hidden = items.filter(isHidden);
   return (
     <>
-      {shown.map((item) => (
-        <Category key={item.key} item={item} year={year} open={open} />
-      ))}
+      {items
+        .filter((i) => !isHidden(i))
+        .map((item) => (
+          <Category key={item.key} item={item} year={year} open={open} />
+        ))}
       {hidden.length > 0 && (
         <p className="add-doc__hint year-hidden">
           {text.hiddenCount(hidden.length)} ·{" "}
-          <button className="link-btn" onClick={() => setAll((a) => !a)}>
-            {all ? text.hideHidden : text.showHidden}
+          <button className="link-btn" onClick={() => setRevealed((r) => !r)}>
+            {revealed ? text.hideHidden : text.showHidden}
           </button>
         </p>
+      )}
+      {/* Below the note, so revealing them moves nothing that was already there (ADR 0028). */}
+      {revealed && hidden.length > 0 && (
+        <div className="year-hidden__list">
+          {hidden.map((item) => (
+            <Category key={item.key} item={item} year={year} open={open} />
+          ))}
+        </div>
       )}
     </>
   );
