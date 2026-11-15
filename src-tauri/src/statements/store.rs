@@ -59,6 +59,18 @@ pub struct TransactionRow {
     pub transfer: bool,
 }
 
+impl TransactionRow {
+    /// What left the account: a charge is positive, a refund or other credit negative.
+    pub fn outflow_cents(&self) -> i64 {
+        -self.cents
+    }
+}
+
+/// What a set of lines paid, refunds netted against charges.
+pub fn net_outflow(lines: &[impl std::borrow::Borrow<TransactionRow>]) -> i64 {
+    lines.iter().map(|l| l.borrow().outflow_cents()).sum()
+}
+
 const STATEMENT_COLUMNS: &str = "id, account_id, number, year, from_date, to_date, old_balance, credits, debits, \
      new_balance, layout, file_hash, file, pages, imported_at";
 

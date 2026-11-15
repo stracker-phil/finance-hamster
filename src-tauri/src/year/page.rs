@@ -5,7 +5,7 @@ use serde::Serialize;
 use ts_rs::TS;
 
 use super::facts::{self, Placed, eur};
-use super::{answers, summary};
+use super::{answers, drift, summary};
 use crate::date::DateOrder;
 use crate::db::Db;
 use crate::error::{AppError, AppResult};
@@ -35,6 +35,8 @@ pub enum AttentionKind {
     Draft,
     /// A document without a payment date.
     Undated,
+    /// A closed year whose data now gives another value than the one filed.
+    ChangedSinceClosing,
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
@@ -173,6 +175,19 @@ pub fn page(
     let questions = summary::question_views(&ruleset, &given, format);
     let unanswered = questions.iter().filter(|q| !q.answered).count();
     let (progress, progress_percent) = summary::progress_text(&facts, unanswered, questions.len());
+    let mut kennzahlen = summary::kennzahlen(
+        year,
+        &ruleset,
+        &facts,
+        &given,
+        !needle.is_empty(),
+        &shown,
+        format,
+    );
+    let mut attention = facts.attention;
+    if row.state == YearState::Closed && needle.is_empty() {
+        attention.extend(drift::restore_filed(db, year, &mut kennzahlen)?);
+    }
     Ok(YearPage {
         year,
         ruleset: row.ruleset.clone(),
@@ -185,18 +200,10 @@ pub fn page(
         },
         progress_percent,
         pauschale_note: summary::pauschale_note(&ruleset, total, format),
-        kennzahlen: summary::kennzahlen(
-            year,
-            &ruleset,
-            &facts,
-            &given,
-            !needle.is_empty(),
-            &shown,
-            format,
-        ),
+        kennzahlen,
         months: summary::months(&in_view, format),
         questions,
         archived: facts.archived as u32,
-        attention: facts.attention,
+        attention,
     })
 }

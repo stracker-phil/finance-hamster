@@ -17,9 +17,9 @@ pub fn default_work_share(ruleset: Option<&Ruleset>, item_key: Option<&str>) -> 
     100 - i64::from(private.min(100))
 }
 
-/// The ANV amount of `paid_cents` at `work_share` percent, rounded to the cent.
+/// The ANV amount of `paid_cents` at `work_share` percent, rounded half away from zero; a refund stays negative.
 pub fn anv_cents(paid_cents: i64, work_share: i64) -> i64 {
-    (paid_cents.abs() * work_share + 50) / 100
+    paid_cents.signum() * ((paid_cents.abs() * work_share + 50) / 100)
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
@@ -78,7 +78,7 @@ pub fn estimate(
         work_share,
         share_hint,
         anv: eur(anv),
-        formula: format!("{} × {work_share} %", eur(paid_cents.abs())),
+        formula: format!("{} × {work_share} %", eur(paid_cents)),
         gwg,
     }
 }
@@ -129,10 +129,15 @@ mod tests {
     }
 
     #[test]
-    fn the_anv_amount_rounds_to_the_cent_and_ignores_the_sign() {
+    fn the_anv_amount_rounds_half_away_from_zero_and_keeps_the_sign() {
         for (paid, share, expected) in [
             (12_123, 60, 7_274),
-            (-12_123, 60, 7_274),
+            (-12_123, 60, -7_274),
+            (-1_000, 60, -600),
+            (-1_001, 50, -501),
+            (1_001, 50, 501),
+            (-1, 50, -1),
+            (-1, 49, 0),
             (1_000, 100, 1_000),
             (1, 50, 1),
             (1, 49, 0),
@@ -161,11 +166,19 @@ mod tests {
     }
 
     #[test]
-    fn an_estimate_reads_in_the_chosen_number_format_and_uses_the_paid_amount_without_sign() {
-        let estimate = estimate_of(Some("phone"), -12_123, 60, NumberFormat::CommaDecimal);
+    fn an_estimate_reads_in_the_chosen_number_format() {
+        let estimate = estimate_of(Some("phone"), 12_123, 60, NumberFormat::CommaDecimal);
 
         assert_eq!(estimate.anv, "€72,74");
         assert_eq!(estimate.formula, "€121,23 × 60 %");
+    }
+
+    #[test]
+    fn an_estimate_of_a_net_refund_keeps_the_minus_sign() {
+        let estimate = estimate_of(Some("phone"), -12_123, 60, NumberFormat::DotDecimal);
+
+        assert_eq!(estimate.anv, "\u{2212}€72.74");
+        assert_eq!(estimate.formula, "\u{2212}€121.23 × 60 %");
     }
 
     #[test]

@@ -145,7 +145,7 @@ pub(super) fn decided_lines(
             continue;
         }
         let share = default_work_share(Some(ruleset), Some(&item.key));
-        let counted = anv_cents(line.cents, share);
+        let counted = anv_cents(line.outflow_cents(), share);
         facts.placed.push(Placed {
             item: item.key.clone(),
             date: Some(line.value_date.clone()),

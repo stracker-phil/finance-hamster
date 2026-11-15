@@ -1432,6 +1432,43 @@ fn linked_lines_override_a_typed_amount_as_the_paid_amount() {
 }
 
 #[test]
+fn a_refund_linked_to_a_charge_is_netted_against_it_in_the_paid_amount() {
+    let (_dir, db) = setup();
+    add_lines(
+        &db,
+        &[
+            debit("l-1", "2026-10-14", -10_000, "Lastschrift SEITENWEISE"),
+            debit("l-2", "2026-10-20", 3_000, "Gutschrift SEITENWEISE"),
+        ],
+    );
+    let doc = draft(&db, "doc-a", |d| d.item_key = Some("books".into()));
+    link(&db, "doc-a", "l-1");
+    link(&db, "doc-a", "l-2");
+    let lines = view::linked_lines(&db, "doc-a").unwrap();
+
+    assert_eq!(view::paid_cents(&doc, &lines), Some(7_000));
+    assert_eq!(page(&db, "doc-a").paid.as_deref(), Some("€70.00"));
+}
+
+#[test]
+fn refunds_that_cover_the_charge_leave_a_paid_amount_of_zero_or_below() {
+    let (_dir, db) = setup();
+    add_lines(
+        &db,
+        &[
+            debit("l-1", "2026-10-14", -1_000, "Lastschrift SEITENWEISE"),
+            debit("l-2", "2026-10-20", 1_500, "Gutschrift SEITENWEISE"),
+        ],
+    );
+    let doc = draft(&db, "doc-a", |_| {});
+    link(&db, "doc-a", "l-1");
+    link(&db, "doc-a", "l-2");
+    let lines = view::linked_lines(&db, "doc-a").unwrap();
+
+    assert_eq!(view::paid_cents(&doc, &lines), Some(-500));
+}
+
+#[test]
 fn an_invoice_in_a_foreign_currency_shows_its_code_and_plain_amount() {
     let (_dir, db) = setup();
     draft(&db, "doc-e", |d| {
@@ -2119,6 +2156,129 @@ fn a_line_that_is_missing_or_already_linked_cannot_be_linked() {
         )
     );
     assert_eq!(count(&db, store::LINKS), 1);
+}
+
+fn holder_of_l1(db: &Db, state: DocState) {
+    two_october_lines(db);
+    draft(db, "doc-a", |d| {
+        d.vendor_id = Some("vendor-1".into());
+        d.state = state;
+    });
+    link(db, "doc-a", "l-1");
+}
+
+#[test]
+fn a_line_that_pays_another_document_cannot_be_linked_and_names_that_document() {
+    let (_dir, db) = setup_with_vendor();
+    holder_of_l1(&db, DocState::Draft);
+    draft(&db, "doc-b", |_| {});
+
+    let result = apply(&db, "doc-b", DocumentEdit::Link { line: "l-1".into() });
+
+    assert_eq!(
+        rejected(result),
+        (
+            "document.lines".into(),
+            "This line already pays Pixelforge Ltd. invoice; unlink it there first".into()
+        )
+    );
+    assert_eq!(count(&db, store::LINKS), 1);
+}
+
+#[test]
+fn a_line_that_pays_a_finished_document_cannot_be_linked_again() {
+    let (_dir, db) = setup_with_vendor();
+    holder_of_l1(&db, DocState::Finished);
+    draft(&db, "doc-b", |_| {});
+
+    let result = apply(&db, "doc-b", DocumentEdit::Link { line: "l-1".into() });
+
+    assert_eq!(rejected(result).0, "document.lines");
+    assert_eq!(count(&db, store::LINKS), 1);
+}
+
+#[test]
+fn a_line_that_only_an_excluded_document_links_can_be_linked_again() {
+    let (_dir, db) = setup_with_vendor();
+    holder_of_l1(&db, DocState::Excluded);
+    draft(&db, "doc-b", |_| {});
+
+    apply(&db, "doc-b", DocumentEdit::Link { line: "l-1".into() }).unwrap();
+
+    assert_eq!(count(&db, store::LINKS), 2);
+}
+
+#[test]
+fn adding_a_document_on_a_line_that_pays_another_document_is_refused_before_anything_is_written() {
+    let (dir, db) = setup();
+    add_lines(&db, &[dollar_debit("l-fx", "2026-11-10", -11_871)]);
+    draft(&db, "doc-a", |_| {});
+    link(&db, "doc-a", "l-fx");
+    let pending = pixelforge_pending(&db);
+
+    let result = commit(
+        &db,
+        dir.path(),
+        pending,
+        &input("Pixelforge Ltd.", Some("phone"), Some("l-fx")),
+    );
+
+    assert_eq!(failed_field(result), "document.lines");
+    assert_eq!(count(&db, store::DOCUMENTS), 1);
+    assert_eq!(count(&db, store::VENDORS), 0);
+    assert_eq!(count(&db, store::LINKS), 1);
+}
+
+#[test]
+fn adding_a_document_on_a_line_that_only_an_excluded_document_links_works() {
+    let (dir, db) = setup();
+    add_lines(&db, &[dollar_debit("l-fx", "2026-11-10", -11_871)]);
+    draft(&db, "doc-a", |d| d.state = DocState::Excluded);
+    link(&db, "doc-a", "l-fx");
+    let pending = pixelforge_pending(&db);
+
+    commit(
+        &db,
+        dir.path(),
+        pending,
+        &input("Pixelforge Ltd.", Some("phone"), Some("l-fx")),
+    )
+    .unwrap();
+
+    assert_eq!(count(&db, store::DOCUMENTS), 2);
+    assert_eq!(count(&db, store::LINKS), 2);
+}
+
+#[test]
+fn restoring_an_excluded_document_whose_line_now_pays_another_document_is_refused() {
+    let (_dir, db) = setup_with_vendor();
+    holder_of_l1(&db, DocState::Excluded);
+    draft(&db, "doc-b", |d| d.vendor_id = Some("vendor-1".into()));
+    link(&db, "doc-b", "l-1");
+
+    let result = lifecycle::restore(&db, "doc-a", Source::Ui);
+
+    match result {
+        Err(AppError::InvalidField { field, message }) => {
+            assert_eq!(field, "document.lines");
+            assert_eq!(
+                message,
+                "This line already pays Pixelforge Ltd. invoice; unlink it there first"
+            );
+        }
+        other => panic!("expected an invalid field, got {other:?}"),
+    }
+    assert_eq!(document(&db, "doc-a").state, DocState::Excluded);
+}
+
+#[test]
+fn restoring_an_excluded_document_works_while_its_line_pays_no_other_document() {
+    let (_dir, db) = setup_with_vendor();
+    holder_of_l1(&db, DocState::Excluded);
+
+    lifecycle::restore(&db, "doc-a", Source::Ui).unwrap();
+
+    assert_eq!(document(&db, "doc-a").state, DocState::Draft);
 }
 
 #[test]

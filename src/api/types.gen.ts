@@ -112,7 +112,7 @@ excluded: string, deletable: boolean,
  */
 deletableNote: string | null, };
 
-export type AttentionKind = "missing_invoice" | "draft" | "undated";
+export type AttentionKind = "missing_invoice" | "draft" | "undated" | "changed_since_closing";
 
 export type AttentionView = { kind: AttentionKind, title: string, detail: string, 
 /**
@@ -439,7 +439,7 @@ rate: string | null,
 reported: boolean, };
 
 /**
- * The shortcut another command already holds, as the page asks before taking it.
+ * A shortcut another command already holds.
  */
 export type KeyConflict = { 
 /**

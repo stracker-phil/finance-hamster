@@ -184,6 +184,7 @@ pub fn edit(
             {
                 return Err(invalid("lines", "This line is linked already"));
             }
+            super::refuse_paid_elsewhere(db, line, &doc.id)?;
             changes.push(Change::insert(
                 store::LINKS,
                 &LinkRow {

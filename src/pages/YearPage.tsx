@@ -118,7 +118,12 @@ function Kennzahl({ item, year, open }: { item: KennzahlView; year: number; open
 /** Rows shown before "Show all": a long list hides the sections below it. */
 const ATTENTION_SHOWN = 5;
 
-const KIND_HEADING: Record<AttentionKind, string> = { missing_invoice: "Invoices to attach", draft: "Drafts to finish", undated: "Documents without a date" };
+const KIND_HEADING: Record<AttentionKind, string> = {
+  missing_invoice: "Invoices to attach",
+  draft: "Drafts to finish",
+  undated: "Documents without a date",
+  changed_since_closing: "Changed since closing",
+};
 
 /** A missing invoice's Attach PDF…: for its bank line when it has one, else any new document. */
 const attachMissing = (item: AttentionView) => (item.lineId ? void attachInvoiceTo(item.lineId) : startAddDocument());
@@ -164,7 +169,7 @@ function AttentionList({ year, items, focus }: { year: number; items: AttentionV
               </button>
             ) : entryId ? (
               <AttachButton year={year} entryId={entryId} />
-            ) : (
+            ) : item.kind === "changed_since_closing" ? null : (
               <button className="btn btn--small" onClick={() => attachMissing(item)}>
                 Attach PDF…
               </button>

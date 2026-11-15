@@ -133,6 +133,18 @@ describe("YearPage", () => {
       expect(useStore.getState().route).toEqual({ page: "document", documentId: "doc-2", year: 2026 });
     });
 
+    it("shows the title and detail of a changed-since-closing entry with no button in its row", async () => {
+      await show({
+        attention: [attentionView({ kind: "changed_since_closing", title: "Example Hosting", detail: "Amount changed since closing", documentId: null })],
+      });
+
+      const section = within(screen.getByRole("region", { name: "Needs attention" }));
+      expect(section.getByText("Example Hosting")).toBeTruthy();
+      expect(section.getByText("Amount changed since closing")).toBeTruthy();
+      expect(section.queryByRole("button", { name: "Attach PDF…" })).toBeNull();
+      expect(section.queryByRole("button", { name: /^Open/ })).toBeNull();
+    });
+
     describe("with more than five entries", () => {
       const seven = () => Array.from({ length: 7 }, (_, i) => attentionView({ title: `Example Receipt ${i + 1}`, documentId: `doc-${i + 1}` }));
 
@@ -188,7 +200,7 @@ describe("YearPage", () => {
         attentionView({ kind: "draft", title: "Example Draft", documentId: "doc-2" }),
         attentionView({ kind: "undated", title: "Example Undated", documentId: "doc-3" }),
       ];
-      const showFocused = async (attention: AttentionView[], kind: "missing_invoice" | "draft" | "undated") => {
+      const showFocused = async (attention: AttentionView[], kind: "missing_invoice" | "draft" | "undated" | "changed_since_closing") => {
         Element.prototype.scrollIntoView = vi.fn();
         mocked.yearPage.mockResolvedValue(yearPage({ attention }));
         renderWithQuery(<YearPage year={2026} attention={kind} />);
@@ -199,6 +211,7 @@ describe("YearPage", () => {
         ["missing_invoice", "Invoices to attach"],
         ["draft", "Drafts to finish"],
         ["undated", "Documents without a date"],
+        ["changed_since_closing", "Changed since closing"],
       ] as const)("headlines the %s kind as %s", async (kind, heading) => {
         await showFocused(mixed(), kind);
 

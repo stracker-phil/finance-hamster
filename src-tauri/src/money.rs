@@ -72,13 +72,15 @@ pub fn copy_value(cents: i64) -> String {
 }
 
 /// Reads an amount the way people type it: `12`, `12.5`, `1,234.56`, `1.234,56`, `12,50`, with an optional
-/// sign or `€`. The last `.` or `,` followed by one or two digits is the decimal mark.
+/// sign and `€` on either side. The last `.` or `,` followed by one or two digits is the decimal mark; any other
+/// mark must group thousands, so a typo like `1,2,3` is refused rather than read as 12.30.
 pub fn parse_cents(text: &str) -> Option<i64> {
-    let trimmed = text.trim().trim_start_matches('€').trim();
-    let (negative, body) = match trimmed.strip_prefix(['-', '\u{2212}']) {
-        Some(rest) => (true, rest.trim()),
-        None => (false, trimmed.strip_prefix('+').unwrap_or(trimmed).trim()),
+    let trimmed = text.trim().trim_matches('€').trim();
+    let (negative, rest) = match trimmed.strip_prefix(['-', '\u{2212}']) {
+        Some(rest) => (true, rest),
+        None => (false, trimmed.strip_prefix('+').unwrap_or(trimmed)),
     };
+    let body = rest.trim().trim_start_matches('€').trim();
     if body.is_empty()
         || !body
             .chars()
@@ -89,11 +91,11 @@ pub fn parse_cents(text: &str) -> Option<i64> {
     let decimal_at = body
         .rfind(['.', ','])
         .filter(|&i| (1..=2).contains(&(body.len() - i - 1)));
-    let (whole, fraction) = match decimal_at {
-        Some(i) => (&body[..i], &body[i + 1..]),
-        None => (body, ""),
+    let (whole, fraction, decimal) = match decimal_at {
+        Some(i) => (&body[..i], &body[i + 1..], body[i..].chars().next()),
+        None => (body, "", None),
     };
-    let whole_digits: String = whole.chars().filter(char::is_ascii_digit).collect();
+    let whole_digits = ungrouped(whole, decimal)?;
     let whole: i64 = if whole_digits.is_empty() {
         0
     } else {
@@ -106,6 +108,19 @@ pub fn parse_cents(text: &str) -> Option<i64> {
     };
     let cents = whole.checked_mul(100)?.checked_add(fraction)?;
     Some(if negative { -cents } else { cents })
+}
+
+/// The digits of a whole part: one grouping mark, not the decimal one, with groups of three after the first.
+fn ungrouped(whole: &str, decimal: Option<char>) -> Option<String> {
+    let Some(mark) = whole.chars().find(|c| !c.is_ascii_digit()) else {
+        return Some(whole.to_string());
+    };
+    if Some(mark) == decimal || whole.chars().any(|c| !c.is_ascii_digit() && c != mark) {
+        return None;
+    }
+    let groups: Vec<&str> = whole.split(mark).collect();
+    let first_fits = (1..=3).contains(&groups[0].len());
+    (first_fits && groups[1..].iter().all(|g| g.len() == 3)).then(|| groups.concat())
 }
 
 #[cfg(test)]
@@ -223,8 +238,22 @@ mod tests {
             ("1.234.567", 123_456_700),
             (".5", 50),
             ("0,07", 7),
+            (".50", 50),
+            ("12.345.678,90", 1_234_567_890),
+            ("12,50 €", 1250),
+            ("€12,50", 1250),
+            ("-€5", -500),
+            ("€-5", -500),
+            ("- 5", -500),
         ] {
             assert_eq!(parse_cents(text), Some(expected), "{text:?}");
+        }
+    }
+
+    #[test]
+    fn badly_grouped_amounts_are_refused() {
+        for text in ["1,2,3", "1.23.45", "12.34,5", "1.2345,00", "12,345,6"] {
+            assert_eq!(parse_cents(text), None, "{text:?}");
         }
     }
 

@@ -139,6 +139,13 @@ pub fn restore(db: &Db, id: &str, source: Source) -> AppResult<Written> {
             "Only an excluded document can be restored".into(),
         ));
     }
+    for link in db
+        .read(super::store::links)?
+        .iter()
+        .filter(|l| l.document_id == doc.id)
+    {
+        super::refuse_paid_elsewhere(db, &link.transaction_id, &doc.id)?;
+    }
     transition(db, doc, "Restore", source, |d| {
         d.state = DocState::Draft;
         d.excluded_at = None;

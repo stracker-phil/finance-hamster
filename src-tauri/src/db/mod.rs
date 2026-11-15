@@ -3,6 +3,7 @@
 
 pub mod change;
 pub mod commands;
+mod frozen;
 pub mod journal;
 pub mod migrations;
 mod undo;
@@ -172,6 +173,7 @@ impl Db {
         let tx = conn.transaction()?;
         let mut fields = Vec::new();
         for change in &op.changes {
+            frozen::check(&tx, change)?;
             change.apply(&tx)?;
             fields.extend(change.fields());
         }

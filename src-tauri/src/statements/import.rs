@@ -341,11 +341,15 @@ pub fn commit(
     };
     let rules = db.read(rules::store::rules)?;
     let own_accounts = db.read(rules::apply::own_accounts)?;
+    let closed = db.read(crate::taxyears::closed_years)?;
     let mut changes = vec![Change::insert(store::STATEMENTS, &statement)?];
     let mut decisions = Vec::new();
     for line in &p.lines {
         let row = transaction_row(&statement, line, &own_accounts)?;
         changes.push(Change::insert(store::TRANSACTIONS, &row)?);
+        if crate::taxyears::in_closed(&closed, &row.value_date) {
+            continue;
+        }
         if let Some(decision) = rules::engine::decide(&rules, &row, &own_accounts, now) {
             decisions.push(Change::insert(rules::store::DECISIONS, &decision)?);
         }

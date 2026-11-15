@@ -1,5 +1,5 @@
 //! Brings the rule decisions of every line in line with a set of rules, then with the subscriptions' own
-//! matching for lines no rule decides; hand decisions are never touched.
+//! matching for lines no rule decides; hand decisions and lines in closed tax years are never touched.
 
 use rusqlite::Connection;
 
@@ -10,6 +10,7 @@ use crate::db::Change;
 use crate::error::AppResult;
 use crate::statements::store::{self as statements, TransactionRow};
 use crate::subscriptions::matcher::{self, Matchers};
+use crate::taxyears;
 
 pub fn own_accounts(conn: &Connection) -> AppResult<Vec<OwnAccount>> {
     Ok(own_of(accounts::rows(conn)?))
@@ -76,9 +77,11 @@ fn changes_for(
 ) -> AppResult<Vec<Change>> {
     let existing = store::decisions(conn)?;
     let lines = statements::all_transactions(conn)?;
+    let closed = taxyears::closed_years(conn)?;
     let recomputed = |line: &TransactionRow| {
         !existing.get(&line.id).is_some_and(DecisionRow::by_hand)
             && skipped != Some(line.id.as_str())
+            && !taxyears::in_closed(&closed, &line.value_date)
     };
     let charges = subscriptions.assign(&lines, &matcher::taken(&existing, true), |line| {
         recomputed(line) && engine::decide(rules, line, own, now).is_none()

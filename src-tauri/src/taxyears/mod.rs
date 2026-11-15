@@ -97,6 +97,22 @@ pub fn row(conn: &Connection, year: i32) -> AppResult<Option<TaxYearRow>> {
         .optional()?)
 }
 
+/// The closed tax years, for the bulk re-deciders that leave their lines alone.
+pub fn closed_years(conn: &Connection) -> AppResult<std::collections::HashSet<i32>> {
+    Ok(rows(conn)?
+        .into_iter()
+        .filter(|r| r.state == YearState::Closed)
+        .map(|r| r.year)
+        .collect())
+}
+
+/// Whether a `yyyy-mm-dd` date falls in one of `closed`.
+pub fn in_closed(closed: &std::collections::HashSet<i32>, date: &str) -> bool {
+    date.get(..4)
+        .and_then(|y| y.parse::<i32>().ok())
+        .is_some_and(|y| closed.contains(&y))
+}
+
 /// Refuses a change that would touch a closed tax year: a payment date in it, before or after the change.
 pub fn refuse_closed(db: &Db, dates: &[Option<&str>]) -> AppResult<()> {
     for year in dates
@@ -443,6 +459,56 @@ mod tests {
         .unwrap();
 
         assert_eq!(refuse_closed(&db, &[Some("2025-05-05")]), Ok(()));
+    }
+
+    #[test]
+    fn closed_years_are_the_years_whose_state_is_closed() {
+        let (_dir, db) = setup();
+        add_years(
+            &db,
+            &[
+                (2024, YearState::Closed),
+                (2025, YearState::Closed),
+                (2026, YearState::Open),
+            ],
+        );
+
+        assert_eq!(
+            db.read(closed_years).unwrap(),
+            std::collections::HashSet::from([2024, 2025])
+        );
+    }
+
+    #[test]
+    fn no_year_is_closed_without_tax_years_or_while_all_are_open() {
+        let (_dir, db) = setup();
+        assert!(db.read(closed_years).unwrap().is_empty());
+
+        add_years(&db, &[(2026, YearState::Open)]);
+
+        assert!(db.read(closed_years).unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_date_is_in_a_closed_year_by_its_first_four_digits() {
+        let closed = std::collections::HashSet::from([2025]);
+        for (date, expected) in [
+            ("2025-01-01", true),
+            ("2025-12-31", true),
+            ("2024-12-31", false),
+            ("2026-01-01", false),
+            ("2025", true),
+            ("202", false),
+            ("n/a", false),
+            ("", false),
+        ] {
+            assert_eq!(in_closed(&closed, date), expected, "{date:?}");
+        }
+    }
+
+    #[test]
+    fn no_date_is_in_a_closed_year_when_none_is_closed() {
+        assert!(!in_closed(&std::collections::HashSet::new(), "2025-06-06"));
     }
 
     #[test]

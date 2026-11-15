@@ -381,7 +381,8 @@ fn an_answer_that_is_not_a_number_or_an_amount_names_its_field_and_stores_nothin
         ("telearbeitstage", "2.5", "A whole number"),
         ("telearbeitstage", "12 days", "A whole number"),
         ("pauschale", "abc", "This isn't an amount"),
-        ("pauschale", "12 €", "This isn't an amount"),
+        ("pauschale", "12 EUR", "This isn't an amount"),
+        ("pauschale", "1,2,3", "This isn't an amount"),
     ] {
         let (_dir, db) = open_year();
 
@@ -1039,6 +1040,10 @@ fn a_year_with_everything_finished_and_answered_is_ready_to_close() {
 #[test]
 fn a_closed_year_says_closed_whatever_is_left() {
     let (_dir, db) = open_year();
+    add_document(&db, "doc-d1", |d| {
+        d.state = DocState::Draft;
+        d.pay_date = Some("2026-03-03".into());
+    });
     db.write(
         Op::new(
             "Close year",
@@ -1054,10 +1059,6 @@ fn a_closed_year_says_closed_whatever_is_left() {
         Source::App,
     )
     .unwrap();
-    add_document(&db, "doc-d1", |d| {
-        d.state = DocState::Draft;
-        d.pay_date = Some("2026-03-03".into());
-    });
 
     let page = year_page(&db);
 
@@ -1619,4 +1620,300 @@ fn the_page_travels_with_camel_case_field_names_and_snake_case_words() {
     assert_eq!(value["state"], "open");
     assert_eq!(value["attention"][0]["kind"], "draft");
     assert_eq!(value["attention"][0]["documentId"], "doc-d1");
+}
+
+#[test]
+fn a_refund_linked_to_a_document_is_netted_against_its_charge_in_the_year() {
+    let (_dir, db) = open_year();
+    add_lines(
+        &db,
+        &[
+            debit("l-charge", "2026-10-14", -10_000, "Lastschrift SEITENWEISE"),
+            debit("l-refund", "2026-10-20", 3_000, "Gutschrift SEITENWEISE"),
+        ],
+    );
+    add_document(&db, "doc-p", |d| {
+        d.item_key = Some("phone".into());
+        d.pay_date = Some("2026-10-14".into());
+        d.work_share = 60;
+    });
+    link(&db, "doc-p", "l-charge");
+    link(&db, "doc-p", "l-refund");
+
+    let page = year_page(&db);
+
+    assert_eq!(
+        rows_of(&page, "721"),
+        [YearRow {
+            id: "doc-p".into(),
+            kind: RowKind::Document,
+            title: "doc-p".into(),
+            detail: "14 Oct · 60 % of €70.00".into(),
+            amount: "€42.00".into(),
+            draft: false,
+            carried_from: None,
+            kz: "721".into(),
+            attach: false,
+        }]
+    );
+    assert_eq!(page.total, "€42.00");
+    assert!(kennzahlen(&page).contains(&("721", "42,00")));
+}
+
+#[test]
+fn a_refund_in_another_year_does_not_reduce_this_years_payment() {
+    let (_dir, db) = open_year();
+    add_lines(
+        &db,
+        &[
+            debit("l-charge", "2026-12-20", -10_000, "Lastschrift SEITENWEISE"),
+            debit("l-refund", "2027-01-08", 3_000, "Gutschrift SEITENWEISE"),
+        ],
+    );
+    add_document(&db, "doc-b", |d| {
+        d.item_key = Some("books".into());
+        d.pay_date = Some("2026-12-20".into());
+    });
+    link(&db, "doc-b", "l-charge");
+    link(&db, "doc-b", "l-refund");
+
+    let page = year_page(&db);
+
+    assert_eq!(amounts(rows_of(&page, "720")), ["€100.00"]);
+    assert_eq!(page.total, "€100.00");
+}
+
+#[test]
+fn a_credit_line_decided_anv_without_a_document_reduces_the_years_total() {
+    let (_dir, db) = open_year();
+    add_lines(
+        &db,
+        &[
+            debit("l-tips", "2026-09-09", -5_000, "Lastschrift COPYSHOP"),
+            debit("l-back", "2026-09-12", 1_000, "Gutschrift COPYSHOP"),
+        ],
+    );
+    decide(&db, "l-tips", Action::Anv, Some("tips"));
+    decide(&db, "l-back", Action::Anv, Some("tips"));
+
+    let page = year_page(&db);
+
+    let credit = rows_of(&page, "722")
+        .iter()
+        .find(|r| r.id == "l-back")
+        .unwrap();
+    assert_eq!(credit.amount, "\u{2212}€8.00");
+    assert_eq!(credit.kind, RowKind::Line);
+    assert_eq!(page.total, "€32.00");
+    assert!(kennzahlen(&page).contains(&("722", "32,00")));
+}
+
+#[test]
+fn a_depreciable_document_whose_refunds_cover_its_cost_counts_as_a_whole_without_slices() {
+    let (_dir, db) = depreciation_years();
+    computer(&db, "pc", "2026-03-10", 1, |_| {});
+    add_lines(
+        &db,
+        &[
+            debit("l-charge", "2026-03-10", -150_000, "Lastschrift PIXELFORGE"),
+            debit("l-refund", "2026-03-20", 150_000, "Gutschrift PIXELFORGE"),
+        ],
+    );
+    link(&db, "pc", "l-charge");
+    link(&db, "pc", "l-refund");
+
+    let this_year = page_of(&db, 2026);
+    let next_year = page_of(&db, 2027);
+
+    assert_eq!(
+        rows_of(&this_year, "720"),
+        [slice_row("pc", "10 Mar", "€0.00", None, false)]
+    );
+    assert_eq!(this_year.total, "€0.00");
+    assert!(rows_of(&next_year, "720").is_empty());
+    assert_eq!(next_year.total, "€0.00");
+}
+
+#[test]
+fn a_depreciable_document_is_spread_over_what_is_left_after_a_partial_refund() {
+    let (_dir, db) = depreciation_years();
+    computer(&db, "pc", "2026-03-10", 1, |_| {});
+    add_lines(
+        &db,
+        &[
+            debit("l-charge", "2026-03-10", -170_000, "Lastschrift PIXELFORGE"),
+            debit("l-refund", "2026-03-12", 20_000, "Gutschrift PIXELFORGE"),
+        ],
+    );
+    link(&db, "pc", "l-charge");
+    link(&db, "pc", "l-refund");
+
+    let page = page_of(&db, 2026);
+
+    assert_eq!(
+        rows_of(&page, "720"),
+        [slice_row(
+            "pc",
+            "10 Mar · year 1 of depreciating €1,500.00 over 3 years",
+            "€500.00",
+            None,
+            false
+        )]
+    );
+}
+
+fn closed_subscription_year() -> (TempDir, Db) {
+    use crate::test_support::subscriptions::{insert_rows, plan_row, subscription_row};
+    let (dir, db) = open_year();
+    let mut copy_club = subscription_row("sub-copy", "Copy Club", "COPYSHOP");
+    copy_club.item_key = Some("tips".into());
+    insert_rows(
+        &db,
+        &copy_club,
+        &[plan_row("plan-1", "sub-copy", 5_000, "2026-01-01", None)],
+    );
+    add_lines(
+        &db,
+        &[debit(
+            "l-copy",
+            "2026-09-09",
+            -5_000,
+            "Lastschrift COPYSHOP",
+        )],
+    );
+    insert(
+        &db,
+        decisions::DECISIONS,
+        &DecisionRow {
+            id: "l-copy".into(),
+            kind: Action::Subscription,
+            item_key: None,
+            subscription_id: Some("sub-copy".into()),
+            document_id: None,
+            rule_id: None,
+            decided_at: 1,
+        },
+    );
+    finished(&db, "doc-a", "books", "2026-10-14", 4_690, 100);
+    crate::year::close::close(
+        &db,
+        dir.path(),
+        2026,
+        NumberFormat::DotDecimal,
+        DateOrder::DayFirst,
+        "Closed 13 Nov 2026",
+        500,
+        Source::Ui,
+    )
+    .unwrap();
+    (dir, db)
+}
+
+/// The Copy Club subscription no longer counts for any item.
+fn drop_the_subscriptions_item(db: &Db) {
+    use crate::subscriptions::edit;
+    use crate::test_support::subscriptions::{form, today};
+    edit::update(
+        db,
+        "sub-copy",
+        &form("Copy Club", "COPYSHOP", "50.00"),
+        today(),
+        NOW,
+        Source::Ui,
+    )
+    .unwrap();
+}
+
+fn changed_since_closing(kz: &str, filed: &str, now: &str) -> AttentionView {
+    AttentionView {
+        kind: AttentionKind::ChangedSinceClosing,
+        title: format!("KZ {kz} changed since closing"),
+        detail: format!(
+            "Filed {filed}; the data now gives {now}. Reopen the year to look into it."
+        ),
+        document_id: None,
+        entry_id: None,
+        line_id: None,
+    }
+}
+
+#[test]
+fn a_closed_year_whose_data_did_not_change_has_nothing_changed_since_closing() {
+    let (_dir, db) = closed_subscription_year();
+
+    let page = year_page(&db);
+
+    assert_eq!(page.state, YearState::Closed);
+    assert_eq!(page.attention, Vec::<AttentionView>::new());
+    assert!(kennzahlen(&page).contains(&("722", "40,00")));
+}
+
+#[test]
+fn a_closed_year_keeps_the_filed_value_and_names_what_the_data_now_gives() {
+    let (_dir, db) = closed_subscription_year();
+    drop_the_subscriptions_item(&db);
+
+    let page = year_page(&db);
+
+    assert_eq!(
+        kennzahlen(&page),
+        [
+            ("720", "46,90"),
+            ("721", "0,00"),
+            ("722", "40,00"),
+            ("724", "0,00"),
+            ("726", "0,00")
+        ]
+    );
+    assert_eq!(
+        page.attention,
+        [changed_since_closing("722", "40,00", "0,00")]
+    );
+}
+
+#[test]
+fn a_filtered_page_of_a_closed_year_does_not_report_changes_since_closing() {
+    let (_dir, db) = closed_subscription_year();
+    drop_the_subscriptions_item(&db);
+
+    let page = page_matching(&db, "books");
+
+    assert_eq!(page.attention, Vec::<AttentionView>::new());
+}
+
+#[test]
+fn a_reopened_year_shows_the_live_values_and_no_change_since_closing() {
+    let (_dir, db) = closed_subscription_year();
+    drop_the_subscriptions_item(&db);
+    crate::year::close::reopen(&db, 2026, Source::Ui).unwrap();
+
+    let page = year_page(&db);
+
+    assert_eq!(page.state, YearState::Open);
+    assert!(kennzahlen(&page).contains(&("722", "0,00")));
+    assert!(
+        page.attention
+            .iter()
+            .all(|a| a.kind != AttentionKind::ChangedSinceClosing)
+    );
+}
+
+#[test]
+fn a_change_since_closing_travels_as_a_snake_case_kind() {
+    let (_dir, db) = closed_subscription_year();
+    drop_the_subscriptions_item(&db);
+
+    let value = serde_json::to_value(year_page(&db)).unwrap();
+
+    assert_eq!(
+        value["attention"][0],
+        json!({
+            "kind": "changed_since_closing",
+            "title": "KZ 722 changed since closing",
+            "detail": "Filed 40,00; the data now gives 0,00. Reopen the year to look into it.",
+            "documentId": null,
+            "entryId": null,
+            "lineId": null
+        })
+    );
 }

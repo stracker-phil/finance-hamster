@@ -31,8 +31,12 @@ pub fn plan_on<'a>(plans: &[&'a PlanRow], day: &str) -> Option<&'a PlanRow> {
         .copied()
 }
 
-/// The charge's amount in the plan's currency, without sign; None when the line was paid in another one.
+/// The charge's amount in the plan's currency, without sign; None for a credit (a refund is no charge) or a
+/// line paid in another currency.
 pub fn charged_in(t: &TransactionRow, currency: &str) -> Option<i64> {
+    if t.cents >= 0 {
+        return None;
+    }
     match t.original_currency.as_deref() {
         None if currency == "EUR" => Some(t.cents.abs()),
         Some(code) if code == currency => t.original_cents.map(i64::abs),

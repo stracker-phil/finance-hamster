@@ -57,3 +57,5 @@ Why Hamster is built the way it is. One record per decision, in Nygard format, a
 | [0045](0045-subscriptions-ask-about-another-amount.md) | Subscriptions ask about another amount and take one charge per period | Accepted (2026-11-14) |
 | [0046](0046-commands-are-a-catalog-with-colon-ids.md) | Commands are a catalog with colon ids; page keys are fixed | Accepted (2026-11-15) |
 | [0047](0047-no-links.md) | No links | Accepted (2026-11-15) |
+| [0048](0048-closed-years-are-frozen-in-the-write-path.md) | Closed years are frozen in the write path and show what was filed | Accepted (2026-11-15) |
+| [0049](0049-refunds-net-against-charges.md) | Refunds net against charges; one line pays one document | Accepted (2026-11-15) |

@@ -157,12 +157,12 @@ fn vendor_options(vendors: &[VendorRow], documents: &[DocumentRow]) -> Vec<Vendo
         .collect()
 }
 
-/// What the document paid: the linked lines' sum, or the typed amount without lines.
+/// What the document paid: the linked lines' net outflow, or the typed amount without lines.
 pub fn paid_cents(doc: &DocumentRow, lines: &[TransactionRow]) -> Option<i64> {
     if lines.is_empty() {
         doc.paid_cents
     } else {
-        Some(lines.iter().map(|l| l.cents.abs()).sum())
+        Some(statements::net_outflow(lines))
     }
 }
 

@@ -16,11 +16,11 @@ use crate::accounts::{self, AccountRow};
 use crate::db::{Change, Db, Op, Source, Written};
 use crate::error::{AppError, AppResult};
 use crate::statements::import;
-use crate::statements::import_tests::{october, open_with_accounts};
+use crate::statements::import_tests::{october, open_with_accounts, set_year_state};
 use crate::statements::store::{self as statements, StatementRow, TransactionRow};
 use crate::taxyears::{self, TaxYearRow, YearState};
 use crate::test_support::rules::{minimal_rules, rules_text, set};
-use crate::test_support::statements::{Statement, StatementLine};
+use crate::test_support::statements::{Statement, StatementLine, demo_month};
 
 pub(super) const NOW: i64 = 1_700_000_000;
 pub(super) const PRIVATE_IBAN: &str = "AT241999900000000001";
@@ -433,6 +433,153 @@ fn with_only_closed_years_the_newest_gives_the_items() {
     let labels: Vec<String> = items(&db).unwrap().into_iter().map(|i| i.label).collect();
 
     assert_eq!(labels, vec!["KZ 720 · Neu"]);
+}
+
+/// December 2025 and October 2026 imported, both with E-COMM card payments on the 7th and 10th.
+fn setup_with_two_years() -> (TempDir, Db) {
+    let (dir, db) = setup();
+    import_statement(&db, dir.path(), &demo_month(12, 2025, 12, 141_230));
+    import_statement(&db, dir.path(), &october());
+    (dir, db)
+}
+
+/// What each decided line was decided as, by value date.
+fn kinds_by_date(db: &Db) -> Vec<(String, Action)> {
+    let decisions = decisions_of(db);
+    let mut kinds: Vec<(String, Action)> = db
+        .read(statements::all_transactions)
+        .unwrap()
+        .into_iter()
+        .filter_map(|l| decisions.get(&l.id).map(|d| (l.value_date, d.kind)))
+        .collect();
+    kinds.sort_by(|a, b| a.0.cmp(&b.0));
+    kinds
+}
+
+fn dated(kind: Action, dates: &[&str]) -> Vec<(String, Action)> {
+    dates.iter().map(|d| ((*d).to_string(), kind)).collect()
+}
+
+#[test]
+fn saving_a_rule_decides_lines_of_open_years_and_leaves_closed_years_alone() {
+    let (_dir, db) = setup_with_two_years();
+    add_year(&db, 2025, YearState::Closed, "Alt");
+
+    add(&db, ignore(&["E-COMM"]));
+
+    assert_eq!(
+        kinds_by_date(&db),
+        dated(Action::Ignore, &["2026-10-07", "2026-10-10"])
+    );
+}
+
+#[test]
+fn saving_a_rule_decides_every_matching_line_while_all_years_are_open() {
+    let (_dir, db) = setup_with_two_years();
+
+    add(&db, ignore(&["E-COMM"]));
+
+    assert_eq!(
+        kinds_by_date(&db),
+        dated(
+            Action::Ignore,
+            &["2025-12-07", "2025-12-10", "2026-10-07", "2026-10-10"]
+        )
+    );
+}
+
+#[test]
+fn editing_a_rule_keeps_the_decisions_of_closed_years_as_they_were() {
+    let (dir, db) = setup();
+    add(&db, ignore(&["E-COMM"]));
+    let rule = last_rule(&db);
+    import_statement(&db, dir.path(), &demo_month(12, 2025, 12, 141_230));
+    import_statement(&db, dir.path(), &october());
+    add_year(&db, 2025, YearState::Closed, "Alt");
+
+    save(
+        &db,
+        Some(&rule.id),
+        &assign(&["E-COMM"], "books"),
+        NOW,
+        Source::Ui,
+    )
+    .unwrap();
+
+    let mut expected = dated(Action::Ignore, &["2025-12-07", "2025-12-10"]);
+    expected.extend(dated(Action::Anv, &["2026-10-07", "2026-10-10"]));
+    assert_eq!(kinds_by_date(&db), expected);
+}
+
+#[test]
+fn deleting_a_rule_keeps_the_decisions_it_made_in_closed_years() {
+    let (dir, db) = setup();
+    add(&db, ignore(&["E-COMM"]));
+    let rule = last_rule(&db);
+    import_statement(&db, dir.path(), &demo_month(12, 2025, 12, 141_230));
+    import_statement(&db, dir.path(), &october());
+    add_year(&db, 2025, YearState::Closed, "Alt");
+
+    delete(&db, &rule.id, NOW, Source::Ui).unwrap();
+
+    assert_eq!(
+        kinds_by_date(&db),
+        dated(Action::Ignore, &["2025-12-07", "2025-12-10"])
+    );
+}
+
+#[test]
+fn re_running_counts_and_changes_only_lines_of_open_years() {
+    let (_dir, db) = setup_with_two_years();
+    add_year(&db, 2025, YearState::Closed, "Alt");
+    insert_rule(&db, &rule_row("rule-card", 0, &["E-COMM"], Action::Ignore));
+
+    let (_, lines) = rerun(&db, NOW, Source::Ui).unwrap().unwrap();
+
+    assert_eq!(lines, 2);
+    assert_eq!(
+        kinds_by_date(&db),
+        dated(Action::Ignore, &["2026-10-07", "2026-10-10"])
+    );
+}
+
+#[test]
+fn re_running_has_nothing_to_change_when_only_closed_years_would_change() {
+    let (dir, db) = setup();
+    import_statement(&db, dir.path(), &demo_month(12, 2025, 12, 141_230));
+    add_year(&db, 2025, YearState::Closed, "Alt");
+    insert_rule(&db, &rule_row("rule-card", 0, &["E-COMM"], Action::Ignore));
+
+    assert_eq!(rerun(&db, NOW, Source::Ui).unwrap(), None);
+    assert_eq!(decisions_of(&db), HashMap::new());
+}
+
+#[test]
+fn a_rule_save_that_would_only_touch_a_closed_year_still_succeeds() {
+    let (dir, db) = setup();
+    import_statement(&db, dir.path(), &demo_month(12, 2025, 12, 141_230));
+    add_year(&db, 2025, YearState::Closed, "Alt");
+
+    let written = add(&db, assign(&["E-COMM"], "books"));
+
+    assert_eq!(written.tables, labels(&["rules"]));
+    assert_eq!(rules_of(&db).len(), 1);
+    assert_eq!(decisions_of(&db), HashMap::new());
+}
+
+#[test]
+fn setting_a_statement_name_leaves_the_transfers_of_a_closed_year_undecided() {
+    let (dir, db) = setup();
+    ensure_builtins(&db, NOW, Source::App).unwrap();
+    let mut statement = october();
+    statement.lines.insert(1, named_transfer(2));
+    import_statement(&db, dir.path(), &statement);
+    set_year_state(&db, 2026, YearState::Closed);
+
+    let written = set_statement_name(&db, "account-2", Some("household"));
+
+    assert_eq!(written.tables, labels(&["accounts"]));
+    assert_eq!(decision_for(&db, "HAUSHALT"), None);
 }
 
 #[test]

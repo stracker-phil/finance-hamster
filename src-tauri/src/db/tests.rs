@@ -1,6 +1,8 @@
 use serde_json::json;
 
 use super::*;
+
+mod frozen;
 use crate::test_support::temp_config_dir;
 
 type ThingRow = (String, Option<String>, Option<i64>, Option<i64>);

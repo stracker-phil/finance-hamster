@@ -287,15 +287,17 @@ pub fn set_ended(
 pub fn delete(db: &Db, id: &str, now: i64, source: Source) -> AppResult<Written> {
     let (mut subscriptions, mut plans) = current_state(db)?;
     let sub = existing(&subscriptions, id)?;
-    let mut changes = vec![Change::delete(store::SUBSCRIPTIONS, &sub)?];
-    for plan in plans.iter().filter(|p| p.subscription_id == id) {
-        changes.push(Change::delete(store::PLANS, plan)?);
-    }
+    // Its decisions go first, while the subscription still says whether they counted (db/frozen.rs).
+    let mut changes = Vec::new();
     for decision in db.read(rules_store::decisions)?.values() {
         if decision.by_hand() && decision.subscription_id.as_deref() == Some(id) {
             changes.push(Change::delete(rules_store::DECISIONS, decision)?);
         }
     }
+    for plan in plans.iter().filter(|p| p.subscription_id == id) {
+        changes.push(Change::delete(store::PLANS, plan)?);
+    }
+    changes.push(Change::delete(store::SUBSCRIPTIONS, &sub)?);
     subscriptions.retain(|s| s.id != id);
     plans.retain(|p| p.subscription_id != id);
     let label = format!("Delete Subscription: {}", sub.name);

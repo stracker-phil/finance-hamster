@@ -574,6 +574,36 @@ fn the_charged_amount_has_no_sign_and_is_in_the_plans_currency_or_nothing() {
 }
 
 #[test]
+fn a_credit_is_no_charge_in_any_currency() {
+    let credit = line("l1", "2026-10-07", 1_299, "X");
+    let zero = line("l2", "2026-10-07", 0, "X");
+    let foreign_credit = foreign(line("l3", "2026-10-07", 2_248, "X"), 2_400, "USD");
+    for (t, currency) in [
+        (&credit, "EUR"),
+        (&zero, "EUR"),
+        (&foreign_credit, "USD"),
+        (&foreign_credit, "EUR"),
+    ] {
+        assert_eq!(charged_in(t, currency), None, "{} {currency}", t.id);
+    }
+}
+
+#[test]
+fn a_refund_at_the_plans_amount_is_not_decided_and_leaves_the_periods_charge_to_the_real_debit() {
+    let m = streamflix_matchers(false, plan_interval(Interval::Monthly));
+    let lines = [
+        line("refund", "2026-10-06", 1_000, "STREAMFLIX REFUND"),
+        line("debit", "2026-10-07", -1_000, "STREAMFLIX"),
+    ];
+
+    assert_eq!(
+        verdicts(&m, &lines, &[]),
+        [Verdict::Nothing, Verdict::Booked]
+    );
+    assert_eq!(decision_of(&m, &lines[0]), None);
+}
+
+#[test]
 fn a_line_with_the_text_at_another_amount_asks_about_the_subscription_and_its_plan() {
     let sub = subscription_row("sub-1", "Streamflix", "STREAMFLIX");
     let plan = plan_row("p", "sub-1", 1_299, "2026-01-01", None);

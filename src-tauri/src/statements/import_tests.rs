@@ -8,6 +8,7 @@ use crate::db::{Change, Db, Op, Source};
 use crate::error::{AppError, AppResult};
 use crate::platform::pdf::write::{self, Font, Run};
 use crate::settings::NumberFormat;
+use crate::taxyears::YearState;
 use crate::test_support::demo::DEMO_ACCOUNTS;
 use crate::test_support::statements::{Statement, StatementLine, demo_month};
 use crate::test_support::temp_config_dir;
@@ -69,6 +70,55 @@ pub(crate) fn open_with_accounts_and_year() -> (tempfile::TempDir, Db) {
 
 pub(crate) fn october() -> Statement {
     demo_month(10, 2026, 10, 141_230)
+}
+
+/// Inserts the tax year with `state`, or changes its state when it exists; written as the app does.
+pub(crate) fn set_year_state(db: &Db, year: i32, state: crate::taxyears::YearState) {
+    use crate::taxyears::{self, TaxYearRow, YearState};
+    let closed_at = (state == YearState::Closed).then_some(2);
+    let change = match db.read(|c| taxyears::row(c, year)).unwrap() {
+        Some(before) => {
+            let after = TaxYearRow {
+                state,
+                closed_at,
+                ..before.clone()
+            };
+            Change::update(taxyears::TABLE, &before, &after).unwrap()
+        }
+        None => {
+            let row = TaxYearRow {
+                state,
+                closed_at,
+                ..TaxYearRow::new(
+                    year,
+                    format!("{year} v1"),
+                    crate::test_support::rules::minimal_text(year),
+                    1,
+                )
+            };
+            Change::insert(taxyears::TABLE, &row).unwrap()
+        }
+    };
+    db.write(Op::new("Set year state", vec![change]), Source::App)
+        .unwrap();
+}
+
+/// January 2026 with one more card payment to STREAMFLIX dated 30 December 2025, so it spans two tax years:
+/// 8 lines, the E-COMM ones on 2025-12-30, 2026-01-07 and 2026-01-10.
+pub(crate) fn two_year_statement() -> Statement {
+    let mut statement = demo_month(1, 2026, 1, 141_230);
+    let december = chrono::NaiveDate::from_ymd_opt(2025, 12, 30).unwrap();
+    statement.lines.insert(
+        0,
+        StatementLine {
+            text: format!("E-COMM {:>8} AT  K1   28.12. 00:00", "9,99"),
+            extra: vec!["STREAMFLIX WIEN 1010 040".into()],
+            value_date: december,
+            cents: -999,
+        },
+    );
+    statement.from = december;
+    statement
 }
 
 fn prepared(db: &Db, dir: &Path, statement: &Statement) -> Pending {
@@ -642,6 +692,86 @@ fn only_the_same_accounts_earlier_statements_count_for_the_chain() {
     let pending = prepared(&db, dir.path(), &october());
 
     assert_eq!(preview_of(&db, &pending).chain, ChainKind::First);
+}
+
+fn store_card_rule(db: &Db) {
+    let rule = crate::rules::store::RuleRow {
+        contains: crate::rules::encode_tokens(&["E-COMM"]),
+        ..crate::rules::blank("rule-card".into(), 0, 1)
+    };
+    db.write(
+        Op::new(
+            "Add rule",
+            vec![Change::insert(crate::rules::store::RULES, &rule).unwrap()],
+        ),
+        Source::App,
+    )
+    .unwrap();
+}
+
+/// The value dates of the lines that have a decision, oldest first.
+fn decided_dates(db: &Db) -> Vec<String> {
+    let decisions = db.read(crate::rules::store::decisions).unwrap();
+    let mut dates: Vec<String> = db
+        .read(store::all_transactions)
+        .unwrap()
+        .into_iter()
+        .filter(|l| decisions.contains_key(&l.id))
+        .map(|l| l.value_date)
+        .collect();
+    dates.sort();
+    dates
+}
+
+#[test]
+fn a_rule_decides_every_line_it_matches_while_all_years_are_open() {
+    let (dir, db) = open_with_accounts_and_year();
+    set_year_state(&db, 2025, YearState::Open);
+    store_card_rule(&db);
+
+    imported(&db, dir.path(), &two_year_statement());
+
+    assert_eq!(
+        decided_dates(&db),
+        vec!["2025-12-30", "2026-01-07", "2026-01-10"]
+    );
+}
+
+#[test]
+fn a_statement_with_lines_of_a_closed_and_an_open_year_decides_only_the_open_years_lines() {
+    let (dir, db) = open_with_accounts_and_year();
+    set_year_state(&db, 2025, YearState::Closed);
+    store_card_rule(&db);
+
+    let row = imported(&db, dir.path(), &two_year_statement());
+
+    assert_eq!(lines_of(&db, &row.id).len(), 8);
+    assert_eq!(decided_dates(&db), vec!["2026-01-07", "2026-01-10"]);
+}
+
+#[test]
+fn a_statement_of_a_closed_year_is_stored_whole_and_decided_by_no_rule() {
+    let (dir, db) = open_with_accounts_and_year();
+    set_year_state(&db, 2026, YearState::Closed);
+    store_card_rule(&db);
+
+    let row = imported(&db, dir.path(), &october());
+
+    assert_eq!(lines_of(&db, &row.id).len(), 7);
+    assert_eq!(decided_dates(&db), Vec::<String>::new());
+    assert_eq!(count(&db, "decisions"), 0);
+}
+
+#[test]
+fn undoing_an_import_without_decisions_still_works_after_its_year_closed() {
+    let (dir, db) = open_with_accounts_and_year();
+    imported(&db, dir.path(), &october());
+    set_year_state(&db, 2026, YearState::Closed);
+
+    let undone = db.undo().unwrap().unwrap();
+
+    assert_eq!(undone.label, "Import Statement Nr. 010/2026");
+    assert_eq!(count(&db, "statements"), 0);
 }
 
 #[test]

@@ -312,6 +312,7 @@ pub fn commit(
     };
     changes.push(Change::insert(store::DOCUMENTS, &doc)?);
     if let Some(line) = &line {
+        super::refuse_paid_elsewhere(db, &line.id, &doc.id)?;
         let link = LinkRow {
             id: uuid::Uuid::new_v4().to_string(),
             document_id: doc.id.clone(),

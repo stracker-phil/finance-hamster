@@ -159,7 +159,7 @@ fn document_rows(
             let belongs = in_year(&pay_date, year);
             (belongs, doc.paid_cents.filter(|_| belongs))
         } else {
-            let sum: i64 = this_year.iter().map(|l| l.cents.abs()).sum();
+            let sum = statements::net_outflow(&this_year);
             (
                 !this_year.is_empty(),
                 (!this_year.is_empty()).then_some(sum),
@@ -235,9 +235,10 @@ fn spread_in(
     let paid = if lines.is_empty() {
         doc.paid_cents
     } else {
-        Some(lines.iter().map(|l| l.cents.abs()).sum())
+        Some(statements::net_outflow(lines))
     };
-    let Some(paid) = paid else {
+    // Nothing left to depreciate once refunds cover the cost.
+    let Some(paid) = paid.filter(|&p| p > 0) else {
         return Ok(Spreading::Whole);
     };
     let Some(ruleset) = rules::ruleset_for_year(db, day.year())? else {

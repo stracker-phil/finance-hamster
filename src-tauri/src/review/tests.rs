@@ -14,9 +14,12 @@ use crate::error::AppError;
 use crate::rules::store::{self as rules_store, Action, DecisionRow, RuleRow};
 use crate::settings::NumberFormat;
 use crate::statements::import;
-use crate::statements::import_tests::{october, open_with_accounts, open_with_accounts_and_year};
+use crate::statements::import_tests::{
+    october, open_with_accounts, open_with_accounts_and_year, set_year_state,
+};
 use crate::statements::store::{self as statements, TransactionRow};
 use crate::subscriptions::store as subscription_store;
+use crate::taxyears::YearState;
 use crate::test_support::demo::seed_if_empty;
 use crate::test_support::statements::{Statement, StatementLine, demo_month};
 use crate::test_support::subscriptions::{add as add_subscription, form as subscription_form};
@@ -559,6 +562,116 @@ fn an_item_decision_needs_an_item_of_the_year() {
 
     assert_eq!(decisions(&db), HashMap::new());
     assert_eq!(rules(&db), vec![]);
+}
+
+const CLOSED_2026: &str = "Tax year 2026 is closed; reopen it to change what it counts";
+
+fn line_on(db: &Db, title: &str, date: &str) -> String {
+    all_lines(db)
+        .into_iter()
+        .find(|l| title_of(l) == title && l.value_date == date)
+        .unwrap_or_else(|| panic!("no line {title} on {date}"))
+        .id
+}
+
+fn assign_to_books(db: &Db, line_id: &str, always: bool) -> Result<Written, AppError> {
+    decide(
+        db,
+        line_id,
+        Action::Anv,
+        Some("books".into()),
+        None,
+        always,
+        NOW + 5,
+        Source::Ui,
+    )
+}
+
+fn closed_refusal(result: Result<Written, AppError>) -> String {
+    match result {
+        Err(AppError::InvalidInput(message)) => message,
+        other => panic!("expected a refusal, got {other:?}"),
+    }
+}
+
+#[test]
+fn an_item_decision_on_a_line_of_a_closed_year_is_refused_and_stores_nothing() {
+    let (_dir, db) = imported(&[october()]);
+    set_year_state(&db, 2026, YearState::Closed);
+    let id = line_id(&db, "STREAMFLIX WIEN 1010", 10);
+
+    let message = closed_refusal(assign_to_books(&db, &id, false));
+
+    assert_eq!(message, CLOSED_2026);
+    assert_eq!(decisions(&db), HashMap::new());
+}
+
+#[test]
+fn an_always_decision_on_a_line_of_a_closed_year_creates_no_rule() {
+    let (_dir, db) = imported(&[october()]);
+    set_year_state(&db, 2026, YearState::Closed);
+    let id = line_id(&db, "STREAMFLIX WIEN 1010", 10);
+
+    assert_eq!(closed_refusal(assign_to_books(&db, &id, true)), CLOSED_2026);
+
+    assert_eq!(rules(&db), vec![]);
+    assert_eq!(decisions(&db), HashMap::new());
+}
+
+#[test]
+fn an_ignore_decision_on_a_line_of_a_closed_year_is_allowed() {
+    let (_dir, db) = imported(&[october()]);
+    set_year_state(&db, 2026, YearState::Closed);
+
+    decide_line(&db, "STREAMFLIX WIEN 1010", 10, Action::Ignore, None, false);
+
+    let decision = decision_of(&db, "STREAMFLIX WIEN 1010", 10).unwrap();
+    assert_eq!(decision.kind, Action::Ignore);
+}
+
+#[test]
+fn reopening_the_year_makes_an_item_decision_possible_again() {
+    let (_dir, db) = imported(&[october()]);
+    set_year_state(&db, 2026, YearState::Closed);
+    let id = line_id(&db, "STREAMFLIX WIEN 1010", 10);
+    assert!(assign_to_books(&db, &id, false).is_err());
+
+    set_year_state(&db, 2026, YearState::Open);
+    assign_to_books(&db, &id, false).unwrap();
+
+    assert_eq!(decisions(&db)[&id].kind, Action::Anv);
+}
+
+#[test]
+fn an_always_decision_applies_its_rule_to_open_years_only() {
+    let (_dir, db) = imported(&[demo_month(12, 2025, 12, 141_230), october()]);
+    set_year_state(&db, 2025, YearState::Closed);
+    let october_line = line_on(&db, "STREAMFLIX WIEN 1010", "2026-10-07");
+
+    assign_to_books(&db, &october_line, true).unwrap();
+
+    assert_eq!(rules(&db).len(), 1);
+    let decided: Vec<String> = decisions(&db).into_keys().collect();
+    assert_eq!(decided, vec![october_line]);
+}
+
+#[test]
+fn an_item_decision_made_before_its_year_closed_cannot_be_undone_until_it_reopens() {
+    let (_dir, db) = imported(&[october()]);
+    let id = line_id(&db, "STREAMFLIX WIEN 1010", 10);
+    assign_to_books(&db, &id, false).unwrap();
+    set_year_state(&db, 2026, YearState::Closed);
+
+    assert_eq!(
+        closed_refusal(db.undo().map(|undone| undone.unwrap())),
+        CLOSED_2026
+    );
+    assert_eq!(decisions(&db)[&id].kind, Action::Anv);
+
+    set_year_state(&db, 2026, YearState::Open);
+    db.undo().unwrap().unwrap();
+
+    assert_eq!(decisions(&db), HashMap::new());
 }
 
 #[test]
