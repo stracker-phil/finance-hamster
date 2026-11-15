@@ -6,7 +6,7 @@ mod steps;
 #[cfg(test)]
 mod tests;
 
-use chrono::NaiveDate;
+use chrono::{Datelike, NaiveDate};
 use serde::Serialize;
 use ts_rs::TS;
 
@@ -196,30 +196,39 @@ pub fn today_view(
 ) -> AppResult<TodayView> {
     let format = Format { number, order };
     let statements_view = coverage::coverage(db, today, "", order, import_after_days)?;
-    let newest_open = db
+    // Oldest first: the year being filed comes before the year under way.
+    let mut open: Vec<i32> = db
         .read(taxyears::rows)?
         .into_iter()
-        .find(|y| y.state == YearState::Open)
-        .map(|y| y.year);
-    let page = newest_open
-        .map(|year| year_page::page(db, year, "", number, order))
-        .transpose()?;
-    let from_year = |step: fn(&YearPage) -> Option<Step>| page.as_ref().and_then(step);
-    let mut steps = [
-        review_step(db)?,
-        from_year(attach_step),
-        import_step(db, &statements_view, order)?,
-        from_year(questions_step),
-        from_year(draft_step),
-    ]
-    .into_iter()
-    .flatten();
+        .filter(|y| y.state == YearState::Open)
+        .map(|y| y.year)
+        .collect();
+    open.sort_unstable();
+    let pages = open
+        .iter()
+        .map(|&year| year_page::page(db, year, "", number, order))
+        .collect::<AppResult<Vec<_>>>()?;
+    let from_years =
+        |step: fn(&YearPage) -> Option<Step>| pages.iter().filter_map(step).collect::<Vec<_>>();
+    let mut steps = [review_step(db)?]
+        .into_iter()
+        .flatten()
+        .chain(from_years(attach_step))
+        .chain(import_step(db, &statements_view, order)?)
+        .chain(from_years(questions_step))
+        .chain(from_years(draft_step));
+    // The right column shows the oldest open year once it is over (it waits to be filed), else the current one.
+    let shown = pages
+        .iter()
+        .find(|p| p.year < today.year())
+        .or_else(|| pages.last())
+        .cloned();
     Ok(TodayView {
         date: date::weekday_long(today, order),
         next: steps.next(),
         also: steps.collect(),
         upcoming: upcoming(db, today, &format)?,
-        year: page.map(|p| YearSummary {
+        year: shown.map(|p| YearSummary {
             year: p.year,
             total: p.total,
             progress: p.progress,

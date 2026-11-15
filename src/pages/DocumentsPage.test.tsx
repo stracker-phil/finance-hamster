@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -20,6 +20,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   useStore.setState({ route: HOME, back: [], forward: [], filter: "" });
   mocked.documentsList.mockResolvedValue([]);
+  mocked.documentAddChoose.mockResolvedValue(null);
 });
 
 describe("DocumentsPage", () => {
@@ -145,6 +146,23 @@ describe("DocumentsPage", () => {
     renderWithQuery(<DocumentsPage />);
 
     expect(await screen.findByText("No documents")).toBeTruthy();
-    expect(screen.getByText("Drop an invoice PDF onto the window to add it.")).toBeTruthy();
+    expect(screen.getByText("Drop an invoice PDF onto the window, or choose one.")).toBeTruthy();
+  });
+
+  it("asks for an invoice PDF when Choose File… is clicked on the empty page", async () => {
+    mocked.documentAddChoose.mockResolvedValue(null);
+    renderWithQuery(<DocumentsPage />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Choose File…" }));
+
+    await waitFor(() => expect(mocked.documentAddChoose).toHaveBeenCalled());
+  });
+
+  it("offers no Choose File… once documents exist", async () => {
+    mocked.documentsList.mockResolvedValue([documentGroup()]);
+    renderWithQuery(<DocumentsPage />);
+
+    await screen.findByRole("button", { name: /Demo Cloud Ltd/ });
+    expect(screen.queryByRole("button", { name: "Choose File…" })).toBeNull();
   });
 });

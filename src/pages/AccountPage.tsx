@@ -1,4 +1,6 @@
-import type { LineStatus } from "../api";
+import { useState } from "react";
+import type { LineStatus, LineView } from "../api";
+import { ChangeLineSheet } from "../statements/ChangeLineSheet";
 import { useAccountLines } from "../queries/statements";
 import { useStore } from "../state/store";
 import { EmptyPage } from "./EmptyPage";
@@ -11,7 +13,11 @@ const MUTED: LineStatus[] = ["ignored", "transfer", "review"];
 export function AccountPage({ accountId }: { accountId: string }) {
   const filter = useStore((s) => s.filter);
   const { data, error } = useAccountLines(accountId, filter);
+  const navigate = useStore((s) => s.navigate);
+  const [changing, setChanging] = useState<LineView | null>(null);
   const text = useT().pages.account;
+  // A transfer between own accounts is decided by the app; a line still waiting goes to Review.
+  const open = (line: LineView) => (line.status === "review" ? navigate({ page: "review" }) : setChanging(line));
   if (error) return <EmptyPage title={text.missingTitle} text={text.missingText} />;
   if (data && data.groups.length === 0) return <EmptyPage title={text.emptyTitle} text={text.emptyText} />;
   return (
@@ -25,7 +31,14 @@ export function AccountPage({ accountId }: { accountId: string }) {
             <span className="line-head__count">{group.count}</span>
           </div>
           {group.lines.map((line) => (
-            <div key={line.id} className={MUTED.includes(line.status) ? "line-row line-row--muted" : "line-row"}>
+            <button
+              key={line.id}
+              type="button"
+              className={MUTED.includes(line.status) ? "line-row line-row--muted" : "line-row"}
+              disabled={line.status === "transfer"}
+              aria-label={text.change(line.title)}
+              onClick={() => open(line)}
+            >
               <span className="line-row__date">{line.date}</span>
               <span className="line-row__title">{line.title}</span>
               {line.status === "anv" && <span className="chip chip--anv">ANV</span>}
@@ -34,7 +47,7 @@ export function AccountPage({ accountId }: { accountId: string }) {
               {line.note && <span className="line-row__note">{line.note}</span>}
               {line.original && <span className="line-row__fx">{line.original}</span>}
               <span className={line.credit ? "line-row__amount line-row__amount--in" : "line-row__amount"}>{line.amount}</span>
-            </div>
+            </button>
           ))}
           {group.missingBefore && (
             <div className="line-gap" role="note">
@@ -44,6 +57,7 @@ export function AccountPage({ accountId }: { accountId: string }) {
           )}
         </section>
       ))}
+      {changing && <ChangeLineSheet line={changing} onClose={() => setChanging(null)} />}
     </div>
   );
 }

@@ -30,8 +30,11 @@ pub struct LineView {
     pub credit: bool,
     pub transfer: bool,
     pub status: LineStatus,
-    /// `KZ 720`, `Ignored by rule`, `Waiting for review`.
+    /// `Books & magazines`, `Ignored by rule`, `Waiting for review`.
     pub note: Option<String>,
+    /// What the line was decided as, for changing it: the item of an ANV line, the subscription of a charge.
+    pub item_key: Option<String>,
+    pub subscription_id: Option<String>,
 }
 
 #[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq, TS)]
@@ -163,6 +166,8 @@ fn line_view(
         transfer: t.transfer,
         status: line_status,
         note,
+        item_key: decision.and_then(|d| d.item_key.clone()),
+        subscription_id: decision.and_then(|d| d.subscription_id.clone()),
         id: t.id,
     }
 }

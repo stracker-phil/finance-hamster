@@ -40,7 +40,12 @@ pub fn question_views(
 }
 
 /// `2 drafts to finish · 1 invoice and 2 answers missing`, with the share of done facts in percent.
-pub fn progress_text(facts: &Facts, unanswered: usize, questions: usize) -> (String, u32) {
+pub fn progress_text(
+    facts: &Facts,
+    unanswered: usize,
+    questions: usize,
+    year_over: bool,
+) -> (String, u32) {
     let mut missing = Vec::new();
     let invoices = facts.missing_invoices;
     if invoices > 0 {
@@ -86,10 +91,12 @@ pub fn progress_text(facts: &Facts, unanswered: usize, questions: usize) -> (Str
     let percent = (done * 100)
         .checked_div(open + done)
         .map_or(100, |p| p as u32);
-    let text = if parts.is_empty() {
+    let text = if !parts.is_empty() {
+        parts.join(" · ")
+    } else if year_over {
         crate::tr!("Ready to close", "Bereit zum Abschließen")
     } else {
-        parts.join(" · ")
+        crate::tr!("Nothing open", "Nichts offen")
     };
     (text, percent)
 }

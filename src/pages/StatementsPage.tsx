@@ -1,5 +1,6 @@
 import { ChevronRight, Upload } from "lucide-react";
-import type { AccountCoverage } from "../api";
+import { api, type AccountCoverage } from "../api";
+import { showError } from "../lib/undoToast";
 import { useCoverage } from "../queries/statements";
 import { startImport } from "../statements/importFlow";
 import { useStore } from "../state/store";
@@ -50,7 +51,14 @@ export function StatementsPage() {
   const { data } = useCoverage(filter);
   const navigate = useStore((s) => s.navigate);
   const text = useT().pages.statements;
-  if (data && data.accounts.length === 0) return <EmptyPage title={text.emptyTitle} text={text.emptyText} />;
+  if (data && data.accounts.length === 0)
+    return (
+      <EmptyPage title={text.emptyTitle} text={text.emptyText}>
+        <button className="btn btn--primary" onClick={() => void api.settingsShow("accounts").catch(showError)}>
+          {text.openAccounts}
+        </button>
+      </EmptyPage>
+    );
   const toReview = data?.accounts.reduce((sum, a) => sum + a.toReview, 0) ?? 0;
   return (
     <div className="page-scroll">

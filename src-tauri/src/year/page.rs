@@ -186,7 +186,9 @@ pub fn page(
         .collect();
     let questions = summary::question_views(&ruleset, &given, format);
     let unanswered = questions.iter().filter(|q| !q.answered).count();
-    let (progress, progress_percent) = summary::progress_text(&facts, unanswered, questions.len());
+    let over = year < chrono::Datelike::year(&chrono::Local::now());
+    let (progress, progress_percent) =
+        summary::progress_text(&facts, unanswered, questions.len(), over);
     let mut kennzahlen = summary::kennzahlen(
         year,
         &ruleset,

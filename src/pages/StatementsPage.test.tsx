@@ -17,6 +17,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   useStore.setState({ route: HOME, back: [], forward: [], filter: "", toasts: [], importPreview: null });
   mocked.statementsCoverage.mockResolvedValue(coverage());
+  mocked.settingsShow.mockResolvedValue(undefined);
 });
 
 describe("StatementsPage", () => {
@@ -153,12 +154,33 @@ describe("StatementsPage", () => {
     });
   });
 
-  it("points to Settings when there is no account", async () => {
-    mocked.statementsCoverage.mockResolvedValue(coverage({ accounts: [] }));
+  describe("without an account", () => {
+    beforeEach(() => {
+      mocked.statementsCoverage.mockResolvedValue(coverage({ accounts: [] }));
+    });
 
-    render(<StatementsPage />);
+    it("asks for the bank account whose statements are imported", async () => {
+      render(<StatementsPage />);
 
-    expect(await screen.findByText("No accounts")).toBeTruthy();
-    expect(screen.getByText("Add an account in Settings → Accounts.")).toBeTruthy();
+      expect(await screen.findByText("No accounts")).toBeTruthy();
+      expect(screen.getByText("Add the bank account whose statements you import.")).toBeTruthy();
+    });
+
+    it("opens the Accounts settings with Open Accounts…", async () => {
+      render(<StatementsPage />);
+
+      await userEvent.click(await screen.findByRole("button", { name: "Open Accounts…" }));
+
+      expect(mocked.settingsShow).toHaveBeenCalledWith("accounts");
+    });
+
+    it("shows the error when the settings cannot be opened", async () => {
+      mocked.settingsShow.mockRejectedValue({ kind: "io", message: "No window", code: null });
+      render(<StatementsPage />);
+
+      await userEvent.click(await screen.findByRole("button", { name: "Open Accounts…" }));
+
+      await waitFor(() => expect(useStore.getState().toasts.at(-1)).toMatchObject({ kind: "error", message: "No window" }));
+    });
   });
 });

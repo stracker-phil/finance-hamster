@@ -51,10 +51,18 @@ pub(super) fn review_step(db: &Db) -> AppResult<Option<Step>> {
             "etwa {minutes} Minute",
             "etwa {minutes} Minuten"
         ),
-        line: tr!(
-            "From {from}. Rules decided the rest.",
-            "Von {from}. Den Rest haben Regeln entschieden."
-        ),
+        line: if db
+            .read(crate::rules::store::decisions)?
+            .values()
+            .any(|d| d.rule_id.is_some())
+        {
+            tr!(
+                "From {from}. Rules decided the rest.",
+                "Von {from}. Den Rest haben Regeln entschieden."
+            )
+        } else {
+            tr!("From {from}.", "Von {from}.")
+        },
         button: tr!("Start Review", "Prüfen starten"),
         target: StepTarget::Review,
     }))

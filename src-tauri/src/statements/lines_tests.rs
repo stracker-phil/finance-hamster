@@ -510,6 +510,57 @@ fn a_subscription_decision_is_a_subscription_without_a_note() {
 }
 
 #[test]
+fn a_line_carries_the_item_or_subscription_it_was_decided_as() {
+    let (_dir, db) = decided_october();
+    let subscription_id = add_subscription(
+        &db,
+        &subscription_form("Streamflix", "NO SUCH TEXT", "12.99"),
+    );
+    let line_id = line_titled(&lines_of(&db, "account-1"), "STREAMFLIX WIEN 1010")
+        .id
+        .clone();
+    review::decide(
+        &db,
+        &line_id,
+        Action::Subscription,
+        None,
+        Some(subscription_id.clone()),
+        false,
+        NOW,
+        Source::Ui,
+    )
+    .unwrap();
+
+    let page = lines_of(&db, "account-1");
+
+    let carried = |title: &str| {
+        let line = line_titled(&page, title);
+        (line.item_key.clone(), line.subscription_id.clone())
+    };
+    assert_eq!(
+        carried("BUCHHANDLUNG SEITENWEISE"),
+        (Some("books".into()), None)
+    );
+    assert_eq!(
+        carried("STREAMFLIX WIEN 1010"),
+        (None, Some(subscription_id))
+    );
+    assert_eq!(carried("NORDWIND SOFTWARE GMBH"), (None, None));
+    assert_eq!(carried("LUMEN AI SAN FRANCISCO"), (None, None));
+}
+
+#[test]
+fn a_line_serializes_its_item_and_subscription_in_camel_case() {
+    let (_dir, db) = decided_october();
+    let page = lines_of(&db, "account-1");
+
+    let value = serde_json::to_value(line_titled(&page, "BUCHHANDLUNG SEITENWEISE")).unwrap();
+
+    assert_eq!(value["itemKey"], "books");
+    assert_eq!(value["subscriptionId"], serde_json::Value::Null);
+}
+
+#[test]
 fn line_statuses_travel_as_snake_case_words() {
     for (status, word) in [
         (LineStatus::Review, "review"),

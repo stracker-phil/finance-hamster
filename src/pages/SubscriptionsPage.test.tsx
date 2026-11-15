@@ -32,6 +32,7 @@ describe("SubscriptionsPage", () => {
       renderWithQuery(<SubscriptionsPage />);
 
       expect(await screen.findByText("No subscriptions")).toBeTruthy();
+      expect(screen.getByText("Add one here, or choose Subscription for a line in Review.")).toBeTruthy();
       expect(screen.getByRole("button", { name: "New Subscription" })).toBeTruthy();
     });
 

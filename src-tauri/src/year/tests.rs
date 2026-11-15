@@ -1222,19 +1222,50 @@ fn progress_reads_in_german_with_the_verb_agreeing_in_number() {
 }
 
 #[test]
-fn a_finished_year_is_ready_to_close_in_german() {
-    let (_dir, db) = open_year();
-    finished(&db, "doc-a", "books", "2026-10-14", 4_690, 100);
-    answer_with(&db, "telearbeitstage", "28");
-    answer_with(&db, "pauschale", "120");
+fn nothing_open_reads_ready_to_close_only_once_the_year_is_over() {
+    use super::facts::Facts;
+    use super::summary::progress_text;
+    use crate::i18n::with_lang;
+    use crate::settings::Language;
+    let facts = Facts {
+        finished: 2,
+        ..Facts::default()
+    };
 
-    let page = crate::i18n::with_lang(crate::settings::Language::De, || year_page(&db));
+    for (lang, over, expected) in [
+        (Language::En, true, "Ready to close"),
+        (Language::En, false, "Nothing open"),
+        (Language::De, true, "Bereit zum Abschließen"),
+        (Language::De, false, "Nichts offen"),
+    ] {
+        let (text, percent) = with_lang(lang, || progress_text(&facts, 0, 2, over));
 
-    assert_eq!(page.progress, "Bereit zum Abschließen");
+        assert_eq!(
+            (text.as_str(), percent),
+            (expected, 100),
+            "{over} {expected}"
+        );
+    }
 }
 
 #[test]
-fn a_year_with_everything_finished_and_answered_is_ready_to_close() {
+fn open_work_is_listed_whether_or_not_the_year_is_over() {
+    use super::facts::Facts;
+    use super::summary::progress_text;
+    let facts = Facts {
+        drafts: 1,
+        ..Facts::default()
+    };
+
+    for over in [true, false] {
+        let (text, _) = progress_text(&facts, 1, 1, over);
+
+        assert_eq!(text, "1 draft to finish · 1 answer missing", "{over}");
+    }
+}
+
+#[test]
+fn a_year_with_everything_finished_and_answered_is_fully_done() {
     let (_dir, db) = open_year();
     finished(&db, "doc-a", "books", "2026-10-14", 4_690, 100);
     answer_with(&db, "telearbeitstage", "28");
@@ -1242,7 +1273,6 @@ fn a_year_with_everything_finished_and_answered_is_ready_to_close() {
 
     let page = year_page(&db);
 
-    assert_eq!(page.progress, "Ready to close");
     assert_eq!(page.progress_percent, 100);
 }
 
@@ -1757,7 +1787,7 @@ fn questions_show_their_answers_as_the_field_does() {
         ]
     );
     assert_eq!(comma.questions[1].value, "1.234,50");
-    assert_eq!(page.progress, "Ready to close");
+    assert_eq!(page.progress_percent, 100);
 }
 
 fn page_comma(db: &Db) -> YearPage {

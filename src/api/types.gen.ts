@@ -485,9 +485,13 @@ original: string | null,
  */
 amount: string, credit: boolean, transfer: boolean, status: LineStatus, 
 /**
- * `KZ 720`, `Ignored by rule`, `Waiting for review`.
+ * `Books & magazines`, `Ignored by rule`, `Waiting for review`.
  */
-note: string | null, };
+note: string | null, 
+/**
+ * What the line was decided as, for changing it: the item of an ANV line, the subscription of a charge.
+ */
+itemKey: string | null, subscriptionId: string | null, };
 
 export type MatchCount = { 
 /**

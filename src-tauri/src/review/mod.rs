@@ -395,17 +395,19 @@ pub fn decide_as(
     } else {
         None
     };
+    // Deciding a line again (a change from the Account page) replaces the earlier decision.
+    let before = db.read(rules_store::decisions)?.remove(&line.id);
     let decision = DecisionRow {
         id: line.id.clone(),
         kind: action,
         item_key: item_key.clone(),
         subscription_id,
-        document_id: None,
+        document_id: before.as_ref().and_then(|b| b.document_id.clone()),
         rule_id: None,
         decided_at: now,
     };
     let title = title_of(&line);
-    let mut changes = vec![match db.read(rules_store::decisions)?.get(&line.id) {
+    let mut changes = vec![match &before {
         Some(before) => Change::update(rules_store::DECISIONS, before, &decision)?,
         None => Change::insert(rules_store::DECISIONS, &decision)?,
     }];

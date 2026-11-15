@@ -1,11 +1,15 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
 
 import { api } from "../api";
+import { HOME } from "../state/route";
 import { useStore } from "../state/store";
+import { withMenus } from "../test/popup";
 import { renderWithQuery as render } from "../test/renderWithQuery";
+import { reviewQueue } from "../test/review";
 import { accountLines, lineView, statementGroup } from "../test/statements";
 import { AccountPage } from "./AccountPage";
 
@@ -13,8 +17,9 @@ const mocked = vi.mocked(api, true);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useStore.setState({ toasts: [], filter: "" });
+  useStore.setState({ route: HOME, back: [], forward: [], toasts: [], filter: "" });
   mocked.accountLines.mockResolvedValue(accountLines());
+  mocked.reviewQueue.mockResolvedValue(reviewQueue({ lines: [] }));
 });
 
 describe("AccountPage", () => {
@@ -145,6 +150,67 @@ describe("AccountPage", () => {
 
     expect(await screen.findByText("No lines")).toBeTruthy();
     expect(screen.getByText("This account has no imported statement yet.")).toBeTruthy();
+  });
+
+  describe("changing a line", () => {
+    const withLine = (patch: Parameters<typeof lineView>[0]) => mocked.accountLines.mockResolvedValue(accountLines({ groups: [statementGroup({ lines: [lineView({ title: "Example Market", ...patch })] })] }));
+
+    it("names each line row after its title", async () => {
+      render(<AccountPage accountId="acc-1" />);
+
+      expect(await screen.findByRole("button", { name: "Change Example Market" })).toBeTruthy();
+    });
+
+    it.each(["anv", "subscription", "ignored"] as const)("opens the sheet for a %s line", async (status) => {
+      withLine({ status, itemKey: "kz-169" });
+      render(withMenus(<AccountPage accountId="acc-1" />));
+
+      await userEvent.click(await screen.findByRole("button", { name: "Change Example Market" }));
+
+      const dialog = await screen.findByRole("dialog", { name: "What is this line?" });
+      expect(within(dialog).getByText("Example Market · −€22.48")).toBeTruthy();
+    });
+
+    it("opens the review for a line waiting for a decision, without a sheet", async () => {
+      withLine({ status: "review", note: "Waiting for review" });
+      render(<AccountPage accountId="acc-1" />);
+
+      await userEvent.click(await screen.findByRole("button", { name: "Change Example Market" }));
+
+      expect(useStore.getState().route).toEqual({ page: "review" });
+      expect(screen.queryByRole("dialog")).toBeNull();
+    });
+
+    it("disables the row of a transfer", async () => {
+      withLine({ status: "transfer", transfer: true });
+      render(<AccountPage accountId="acc-1" />);
+
+      const row = await screen.findByRole<HTMLButtonElement>("button", { name: "Change Example Market" });
+      expect(row.disabled).toBe(true);
+    });
+
+    it("closes the sheet with Cancel", async () => {
+      withLine({ status: "ignored" });
+      render(withMenus(<AccountPage accountId="acc-1" />));
+      await userEvent.click(await screen.findByRole("button", { name: "Change Example Market" }));
+
+      await userEvent.click(await screen.findByRole("button", { name: "Cancel" }));
+
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(mocked.reviewDecide).not.toHaveBeenCalled();
+    });
+
+    it("closes the sheet after a saved change", async () => {
+      withLine({ status: "anv", itemKey: "kz-169" });
+      mocked.reviewDecide.mockResolvedValue("Ignore: Example Market");
+      render(withMenus(<AccountPage accountId="acc-1" />));
+      await userEvent.click(await screen.findByRole("button", { name: "Change Example Market" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Ignore" }));
+
+      await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    });
   });
 
   it("says the account is gone and shows the error when it cannot be read", async () => {

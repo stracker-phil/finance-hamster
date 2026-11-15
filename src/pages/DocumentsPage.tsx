@@ -1,5 +1,6 @@
 import { FileText, Search } from "lucide-react";
 import type { DocState } from "../api";
+import { startAddDocument } from "../documents/addFlow";
 import { useDocuments } from "../queries/documents";
 import { useStore } from "../state/store";
 import { EmptyPage } from "./EmptyPage";
@@ -30,7 +31,11 @@ export function DocumentsPage() {
           (query.trim() ? (
             <p className="docs-page__none">{text.noMatch(query.trim())}</p>
           ) : (
-            <EmptyPage title={text.emptyTitle} text={text.emptyText} />
+            <EmptyPage title={text.emptyTitle} text={text.emptyText}>
+              <button className="btn btn--primary" onClick={startAddDocument}>
+                {text.chooseFile}
+              </button>
+            </EmptyPage>
           ))}
         {groups?.map((group) => (
           <section key={group.title} className="docs-group" aria-label={group.title}>

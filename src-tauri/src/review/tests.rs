@@ -728,6 +728,103 @@ fn a_hand_decision_replaces_the_decision_a_rule_made_and_undo_brings_it_back() {
     );
 }
 
+/// Like `imported`, with a second item `tools` next to `books` in the open 2026 year.
+fn imported_with_two_items(statements: &[Statement]) -> (TempDir, Db) {
+    use crate::db::{Change, Op};
+    use crate::taxyears::{self, TaxYearRow};
+    use crate::test_support::rules::{minimal_rules, rules_text, set};
+    let (dir, db) = open_with_accounts();
+    let mut rules = minimal_rules(2026);
+    set(
+        &mut rules,
+        "/items",
+        serde_json::json!([
+            { "key": "books", "kz": "720", "name": "Books", "section": "main", "kind": "documents" },
+            { "key": "tools", "kz": "721", "name": "Tools", "section": "main", "kind": "documents" }
+        ]),
+    );
+    let year = TaxYearRow::new(2026, "2026 v1".into(), rules_text(&rules), 1);
+    db.write(
+        Op::new(
+            "Add year",
+            vec![Change::insert(taxyears::TABLE, &year).unwrap()],
+        ),
+        Source::App,
+    )
+    .unwrap();
+    import_all(&db, &dir, statements);
+    (dir, db)
+}
+
+fn redecide(db: &Db, id: &str, action: Action, item: Option<&str>) -> Result<Written, AppError> {
+    decide(
+        db,
+        id,
+        action,
+        item.map(Into::into),
+        None,
+        false,
+        NOW + 9,
+        Source::Ui,
+    )
+}
+
+#[test]
+fn deciding_an_anv_line_again_as_ignore_replaces_the_decision_in_one_undoable_step() {
+    let (_dir, db) = imported_with_two_items(&[october()]);
+    let id = line_id(&db, "STREAMFLIX WIEN 1010", 10);
+    redecide(&db, &id, Action::Anv, Some("books")).unwrap();
+    let anv = decisions(&db)[&id].clone();
+
+    let result = redecide(&db, &id, Action::Ignore, None).unwrap();
+
+    assert_eq!(result.tables, ["decisions"]);
+    let now = &decisions(&db)[&id];
+    assert_eq!((now.kind, now.item_key.as_deref()), (Action::Ignore, None));
+    assert_eq!(decisions(&db).len(), 1);
+
+    db.undo().unwrap().unwrap();
+
+    assert_eq!(decisions(&db)[&id], anv);
+}
+
+#[test]
+fn deciding_an_anv_line_again_with_another_item_replaces_the_item_and_undo_restores_the_first() {
+    let (_dir, db) = imported_with_two_items(&[october()]);
+    let id = line_id(&db, "STREAMFLIX WIEN 1010", 10);
+    redecide(&db, &id, Action::Anv, Some("books")).unwrap();
+    let books = decisions(&db)[&id].clone();
+
+    redecide(&db, &id, Action::Anv, Some("tools")).unwrap();
+
+    let now = &decisions(&db)[&id];
+    assert_eq!(
+        (now.kind, now.item_key.as_deref()),
+        (Action::Anv, Some("tools"))
+    );
+    assert_eq!(decisions(&db).len(), 1);
+
+    db.undo().unwrap().unwrap();
+
+    assert_eq!(decisions(&db)[&id], books);
+}
+
+#[test]
+fn a_line_of_a_closed_year_cannot_be_decided_again() {
+    for (action, item) in [(Action::Ignore, None), (Action::Anv, Some("tools"))] {
+        let (_dir, db) = imported_with_two_items(&[october()]);
+        let id = line_id(&db, "STREAMFLIX WIEN 1010", 10);
+        redecide(&db, &id, Action::Anv, Some("books")).unwrap();
+        let anv = decisions(&db)[&id].clone();
+        set_year_state(&db, 2026, YearState::Closed);
+
+        let message = closed_refusal(redecide(&db, &id, action, item));
+
+        assert_eq!(message, CLOSED_2026, "{action:?}");
+        assert_eq!(decisions(&db)[&id], anv, "{action:?}");
+    }
+}
+
 #[test]
 fn always_adds_a_rule_for_the_key_and_applies_it_to_the_other_undecided_lines() {
     let (_dir, db) = imported(&[september(), october()]);

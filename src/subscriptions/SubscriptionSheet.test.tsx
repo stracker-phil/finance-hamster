@@ -361,27 +361,22 @@ describe("SubscriptionSheet", () => {
     });
   });
 
-  describe("the Cancelled state", () => {
-    it("reveals Ended on with today and sends the end date", async () => {
+  describe("the end of a subscription", () => {
+    it("has no Active or Cancelled control, and no end date for an active subscription", () => {
       renderSheet({ initial: subscriptionForm() });
+
+      expect(screen.queryByRole("button", { name: "Active" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Cancelled" })).toBeNull();
       expect(screen.queryByLabelText("Ended on")).toBeNull();
-
-      await userEvent.click(screen.getByRole("button", { name: "Cancelled" }));
-
-      expect(screen.getByLabelText<HTMLInputElement>("Ended on").value).toBe("2026-11-13");
-      await submit();
-      expect(mocked.subscriptionSave).toHaveBeenCalledWith(null, expect.objectContaining({ active: false, endedOn: "2026-11-13" }));
     });
 
-    it("hides Ended on and clears the end date when Active is chosen again", async () => {
-      renderSheet({ initial: subscriptionForm({ active: false, endedOn: "2026-03-31" }) });
+    it("keeps the end date of an ended subscription and sends it unchanged", async () => {
+      renderSheet({ id: "sub-9", initial: subscriptionForm({ active: false, endedOn: "2026-03-31" }) });
       expect(screen.getByLabelText<HTMLInputElement>("Ended on").value).toBe("2026-03-31");
 
-      await userEvent.click(screen.getByRole("button", { name: "Active" }));
-      await submit();
+      await userEvent.click(screen.getByRole("button", { name: "Save" }));
 
-      expect(screen.queryByLabelText("Ended on")).toBeNull();
-      expect(mocked.subscriptionSave).toHaveBeenCalledWith(null, expect.objectContaining({ active: true, endedOn: null }));
+      expect(mocked.subscriptionSave).toHaveBeenCalledWith("sub-9", expect.objectContaining({ active: false, endedOn: "2026-03-31" }));
     });
   });
 

@@ -225,7 +225,7 @@ fn a_single_line_asks_for_one_minute_of_review() {
             key: "review".into(),
             title: "1 line to review".into(),
             detail: "about 1 minute".into(),
-            line: "From Private. Rules decided the rest.".into(),
+            line: "From Private.".into(),
             button: "Start Review".into(),
             target: StepTarget::Review,
         }
@@ -266,10 +266,50 @@ fn review_names_only_the_accounts_with_waiting_lines_and_counts_undecided_ones()
     let step = view(&db).next.unwrap();
 
     assert_eq!(step.title, "2 lines to review");
-    assert_eq!(
-        step.line,
-        "From Private and Business. Rules decided the rest."
+    assert_eq!(step.line, "From Private and Business.");
+}
+
+fn decide_by_rule(db: &Db, n: u32) {
+    insert(
+        db,
+        DECISIONS,
+        &DecisionRow {
+            id: format!("line-{n}"),
+            kind: Action::Ignore,
+            item_key: None,
+            subscription_id: None,
+            document_id: None,
+            rule_id: Some("rule-1".into()),
+            decided_at: 1,
+        },
     );
+}
+
+#[test]
+fn the_review_line_says_rules_decided_the_rest_only_when_a_rule_decided_a_line() {
+    let (_dir, db) = quiet();
+    add_line(&db, 1, "account-1", "2026-11-09", "Lastschrift A");
+    add_line(&db, 2, "account-1", "2026-11-09", "Lastschrift B");
+    decide_by_rule(&db, 2);
+
+    let english = view(&db).next.unwrap();
+    let german = crate::i18n::with_lang(crate::settings::Language::De, || view(&db).next.unwrap());
+
+    assert_eq!(english.line, "From Private. Rules decided the rest.");
+    assert_eq!(
+        german.line,
+        "Von Private. Den Rest haben Regeln entschieden."
+    );
+}
+
+#[test]
+fn a_hand_decision_alone_does_not_make_the_review_line_mention_rules() {
+    let (_dir, db) = quiet();
+    add_line(&db, 1, "account-1", "2026-11-09", "Lastschrift A");
+    add_line(&db, 2, "account-1", "2026-11-09", "Lastschrift B");
+    decide(&db, 2, Action::Ignore, None);
+
+    assert_eq!(view(&db).next.unwrap().line, "From Private.");
 }
 
 #[test]
@@ -507,7 +547,7 @@ fn steps_read_in_german_with_singular_and_plural() {
             key: "review".into(),
             title: "1 Buchung zu prüfen".into(),
             detail: "etwa 1 Minute".into(),
-            line: "Von Private. Den Rest haben Regeln entschieden.".into(),
+            line: "Von Private.".into(),
             button: "Prüfen starten".into(),
             target: StepTarget::Review,
         }
@@ -646,6 +686,74 @@ fn year_steps_belong_to_the_newest_open_year_not_a_newer_closed_one() {
         })
     );
     assert_eq!(view.year.map(|y| y.year), Some(2026));
+}
+
+fn open_year_2025(db: &Db) {
+    insert(
+        db,
+        taxyears::TABLE,
+        &taxyears::TaxYearRow::new(2025, "2025 v1".into(), minimal_text(2025), 1),
+    );
+}
+
+#[test]
+fn steps_of_every_open_year_come_oldest_year_first() {
+    let (_dir, db) = quiet();
+    open_year_2025(&db);
+    missing_invoice(&db, 1, "2026-10-05", "Lastschrift A");
+    missing_invoice(&db, 2, "2025-10-05", "Lastschrift B");
+
+    let view = view(&db);
+
+    let targets: Vec<StepTarget> = view
+        .next
+        .iter()
+        .chain(&view.also)
+        .map(|s| s.target.clone())
+        .collect();
+    assert_eq!(
+        targets,
+        [
+            StepTarget::Year {
+                year: 2025,
+                attention: Some(AttentionKind::MissingInvoice)
+            },
+            StepTarget::Year {
+                year: 2026,
+                attention: Some(AttentionKind::MissingInvoice)
+            },
+        ]
+    );
+}
+
+#[test]
+fn the_right_column_shows_the_oldest_open_year_once_it_is_over() {
+    let (_dir, db) = quiet();
+    open_year_2025(&db);
+    missing_invoice(&db, 2, "2025-10-05", "Lastschrift B");
+
+    let year = view(&db).year.unwrap();
+
+    assert_eq!(
+        (year.year, year.progress.as_str()),
+        (2025, "1 invoice missing")
+    );
+}
+
+#[test]
+fn the_right_column_shows_the_current_year_when_no_older_year_is_open() {
+    let (_dir, db) = quiet();
+    insert(
+        &db,
+        taxyears::TABLE,
+        &taxyears::TaxYearRow {
+            state: YearState::Closed,
+            closed_at: Some(2),
+            ..taxyears::TaxYearRow::new(2025, "2025 v1".into(), minimal_text(2025), 1)
+        },
+    );
+
+    assert_eq!(view(&db).year.map(|y| y.year), Some(2026));
 }
 
 #[test]

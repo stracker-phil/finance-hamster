@@ -39,11 +39,6 @@ export const intervals = (text: SheetText): { value: Interval; label: string }[]
   { value: "yearly", label: text.yearly },
 ];
 
-const states = (text: SheetText) => [
-  { value: "active" as const, label: text.active },
-  { value: "cancelled" as const, label: text.cancelled },
-];
-
 const reminders = (text: SheetText): { value: Reminder; label: string }[] => [
   { value: "off", label: text.reminderOff },
   { value: "one_day", label: text.oneDay },
@@ -114,7 +109,6 @@ export function SubscriptionSheet({ id, initial, source, onClose }: { id: string
             <h2 id={titleId}>{editing ? text.editTitle(form.name) : text.newTitle}</h2>
             <span className="add-doc__hint">{editing ? text.editHint : text.newHint}</span>
           </div>
-          <Segmented label={text.state} options={states(text)} value={form.active ? "active" : "cancelled"} onChange={(state) => set({ active: state === "active", endedOn: state === "active" ? null : (form.endedOn ?? today()) })} />
         </div>
         <div className="sub-sheet__body">
           {source && <SourceLine line={source} onSelect={(matchText) => set({ matchText })} />}
