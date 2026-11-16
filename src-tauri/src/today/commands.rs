@@ -9,7 +9,7 @@ use crate::state::AppState;
 pub async fn today_view(state: State<'_, AppState>) -> AppResult<TodayView> {
     let settings = state.settings.get();
     super::today_view(
-        &state.db,
+        &state.db(),
         chrono::Local::now().date_naive(),
         settings.number_format,
         DateOrder::system(),

@@ -284,7 +284,7 @@ fn profile_actions_missing_a_name_are_usage_errors() {
         vec!["profile", "rename", "Alex"],
     ] {
         assert!(
-            matches!(run(&args),CliOutcome::Exit { code: 2, .. }),
+            matches!(run(&args), CliOutcome::Exit { code: 2, .. }),
             "{args:?}"
         );
     }

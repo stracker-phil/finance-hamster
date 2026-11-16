@@ -28,7 +28,7 @@ pub fn announce(app: &AppHandle, written: &Written) {
 /// The label of what was undone ("Mark as ANV"), or null when there was nothing to undo.
 #[tauri::command]
 pub async fn undo(app: AppHandle, state: State<'_, AppState>) -> AppResult<Option<String>> {
-    let written = state.db.undo()?;
+    let written = state.db().undo()?;
     if let Some(written) = &written {
         announce(&app, written);
         crate::documents::commands::relocate(&app, &state);
@@ -38,7 +38,7 @@ pub async fn undo(app: AppHandle, state: State<'_, AppState>) -> AppResult<Optio
 
 #[tauri::command]
 pub async fn redo(app: AppHandle, state: State<'_, AppState>) -> AppResult<Option<String>> {
-    let written = state.db.redo()?;
+    let written = state.db().redo()?;
     if let Some(written) = &written {
         announce(&app, written);
         crate::documents::commands::relocate(&app, &state);

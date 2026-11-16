@@ -107,6 +107,8 @@ fn restrict_to_owner(path: &Path) -> AppResult<()> {
 
 pub struct Db {
     conn: Mutex<Connection>,
+    /// The profile folder the file lives in, with the PDFs that belong to its rows.
+    dir: PathBuf,
     journal_path: PathBuf,
     /// The last `seq` in `journal.jsonl`, so a write appends without reading the file; None after a failed
     /// append, and the next write reads the file again.
@@ -129,10 +131,15 @@ impl Db {
             .ok();
         Ok(Db {
             conn: Mutex::new(conn),
+            dir: dir.to_path_buf(),
             journal_path,
             mirrored: Mutex::new(mirrored),
             history: Mutex::new(UndoStack::default()),
         })
+    }
+
+    pub fn dir(&self) -> &Path {
+        &self.dir
     }
 
     /// Hands the connection to a read; every write goes through `write`.

@@ -5,7 +5,6 @@ pub mod cli;
 pub mod commands;
 
 use std::path::{Path, PathBuf};
-use std::sync::OnceLock;
 
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
@@ -50,7 +49,7 @@ pub struct Profiles {
     pub profiles: Vec<Profile>,
 }
 
-/// The profile this run of the app works in.
+/// The profile `open` opened.
 pub struct Active {
     pub id: String,
     pub dir: PathBuf,
@@ -58,18 +57,9 @@ pub struct Active {
     pub first: bool,
 }
 
-static ACTIVE: OnceLock<Active> = OnceLock::new();
-
-/// Sets the profile for this run; later calls keep the first.
-pub fn set_active(active: Active) {
-    let _ = ACTIVE.set(active);
-}
-
-/// Panics before `set_active`.
-pub fn active() -> &'static Active {
-    ACTIVE
-        .get()
-        .expect("the active profile is set before the app starts")
+/// Whether `id` is the profile made first.
+pub fn is_first(root: &Path, id: &str) -> bool {
+    load(root).profiles.first().is_some_and(|p| p.id == id)
 }
 
 pub fn dir(root: &Path, id: &str) -> PathBuf {

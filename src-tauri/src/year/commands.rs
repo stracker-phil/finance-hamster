@@ -23,7 +23,7 @@ pub async fn year_page(
     query: String,
 ) -> AppResult<YearPage> {
     page::page(
-        &state.db,
+        &state.db(),
         year,
         &query,
         state.settings.get().number_format,
@@ -42,7 +42,7 @@ pub async fn year_answer(
 ) -> AppResult<Option<String>> {
     let ruleset: Ruleset = serde_json::from_str(&open_year(&state, year)?.rules)?;
     let written = super::answers::answer(
-        &state.db,
+        &state.db(),
         &ruleset,
         year,
         &question,
@@ -63,7 +63,7 @@ pub async fn year_categories(
     year: i32,
 ) -> AppResult<Vec<super::hidden::CategoryChoice>> {
     let ruleset: Ruleset = serde_json::from_str(&year_row(&state, year)?.rules)?;
-    let hidden = state.db.read(|c| super::hidden::hidden(c, year))?;
+    let hidden = state.db().read(|c| super::hidden::hidden(c, year))?;
     Ok(super::hidden::choices(&ruleset, &hidden))
 }
 
@@ -77,7 +77,7 @@ pub async fn year_set_category_shown(
     shown: bool,
 ) -> AppResult<Option<String>> {
     let ruleset: Ruleset = serde_json::from_str(&year_row(&state, year)?.rules)?;
-    let written = super::hidden::set_shown(&state.db, &ruleset, year, &key, shown)?;
+    let written = super::hidden::set_shown(&state.db(), &ruleset, year, &key, shown)?;
     if let Some(written) = &written {
         announce(&app, written);
     }
@@ -85,7 +85,7 @@ pub async fn year_set_category_shown(
 }
 
 fn year_row(state: &AppState, year: i32) -> AppResult<taxyears::TaxYearRow> {
-    state.db.read(|c| taxyears::row(c, year))?.ok_or_else(|| {
+    state.db().read(|c| taxyears::row(c, year))?.ok_or_else(|| {
         AppError::NotFound(crate::tr!("No tax year {year}", "Kein Steuerjahr {year}"))
     })
 }
@@ -111,9 +111,10 @@ pub async fn year_entry_add(
     entry: NewEntry,
 ) -> AppResult<String> {
     let ruleset: Ruleset = serde_json::from_str(&open_year(&state, year)?.rules)?;
+    let db = state.db();
     let written = entries::add(
-        &state.db,
-        &crate::profile_dir(),
+        &db,
+        db.dir(),
         &ruleset,
         year,
         &entry,
@@ -132,7 +133,7 @@ pub async fn year_entry_delete(
     id: String,
 ) -> AppResult<String> {
     open_year(&state, year)?;
-    let written = entries::delete(&state.db, year, &id, Source::Ui)?;
+    let written = entries::delete(&state.db(), year, &id, Source::Ui)?;
     announce(&app, &written);
     Ok(written.label)
 }
@@ -178,14 +179,8 @@ pub async fn year_entry_attach(
     path: String,
 ) -> AppResult<String> {
     open_year(&state, year)?;
-    let written = entries::attach(
-        &state.db,
-        &crate::profile_dir(),
-        year,
-        &id,
-        Path::new(&path),
-        Source::Ui,
-    )?;
+    let db = state.db();
+    let written = entries::attach(&db, db.dir(), year, &id, Path::new(&path), Source::Ui)?;
     announce(&app, &written);
     Ok(written.label)
 }
@@ -197,7 +192,8 @@ pub async fn year_evidence_open(
     year: i32,
     id: String,
 ) -> AppResult<()> {
-    let path = entries::evidence_path(&state.db, &crate::profile_dir(), year, &id)?;
+    let db = state.db();
+    let path = entries::evidence_path(&db, db.dir(), year, &id)?;
     tauri_plugin_opener::open_path(&path, None::<&str>).map_err(|e| {
         AppError::Internal(crate::tr!(
             "Couldn't open {}: {e}",
@@ -218,7 +214,7 @@ fn stamp(prefix: &str) -> String {
 #[tauri::command]
 pub async fn year_close_check(state: State<'_, AppState>, year: i32) -> AppResult<CloseCheck> {
     let page = page::page(
-        &state.db,
+        &state.db(),
         year,
         "",
         state.settings.get().number_format,
@@ -234,9 +230,10 @@ pub async fn year_close(
     state: State<'_, AppState>,
     year: i32,
 ) -> AppResult<String> {
+    let db = state.db();
     let written = close::close(
-        &state.db,
-        &crate::profile_dir(),
+        &db,
+        db.dir(),
         year,
         state.settings.get().number_format,
         DateOrder::system(),
@@ -254,7 +251,7 @@ pub async fn year_reopen(
     state: State<'_, AppState>,
     year: i32,
 ) -> AppResult<String> {
-    let written = close::reopen(&state.db, year, Source::Ui)?;
+    let written = close::reopen(&state.db(), year, Source::Ui)?;
     announce(&app, &written);
     Ok(written.label)
 }
@@ -262,7 +259,8 @@ pub async fn year_reopen(
 /// Opens the newest snapshot's summary PDF in the default viewer.
 #[tauri::command]
 pub async fn year_open_snapshot(state: State<'_, AppState>, year: i32) -> AppResult<()> {
-    let path = close::snapshot_file(&state.db, &crate::profile_dir(), year)?;
+    let db = state.db();
+    let path = close::snapshot_file(&db, db.dir(), year)?;
     tauri_plugin_opener::open_path(&path, None::<&str>).map_err(|e| {
         AppError::Internal(crate::tr!(
             "Couldn't open {}: {e}",
@@ -301,7 +299,7 @@ pub async fn year_export_summary(app: AppHandle, year: i32) -> AppResult<bool> {
     };
     let state = app.state::<AppState>();
     let page = page::page(
-        &state.db,
+        &state.db(),
         year,
         "",
         state.settings.get().number_format,

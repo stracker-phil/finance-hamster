@@ -62,18 +62,18 @@ async fn choose_pdf(app: &AppHandle) -> AppResult<Option<Vec<u8>>> {
 
 #[tauri::command]
 pub async fn payslips_year(state: State<'_, AppState>, year: i32) -> AppResult<PayslipsYear> {
-    view::year_view(&state.db, year, state.settings.get().number_format)
+    view::year_view(&state.db(), year, state.settings.get().number_format)
 }
 
 /// Dokumente → Lohnzettel: every year with a payslip or an open tax year, twelve months each.
 #[tauri::command]
 pub async fn payslips_list(state: State<'_, AppState>) -> AppResult<Vec<PayslipsYear>> {
-    view::list(&state.db, state.settings.get().number_format)
+    view::list(&state.db(), state.settings.get().number_format)
 }
 
 #[tauri::command]
 pub async fn payslip_view(state: State<'_, AppState>, id: String) -> AppResult<PayslipView> {
-    view::payslip_view(&state.db, &id, state.settings.get().number_format)
+    view::payslip_view(&state.db(), &id, state.settings.get().number_format)
 }
 
 /// A new payslip's id and the label of the change.
@@ -92,7 +92,8 @@ pub async fn payslip_add(
     year: i32,
     month: u32,
 ) -> AppResult<PayslipAdded> {
-    let (written, id) = edit::add(&state.db, &crate::profile_dir(), year, month, None, now())?;
+    let db = state.db();
+    let (written, id) = edit::add(&db, db.dir(), year, month, None, now())?;
     Ok(PayslipAdded {
         id,
         label: announced(&app, written),
@@ -110,14 +111,8 @@ pub async fn payslip_add_pdf(
         return Ok(None);
     };
     let state = tauri::Manager::state::<AppState>(&app);
-    let (written, id) = edit::add(
-        &state.db,
-        &crate::profile_dir(),
-        year,
-        month,
-        Some(&bytes),
-        now(),
-    )?;
+    let db = state.db();
+    let (written, id) = edit::add(&db, db.dir(), year, month, Some(&bytes), now())?;
     Ok(Some(PayslipAdded {
         id,
         label: announced(&app, written),
@@ -131,7 +126,8 @@ pub async fn payslip_attach(app: AppHandle, id: String) -> AppResult<Option<Stri
         return Ok(None);
     };
     let state = tauri::Manager::state::<AppState>(&app);
-    let written = edit::attach(&state.db, &crate::profile_dir(), &id, &bytes)?;
+    let db = state.db();
+    let written = edit::attach(&db, db.dir(), &id, &bytes)?;
     Ok(Some(announced(&app, written)))
 }
 
@@ -162,14 +158,8 @@ pub async fn payslip_add_waiting(
             "Dieses PDF wartet nicht mehr aufs Hinzufügen"
         ))
     })?;
-    let (written, id) = edit::add(
-        &state.db,
-        &crate::profile_dir(),
-        year,
-        month,
-        Some(&pending.bytes),
-        now(),
-    )?;
+    let db = state.db();
+    let (written, id) = edit::add(&db, db.dir(), year, month, Some(&pending.bytes), now())?;
     state.adds.take(&token);
     Ok(PayslipAdded {
         id,
@@ -185,7 +175,7 @@ pub async fn payslip_edit(
     id: String,
     change: PayslipEdit,
 ) -> AppResult<Option<String>> {
-    Ok(edit::edit(&state.db, &id, &change)?.map(|w| announced(&app, w)))
+    Ok(edit::edit(&state.db(), &id, &change)?.map(|w| announced(&app, w)))
 }
 
 #[tauri::command]
@@ -194,6 +184,6 @@ pub async fn payslip_delete(
     state: State<'_, AppState>,
     id: String,
 ) -> AppResult<String> {
-    let written = edit::delete(&state.db, &id)?;
+    let written = edit::delete(&state.db(), &id)?;
     Ok(announced(&app, written))
 }

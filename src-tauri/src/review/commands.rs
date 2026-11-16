@@ -11,7 +11,7 @@ use crate::state::AppState;
 #[tauri::command]
 pub async fn review_queue(state: State<'_, AppState>) -> AppResult<ReviewQueue> {
     super::queue(
-        &state.db,
+        &state.db(),
         state.settings.get().number_format,
         DateOrder::system(),
     )
@@ -31,7 +31,7 @@ pub async fn review_decide(
     term: Option<String>,
 ) -> AppResult<String> {
     let written = super::decide_as(
-        &state.db,
+        &state.db(),
         &line_id,
         action,
         item_key,

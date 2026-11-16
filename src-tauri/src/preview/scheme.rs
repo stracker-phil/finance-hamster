@@ -105,7 +105,8 @@ fn render(
     width: f64,
 ) -> AppResult<Vec<u8>> {
     let state = app.state::<AppState>();
-    let path = super::resolve(&state.db, &crate::profile_dir(), source)?;
+    let db = state.db();
+    let path = super::resolve(&db, db.dir(), source)?;
     Pdf::open(&path)?.page_png(page, width)
 }
 

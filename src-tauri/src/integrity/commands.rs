@@ -14,11 +14,8 @@ pub async fn files_verify(
     state: State<'_, AppState>,
     last: State<'_, LastCheck>,
 ) -> AppResult<FileCheck> {
-    let check = super::verify(
-        &state.db,
-        &crate::profile_dir(),
-        chrono::Utc::now().timestamp_millis(),
-    )?;
+    let db = state.db();
+    let check = super::verify(&db, db.dir(), chrono::Utc::now().timestamp_millis())?;
     last.set(check.clone());
     let _ = app.emit(FILES_CHECKED, ());
     Ok(check)
@@ -35,9 +32,10 @@ pub async fn status_view(
     state: State<'_, AppState>,
     last: State<'_, LastCheck>,
 ) -> AppResult<Vec<StatusGroup>> {
+    let db = state.db();
     status::status(
-        &state.db,
-        &crate::profile_dir(),
+        &db,
+        db.dir(),
         last.get().as_ref(),
         chrono::Local::now().date_naive(),
         DateOrder::system(),

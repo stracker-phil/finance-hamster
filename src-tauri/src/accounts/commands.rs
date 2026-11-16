@@ -7,7 +7,7 @@ use crate::state::AppState;
 
 #[tauri::command]
 pub async fn list_accounts(state: State<'_, AppState>) -> AppResult<Vec<Account>> {
-    super::list(&state.db)
+    super::list(&state.db())
 }
 
 #[tauri::command]
@@ -16,7 +16,8 @@ pub async fn add_account(
     state: State<'_, AppState>,
     account: NewAccount,
 ) -> AppResult<Account> {
-    let (account, written) = super::add(&state.db, account, chrono::Utc::now().timestamp_millis())?;
+    let (account, written) =
+        super::add(&state.db(), account, chrono::Utc::now().timestamp_millis())?;
     announce(&app, &written);
     Ok(account)
 }
@@ -28,7 +29,7 @@ pub async fn edit_account(
     id: String,
     account: AccountEdit,
 ) -> AppResult<()> {
-    let written = super::edit(&state.db, &id, account)?;
+    let written = super::edit(&state.db(), &id, account)?;
     announce(&app, &written);
     Ok(())
 }

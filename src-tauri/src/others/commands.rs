@@ -24,12 +24,12 @@ fn announced(app: &AppHandle, written: Written) -> String {
 
 #[tauri::command]
 pub async fn others_list(state: State<'_, AppState>, query: String) -> AppResult<Vec<OtherGroup>> {
-    view::list(&state.db, &query, DateOrder::system())
+    view::list(&state.db(), &query, DateOrder::system())
 }
 
 #[tauri::command]
 pub async fn other_view(state: State<'_, AppState>, id: String) -> AppResult<OtherView> {
-    view::view(&state.db, &id)
+    view::view(&state.db(), &id)
 }
 
 /// Asks for a PDF and keeps it; None when cancelled.
@@ -72,7 +72,8 @@ pub async fn other_add_pdf(app: AppHandle) -> AppResult<Option<Added>> {
         .unwrap_or("document.pdf")
         .to_string();
     let state = tauri::Manager::state::<AppState>(&app);
-    let (written, id) = edit::add(&state.db, &crate::profile_dir(), &name, &bytes, now())?;
+    let db = state.db();
+    let (written, id) = edit::add(&db, db.dir(), &name, &bytes, now())?;
     Ok(Some(Added {
         id,
         label: announced(&app, written),
@@ -92,13 +93,8 @@ pub async fn other_add_waiting(
             "Dieses PDF wartet nicht mehr aufs Hinzufügen"
         ))
     })?;
-    let (written, id) = edit::add(
-        &state.db,
-        &crate::profile_dir(),
-        &pending.original_name,
-        &pending.bytes,
-        now(),
-    )?;
+    let db = state.db();
+    let (written, id) = edit::add(&db, db.dir(), &pending.original_name, &pending.bytes, now())?;
     state.adds.take(&token);
     Ok(Added {
         id,
@@ -113,7 +109,7 @@ pub async fn other_edit(
     id: String,
     change: OtherEdit,
 ) -> AppResult<Option<String>> {
-    Ok(edit::edit(&state.db, &id, &change)?.map(|w| announced(&app, w)))
+    Ok(edit::edit(&state.db(), &id, &change)?.map(|w| announced(&app, w)))
 }
 
 #[tauri::command]
@@ -122,6 +118,6 @@ pub async fn other_delete(
     state: State<'_, AppState>,
     id: String,
 ) -> AppResult<String> {
-    let written = edit::delete(&state.db, &id)?;
+    let written = edit::delete(&state.db(), &id)?;
     Ok(announced(&app, written))
 }

@@ -40,7 +40,7 @@ These rules hold everywhere in the code. Keep them when you change things.
   holds `hamster.lock` in the config dir; a second one hands its request over and exits
   (ADR 0009). A process that finds the lock taken but nobody listening waits for the lock, which is how a
   profile switch hands over (ADR 0060).
-- One process works in one profile, opened at launch (`profiles::open`, `crate::profile_dir()`); switching
+- One process works in one profile, opened at launch (`profiles::open`); commands take the open profile's database once (`AppState::db`, which knows its `dir`), so a row and its PDF always go to the same profile; switching
   writes the new active profile to `profiles.json`, removes the socket, starts a new Hamster through
   LaunchServices and quits (`instance::relaunch`).
 - Windows are declared `visible: false` and shown by Rust, so `--hidden` never flashes them. Closing hides;

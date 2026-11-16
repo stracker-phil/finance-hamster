@@ -27,13 +27,13 @@ fn announced(app: &AppHandle, written: Written) -> String {
 
 #[tauri::command]
 pub async fn rules_overview(state: State<'_, AppState>) -> AppResult<RulesOverview> {
-    super::overview(&state.db)
+    super::overview(&state.db())
 }
 
 #[tauri::command]
 pub async fn rules_year(state: State<'_, AppState>, year: i32) -> AppResult<RulesYearView> {
     let row = state
-        .db
+        .db()
         .read(|c| taxyears::row(c, year))?
         .ok_or_else(|| AppError::NotFound(crate::tr!("Tax year {year}", "Steuerjahr {year}")))?;
     let ruleset = check::read(&row.rules, &BTreeSet::new())
@@ -56,13 +56,13 @@ pub async fn rules_set_value(
     value: String,
 ) -> AppResult<String> {
     let format = state.settings.get().number_format;
-    let written = edit::set_value(&state.db, year, &path, &value, format, now())?;
+    let written = edit::set_value(&state.db(), year, &path, &value, format, now())?;
     Ok(announced(&app, written))
 }
 
 #[tauri::command]
 pub async fn rules_json(state: State<'_, AppState>, year: i32) -> AppResult<String> {
-    edit::json(&state.db, year)
+    edit::json(&state.db(), year)
 }
 
 #[tauri::command]
@@ -71,7 +71,7 @@ pub async fn rules_preview_json(
     year: i32,
     text: String,
 ) -> AppResult<JsonPreview> {
-    edit::preview_json(&state.db, year, &text)
+    edit::preview_json(&state.db(), year, &text)
 }
 
 #[tauri::command]
@@ -81,7 +81,7 @@ pub async fn rules_set_json(
     year: i32,
     text: String,
 ) -> AppResult<String> {
-    let written = edit::set_json(&state.db, year, &text, now())?;
+    let written = edit::set_json(&state.db(), year, &text, now())?;
     Ok(announced(&app, written))
 }
 
@@ -91,13 +91,13 @@ pub async fn rules_use_builtin(
     state: State<'_, AppState>,
     year: i32,
 ) -> AppResult<String> {
-    let written = super::use_builtin(&state.db, year, now())?;
+    let written = super::use_builtin(&state.db(), year, now())?;
     Ok(announced(&app, written))
 }
 
 #[tauri::command]
 pub async fn rules_start_next(app: AppHandle, state: State<'_, AppState>) -> AppResult<String> {
-    let written = super::start_next(&state.db, now())?;
+    let written = super::start_next(&state.db(), now())?;
     Ok(announced(&app, written))
 }
 
@@ -134,7 +134,7 @@ pub async fn rules_import_choose(app: AppHandle) -> AppResult<Option<RulesImport
             path.display()
         ))
     })?;
-    import::preview(&app.state::<AppState>().db, text).map(Some)
+    import::preview(&app.state::<AppState>().db(), text).map(Some)
 }
 
 /// Imports the rules `rules_import_choose` read; the label of the change.
@@ -144,7 +144,7 @@ pub async fn rules_import(
     state: State<'_, AppState>,
     text: String,
 ) -> AppResult<String> {
-    let written = import::import(&state.db, &text, now())?;
+    let written = import::import(&state.db(), &text, now())?;
     Ok(announced(&app, written))
 }
 

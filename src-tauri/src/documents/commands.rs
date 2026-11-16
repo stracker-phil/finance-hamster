@@ -35,10 +35,10 @@ fn read(app: &AppHandle, path: &Path) -> AppResult<AddPreview> {
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_else(|| "document.pdf".into());
-    let pending = add::prepare(&state.db, bytes, name)?;
+    let pending = add::prepare(&state.db(), bytes, name)?;
     let token = state.adds.put(pending.clone());
     add::preview(
-        &state.db,
+        &state.db(),
         token,
         &pending,
         state.settings.get().number_format,
@@ -91,14 +91,8 @@ pub async fn document_add_commit(
             "Dieser Beleg wartet nicht mehr aufs Hinzufügen"
         ))
     })?;
-    let written = add::commit(
-        &state.db,
-        &crate::profile_dir(),
-        pending,
-        &input,
-        now(),
-        Source::Ui,
-    )?;
+    let db = state.db();
+    let written = add::commit(&db, db.dir(), pending, &input, now(), Source::Ui)?;
     state.adds.take(&input.token);
     announce(&app, &written);
     relocate(&app, &state);
@@ -112,7 +106,7 @@ pub async fn document_line_choice(
     id: String,
 ) -> AppResult<Option<LineChoice>> {
     super::payments::choice_of(
-        &state.db,
+        &state.db(),
         &id,
         state.settings.get().number_format,
         DateOrder::system(),
@@ -134,10 +128,10 @@ pub async fn document_estimate(
     let Some(id) = line_id else {
         return Ok(None);
     };
-    let Some(line) = state.db.read(|c| statements::transaction_by_id(c, &id))? else {
+    let Some(line) = state.db().read(|c| statements::transaction_by_id(c, &id))? else {
         return Ok(None);
     };
-    let ruleset = rules::ruleset(&state.db)?;
+    let ruleset = rules::ruleset(&state.db())?;
     let share = amounts::default_work_share(ruleset.as_ref(), item_key.as_deref());
     Ok(Some(amounts::estimate(
         ruleset.as_ref(),
@@ -150,7 +144,8 @@ pub async fn document_estimate(
 
 /// Moves the drafts' files after a write and announces it.
 pub fn relocate(app: &AppHandle, state: &AppState) {
-    match files::relocate(&state.db, &crate::profile_dir()) {
+    let db = state.db();
+    match files::relocate(&db, db.dir()) {
         Ok(Some(written)) => announce(app, &written),
         Ok(None) => {}
         Err(e) => log::warn!("Couldn't move document files: {e}"),
@@ -186,7 +181,7 @@ pub fn offer(app: &AppHandle, path: &Path) {
 #[tauri::command]
 pub async fn document_view(state: State<'_, AppState>, id: String) -> AppResult<DocumentView> {
     view::document(
-        &state.db,
+        &state.db(),
         &id,
         state.settings.get().number_format,
         DateOrder::system(),
@@ -202,7 +197,7 @@ pub async fn document_edit(
     change: DocumentEdit,
 ) -> AppResult<Option<String>> {
     let written = edit::edit(
-        &state.db,
+        &state.db(),
         &id,
         &change,
         chrono::Utc::now().timestamp_millis(),
@@ -223,7 +218,7 @@ pub async fn document_line_options(
     query: String,
 ) -> AppResult<Vec<LineChoice>> {
     view::line_options(
-        &state.db,
+        &state.db(),
         &id,
         &query,
         state.settings.get().number_format,
@@ -237,7 +232,7 @@ pub async fn documents_list(
     query: String,
 ) -> AppResult<Vec<DocumentGroup>> {
     list::documents(
-        &state.db,
+        &state.db(),
         &query,
         state.settings.get().number_format,
         DateOrder::system(),
@@ -246,7 +241,7 @@ pub async fn documents_list(
 
 #[tauri::command]
 pub async fn vendors_view(state: State<'_, AppState>) -> AppResult<VendorsView> {
-    vendors::view(&state.db)
+    vendors::view(&state.db())
 }
 
 /// One change to a vendor (Settings → Vendors); returns the label of the change.
@@ -268,12 +263,12 @@ pub async fn vendor_change(
     change: VendorChange,
 ) -> AppResult<String> {
     let written = match change {
-        VendorChange::Rename { name } => vendors::rename(&state.db, &id, &name, Source::Ui)?,
+        VendorChange::Rename { name } => vendors::rename(&state.db(), &id, &name, Source::Ui)?,
         VendorChange::DefaultItem { key } => {
-            vendors::set_default_item(&state.db, &id, key, Source::Ui)?
+            vendors::set_default_item(&state.db(), &id, key, Source::Ui)?
         }
-        VendorChange::MergeInto { into } => vendors::merge(&state.db, &id, &into, Source::Ui)?,
-        VendorChange::Delete => vendors::delete(&state.db, &id, Source::Ui)?,
+        VendorChange::MergeInto { into } => vendors::merge(&state.db(), &id, &into, Source::Ui)?,
+        VendorChange::Delete => vendors::delete(&state.db(), &id, Source::Ui)?,
     };
     announce(&app, &written);
     relocate(&app, &state);
@@ -302,7 +297,7 @@ pub async fn document_step(
     id: String,
     step: DocumentStep,
 ) -> AppResult<String> {
-    let db = &state.db;
+    let db = &state.db();
     let written = match step {
         DocumentStep::Finish => lifecycle::finish(db, &id, now(), Source::Ui)?,
         DocumentStep::Unlock => lifecycle::unlock(db, &id, Source::Ui)?,
@@ -325,9 +320,10 @@ pub async fn document_delete(
     reason: String,
     understood: bool,
 ) -> AppResult<String> {
+    let db = state.db();
     let written = lifecycle::delete(
-        &state.db,
-        &crate::profile_dir(),
+        &db,
+        db.dir(),
         &id,
         &reason,
         understood,
@@ -344,7 +340,7 @@ pub async fn document_history(
     id: String,
 ) -> AppResult<Vec<HistoryEntry>> {
     history::document_history(
-        &state.db,
+        &state.db(),
         &id,
         state.settings.get().number_format,
         DateOrder::system(),
@@ -358,7 +354,7 @@ pub async fn year_log(
     query: String,
 ) -> AppResult<Vec<HistoryEntry>> {
     history::year_log(
-        &state.db,
+        &state.db(),
         year,
         &query,
         state.settings.get().number_format,
@@ -372,7 +368,7 @@ pub async fn archive_list(
     year: i32,
 ) -> AppResult<Vec<ArchivedDocument>> {
     lifecycle::archive(
-        &state.db,
+        &state.db(),
         year,
         state.settings.get().archive_days,
         now(),
@@ -382,5 +378,5 @@ pub async fn archive_list(
 
 #[tauri::command]
 pub async fn deletion_log(state: State<'_, AppState>) -> AppResult<Vec<DeletionView>> {
-    lifecycle::deletion_log(&state.db, DateOrder::system())
+    lifecycle::deletion_log(&state.db(), DateOrder::system())
 }

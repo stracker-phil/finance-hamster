@@ -16,7 +16,7 @@ fn now() -> i64 {
 #[tauri::command]
 pub async fn rules_view(state: State<'_, AppState>) -> AppResult<RulesView> {
     view::rules(
-        &state.db,
+        &state.db(),
         state.settings.get().number_format,
         DateOrder::system(),
     )
@@ -30,7 +30,7 @@ pub async fn rule_save(
     id: Option<String>,
     form: RuleForm,
 ) -> AppResult<String> {
-    let written = super::save(&state.db, id.as_deref(), &form, now(), Source::Ui)?;
+    let written = super::save(&state.db(), id.as_deref(), &form, now(), Source::Ui)?;
     announce(&app, &written);
     Ok(written.label)
 }
@@ -41,7 +41,7 @@ pub async fn rule_delete(
     state: State<'_, AppState>,
     id: String,
 ) -> AppResult<String> {
-    let written = super::delete(&state.db, &id, now(), Source::Ui)?;
+    let written = super::delete(&state.db(), &id, now(), Source::Ui)?;
     announce(&app, &written);
     Ok(written.label)
 }
@@ -49,7 +49,7 @@ pub async fn rule_delete(
 /// Applies the rules to every line again; returns how many lines changed, in words.
 #[tauri::command]
 pub async fn rules_rerun(app: AppHandle, state: State<'_, AppState>) -> AppResult<String> {
-    Ok(match super::rerun(&state.db, now(), Source::Ui)? {
+    Ok(match super::rerun(&state.db(), now(), Source::Ui)? {
         None => crate::tr!(
             "Rules applied · no line changed",
             "Regeln angewendet · keine Buchung geändert"
@@ -71,7 +71,7 @@ pub async fn rules_rerun(app: AppHandle, state: State<'_, AppState>) -> AppResul
 #[tauri::command]
 pub async fn rule_preview(state: State<'_, AppState>, form: RuleForm) -> AppResult<RulePreview> {
     super::preview::preview(
-        &state.db,
+        &state.db(),
         &form,
         state.settings.get().number_format,
         DateOrder::system(),

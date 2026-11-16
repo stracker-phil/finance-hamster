@@ -126,7 +126,7 @@ fn init_logging(level: LogLevel) -> tauri::plugin::TauriPlugin<tauri::Wry> {
 fn add_builtin_rules(app: &tauri::App) {
     let state = app.state::<AppState>();
     let now = chrono::Utc::now().timestamp_millis();
-    if let Err(e) = crate::rules::ensure_builtins(&state.db, now, crate::db::Source::App) {
+    if let Err(e) = crate::rules::ensure_builtins(&state.db(), now, crate::db::Source::App) {
         log::warn!("Couldn't add the built-in rules: {e}");
     }
 }
@@ -134,12 +134,8 @@ fn add_builtin_rules(app: &tauri::App) {
 /// Checks the stored PDFs in the background; a problem shows as the main window's banner.
 fn check_files(app: AppHandle) {
     std::thread::spawn(move || {
-        let state = app.state::<AppState>();
-        match crate::integrity::verify(
-            &state.db,
-            &crate::profile_dir(),
-            chrono::Utc::now().timestamp_millis(),
-        ) {
+        let db = app.state::<AppState>().db();
+        match crate::integrity::verify(&db, db.dir(), chrono::Utc::now().timestamp_millis()) {
             Ok(check) => {
                 if !check.problems.is_empty() {
                     log::warn!(
@@ -163,9 +159,10 @@ fn start_reminders(app: AppHandle) {
     std::thread::spawn(move || {
         loop {
             let state = app.state::<AppState>();
+            let db = state.db();
             let told = crate::reminders::tell(
-                &state.db,
-                &crate::profile_dir(),
+                &db,
+                db.dir(),
                 &state.settings.get(),
                 chrono::Local::now().date_naive(),
                 crate::date::DateOrder::system(),
@@ -183,7 +180,7 @@ fn start_reminders(app: AppHandle) {
 
 fn start_tax_years(app: &tauri::App) {
     let state = app.state::<AppState>();
-    match crate::taxyears::start_on_launch(&state.db, chrono::Local::now()) {
+    match crate::taxyears::start_on_launch(&state.db(), chrono::Local::now()) {
         Ok(written) => {
             if let Ok(mut notices) = state.notices.lock() {
                 notices.extend(
@@ -201,15 +198,13 @@ fn start_tax_years(app: &tauri::App) {
 /// Only into the first profile; one made later starts empty.
 #[cfg(debug_assertions)]
 fn seed_demo(app: &tauri::App) {
-    if !crate::profiles::active().first {
+    let state = app.state::<AppState>();
+    if !crate::profiles::is_first(&crate::config_dir(), &state.profile_id()) {
         return;
     }
-    let state = app.state::<AppState>();
-    match crate::test_support::demo::seed_if_empty(
-        &state.db,
-        &crate::profile_dir(),
-        chrono::Local::now().date_naive(),
-    ) {
+    let db = state.db();
+    match crate::test_support::demo::seed_if_empty(&db, db.dir(), chrono::Local::now().date_naive())
+    {
         Ok(0) => {}
         Ok(count) => log::info!("Seeded the demo data ({count} ops)"),
         Err(e) => log::warn!("Couldn't seed the demo data: {e}"),

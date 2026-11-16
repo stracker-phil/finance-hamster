@@ -32,7 +32,8 @@ pub fn pdf_view_show(
     source: PdfSource,
     frame: Frame,
 ) -> AppResult<()> {
-    let path = super::resolve(&state.db, &crate::profile_dir(), &source)?;
+    let db = state.db();
+    let path = super::resolve(&db, db.dir(), &source)?;
     change(&app, Change::Show { path, frame })
 }
 

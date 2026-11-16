@@ -73,11 +73,6 @@ pub fn config_dir() -> PathBuf {
     home.join("Library/Application Support").join(IDENTIFIER)
 }
 
-/// The active profile's folder: its database, journal, PDFs, rules and settings (ADR 0060).
-pub fn profile_dir() -> PathBuf {
-    profiles::active().dir.clone()
-}
-
 pub fn socket_path() -> PathBuf {
     config_dir().join(SOCKET_NAME)
 }
@@ -165,11 +160,11 @@ pub fn run() {
     let _instance_lock = instance::forward_or_lock(&config_dir, &socket, &message);
     i18n::set(settings::app_language(&config_dir));
     let first_name = tr!("My Profile", "Mein Profil");
-    match profiles::open(&config_dir, &first_name) {
-        Ok(active) => profiles::set_active(active),
+    let active = match profiles::open(&config_dir, &first_name) {
+        Ok(active) => active,
         Err(e) => fail(&format!("Hamster can't open its profile: {e}")),
-    }
-    let state = match AppState::open(&config_dir, &profile_dir()) {
+    };
+    let state = match AppState::open(&config_dir, &active.dir) {
         Ok(state) => state,
         Err(e) => fail(&format!("Hamster can't open its data: {e}")),
     };

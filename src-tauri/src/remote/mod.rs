@@ -3,7 +3,7 @@
 use std::time::Duration;
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 
 use crate::cli::reply::StatusReport;
 use crate::error::AppError;
@@ -29,7 +29,7 @@ fn profile(app: AppHandle, request: &ProfileRequest) -> HandlerResult {
     let root = crate::config_dir();
     let answer =
         crate::profiles::cli::answer(&root, request).map_err(crate::ipc::IpcError::from)?;
-    if crate::profiles::load(&root).active != crate::profiles::active().id {
+    if crate::profiles::load(&root).active != app.state::<crate::state::AppState>().profile_id() {
         tauri::async_runtime::spawn(async move {
             tokio::time::sleep(QUIT_DELAY).await;
             if let Err(e) = crate::instance::relaunch(&app) {

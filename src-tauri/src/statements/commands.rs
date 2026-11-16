@@ -26,14 +26,15 @@ fn today() -> chrono::NaiveDate {
 fn prepare(app: &AppHandle, path: &std::path::Path) -> AppResult<ImportPreview> {
     let state = app.state::<AppState>();
     let bytes = std::fs::read(path)?;
-    let pending = import::prepare(&state.db, &crate::profile_dir(), bytes)?;
+    let db = state.db();
+    let pending = import::prepare(&db, db.dir(), bytes)?;
     let file_name = path
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_default();
     let token = state.imports.put(pending.clone());
     import::preview(
-        &state.db,
+        &state.db(),
         token,
         file_name,
         &pending,
@@ -88,13 +89,8 @@ pub async fn statement_import_commit(
         ))
     })?;
     let now = chrono::Utc::now().timestamp_millis();
-    let (written, _) = import::commit(
-        &state.db,
-        &crate::profile_dir(),
-        pending,
-        now,
-        Source::Import,
-    )?;
+    let db = state.db();
+    let (written, _) = import::commit(&db, db.dir(), pending, now, Source::Import)?;
     announce(&app, &written);
     Ok(written.label)
 }
@@ -111,7 +107,7 @@ pub async fn statements_list(
     query: String,
 ) -> AppResult<Vec<super::documents::AccountStatements>> {
     super::documents::list(
-        &state.db,
+        &state.db(),
         &query,
         state.settings.get().number_format,
         DateOrder::system(),
@@ -124,7 +120,7 @@ pub async fn statement_view(
     id: String,
 ) -> AppResult<super::documents::StatementView> {
     super::documents::view(
-        &state.db,
+        &state.db(),
         &id,
         state.settings.get().number_format,
         DateOrder::system(),
@@ -140,7 +136,7 @@ pub async fn statements_coverage(
 ) -> AppResult<Coverage> {
     let today = today();
     view::year_coverage(
-        &state.db,
+        &state.db(),
         today,
         year.unwrap_or_else(|| chrono::Datelike::year(&today)),
         &query,
@@ -156,7 +152,7 @@ pub async fn account_lines(
     query: String,
 ) -> AppResult<AccountLines> {
     lines::account_lines(
-        &state.db,
+        &state.db(),
         &account_id,
         &query,
         state.settings.get().number_format,

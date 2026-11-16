@@ -231,7 +231,7 @@ pub async fn search_elsewhere(
     query: String,
 ) -> AppResult<Vec<Elsewhere>> {
     elsewhere(
-        &state.db,
+        &state.db(),
         &query,
         state.settings.get().number_format,
         DateOrder::system(),
