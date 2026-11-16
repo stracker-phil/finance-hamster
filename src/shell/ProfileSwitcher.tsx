@@ -21,10 +21,9 @@ function ProfileNameSheet({ sheet, onClose }: { sheet: NameSheet; onClose: () =>
   const submit = (e: FormEvent) => {
     e.preventDefault();
     setBusy(true);
-    // The sheet stays open after creating: the app restarts on the new profile.
-    const createProfile = () => api.profileCreate(name);
-    const renameProfile = (profile: Profile) => api.profileRename(profile.id, name).then(onClose);
-    (sheet.kind === "new" ? createProfile() : renameProfile(sheet.profile))
+    const request = sheet.kind === "new" ? api.profileCreate(name) : api.profileRename(sheet.profile.id, name);
+    request
+      .then(onClose)
       .catch((err: unknown) => setError(toAppError(err).message))
       .finally(() => setBusy(false));
   };

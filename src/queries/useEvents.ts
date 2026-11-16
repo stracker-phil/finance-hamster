@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useQueryClient, type QueryClient, type QueryKey } from "@tanstack/react-query";
 import { api, type EventName } from "../api";
+import { useStore } from "../state/store";
 import { ACCOUNTS_KEY } from "./accounts";
 import { COMMANDS_KEY } from "./commands";
 import { ARCHIVE_KEY, DELETIONS_KEY, DOCUMENT_KEY, DOCUMENT_LINES_KEY, DOCUMENTS_KEY, HISTORY_KEY, LOG_KEY, VENDORS_KEY } from "./documents";
@@ -50,13 +51,18 @@ function invalidate(client: QueryClient, keys: QueryKey[]) {
   for (const queryKey of keys) void client.invalidateQueries({ queryKey }, { cancelRefetch: false });
 }
 
-/** Subscribes to the invalidation events and `data_changed` while mounted; refetches the queries they name. */
+/** Subscribes to the invalidation events and `data_changed` while mounted; refetches the queries they name.
+ *  A profile switch drops every query and resets the window's state. */
 export function useEvents() {
   const client = useQueryClient();
   useEffect(() => {
     const unlisten = [
       ...Object.entries(INVALIDATIONS).map(([event, keys]) => api.listen(event as EventName, () => invalidate(client, keys))),
       api.listen("data_changed", ({ tables }) => invalidate(client, tables.flatMap((t) => TABLE_KEYS[t] ?? []))),
+      api.listen("profile_switched", () => {
+        useStore.getState().leaveProfile();
+        void client.resetQueries();
+      }),
     ];
     return () => unlisten.forEach((p) => void p.then((fn) => fn()).catch(() => {}));
   }, [client]);

@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
 
 import { api } from "../api";
+import { HOME } from "../state/route";
+import { useStore } from "../state/store";
 import { account } from "../test/accounts";
 import { renderWithQuery } from "../test/renderWithQuery";
 import { accountStatements, archivedDocument, deletionView, documentGroup, documentRow, documentView, historyEntry, lineChoice, otherGroup, otherListRow, otherView, statementListRow, statementView, vendorView, vendorsView } from "../test/documents";
@@ -687,6 +689,49 @@ describe("useEvents", () => {
       await act(async () => handler(null));
 
       expect(await screen.findByText("Profiles: Alex")).toBeTruthy();
+    });
+  });
+
+  describe("profile switch", () => {
+    function SwitchProbe() {
+      useEvents();
+      const { data } = useAccounts();
+      return <p>Accounts: {data?.map((a) => a.name).join(", ")}</p>;
+    }
+
+    it("goes back to Today and shows the new profile's data when profile_switched arrives", async () => {
+      useStore.setState({ route: { page: "subscriptions" }, back: [HOME], filter: "rent" });
+      renderWithQuery(<SwitchProbe />);
+      await screen.findByText("Accounts: Private");
+      mocked.listAccounts.mockResolvedValue([account({ id: "acc-9", name: "Joint" })]);
+      await waitFor(() => expect(mocked.listen.mock.calls.some(([name]) => name === "profile_switched")).toBe(true));
+      const handler = mocked.listen.mock.calls.find(([name]) => name === "profile_switched")![1] as (payload: null) => void;
+
+      await act(async () => handler(null));
+
+      expect(await screen.findByText("Accounts: Joint")).toBeTruthy();
+      const s = useStore.getState();
+      expect(s.route).toEqual(HOME);
+      expect(s.back).toEqual([]);
+      expect(s.filter).toBe("");
+    });
+
+    it("refetches queries that no event names, since every query is reset", async () => {
+      function Everything() {
+        useEvents();
+        const { data: payslips } = usePayslipsYear(2026);
+        return <p>Panel: {payslips?.telework}</p>;
+      }
+      mocked.payslipsYear.mockResolvedValue(payslipsYear({ telework: "Old days" }));
+      renderWithQuery(<Everything />);
+      await screen.findByText("Panel: Old days");
+      mocked.payslipsYear.mockResolvedValue(payslipsYear({ telework: "New days" }));
+      await waitFor(() => expect(mocked.listen.mock.calls.some(([name]) => name === "profile_switched")).toBe(true));
+      const handler = mocked.listen.mock.calls.find(([name]) => name === "profile_switched")![1] as (payload: null) => void;
+
+      await act(async () => handler(null));
+
+      expect(await screen.findByText("Panel: New days")).toBeTruthy();
     });
   });
 

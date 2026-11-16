@@ -22,8 +22,10 @@ export interface EventPayloads {
   data_changed: DataChanged;
   /** `settings.json` changed. */
   settings_changed: null;
-  /** A profile was renamed. */
+  /** A profile was added or renamed. */
   profiles_changed: null;
+  /** The app opened another profile; every view of the old one is stale. */
+  profile_switched: null;
   /** A dropped statement was read, or refused. */
   import_ready: ImportReady;
   add_ready: AddReady;

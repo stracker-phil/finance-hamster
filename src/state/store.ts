@@ -93,6 +93,9 @@ export interface AppStore {
   openMenu: (entries: MenuEntry[], at: MenuAt, label?: string) => void;
   closeMenu: () => void;
 
+  /** Back to Today with nothing open and nothing remembered from the profile before (ADR 0061). */
+  leaveProfile: () => void;
+
   confirmation: Confirmation | null;
   /** Shows the sheet; resolves true when the owner confirms, false on Cancel or Escape. A new question
    *  replaces an open one, which resolves false. */
@@ -106,10 +109,26 @@ let nextMenuId = 1;
 const repeats = (last: Toast, kind: ToastKind, message: string, action?: Toast["action"]) =>
   !action && !last.action && last.kind === kind && last.message === message;
 
-export const useStore = create<AppStore>((set, get) => ({
+/** Where a session starts, and where a profile switch returns to (`leaveProfile`). */
+const SESSION_START = {
   route: HOME,
   back: [],
   forward: [],
+  filter: "",
+  paletteOpen: false,
+  paletteQuery: "",
+  importPreview: null,
+  addPreview: null,
+  addOnAdded: null,
+  addKind: "invoice",
+  documentsTab: "invoices",
+  statementsYear: null,
+  subscriptionSheet: null,
+  menu: null,
+} satisfies Partial<AppStore>;
+
+export const useStore = create<AppStore>((set, get) => ({
+  ...SESSION_START,
   navigate: (route) => {
     const { route: current, back } = get();
     if (sameRoute(route, current)) return;
@@ -128,12 +147,9 @@ export const useStore = create<AppStore>((set, get) => ({
     set({ route: next, back: [...back, route], forward: rest, filter: "" });
   },
 
-  paletteOpen: false,
-  paletteQuery: "",
   searchEverywhere: (paletteQuery) => set({ paletteOpen: true, paletteQuery }),
   setPaletteOpen: (paletteOpen) => set({ paletteOpen, paletteQuery: "" }),
 
-  filter: "",
   setFilter: (filter) => set({ filter }),
 
   toasts: [],
@@ -148,16 +164,9 @@ export const useStore = create<AppStore>((set, get) => ({
   },
   dismissToast: (id) => set({ toasts: get().toasts.filter((t) => t.id !== id) }),
 
-  importPreview: null,
-  addPreview: null,
-  addOnAdded: null,
-  addKind: "invoice",
   setAddPreview: (addPreview, onAdded, kind = "invoice") => set({ addPreview, addOnAdded: addPreview ? (onAdded ?? null) : null, addKind: kind }),
-  documentsTab: "invoices",
   setDocumentsTab: (documentsTab) => set({ documentsTab }),
-  statementsYear: null,
   setStatementsYear: (statementsYear) => set({ statementsYear }),
-  subscriptionSheet: null,
   setSubscriptionSheet: (subscriptionSheet) => set({ subscriptionSheet }),
   setImportPreview: (importPreview) => set({ importPreview }),
 
@@ -165,7 +174,6 @@ export const useStore = create<AppStore>((set, get) => ({
   coverPdf: (cover) => set({ pdfCovers: [...get().pdfCovers, cover] }),
   uncoverPdf: (cover) => set({ pdfCovers: get().pdfCovers.filter((c) => c !== cover) }),
 
-  menu: null,
   openMenu: (entries, at, label = t().components.menu) => {
     if (at instanceof HTMLElement && get().menu?.at === at) return set({ menu: null });
     const focused = document.activeElement;
@@ -173,6 +181,11 @@ export const useStore = create<AppStore>((set, get) => ({
     set({ menu: { id: nextMenuId++, entries, at, label, opener } });
   },
   closeMenu: () => set({ menu: null }),
+
+  leaveProfile: () => {
+    get().confirmation?.answer(false);
+    set(SESSION_START);
+  },
 
   confirmation: null,
   confirm: (question) =>

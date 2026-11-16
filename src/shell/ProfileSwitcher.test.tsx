@@ -35,6 +35,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   useStore.setState({ toasts: [], menu: null });
   mocked.profilesList.mockResolvedValue(TWO);
+  mocked.profileCreate.mockResolvedValue(undefined);
+  mocked.profileRename.mockResolvedValue(undefined);
+  mocked.profileSwitch.mockResolvedValue(undefined);
 });
 
 describe("ProfileSwitcher", () => {
@@ -116,7 +119,15 @@ describe("ProfileSwitcher", () => {
       expect(screen.getByRole("button", { name: "Create and Open" })).toBeDisabled();
     });
 
-    it("creates the profile with the typed name", async () => {
+    it("says the new, empty profile opens right away", async () => {
+      renderSwitcher();
+
+      await chooseItem("New Profile…");
+
+      expect(screen.getByText(/Hamster opens the new, empty profile right away\./)).toBeTruthy();
+    });
+
+    it("creates the profile with the typed name and closes the sheet", async () => {
       renderSwitcher();
       await chooseItem("New Profile…");
 
@@ -124,6 +135,7 @@ describe("ProfileSwitcher", () => {
       await userEvent.click(screen.getByRole("button", { name: "Create and Open" }));
 
       expect(mocked.profileCreate).toHaveBeenCalledWith("Casey");
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     });
 
     it("shows a rejection inline as an alert and stays open", async () => {

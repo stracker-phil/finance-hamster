@@ -141,6 +141,62 @@ describe("toasts", () => {
   });
 });
 
+describe("leaveProfile", () => {
+  const preview = { title: "preview" } as never;
+
+  it("goes back to Today with no history, no filter and nothing open", () => {
+    useStore.getState().navigate(subscriptions);
+    useStore.getState().navigate(statements);
+    useStore.getState().goBack();
+    useStore.setState({
+      filter: "rent",
+      paletteOpen: true,
+      paletteQuery: "pixelforge",
+      importPreview: preview,
+      addPreview: preview,
+      addOnAdded: () => {},
+      addKind: "payslip",
+      documentsTab: "payslips",
+      statementsYear: 2024,
+      subscriptionSheet: { kind: "edit", id: "s1", form: {} as never },
+      menu: { id: 1, entries: [], at: { x: 0, y: 0 }, label: "Menu", opener: null },
+    });
+
+    useStore.getState().leaveProfile();
+
+    const s = useStore.getState();
+    expect(s.route).toEqual(HOME);
+    expect(s.back).toEqual([]);
+    expect(s.forward).toEqual([]);
+    expect(s.filter).toBe("");
+    expect(s.paletteOpen).toBe(false);
+    expect(s.paletteQuery).toBe("");
+    expect(s.importPreview).toBeNull();
+    expect(s.addPreview).toBeNull();
+    expect(s.addOnAdded).toBeNull();
+    expect(s.addKind).toBe("invoice");
+    expect(s.documentsTab).toBe("invoices");
+    expect(s.statementsYear).toBeNull();
+    expect(s.subscriptionSheet).toBeNull();
+    expect(s.menu).toBeNull();
+  });
+
+  it("answers an open question false and closes it", async () => {
+    const answer = useStore.getState().confirm({ title: "Delete?", text: "Gone.", action: "Delete" });
+
+    useStore.getState().leaveProfile();
+
+    expect(await answer).toBe(false);
+    expect(useStore.getState().confirmation).toBeNull();
+  });
+
+  it("works when nothing is open", () => {
+    useStore.getState().leaveProfile();
+
+    expect(useStore.getState().route).toEqual(HOME);
+  });
+});
+
 describe("confirm", () => {
   const question = { title: "Delete?", text: "Gone.", action: "Delete" };
 
