@@ -51,8 +51,8 @@ fn forward(socket: &Path, message: &IpcMessage) {
     }
 }
 
-/// The lock holder may still be starting up and not listen yet, or quitting after a profile switch
-/// (`profiles::relaunch`); the lock is taken once it is free.
+/// The lock holder may still be starting up and not listen yet, or be quitting; the lock is taken once it is
+/// free.
 fn wait_for_instance(config_dir: &Path, socket: &Path, message: &IpcMessage) -> Option<File> {
     for _ in 0..LOCK_POLLS {
         std::thread::sleep(LOCK_POLL);
@@ -113,33 +113,4 @@ fn print_result(message: &IpcMessage, result: &serde_json::Value, json: bool) {
         Ok(None) => {}
         Err(e) => fail(&e),
     }
-}
-
-/// After a profile switch (ADR 0060): starts a new Hamster through LaunchServices and quits this one. The
-/// socket goes first, so the new process
-/// doesn't hand its launch to this one; it waits for this one's lock instead (`wait_for_instance`).
-pub fn relaunch(app: &tauri::AppHandle) -> crate::error::AppResult<()> {
-    let socket = crate::socket_path();
-    if let Err(e) = std::fs::remove_file(&socket)
-        && e.kind() != std::io::ErrorKind::NotFound
-    {
-        return Err(e.into());
-    }
-    let exe = std::env::current_exe()?;
-    let bundle = exe
-        .ancestors()
-        .find(|p| p.extension().is_some_and(|e| e == "app"));
-    match bundle {
-        Some(bundle) => {
-            std::process::Command::new("/usr/bin/open")
-                .arg("-n")
-                .arg(bundle)
-                .status()?;
-        }
-        None => {
-            std::process::Command::new(exe).spawn()?;
-        }
-    }
-    app.exit(0);
-    Ok(())
 }

@@ -23,3 +23,5 @@ pub const FILES_CHECKED: &str = "files_checked";
 pub const COMMANDS_CHANGED: &str = "commands_changed";
 /// No payload; a profile was renamed (`profiles.json`).
 pub const PROFILES_CHANGED: &str = "profiles_changed";
+/// No payload; the app opened another profile, and every view of the old one is stale (ADR 0061).
+pub const PROFILE_SWITCHED: &str = "profile_switched";

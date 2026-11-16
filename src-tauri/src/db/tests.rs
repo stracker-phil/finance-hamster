@@ -65,6 +65,13 @@ fn journal_lines(dir: &Path) -> Vec<String> {
 }
 
 #[test]
+fn the_database_reports_the_folder_it_was_opened_in() {
+    let (dir, db) = open();
+
+    assert_eq!(db.dir(), dir.path());
+}
+
+#[test]
 fn an_op_keeps_its_label_and_changes() {
     let change = Change::insert("things", &thing("a", "Rent", 100)).unwrap();
     let op = Op::new("Add Rent", vec![change.clone()]);

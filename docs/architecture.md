@@ -38,11 +38,15 @@ These rules hold everywhere in the code. Keep them when you change things.
 
 - One process holds the window(s); the same binary is the CLI. The first process binds `hamster.sock` and
   holds `hamster.lock` in the config dir; a second one hands its request over and exits
-  (ADR 0009). A process that finds the lock taken but nobody listening waits for the lock, which is how a
-  profile switch hands over (ADR 0060).
-- One process works in one profile, opened at launch (`profiles::open`); commands take the open profile's database once (`AppState::db`, which knows its `dir`), so a row and its PDF always go to the same profile; switching
-  writes the new active profile to `profiles.json`, removes the socket, starts a new Hamster through
-  LaunchServices and quits (`instance::relaunch`).
+  (ADR 0009). A process that finds the lock taken but nobody listening waits for the lock (a holder still
+  starting or quitting).
+- The app works in one profile at a time (ADR 0060, ADR 0061). `profiles::open` picks it at launch and
+  `profiles::switch::prepare` readies it (demo data in debug builds, built-in rules, the current tax year).
+  Commands take the open profile's database once (`AppState::db`, which knows its `dir`), so a row and its PDF
+  always go to the same profile. `profiles::switch::switch` opens another profile in place: the new database
+  opens and `profiles.json` changes first, then `AppState::open_profile` swaps the database, the profile
+  half of the settings and the notices and drops what waited in the Import and Add queues; the preview closes,
+  the file check runs again and `profile_switched` makes the page drop every query and go back to Today.
 - Windows are declared `visible: false` and shown by Rust, so `--hidden` never flashes them. Closing hides;
   only Quit ends the app.
 - Launch requests are queued in Rust and pulled by the page (`take_launch_events`).
@@ -128,7 +132,7 @@ Rust (`src-tauri/src/`):
 | `review/` | Review: `queue` (undecided lines newest first, with the key, suggestion and last item for it), `plan_changed` and the active subscriptions for the Subscription choice; `decide`/`decide_as` (a hand decision, optionally with an "Always do this" rule applied to the other lines in the same op; the rule matches `rule_term`: text the owner selected on the card, which must be in the line, else the title's key), `undecided_by_account` |
 | `preview/` | PDFs by id (`PdfSource`, `resolve`), the `pdf_view_*` commands and the `pdf-page://` scheme serving page PNGs (in the CSP's `img-src`) |
 | `notify.rs` | `Notifier`: records every notification; `deliver` also shows it in the notification center in release builds |
-| `profiles/` | `profiles.json` and the profile folders: `open` (the first profile takes over older data), `create`, `add`, `activate`, `rename`, `named`; `cli.rs` answers `hamster profile`; commands `profiles_list`, `profile_create`, `profile_switch`, `profile_rename` and the `profiles_changed` event |
+| `profiles/` | `profiles.json` and the profile folders: `open` (the first profile takes over older data), `create`, `add`, `activate`, `rename`, `named`; `cli.rs` answers `hamster profile`; `switch.rs` (`prepare`, `switch`); commands `profiles_list`, `profile_create`, `profile_switch`, `profile_rename` and the `profiles_changed` and `profile_switched` events |
 | `settings/` | `settings.json`, split between the config dir (`APP_WIDE`) and the profile: language, appearance, accent, number format, original currency, own transfers, days in the Archive (`SettingsStore`, `get_settings`, `update_settings`) |
 | `instance.rs`, `ipc/` | single instance: lock file, Unix socket, one JSON line per request |
 | `remote/` | handles each `IpcMessage` from another process |

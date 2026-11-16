@@ -227,25 +227,38 @@ fn is_app_wide(key: &str) -> bool {
 /// The two settings files and their current value; every change is saved before it is answered.
 pub struct SettingsStore {
     app: JsonFile,
-    profile: JsonFile,
+    /// The open profile's file; a profile switch replaces it.
+    profile: Mutex<JsonFile>,
     current: Mutex<Settings>,
+}
+
+/// The app-wide fields from `app`, every other one from `profile`.
+fn merged(app: &JsonFile, profile: &JsonFile) -> Settings {
+    let mut fields = profile.load::<Fields>();
+    fields.retain(|key, _| !is_app_wide(key));
+    fields.extend(
+        app.load::<Fields>()
+            .into_iter()
+            .filter(|(key, _)| is_app_wide(key)),
+    );
+    settings_from(fields)
 }
 
 impl SettingsStore {
     pub fn open(app: JsonFile, profile: JsonFile) -> Self {
-        let mut fields = profile.load::<Fields>();
-        fields.retain(|key, _| !is_app_wide(key));
-        fields.extend(
-            app.load::<Fields>()
-                .into_iter()
-                .filter(|(key, _)| is_app_wide(key)),
-        );
-        let current = settings_from(fields);
+        let current = merged(&app, &profile);
         Self {
             app,
-            profile,
+            profile: Mutex::new(profile),
             current: Mutex::new(current),
         }
+    }
+
+    /// Reads the profile half from another profile's file; the app-wide half stays.
+    pub fn open_profile(&self, profile: JsonFile) {
+        let mut current = self.current.lock_unpoisoned();
+        *current = merged(&self.app, &profile);
+        *self.profile.lock_unpoisoned() = profile;
     }
 
     fn save(&self, settings: &Settings) -> AppResult<()> {
@@ -253,7 +266,7 @@ impl SettingsStore {
             .into_iter()
             .partition(|(key, _)| is_app_wide(key));
         self.app.save(&app)?;
-        self.profile.save(&profile)
+        self.profile.lock_unpoisoned().save(&profile)
     }
 
     pub fn get(&self) -> Settings {
@@ -674,6 +687,59 @@ mod tests {
                 ..expected
             }
         );
+    }
+
+    #[test]
+    fn opening_another_profile_reads_its_fields_and_keeps_the_app_wide_ones() {
+        let dir = temp_config_dir();
+        write_json(
+            &app_file(&dir),
+            json!({ "accent": "teal", "language": "de" }),
+        );
+        write_json(&profile_file(&dir), json!({ "archiveDays": 3 }));
+        let other = JsonFile::new(dir.path().join("other").join(FILE_NAME));
+        write_json(
+            &other,
+            json!({ "archiveDays": 5, "accent": "red", "remindGaps": false }),
+        );
+        let store = store_in(&dir);
+        assert_eq!(store.get().archive_days, 3);
+
+        store.open_profile(other);
+
+        assert_eq!(
+            store.get(),
+            Settings {
+                accent: Accent::Teal,
+                language: Language::De,
+                archive_days: 5,
+                remind_gaps: false,
+                ..Settings::default()
+            }
+        );
+    }
+
+    #[test]
+    fn an_update_after_opening_another_profile_writes_its_fields_to_the_new_file_only() {
+        let dir = temp_config_dir();
+        write_json(&profile_file(&dir), json!({ "archiveDays": 3 }));
+        let other = JsonFile::new(dir.path().join("other").join(FILE_NAME));
+        write_json(&other, json!({ "archiveDays": 5 }));
+        let store = store_in(&dir);
+        store.open_profile(JsonFile::new(other.path().to_path_buf()));
+
+        store
+            .update(SettingsPatch {
+                archive_days: Some(11),
+                accent: Some(Accent::Indigo),
+                ..SettingsPatch::default()
+            })
+            .unwrap();
+
+        assert_eq!(read_json(&other)["archiveDays"], json!(11));
+        assert_eq!(read_json(&other).get("accent"), None);
+        assert_eq!(read_json(&profile_file(&dir))["archiveDays"], json!(3));
+        assert_eq!(read_json(&app_file(&dir))["accent"], json!("indigo"));
     }
 
     #[test]

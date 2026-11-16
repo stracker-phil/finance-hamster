@@ -38,7 +38,7 @@ const EXAMPLES: &str = "Examples:
   hamster                  start Hamster or bring it to the front
   hamster status --json    whether it runs, its version and its window
   hamster quit             quit the running app
-  hamster profile switch Alex   restart on the profile named Alex";
+  hamster profile switch Alex   open the profile named Alex";
 
 #[derive(Parser, Debug)]
 #[command(
@@ -104,7 +104,7 @@ enum DevCommand {
 enum ProfileCommand {
     /// Every profile; * marks the one the app opens
     List,
-    /// Open the profile called NAME; a running app restarts on it
+    /// Open the profile called NAME; a running app switches to it in place
     Switch { name: String },
     /// Add an empty profile called NAME
     Add {

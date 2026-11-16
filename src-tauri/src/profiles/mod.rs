@@ -3,6 +3,7 @@
 
 pub mod cli;
 pub mod commands;
+pub mod switch;
 
 use std::path::{Path, PathBuf};
 

@@ -3,7 +3,7 @@
 use std::time::Duration;
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter};
 
 use crate::cli::reply::StatusReport;
 use crate::error::AppError;
@@ -11,7 +11,7 @@ use crate::ipc::{HandlerResult, IpcMessage};
 use crate::profiles::cli::ProfileRequest;
 use crate::{launch, window};
 
-/// Lets the reply to `quit` or a profile switch reach the sender before the app exits.
+/// Lets the reply to `quit` reach the sender before the app exits.
 const QUIT_DELAY: Duration = Duration::from_millis(200);
 
 /// Nothing for the sender to print.
@@ -23,23 +23,37 @@ fn json(value: impl Serialize) -> HandlerResult {
     serde_json::to_value(value).map_err(|e| AppError::from(e).into())
 }
 
-/// The running app's side of `hamster profile`: a changed active profile restarts the app once the reply is
-/// sent; any other change refreshes the switcher.
-fn profile(app: AppHandle, request: &ProfileRequest) -> HandlerResult {
+/// The running app's side of `hamster profile`: a switch opens the profile in place; any other change refreshes
+/// the switcher.
+fn profile(app: AppHandle, request: ProfileRequest) -> HandlerResult {
     let root = crate::config_dir();
-    let answer =
-        crate::profiles::cli::answer(&root, request).map_err(crate::ipc::IpcError::from)?;
-    if crate::profiles::load(&root).active != app.state::<crate::state::AppState>().profile_id() {
-        tauri::async_runtime::spawn(async move {
-            tokio::time::sleep(QUIT_DELAY).await;
-            if let Err(e) = crate::instance::relaunch(&app) {
-                log::warn!("Couldn't restart on the other profile: {e}");
+    let into_ipc = crate::ipc::IpcError::from;
+    match request {
+        ProfileRequest::Switch { name } => {
+            let profile =
+                crate::profiles::named(&crate::profiles::load(&root), &name).map_err(into_ipc)?;
+            crate::profiles::switch::switch(&app, &profile.id).map_err(into_ipc)?;
+            json(profile)
+        }
+        ProfileRequest::Add { name, switch } => {
+            let profile = crate::profiles::add(&root, &name).map_err(into_ipc)?;
+            if switch {
+                crate::profiles::switch::switch(&app, &profile.id).map_err(into_ipc)?;
+            } else {
+                refresh(&app);
             }
-        });
-    } else if let Err(e) = app.emit(crate::events::PROFILES_CHANGED, ()) {
+            json(profile)
+        }
+        other => crate::profiles::cli::answer(&root, &other)
+            .inspect(|_| refresh(&app))
+            .map_err(into_ipc),
+    }
+}
+
+fn refresh(app: &AppHandle) {
+    if let Err(e) = app.emit(crate::events::PROFILES_CHANGED, ()) {
         log::warn!("Couldn't announce the changed profiles: {e}");
     }
-    Ok(answer)
 }
 
 fn quit_after_reply(app: AppHandle) {
@@ -77,7 +91,7 @@ pub async fn handle(app: AppHandle, message: IpcMessage) -> HandlerResult {
             crate::commands::run(&app, &id).map_err(crate::ipc::IpcError::from)?;
             acknowledged()
         }
-        IpcMessage::Profile { request } => profile(app, &request),
+        IpcMessage::Profile { request } => profile(app, request),
         queued @ (IpcMessage::Activate { .. } | IpcMessage::Error { .. }) => {
             launch::queue(&app, queued);
             acknowledged()

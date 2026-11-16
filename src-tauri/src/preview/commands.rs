@@ -44,7 +44,11 @@ pub fn pdf_view_move(app: AppHandle, frame: Frame) -> AppResult<()> {
 
 #[tauri::command]
 pub fn pdf_view_hide(app: AppHandle) -> AppResult<()> {
-    change(&app, Change::Hide)
+    hide(&app)
+}
+
+pub fn hide(app: &AppHandle) -> AppResult<()> {
+    change(app, Change::Hide)
 }
 
 /// What the page draws above the preview: a sheet hides it, menus, toasts and tooltips cut holes (ADR 0057).

@@ -6,6 +6,7 @@ use tauri_plugin_log::{RotationStrategy, Target, TargetKind, TimezoneStrategy};
 use crate::cli::LogLevel;
 use crate::handlers::handlers;
 use crate::ipc::IpcMessage;
+use crate::lock::MutexExt;
 use crate::state::AppState;
 use crate::{ipc, launch, remote, window};
 
@@ -48,11 +49,8 @@ pub fn start(
         })
         .setup(move |app| {
             log::info!("Hamster {} started", env!("CARGO_PKG_VERSION"));
-            #[cfg(debug_assertions)]
-            seed_demo(app);
-            add_builtin_rules(app);
-            start_tax_years(app);
-            check_files(app.handle().clone());
+            open_first_profile(app);
+            crate::integrity::check_in_background(app.handle().clone());
             start_reminders(app.handle().clone());
             take_initial(app.handle(), initial);
             #[cfg(debug_assertions)]
@@ -123,32 +121,10 @@ fn init_logging(level: LogLevel) -> tauri::plugin::TauriPlugin<tauri::Wry> {
         .build()
 }
 
-fn add_builtin_rules(app: &tauri::App) {
+fn open_first_profile(app: &tauri::App) {
     let state = app.state::<AppState>();
-    let now = chrono::Utc::now().timestamp_millis();
-    if let Err(e) = crate::rules::ensure_builtins(&state.db(), now, crate::db::Source::App) {
-        log::warn!("Couldn't add the built-in rules: {e}");
-    }
-}
-
-/// Checks the stored PDFs in the background; a problem shows as the main window's banner.
-fn check_files(app: AppHandle) {
-    std::thread::spawn(move || {
-        let db = app.state::<AppState>().db();
-        match crate::integrity::verify(&db, db.dir(), chrono::Utc::now().timestamp_millis()) {
-            Ok(check) => {
-                if !check.problems.is_empty() {
-                    log::warn!(
-                        "{} stored files are missing or changed",
-                        check.problems.len()
-                    );
-                }
-                app.state::<crate::integrity::LastCheck>().set(check);
-                let _ = tauri::Emitter::emit(&app, crate::events::FILES_CHECKED, ());
-            }
-            Err(e) => log::warn!("Couldn't check the stored files: {e}"),
-        }
-    });
+    let notices = crate::profiles::switch::prepare(&crate::config_dir(), &state.db());
+    state.notices.lock_unpoisoned().extend(notices);
 }
 
 /// How often the running app looks for due reminders.
@@ -176,39 +152,6 @@ fn start_reminders(app: AppHandle) {
             std::thread::sleep(REMINDER_INTERVAL);
         }
     });
-}
-
-fn start_tax_years(app: &tauri::App) {
-    let state = app.state::<AppState>();
-    match crate::taxyears::start_on_launch(&state.db(), chrono::Local::now()) {
-        Ok(written) => {
-            if let Ok(mut notices) = state.notices.lock() {
-                notices.extend(
-                    written
-                        .into_iter()
-                        .filter(|w| w.tables.iter().any(|t| t == "tax_years"))
-                        .map(|w| w.label),
-                );
-            }
-        }
-        Err(e) => log::warn!("Couldn't start the tax years: {e}"),
-    }
-}
-
-/// Only into the first profile; one made later starts empty.
-#[cfg(debug_assertions)]
-fn seed_demo(app: &tauri::App) {
-    let state = app.state::<AppState>();
-    if !crate::profiles::is_first(&crate::config_dir(), &state.profile_id()) {
-        return;
-    }
-    let db = state.db();
-    match crate::test_support::demo::seed_if_empty(&db, db.dir(), chrono::Local::now().date_naive())
-    {
-        Ok(0) => {}
-        Ok(count) => log::info!("Seeded the demo data ({count} ops)"),
-        Err(e) => log::warn!("Couldn't seed the demo data: {e}"),
-    }
 }
 
 #[cfg(debug_assertions)]

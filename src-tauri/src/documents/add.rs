@@ -41,6 +41,10 @@ pub struct AddPending {
 pub struct AddQueue(Mutex<HashMap<String, AddPending>>);
 
 impl AddQueue {
+    pub fn clear(&self) {
+        self.0.lock_unpoisoned().clear();
+    }
+
     pub fn put(&self, pending: AddPending) -> String {
         let token = uuid::Uuid::new_v4().to_string();
         self.0.lock_unpoisoned().insert(token.clone(), pending);

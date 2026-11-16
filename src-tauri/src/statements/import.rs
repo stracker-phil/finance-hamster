@@ -53,6 +53,10 @@ impl ImportQueue {
     pub fn take(&self, token: &str) -> Option<Pending> {
         self.0.lock_unpoisoned().remove(token)
     }
+
+    pub fn clear(&self) {
+        self.0.lock_unpoisoned().clear();
+    }
 }
 
 #[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq, TS)]

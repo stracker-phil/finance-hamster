@@ -6,6 +6,7 @@ pub mod status;
 
 use std::path::Path;
 use std::sync::Mutex;
+use tauri::{Emitter, Manager};
 
 use serde::Serialize;
 use ts_rs::TS;
@@ -59,6 +60,34 @@ impl LastCheck {
     pub fn set(&self, check: FileCheck) {
         *self.0.lock_unpoisoned() = Some(check);
     }
+
+    pub fn clear(&self) {
+        *self.0.lock_unpoisoned() = None;
+    }
+}
+
+/// Checks the open profile's PDFs in the background; a problem shows as the main window's banner.
+pub fn check_in_background(app: tauri::AppHandle) {
+    std::thread::spawn(move || {
+        let db = app.state::<crate::state::AppState>().db();
+        match verify(&db, db.dir(), chrono::Utc::now().timestamp_millis()) {
+            Ok(check) => {
+                if !check.problems.is_empty() {
+                    log::warn!(
+                        "{} stored files are missing or changed",
+                        check.problems.len()
+                    );
+                }
+                // A switch during the check must not show the old profile's banner.
+                let still_open = app.state::<crate::state::AppState>().db().dir() == db.dir();
+                if still_open {
+                    app.state::<LastCheck>().set(check);
+                    let _ = app.emit(crate::events::FILES_CHECKED, ());
+                }
+            }
+            Err(e) => log::warn!("Couldn't check the stored files: {e}"),
+        }
+    });
 }
 
 /// None when the file is where it should be with its hash.
@@ -370,6 +399,20 @@ mod tests {
         last.set(check.clone());
 
         assert_eq!(last.get(), Some(check));
+    }
+
+    #[test]
+    fn clearing_the_last_check_forgets_it() {
+        let last = LastCheck::default();
+        last.set(FileCheck {
+            checked: 2,
+            problems: vec![],
+            at: NOW,
+        });
+
+        last.clear();
+
+        assert_eq!(last.get(), None);
     }
 
     #[test]
