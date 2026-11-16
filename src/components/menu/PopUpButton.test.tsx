@@ -1,12 +1,16 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createRef, useState, type Ref } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../../test/apiMock")).createApiMock() }));
 
+import { api } from "../../api";
 import { useStore } from "../../state/store";
+import { PdfCoversProbe } from "../../test/PdfCoversProbe";
 import { MenuHost, PopUpButton } from ".";
+
+const mocked = vi.mocked(api, true);
 
 const OPTIONS = [
   { value: "monthly", label: "Monthly" },
@@ -47,7 +51,7 @@ const button = () => screen.getByRole("button", { name: "Period" });
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useStore.setState({ menu: null, pdfCovers: 0 });
+  useStore.setState({ menu: null, pdfCovers: [] });
 });
 
 describe("PopUpButton", () => {
@@ -67,6 +71,21 @@ describe("PopUpButton", () => {
 
     await userEvent.keyboard("{Escape}");
     expect(button().getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("lets clicks on the PDF preview through while open and sends the uncovered state once closed", async () => {
+    render(
+      <>
+        <PdfCoversProbe />
+        <Harness />
+      </>,
+    );
+
+    await userEvent.click(button());
+    await waitFor(() => expect(mocked.pdfViewCover).toHaveBeenLastCalledWith(expect.objectContaining({ hidden: false, clickThrough: true })));
+
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(mocked.pdfViewCover).toHaveBeenLastCalledWith({ hidden: false, holes: [], clickThrough: false }));
   });
 
   it("lists its options with the current one checked", async () => {

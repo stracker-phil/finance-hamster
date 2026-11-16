@@ -1,4 +1,4 @@
-import { act, screen, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -9,6 +9,7 @@ import { MenuHost } from "../components/menu";
 import { HOME, type Route } from "../state/route";
 import { useStore } from "../state/store";
 import { addPreview } from "../test/documents";
+import { PdfCoversProbe } from "../test/PdfCoversProbe";
 import { renderWithQuery } from "../test/renderWithQuery";
 import { elsewhere } from "../test/year";
 import { Header } from "./Header";
@@ -30,7 +31,7 @@ function renderHeader(route: Route = YEAR) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useStore.setState({ route: HOME, back: [], forward: [], filter: "", paletteOpen: false, paletteQuery: "", toasts: [], pdfCovers: 0, menu: null, subscriptionSheet: null });
+  useStore.setState({ route: HOME, back: [], forward: [], filter: "", paletteOpen: false, paletteQuery: "", toasts: [], pdfCovers: [], menu: null, subscriptionSheet: null });
   mocked.searchElsewhere.mockResolvedValue([]);
   mocked.listCommands.mockResolvedValue([]);
   useStore.setState({ addPreview: null, addKind: "invoice" });
@@ -159,6 +160,22 @@ describe("Header filter field", () => {
       await userEvent.tab();
 
       expect(screen.queryByRole("menu", { name: "Matches elsewhere" })).toBeNull();
+    });
+
+    it("lets clicks on the PDF preview through while the menu shows and sends the uncovered state once it closes", async () => {
+      renderWithQuery(
+        <>
+          <PdfCoversProbe />
+          <Header route={YEAR} title={{ title: "Header" }} />
+        </>,
+      );
+      await userEvent.type(field("Filter this tax year"), "pixel");
+      await screen.findByRole("menu", { name: "Matches elsewhere" });
+      await waitFor(() => expect(mocked.pdfViewCover).toHaveBeenLastCalledWith(expect.objectContaining({ hidden: false, clickThrough: true })));
+
+      await userEvent.tab();
+
+      await waitFor(() => expect(mocked.pdfViewCover).toHaveBeenLastCalledWith({ hidden: false, holes: [], clickThrough: false }));
     });
 
     it.each([

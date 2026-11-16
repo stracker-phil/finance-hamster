@@ -1,5 +1,6 @@
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
@@ -7,6 +8,7 @@ vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await impo
 import { api } from "../api";
 import { useStore } from "../state/store";
 import { archivedDocument } from "../test/documents";
+import { PdfCoversProbe } from "../test/PdfCoversProbe";
 import { renderWithQuery } from "../test/renderWithQuery";
 import { DeleteSheet } from "./DeleteSheet";
 
@@ -22,7 +24,7 @@ const confirmDelete = async () => {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useStore.setState({ toasts: [], pdfCovers: 0 });
+  useStore.setState({ toasts: [], pdfCovers: [] });
   mocked.documentDelete.mockResolvedValue("Deleted Sample Books");
 });
 
@@ -32,6 +34,24 @@ describe("DeleteSheet", () => {
 
     expect(screen.getByRole("alertdialog", { name: "Delete Sample Books?" })).toBeTruthy();
     expect(screen.getByText("Documents/2026/sample-books.pdf")).toBeTruthy();
+  });
+
+  it("hides the PDF preview while open and sends the uncovered state once closed", async () => {
+    function Host() {
+      const [shown, setShown] = useState(true);
+      return (
+        <>
+          <PdfCoversProbe />
+          {shown && <DeleteSheet doc={archivedDocument()} onClose={() => setShown(false)} />}
+        </>
+      );
+    }
+    renderWithQuery(<Host />);
+    await waitFor(() => expect(mocked.pdfViewCover).toHaveBeenLastCalledWith({ hidden: true, holes: [], clickThrough: false }));
+
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    await waitFor(() => expect(mocked.pdfViewCover).toHaveBeenLastCalledWith({ hidden: false, holes: [], clickThrough: false }));
   });
 
   it("keeps Delete disabled until there is a reason and the understanding is checked", async () => {

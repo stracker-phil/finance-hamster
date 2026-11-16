@@ -1,5 +1,6 @@
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
@@ -7,6 +8,7 @@ vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await impo
 import { api } from "../api";
 import { useStore } from "../state/store";
 import { lineChoice } from "../test/documents";
+import { PdfCoversProbe } from "../test/PdfCoversProbe";
 import { renderWithQuery } from "../test/renderWithQuery";
 import { LinePicker } from "./LinePicker";
 
@@ -26,7 +28,7 @@ const renderPicker = () => {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useStore.setState({ pdfCovers: 0 });
+  useStore.setState({ pdfCovers: [] });
   mocked.documentLineOptions.mockResolvedValue([lineChoice(), lineChoice({ id: "line-2", title: "Example Market", detail: "Business · Mon, 9 Nov · EUR 12.00", amount: "−€12.00" })]);
 });
 
@@ -50,6 +52,24 @@ describe("LinePicker", () => {
     expect(mocked.documentLineOptions).toHaveBeenLastCalledWith("doc-1", "market");
     expect(await screen.findByRole("option", { name: /Example Market/ })).toBeTruthy();
     expect(screen.queryByRole("option", { name: /Demo Cloud Ltd/ })).toBeNull();
+  });
+
+  it("lets clicks on the PDF preview through while open and sends the uncovered state once closed", async () => {
+    function Host() {
+      const [shown, setShown] = useState(true);
+      return (
+        <>
+          <PdfCoversProbe />
+          {shown && <LinePicker documentId="doc-1" onPick={() => {}} onClose={() => setShown(false)} />}
+        </>
+      );
+    }
+    renderWithQuery(<Host />);
+    await waitFor(() => expect(mocked.pdfViewCover).toHaveBeenLastCalledWith(expect.objectContaining({ hidden: false, clickThrough: true })));
+
+    await userEvent.keyboard("{Escape}");
+
+    await waitFor(() => expect(mocked.pdfViewCover).toHaveBeenLastCalledWith({ hidden: false, holes: [], clickThrough: false }));
   });
 
   it("hands the chosen line's id on", async () => {

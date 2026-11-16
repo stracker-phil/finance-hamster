@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { openMenu, useMenuOpenOn } from "../components/menu";
 import { useCommands } from "../queries/commands";
 import { ChevronDown, ChevronLeft, Plus, Search, X } from "lucide-react";
@@ -27,10 +27,11 @@ export const FILTER_FIELD_ID = "page-filter";
 function ElsewhereMenu({ query }: { query: string }) {
   const { data: matches = [] } = useElsewhere(query);
   const navigate = useStore((s) => s.navigate);
-  useCoversPdf(true);
+  const ref = useRef<HTMLDivElement>(null);
+  useCoversPdf("popover", ref);
   const text = useT().shell.header;
   return (
-    <div className="menu elsewhere" role="menu" aria-label={text.matchesElsewhere}>
+    <div ref={ref} className="menu elsewhere" role="menu" aria-label={text.matchesElsewhere}>
       {matches.length > 0 && <div className="elsewhere__caption">{text.matchesElsewhere}</div>}
       {matches.map((match, i) => (
         <button key={i} className="menu-row" role="menuitem" onMouseDown={(e) => e.preventDefault()} onClick={() => navigate(routeOf(match.target))}>

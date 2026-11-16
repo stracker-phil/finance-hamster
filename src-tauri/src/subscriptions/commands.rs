@@ -32,7 +32,7 @@ fn done(app: &AppHandle, written: Written) -> String {
 
 /// `query` keeps the subscriptions whose name or category contains it.
 #[tauri::command]
-pub fn subscriptions_view(
+pub async fn subscriptions_view(
     state: State<'_, AppState>,
     query: String,
 ) -> AppResult<SubscriptionsView> {
@@ -48,7 +48,7 @@ pub fn subscriptions_view(
 }
 
 #[tauri::command]
-pub fn subscription_detail(
+pub async fn subscription_detail(
     state: State<'_, AppState>,
     id: String,
 ) -> AppResult<SubscriptionDetail> {
@@ -60,7 +60,7 @@ pub fn subscription_detail(
 
 /// Adds a subscription (`id` null) or fixes one; returns the label of the change.
 #[tauri::command]
-pub fn subscription_save(
+pub async fn subscription_save(
     app: AppHandle,
     state: State<'_, AppState>,
     id: Option<String>,
@@ -74,7 +74,7 @@ pub fn subscription_save(
 }
 
 #[tauri::command]
-pub fn subscription_change_plan(
+pub async fn subscription_change_plan(
     app: AppHandle,
     state: State<'_, AppState>,
     id: String,
@@ -86,7 +86,7 @@ pub fn subscription_change_plan(
 
 /// Ends a subscription on `ended_on`; null resumes it.
 #[tauri::command]
-pub fn subscription_set_ended(
+pub async fn subscription_set_ended(
     app: AppHandle,
     state: State<'_, AppState>,
     id: String,
@@ -97,7 +97,7 @@ pub fn subscription_set_ended(
 }
 
 #[tauri::command]
-pub fn subscription_delete(
+pub async fn subscription_delete(
     app: AppHandle,
     state: State<'_, AppState>,
     id: String,
@@ -108,7 +108,7 @@ pub fn subscription_delete(
 
 /// How many statement lines the sheet's bank text and amount match.
 #[tauri::command]
-pub fn subscription_match_count(
+pub async fn subscription_match_count(
     state: State<'_, AppState>,
     form: SubscriptionForm,
 ) -> AppResult<MatchCount> {
@@ -118,7 +118,7 @@ pub fn subscription_match_count(
 
 /// A New sheet prefilled from a bank line.
 #[tauri::command]
-pub fn subscription_prefill(
+pub async fn subscription_prefill(
     state: State<'_, AppState>,
     line_id: String,
     term: Option<String>,

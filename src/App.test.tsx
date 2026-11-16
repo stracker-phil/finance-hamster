@@ -27,7 +27,7 @@ async function emit(event: EventName, payload: unknown = null) {
 describe("App", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useStore.setState({ route: HOME, back: [], forward: [], filter: "", toasts: [], confirmation: null, paletteOpen: false, pdfCovers: 0, importPreview: null, addPreview: null, subscriptionSheet: null });
+    useStore.setState({ route: HOME, back: [], forward: [], filter: "", toasts: [], confirmation: null, paletteOpen: false, pdfCovers: [], importPreview: null, addPreview: null, subscriptionSheet: null });
     mocked.takeLaunchEvents.mockResolvedValue([]);
     mocked.listen.mockResolvedValue(() => {});
     mocked.getSettings.mockResolvedValue(settings());
@@ -168,16 +168,15 @@ describe("App", () => {
       expect(await screen.findByRole("option", { name: /Go to Today/ })).toBeTruthy();
     });
 
-    it("suspends the native PDF preview while the palette is open and resumes it once closed", async () => {
+    it("hides the native PDF preview while the palette is open and shows it again once closed", async () => {
       renderApp();
       await emit("run_command", "palette:open");
       await screen.findByRole("dialog");
-      await waitFor(() => expect(mocked.pdfViewSuspend).toHaveBeenCalled());
-      expect(mocked.pdfViewResume).not.toHaveBeenCalled();
+      await waitFor(() => expect(mocked.pdfViewCover).toHaveBeenLastCalledWith({ hidden: true, holes: [], clickThrough: false }));
 
       await userEvent.keyboard("{Escape}");
 
-      await waitFor(() => expect(mocked.pdfViewResume).toHaveBeenCalled());
+      await waitFor(() => expect(mocked.pdfViewCover).toHaveBeenLastCalledWith({ hidden: false, holes: [], clickThrough: false }));
     });
 
     it("focuses the header filter for filter:focus", async () => {

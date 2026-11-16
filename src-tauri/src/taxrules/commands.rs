@@ -26,12 +26,12 @@ fn announced(app: &AppHandle, written: Written) -> String {
 }
 
 #[tauri::command]
-pub fn rules_overview(state: State<'_, AppState>) -> AppResult<RulesOverview> {
+pub async fn rules_overview(state: State<'_, AppState>) -> AppResult<RulesOverview> {
     super::overview(&state.db)
 }
 
 #[tauri::command]
-pub fn rules_year(state: State<'_, AppState>, year: i32) -> AppResult<RulesYearView> {
+pub async fn rules_year(state: State<'_, AppState>, year: i32) -> AppResult<RulesYearView> {
     let row = state
         .db
         .read(|c| taxyears::row(c, year))?
@@ -48,7 +48,7 @@ pub fn rules_year(state: State<'_, AppState>, year: i32) -> AppResult<RulesYearV
 
 /// The label of the change.
 #[tauri::command]
-pub fn rules_set_value(
+pub async fn rules_set_value(
     app: AppHandle,
     state: State<'_, AppState>,
     year: i32,
@@ -61,12 +61,12 @@ pub fn rules_set_value(
 }
 
 #[tauri::command]
-pub fn rules_json(state: State<'_, AppState>, year: i32) -> AppResult<String> {
+pub async fn rules_json(state: State<'_, AppState>, year: i32) -> AppResult<String> {
     edit::json(&state.db, year)
 }
 
 #[tauri::command]
-pub fn rules_preview_json(
+pub async fn rules_preview_json(
     state: State<'_, AppState>,
     year: i32,
     text: String,
@@ -75,7 +75,7 @@ pub fn rules_preview_json(
 }
 
 #[tauri::command]
-pub fn rules_set_json(
+pub async fn rules_set_json(
     app: AppHandle,
     state: State<'_, AppState>,
     year: i32,
@@ -86,7 +86,7 @@ pub fn rules_set_json(
 }
 
 #[tauri::command]
-pub fn rules_use_builtin(
+pub async fn rules_use_builtin(
     app: AppHandle,
     state: State<'_, AppState>,
     year: i32,
@@ -96,7 +96,7 @@ pub fn rules_use_builtin(
 }
 
 #[tauri::command]
-pub fn rules_start_next(app: AppHandle, state: State<'_, AppState>) -> AppResult<String> {
+pub async fn rules_start_next(app: AppHandle, state: State<'_, AppState>) -> AppResult<String> {
     let written = super::start_next(&state.db, now())?;
     Ok(announced(&app, written))
 }
@@ -139,7 +139,11 @@ pub async fn rules_import_choose(app: AppHandle) -> AppResult<Option<RulesImport
 
 /// Imports the rules `rules_import_choose` read; the label of the change.
 #[tauri::command]
-pub fn rules_import(app: AppHandle, state: State<'_, AppState>, text: String) -> AppResult<String> {
+pub async fn rules_import(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    text: String,
+) -> AppResult<String> {
     let written = import::import(&state.db, &text, now())?;
     Ok(announced(&app, written))
 }

@@ -76,7 +76,7 @@ pub async fn statement_import_choose(app: AppHandle) -> AppResult<Option<ImportP
 
 /// Imports a read statement; returns the label of the change.
 #[tauri::command]
-pub fn statement_import_commit(
+pub async fn statement_import_commit(
     app: AppHandle,
     state: State<'_, AppState>,
     token: String,
@@ -106,7 +106,7 @@ pub fn statement_import_cancel(state: State<'_, AppState>, token: String) {
 
 /// Dokumente → Kontoauszüge: every imported statement by account.
 #[tauri::command]
-pub fn statements_list(
+pub async fn statements_list(
     state: State<'_, AppState>,
     query: String,
 ) -> AppResult<Vec<super::documents::AccountStatements>> {
@@ -119,7 +119,7 @@ pub fn statements_list(
 }
 
 #[tauri::command]
-pub fn statement_view(
+pub async fn statement_view(
     state: State<'_, AppState>,
     id: String,
 ) -> AppResult<super::documents::StatementView> {
@@ -132,7 +132,7 @@ pub fn statement_view(
 }
 
 #[tauri::command]
-pub fn statements_coverage(state: State<'_, AppState>, query: String) -> AppResult<Coverage> {
+pub async fn statements_coverage(state: State<'_, AppState>, query: String) -> AppResult<Coverage> {
     view::coverage(
         &state.db,
         today(),
@@ -143,7 +143,7 @@ pub fn statements_coverage(state: State<'_, AppState>, query: String) -> AppResu
 }
 
 #[tauri::command]
-pub fn account_lines(
+pub async fn account_lines(
     state: State<'_, AppState>,
     account_id: String,
     query: String,

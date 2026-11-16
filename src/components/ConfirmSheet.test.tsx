@@ -1,12 +1,20 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { act } from "react";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
+
+import { api } from "../api";
 import { useStore } from "../state/store";
+import { PdfCoversProbe } from "../test/PdfCoversProbe";
 import { ConfirmHost } from "./ConfirmSheet";
 
+const mocked = vi.mocked(api, true);
+
 beforeEach(() => {
-  useStore.setState({ confirmation: null });
+  vi.clearAllMocks();
+  useStore.setState({ confirmation: null, pdfCovers: [] });
 });
 
 function ask() {
@@ -53,16 +61,20 @@ describe("ConfirmHost", () => {
     expect(await answer).toBe(true);
   });
 
-  it("covers the PDF preview while the question is open and uncovers it once answered", async () => {
-    useStore.setState({ pdfCovers: 0 });
-    render(<ConfirmHost />);
+  it("hides the PDF preview while the question is open and sends the uncovered state once answered", async () => {
+    render(
+      <>
+        <PdfCoversProbe />
+        <ConfirmHost />
+      </>,
+    );
     const answer = ask();
-    expect(useStore.getState().pdfCovers).toBe(1);
+    await waitFor(() => expect(mocked.pdfViewCover).toHaveBeenLastCalledWith({ hidden: true, holes: [], clickThrough: false }));
 
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
     await answer;
 
-    expect(useStore.getState().pdfCovers).toBe(0);
+    await waitFor(() => expect(mocked.pdfViewCover).toHaveBeenLastCalledWith({ hidden: false, holes: [], clickThrough: false }));
   });
 
   it("resolves false on Escape", async () => {

@@ -174,6 +174,23 @@ export type Cover = "full" | "part" | "missing" | "before";
 export type Coverage = { months: Array<MonthHead>, accounts: Array<AccountCoverage>, };
 
 /**
+ * What the page draws above the preview right now.
+ */
+export type Covers = { 
+/**
+ * A sheet is open: the view hides.
+ */
+hidden: boolean, 
+/**
+ * Overlays the view leaves out and lets clicks through, in the same coordinates as `Frame`.
+ */
+holes: Array<Frame>, 
+/**
+ * Every click on the view goes to the page, so a click beside an open menu closes it.
+ */
+clickThrough: boolean, };
+
+/**
  * Payload of `data_changed`: the tables a write touched, so the page refetches only what shows them.
  */
 export type DataChanged = { tables: Array<string>, };

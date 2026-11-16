@@ -108,6 +108,9 @@ fn restrict_to_owner(path: &Path) -> AppResult<()> {
 pub struct Db {
     conn: Mutex<Connection>,
     journal_path: PathBuf,
+    /// The last `seq` in `journal.jsonl`, so a write appends without reading the file; None after a failed
+    /// append, and the next write reads the file again.
+    mirrored: Mutex<Option<i64>>,
     history: Mutex<UndoStack>,
 }
 
@@ -121,12 +124,13 @@ impl Db {
         conn.pragma_update(None, "foreign_keys", true)?;
         migrations::migrate(&mut conn)?;
         let journal_path = dir.join(journal::FILE_NAME);
-        if let Err(e) = journal::catch_up(&conn, &journal_path) {
-            log::warn!("Couldn't bring journal.jsonl up to date: {e}");
-        }
+        let mirrored = journal::catch_up(&conn, &journal_path)
+            .inspect_err(|e| log::warn!("Couldn't bring journal.jsonl up to date: {e}"))
+            .ok();
         Ok(Db {
             conn: Mutex::new(conn),
             journal_path,
+            mirrored: Mutex::new(mirrored),
             history: Mutex::new(UndoStack::default()),
         })
     }
@@ -166,6 +170,20 @@ impl Db {
         Ok(Some(written))
     }
 
+    /// Appends the new journal rows to `journal.jsonl`; a failure leaves them for the next write.
+    fn mirror(&self, conn: &Connection) {
+        let mut mirrored = self.mirrored.lock_unpoisoned();
+        let appended = match *mirrored {
+            Some(seq) => journal::append_after(conn, &self.journal_path, seq),
+            None => journal::catch_up(conn, &self.journal_path),
+        };
+        *mirrored = appended
+            .inspect_err(|e| {
+                log::warn!("Couldn't append to journal.jsonl; the next write tries again: {e}")
+            })
+            .ok();
+    }
+
     fn apply(&self, op: &Op, source: Source) -> AppResult<Written> {
         if op.changes.is_empty() {
             return Err(AppError::InvalidInput(tr!(
@@ -188,9 +206,7 @@ impl Db {
         };
         journal::record(&tx, &header, &fields)?;
         tx.commit()?;
-        if let Err(e) = journal::catch_up(&conn, &self.journal_path) {
-            log::warn!("Couldn't append to journal.jsonl; the next write tries again: {e}");
-        }
+        self.mirror(&conn);
         Ok(Written {
             label: op.label.clone(),
             tables: op.tables(),

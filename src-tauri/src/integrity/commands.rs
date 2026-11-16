@@ -9,7 +9,7 @@ use crate::state::AppState;
 
 /// Checks every stored PDF now; the banner and Settings follow the event.
 #[tauri::command]
-pub fn files_verify(
+pub async fn files_verify(
     app: AppHandle,
     state: State<'_, AppState>,
     last: State<'_, LastCheck>,
@@ -31,7 +31,7 @@ pub fn files_last_check(last: State<'_, LastCheck>) -> Option<FileCheck> {
 }
 
 #[tauri::command]
-pub fn status_view(
+pub async fn status_view(
     state: State<'_, AppState>,
     last: State<'_, LastCheck>,
 ) -> AppResult<Vec<StatusGroup>> {

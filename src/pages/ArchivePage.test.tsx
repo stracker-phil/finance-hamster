@@ -15,7 +15,7 @@ const mocked = vi.mocked(api, true);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useStore.setState({ toasts: [], pdfCovers: 0 });
+  useStore.setState({ toasts: [], pdfCovers: [] });
   mocked.getSettings.mockResolvedValue(settings());
   mocked.archiveList.mockResolvedValue([archivedDocument()]);
   mocked.documentStep.mockResolvedValue("Restored Sample Books");

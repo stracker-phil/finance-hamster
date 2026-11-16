@@ -6,7 +6,7 @@ use crate::error::AppResult;
 use crate::state::AppState;
 
 #[tauri::command]
-pub fn today_view(state: State<'_, AppState>) -> AppResult<TodayView> {
+pub async fn today_view(state: State<'_, AppState>) -> AppResult<TodayView> {
     let settings = state.settings.get();
     super::today_view(
         &state.db,

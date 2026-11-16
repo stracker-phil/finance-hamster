@@ -57,8 +57,8 @@ const owner = (target: EventTarget | null) =>
  *  keyboard focus. Any element with a `title` gets it, and any text cut off with an ellipsis shows in full. */
 export function TooltipHost() {
   const [tip, setTip] = useState<Tip | null>(null);
-  useCoversPdf(tip !== null);
   const ref = useRef<HTMLDivElement>(null);
+  useCoversPdf("float", ref, tip !== null);
   // The shown tooltip's width, measured before it paints, so it can keep clear of the window's edges.
   const [width, setWidth] = useState(0);
   useLayoutEffect(() => {

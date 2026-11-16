@@ -4,7 +4,7 @@ use tauri::{AppHandle, Manager, State};
 
 use super::PdfSource;
 use crate::error::{AppError, AppResult};
-use crate::platform::pdf_view::{self, Change, Frame};
+use crate::platform::pdf_view::{self, Change, Covers, Frame};
 use crate::state::AppState;
 use crate::tr;
 use crate::window::MAIN;
@@ -19,7 +19,7 @@ fn change(app: &AppHandle, change: Change) -> AppResult<()> {
     pdf_view::apply(&main_window(app)?, change)
 }
 
-/// Whether the preview is on screen; `scripts/dev/e2e.sh` checks that every overlay hides it.
+/// Whether the preview is on screen; `scripts/dev/e2e.sh` checks it around sheets, menus and toasts.
 #[tauri::command]
 pub async fn pdf_view_visible(app: AppHandle) -> AppResult<bool> {
     pdf_view::visible(&main_window(&app)?)
@@ -46,13 +46,8 @@ pub fn pdf_view_hide(app: AppHandle) -> AppResult<()> {
     change(&app, Change::Hide)
 }
 
-/// An overlay opened over the page; the preview hides until it resumes.
+/// What the page draws above the preview: a sheet hides it, menus, toasts and tooltips cut holes (ADR 0057).
 #[tauri::command]
-pub fn pdf_view_suspend(app: AppHandle) -> AppResult<()> {
-    change(&app, Change::Suspend)
-}
-
-#[tauri::command]
-pub fn pdf_view_resume(app: AppHandle) -> AppResult<()> {
-    change(&app, Change::Resume)
+pub fn pdf_view_cover(app: AppHandle, covers: Covers) -> AppResult<()> {
+    change(&app, Change::Cover(covers))
 }

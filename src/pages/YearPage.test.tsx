@@ -32,7 +32,7 @@ const showView = (name: "Categories" | "Months" | "FinanzOnline") => userEvent.c
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useStore.setState({ route: HOME, back: [], forward: [], filter: "", toasts: [], addPreview: null, pdfCovers: 0, menu: null });
+  useStore.setState({ route: HOME, back: [], forward: [], filter: "", toasts: [], addPreview: null, pdfCovers: [], menu: null });
   mocked.yearPage.mockRejectedValue({ kind: "not_found", message: "No tax year", code: null });
   mocked.documentAddChoose.mockResolvedValue(null);
   mocked.documentLineChoice.mockResolvedValue(null);

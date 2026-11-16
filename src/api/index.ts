@@ -1,7 +1,7 @@
 import { getName, getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { CategoryChoice, Account, AccountEdit, AccountLines, Action, Elsewhere, YearPage, NewEntry, TodayView, RulePreview, FileCheck, StatusGroup, CloseCheck, SubscriptionsView, SubscriptionDetail, SubscriptionForm, PlanForm, MatchCount, AddInput, AddPreview, ArchivedDocument, DeletionView, DocumentEdit, DocumentGroup, DocumentStep, DocumentView, HistoryEntry, VendorChange, VendorsView, Estimate, LineChoice, Coverage, ReviewQueue, RuleForm, RulesView, Frame, ImportPreview, PdfSource, AppError, AppInfo, CommandInfo, KeyConflict, ErrorKind, EventName, EventPayloads, JsonPreview, LaunchEvent, NewAccount, AccountStatements, OtherEdit, OtherGroup, OtherView, StatementView, PayslipAdded, PayslipEdit, PayslipView, PayslipsYear, RulesImport, RulesOverview, RulesYearView, Settings, SettingsPatch, TaxYear } from "./types";
+import type { CategoryChoice, Account, AccountEdit, AccountLines, Action, Elsewhere, YearPage, NewEntry, TodayView, RulePreview, FileCheck, StatusGroup, CloseCheck, SubscriptionsView, SubscriptionDetail, SubscriptionForm, PlanForm, MatchCount, AddInput, AddPreview, ArchivedDocument, DeletionView, DocumentEdit, DocumentGroup, DocumentStep, DocumentView, HistoryEntry, VendorChange, VendorsView, Estimate, LineChoice, Coverage, ReviewQueue, RuleForm, RulesView, Covers, Frame, ImportPreview, PdfSource, AppError, AppInfo, CommandInfo, KeyConflict, ErrorKind, EventName, EventPayloads, JsonPreview, LaunchEvent, NewAccount, AccountStatements, OtherEdit, OtherGroup, OtherView, StatementView, PayslipAdded, PayslipEdit, PayslipView, PayslipsYear, RulesImport, RulesOverview, RulesYearView, Settings, SettingsPatch, TaxYear } from "./types";
 
 export * from "./types";
 
@@ -160,8 +160,7 @@ export const api = {
   pdfViewShow: (source: PdfSource, frame: Frame) => invoke<void>("pdf_view_show", { source, frame }),
   pdfViewMove: (frame: Frame) => invoke<void>("pdf_view_move", { frame }),
   pdfViewHide: () => invoke<void>("pdf_view_hide"),
-  pdfViewSuspend: () => invoke<void>("pdf_view_suspend"),
-  pdfViewResume: () => invoke<void>("pdf_view_resume"),
+  pdfViewCover: (covers: Covers) => invoke<void>("pdf_view_cover", { covers }),
   /** A page (1-based) of a known PDF as an image URL, served by Rust's `pdf-page` scheme. */
   pdfPageUrl: (source: PdfSource, page: number, width: number) => `pdf-page://localhost/${source.kind}/${encodeURIComponent(source.id)}/${page}.png?w=${Math.round(width)}`,
   listen: <E extends EventName>(event: E, handler: (payload: EventPayloads[E]) => void): Promise<UnlistenFn> =>

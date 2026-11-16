@@ -25,7 +25,7 @@ const toastMessages = () => useStore.getState().toasts.map((t) => t.message);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useStore.setState({ route: { page: "other", otherId: "other-1" }, back: [], forward: [], toasts: [], pdfCovers: 0 });
+  useStore.setState({ route: { page: "other", otherId: "other-1" }, back: [], forward: [], toasts: [], pdfCovers: [] });
   mocked.otherEdit.mockResolvedValue(null);
   mocked.otherDelete.mockResolvedValue("Delete Demo Lease");
 });

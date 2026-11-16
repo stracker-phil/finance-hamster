@@ -66,13 +66,13 @@ function useDismiss(layer: RefObject<HTMLDivElement | null>, menu: OpenMenu, onC
   }, [layer, menu, onClose]);
 }
 
-/** The open menu, portaled to `<body>`; the native PDF preview hides while it shows (ADR 0037). */
+/** The open menu, portaled to `<body>`; it is cut out of the native PDF preview (ADR 0057). */
 function OpenMenuLayer({ menu, onClose }: { menu: OpenMenu; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const [placement] = useState(() => placementOf(menu.at));
   const [initial] = useState(() => initialRow(menu));
   useDismiss(ref, menu, onClose);
-  useCoversPdf();
+  useCoversPdf("popover", ref);
 
   // The focus goes back first, so a sheet the row opens returns it there too.
   const choose = (item: MenuItem) => {

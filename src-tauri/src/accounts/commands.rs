@@ -6,12 +6,12 @@ use crate::error::AppResult;
 use crate::state::AppState;
 
 #[tauri::command]
-pub fn list_accounts(state: State<'_, AppState>) -> AppResult<Vec<Account>> {
+pub async fn list_accounts(state: State<'_, AppState>) -> AppResult<Vec<Account>> {
     super::list(&state.db)
 }
 
 #[tauri::command]
-pub fn add_account(
+pub async fn add_account(
     app: AppHandle,
     state: State<'_, AppState>,
     account: NewAccount,
@@ -22,7 +22,7 @@ pub fn add_account(
 }
 
 #[tauri::command]
-pub fn edit_account(
+pub async fn edit_account(
     app: AppHandle,
     state: State<'_, AppState>,
     id: String,

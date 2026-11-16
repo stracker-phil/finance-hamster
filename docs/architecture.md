@@ -25,7 +25,9 @@ These rules hold everywhere in the code. Keep them when you change things.
 8. **One write path into the data** (ADR 0007). Every change goes through the data layer's one
    write function, which validates, saves and announces it as an event. No other code writes the data.
 9. **Commands live in Rust** (ADR 0008, ADR 0046). Menus, shortcuts, the palette and the CLI run
-   commands of one catalog by colon id (`go:today`).
+   commands of one catalog by colon id (`go:today`). A Tauri command that touches data, files or PDFs is an
+   `async fn`, even without an `.await`, so it runs off the main thread and never stalls the window
+   (ADR 0058).
 10. **Small feature modules** (ADR 0006): by feature, pure cores, ports only where a
     swap is real, files under ~400 lines.
 11. **Debug is a separate app on demo data** (ADR 0022); nothing in the repo carries
@@ -92,7 +94,7 @@ Rust (`src-tauri/src/`):
 | `commands/` | the catalog (ADR 0046): `COMMANDS` (colon id, title, accelerator, who runs it: the page, Settings or Rust), `run`, `list`, `shortcut_label`; page commands go to the main window as `run_command`; `handlers.rs` (the Tauri commands, Open Log Folder, Show Data Folder); `keys.rs` (the owner's shortcuts in `keybindings.json` through `JsonFile`, old dotted ids carried over, `conflict` and `reassign`; the menu bar is rebuilt and `commands_changed` sent) |
 | `i18n.rs` | the UI language (ADR 0050): `lang()` (set at launch and by `update_settings`, `with_lang` per thread for tests), `tr!`/`tr_plural!` with both texts at the call site, `Text` for compile-time tables |
 | `menu/` | the menu bar: macOS's standard items (texts in the UI language) around `MENUS` and `HELP` (command ids); a menu item's id is its command; rebuilt on a new language |
-| `db/` | `hamster.sqlite`: `migrations.rs` (numbered, `user_version`), `change.rs` (row changes over JSON rows with inverses and field-level journal entries), `journal.rs` (the `journal` table and its `journal.jsonl` mirror, caught up at every write and at launch; `compare` finds lines edited by hand), `undo.rs`, `frozen.rs` (every change refused when its row counts in a closed tax year, ADR 0048), `Db::write`/`undo`/`redo`, `commands.rs` (`undo`, `redo`, the `data_changed` event) |
+| `db/` | `hamster.sqlite`: `migrations.rs` (numbered, `user_version`), `change.rs` (row changes over JSON rows with inverses and field-level journal entries), `journal.rs` (the `journal` table and its `journal.jsonl` mirror: caught up from the file at launch, then each write appends after the last `seq` `Db` remembers (`append_after`, ADR 0058); `compare` finds lines edited by hand), `undo.rs`, `frozen.rs` (every change refused when its row counts in a closed tax year, ADR 0048), `Db::write`/`undo`/`redo`, `commands.rs` (`undo`, `redo`, the `data_changed` event) |
 | `money.rs`, `date.rs` | cents plus currency, amount labels by the number format, the FinanzOnline copy value, typed amounts; `YYYY-MM-DD` dates and their labels: English in the region's order, German day first |
 | `accounts/` | bank accounts: IBAN check and mask, the name other statements print for an account (`statement_name`, since real statements often print no counterparty IBAN), `add`/`edit`/`list` and their commands; changing an own account or its statement name decides the lines again in the same op |
 | `payslips/` | monthly payslips (ADR 0055): the `payslips` table (one per year and month, values optional), `edit.rs` (add with or without a PDF under `docs/<year>/payslips/`, attach, change one value, delete; each one undoable op), `guess.rs` (the month from a "<month> <year>" at a PDF's top), `view.rs` (the panel's twelve months and sums, one payslip's form), `telework_days` (the latest payslip's year-to-date home office days, which answer the year's question in `year/page.rs`), `view::list` (every year with payslips or open, twelve months each), `commands.rs` |
@@ -146,7 +148,7 @@ Frontend (`src/`):
 | `i18n/` | `en.ts` and `de.ts` (typed as the English catalog), `useT()` in components, `t()` elsewhere; `useLook` sets the language from the settings (ADR 0050) |
 | `settings/`, `windows/settings/` | the Settings window: page registry and search, row controls, the pages (`RulesPage` with `RuleSheet`, `VendorsPage`); a page may have a `detail` one level down (`<page id>/<detail id>`, opened from a `DrillRow`), such as `RulesYearPage` under `TaxRulesPage` |
 | `components/` | `menu/` (the one in-page menu, ADR 0030: `openMenu`/`openContextMenu` put it in the store's `menu`, `MenuHost` (once per window) draws it portaled and covers the native PDF preview while open, `PopUpButton` in place of every `<select>`, which ESLint forbids), `PdfPreview` (the placeholder the native preview follows), `Modal`, `ConfirmSheet`, `Toasts`, `TooltipHost`, `ErrorBoundary`, `icons.tsx` (lucide icons by role) |
-| `lib/` | `pdfCover.ts` (overlays hide the native preview: `useCoversPdf`, `usePdfCovers`), `theme.ts` (scheme and accent on `<html>`), `motion.ts` (`usePresence`, `useGlide`, `useFlash`, `useListGlide`) |
+| `lib/` | `pdfCover.ts` (overlays over the native preview, ADR 0057: a sheet hides it, menus, toasts and tooltips are cut out; `useCoversPdf`, `coversOf`, `usePdfCovers`), `theme.ts` (scheme and accent on `<html>`), `motion.ts` (`usePresence`, `useGlide`, `useFlash`, `useListGlide`) |
 | `styles/` | `palettes/` (every color, light and dark), accents, motion tokens, base, controls, shell, overlays, statements, rules, review, documents |
 | `test/` | `createApiMock`, the module boundary test |
 
@@ -155,7 +157,7 @@ Frontend (`src/`):
 - CSP in `src-tauri/tauri.conf.json` (`csp` and `devCsp`): `script-src 'self'`, `style-src-elem 'self'`, no
   frames, objects, base URI or form actions, `connect-src` only to IPC (ADR 0017).
 - PDFs are never embedded in the webview. The preview is a native PDFKit `PDFView` placed over a page
-  placeholder by Rust (selectable text, no links, no PDF JavaScript); overlays suspend it (ADR 0037).
+  placeholder by Rust (selectable text, no links, no PDF JavaScript); sheets hide it, other overlays cut holes in it (ADR 0037, ADR 0057).
   Thumbnails and the year summary are PNGs served by id through an app URI scheme (ADR 0018).
 - `window/navigation.rs` keeps every webview on the app's own pages; web links go through `open_url`.
 - The bundle is signed with the hardened runtime (`scripts/sign-app.sh`).

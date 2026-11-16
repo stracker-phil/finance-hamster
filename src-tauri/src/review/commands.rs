@@ -9,7 +9,7 @@ use crate::rules::store::Action;
 use crate::state::AppState;
 
 #[tauri::command]
-pub fn review_queue(state: State<'_, AppState>) -> AppResult<ReviewQueue> {
+pub async fn review_queue(state: State<'_, AppState>) -> AppResult<ReviewQueue> {
     super::queue(
         &state.db,
         state.settings.get().number_format,
@@ -20,7 +20,7 @@ pub fn review_queue(state: State<'_, AppState>) -> AppResult<ReviewQueue> {
 /// Decides a line by hand; returns the label of the change.
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
-pub fn review_decide(
+pub async fn review_decide(
     app: AppHandle,
     state: State<'_, AppState>,
     line_id: String,

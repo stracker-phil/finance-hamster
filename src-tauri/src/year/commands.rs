@@ -17,7 +17,11 @@ use crate::taxyears;
 
 /// `query` filters the rows (the header's filter field).
 #[tauri::command]
-pub fn year_page(state: State<'_, AppState>, year: i32, query: String) -> AppResult<YearPage> {
+pub async fn year_page(
+    state: State<'_, AppState>,
+    year: i32,
+    query: String,
+) -> AppResult<YearPage> {
     page::page(
         &state.db,
         year,
@@ -29,7 +33,7 @@ pub fn year_page(state: State<'_, AppState>, year: i32, query: String) -> AppRes
 
 /// Answers one of the year's questions; returns the label of the change, or null when nothing changed.
 #[tauri::command]
-pub fn year_answer(
+pub async fn year_answer(
     app: AppHandle,
     state: State<'_, AppState>,
     year: i32,
@@ -54,7 +58,7 @@ pub fn year_answer(
 
 /// The year's categories with whether each shows while recording.
 #[tauri::command]
-pub fn year_categories(
+pub async fn year_categories(
     state: State<'_, AppState>,
     year: i32,
 ) -> AppResult<Vec<super::hidden::CategoryChoice>> {
@@ -65,7 +69,7 @@ pub fn year_categories(
 
 /// Shows or hides a category while recording; the label of the change, or null when nothing changed.
 #[tauri::command]
-pub fn year_set_category_shown(
+pub async fn year_set_category_shown(
     app: AppHandle,
     state: State<'_, AppState>,
     year: i32,
@@ -100,7 +104,7 @@ fn open_year(state: &AppState, year: i32) -> AppResult<taxyears::TaxYearRow> {
 
 /// Adds an amount or a trip; returns the label of the change.
 #[tauri::command]
-pub fn year_entry_add(
+pub async fn year_entry_add(
     app: AppHandle,
     state: State<'_, AppState>,
     year: i32,
@@ -121,7 +125,7 @@ pub fn year_entry_add(
 }
 
 #[tauri::command]
-pub fn year_entry_delete(
+pub async fn year_entry_delete(
     app: AppHandle,
     state: State<'_, AppState>,
     year: i32,
@@ -166,7 +170,7 @@ fn chosen_path(path: FilePath) -> AppResult<String> {
 
 /// Attaches the PDF at `path` to an amount; returns the label of the change.
 #[tauri::command]
-pub fn year_entry_attach(
+pub async fn year_entry_attach(
     app: AppHandle,
     state: State<'_, AppState>,
     year: i32,
@@ -188,7 +192,11 @@ pub fn year_entry_attach(
 
 /// Opens an amount's evidence PDF in the default viewer.
 #[tauri::command]
-pub fn year_evidence_open(state: State<'_, AppState>, year: i32, id: String) -> AppResult<()> {
+pub async fn year_evidence_open(
+    state: State<'_, AppState>,
+    year: i32,
+    id: String,
+) -> AppResult<()> {
     let path = entries::evidence_path(&state.db, &crate::config_dir(), year, &id)?;
     tauri_plugin_opener::open_path(&path, None::<&str>).map_err(|e| {
         AppError::Internal(crate::tr!(
@@ -208,7 +216,7 @@ fn stamp(prefix: &str) -> String {
 }
 
 #[tauri::command]
-pub fn year_close_check(state: State<'_, AppState>, year: i32) -> AppResult<CloseCheck> {
+pub async fn year_close_check(state: State<'_, AppState>, year: i32) -> AppResult<CloseCheck> {
     let page = page::page(
         &state.db,
         year,
@@ -221,7 +229,11 @@ pub fn year_close_check(state: State<'_, AppState>, year: i32) -> AppResult<Clos
 
 /// Closes the year, storing its snapshot and summary PDF; returns the label of the change.
 #[tauri::command]
-pub fn year_close(app: AppHandle, state: State<'_, AppState>, year: i32) -> AppResult<String> {
+pub async fn year_close(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    year: i32,
+) -> AppResult<String> {
     let written = close::close(
         &state.db,
         &crate::config_dir(),
@@ -237,7 +249,11 @@ pub fn year_close(app: AppHandle, state: State<'_, AppState>, year: i32) -> AppR
 }
 
 #[tauri::command]
-pub fn year_reopen(app: AppHandle, state: State<'_, AppState>, year: i32) -> AppResult<String> {
+pub async fn year_reopen(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    year: i32,
+) -> AppResult<String> {
     let written = close::reopen(&state.db, year, Source::Ui)?;
     announce(&app, &written);
     Ok(written.label)
@@ -245,7 +261,7 @@ pub fn year_reopen(app: AppHandle, state: State<'_, AppState>, year: i32) -> App
 
 /// Opens the newest snapshot's summary PDF in the default viewer.
 #[tauri::command]
-pub fn year_open_snapshot(state: State<'_, AppState>, year: i32) -> AppResult<()> {
+pub async fn year_open_snapshot(state: State<'_, AppState>, year: i32) -> AppResult<()> {
     let path = close::snapshot_file(&state.db, &crate::config_dir(), year)?;
     tauri_plugin_opener::open_path(&path, None::<&str>).map_err(|e| {
         AppError::Internal(crate::tr!(

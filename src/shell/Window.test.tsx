@@ -11,6 +11,7 @@ import { useStore } from "../state/store";
 import { account } from "../test/accounts";
 import { renderWithQuery as render } from "../test/renderWithQuery";
 import { addPreview, documentView, otherGroup, otherView, statementView } from "../test/documents";
+import { PdfCoversProbe } from "../test/PdfCoversProbe";
 import { settings } from "../test/settings";
 import { accountLines, importPreview } from "../test/statements";
 import { Window } from "./Window";
@@ -19,7 +20,7 @@ const mocked = vi.mocked(api, true);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useStore.setState({ route: HOME, back: [], forward: [], filter: "", toasts: [], confirmation: null, paletteOpen: false, pdfCovers: 0, menu: null, importPreview: null, addPreview: null, subscriptionSheet: null });
+  useStore.setState({ route: HOME, back: [], forward: [], filter: "", toasts: [], confirmation: null, paletteOpen: false, pdfCovers: [], menu: null, importPreview: null, addPreview: null, subscriptionSheet: null });
   mocked.runCommand.mockResolvedValue(undefined);
   mocked.listCommands.mockResolvedValue([]);
   mocked.listAccounts.mockResolvedValue([account()]);
@@ -451,13 +452,18 @@ describe("command palette", () => {
     expect(await screen.findByRole("option", { name: "Go to Today" })).toBeTruthy();
   });
 
-  it("covers the PDF preview while open", async () => {
+  it("hides the PDF preview while open", async () => {
     useStore.setState({ paletteOpen: true });
 
-    render(<Window />);
+    render(
+      <>
+        <PdfCoversProbe />
+        <Window />
+      </>,
+    );
 
     await screen.findByRole("dialog");
-    expect(useStore.getState().pdfCovers).toBe(1);
+    await waitFor(() => expect(mocked.pdfViewCover).toHaveBeenLastCalledWith({ hidden: true, holes: [], clickThrough: false }));
   });
 });
 
@@ -610,15 +616,20 @@ describe("New menu", () => {
     expect(items).toEqual(["Import Statement…⌘I", "Add Invoice…⌥⌘O", "Add Payslip…", "Add Other Document…", "New Subscription"]);
   });
 
-  it("covers the PDF preview while open and uncovers it once closed", async () => {
-    render(<Window />);
-    expect(useStore.getState().pdfCovers).toBe(0);
+  it("lets clicks on the PDF preview through while open and sends the uncovered state once closed", async () => {
+    render(
+      <>
+        <PdfCoversProbe />
+        <Window />
+      </>,
+    );
+    expect(mocked.pdfViewCover).not.toHaveBeenCalled();
 
     await openMenu();
-    expect(useStore.getState().pdfCovers).toBe(1);
+    await waitFor(() => expect(mocked.pdfViewCover).toHaveBeenLastCalledWith(expect.objectContaining({ hidden: false, clickThrough: true })));
 
     await userEvent.keyboard("{Escape}");
-    expect(useStore.getState().pdfCovers).toBe(0);
+    await waitFor(() => expect(mocked.pdfViewCover).toHaveBeenLastCalledWith({ hidden: false, holes: [], clickThrough: false }));
   });
 
   it("starts the statement import when Import Statement… is chosen, and closes the menu", async () => {

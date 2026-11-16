@@ -611,6 +611,104 @@ fn reopening_with_a_journal_file_that_is_ahead_keeps_its_content() {
     assert_eq!(std::fs::read_to_string(&path).unwrap(), ahead);
 }
 
+fn assert_journal_fully_mirrored(db: &Db, dir: &Path) {
+    let path = dir.join(journal::FILE_NAME);
+    let rows = db.read(|conn| journal::entries_after(conn, 0)).unwrap();
+    let seqs: Vec<i64> = rows.iter().map(|e| e.seq).collect();
+    assert_eq!(seqs, (1..=rows.len() as i64).collect::<Vec<_>>());
+    let mirror = db.read(|conn| journal::compare(conn, &path)).unwrap();
+    assert_eq!(
+        mirror,
+        journal::Mirror {
+            rows: rows.len(),
+            matching: rows.len(),
+            edited: vec![]
+        }
+    );
+    assert_eq!(journal_lines(dir).len(), rows.len());
+}
+
+#[test]
+fn writes_undo_and_redo_leave_every_journal_row_in_the_file_exactly_once_in_order() {
+    let (dir, db) = open();
+    db.write(insert("a", "Rent", 100), Source::Ui).unwrap();
+    db.write(rename("a", "Rent", "Flat"), Source::Ui).unwrap();
+    db.write(insert("b", "Gym", 200), Source::Ui).unwrap();
+    db.undo().unwrap().unwrap();
+    db.redo().unwrap().unwrap();
+    db.undo().unwrap().unwrap();
+
+    assert_journal_fully_mirrored(&db, dir.path());
+}
+
+#[test]
+fn reopening_and_writing_more_keeps_every_journal_row_in_the_file_exactly_once() {
+    let (dir, db) = open();
+    db.write(insert("a", "Rent", 100), Source::Ui).unwrap();
+    db.write(rename("a", "Rent", "Flat"), Source::Ui).unwrap();
+    drop(db);
+
+    let db = Db::open(dir.path()).unwrap();
+    db.write(insert("b", "Gym", 200), Source::Ui).unwrap();
+    db.write(rename("b", "Gym", "Club"), Source::Ui).unwrap();
+
+    assert_eq!(journal_rows(&db), 10);
+    assert_journal_fully_mirrored(&db, dir.path());
+}
+
+#[test]
+fn a_write_after_the_file_was_removed_appends_only_its_own_rows() {
+    let (dir, db) = open();
+    db.write(insert("a", "Rent", 100), Source::Ui).unwrap();
+    let lines = journal_lines(dir.path());
+    std::fs::remove_file(dir.path().join(journal::FILE_NAME)).unwrap();
+
+    db.write(rename("a", "Rent", "Flat"), Source::Ui).unwrap();
+
+    let after = journal_lines(dir.path());
+    assert_eq!(after.len(), 1);
+    assert_eq!(after[0].split(',').next(), Some(r#"{"seq":5"#));
+    assert!(!lines.contains(&after[0]));
+}
+
+#[test]
+fn a_write_after_the_file_was_truncated_does_not_restore_the_lost_lines() {
+    let (dir, db) = open();
+    db.write(insert("a", "Rent", 100), Source::Ui).unwrap();
+    let lines = journal_lines(dir.path());
+    let path = dir.path().join(journal::FILE_NAME);
+    std::fs::write(&path, format!("{}\n{}\n", lines[0], lines[1])).unwrap();
+
+    db.write(rename("a", "Rent", "Flat"), Source::Ui).unwrap();
+
+    let after = journal_lines(dir.path());
+    assert_eq!(after.len(), 3);
+    assert_eq!(after[..2], lines[..2]);
+    let mirror = db.read(|conn| journal::compare(conn, &path)).unwrap();
+    assert_eq!(mirror.matching, 3);
+    assert_eq!(mirror.edited, vec![3, 4]);
+}
+
+#[test]
+fn reopening_after_the_file_was_removed_or_truncated_while_open_catches_up_the_whole_file() {
+    let (dir, db) = open();
+    db.write(insert("a", "Rent", 100), Source::Ui).unwrap();
+    db.write(rename("a", "Rent", "Flat"), Source::Ui).unwrap();
+    let lines = journal_lines(dir.path());
+    let path = dir.path().join(journal::FILE_NAME);
+
+    std::fs::remove_file(&path).unwrap();
+    drop(db);
+    let db = Db::open(dir.path()).unwrap();
+    assert_eq!(journal_lines(dir.path()), lines);
+
+    std::fs::write(&path, format!("{}\n", lines[0])).unwrap();
+    drop(db);
+    let db = Db::open(dir.path()).unwrap();
+    assert_eq!(journal_lines(dir.path()), lines);
+    assert_journal_fully_mirrored(&db, dir.path());
+}
+
 #[test]
 fn a_file_from_a_newer_hamster_is_refused_when_opening() {
     let dir = temp_config_dir();

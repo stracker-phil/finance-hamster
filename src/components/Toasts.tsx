@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, Info, X } from "lucide-react";
 import { useT } from "../i18n";
 import { useStore, type Toast } from "../state/store";
@@ -65,9 +65,10 @@ function errorLines(message: string): string[] {
 
 export function Toasts() {
   const toasts = useStore((s) => s.toasts);
-  useCoversPdf(toasts.length > 0);
+  const ref = useRef<HTMLDivElement>(null);
+  useCoversPdf("float", ref, toasts.length > 0);
   return (
-    <div className="toasts">
+    <div ref={ref} className="toasts">
       {toasts.map((t) => (
         <ToastItem key={t.id} toast={t} />
       ))}

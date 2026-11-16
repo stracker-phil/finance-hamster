@@ -7,6 +7,7 @@ vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await impo
 import { api } from "../api";
 import { Toasts } from "../components/Toasts";
 import { useStore } from "../state/store";
+import { PdfCoversProbe } from "../test/PdfCoversProbe";
 import { importPreview } from "../test/statements";
 import { ImportSheet } from "./ImportSheet";
 
@@ -15,7 +16,7 @@ const preview = importPreview();
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useStore.setState({ importPreview: preview, toasts: [], pdfCovers: 0 });
+  useStore.setState({ importPreview: preview, toasts: [], pdfCovers: [] });
   mocked.statementImportCommit.mockResolvedValue("Imported Nr. 010/2026");
   mocked.statementImportCancel.mockResolvedValue(undefined);
 });
@@ -49,6 +50,17 @@ describe("ImportSheet", () => {
 
     expect(screen.getByText("Statement Nr. 008 is missing")).toBeTruthy();
     expect(screen.getByText("Import it first to close the gap.")).toBeTruthy();
+  });
+
+  it("hides the PDF preview while open", async () => {
+    render(
+      <>
+        <PdfCoversProbe />
+        <ImportSheet preview={preview} />
+      </>,
+    );
+
+    await waitFor(() => expect(mocked.pdfViewCover).toHaveBeenLastCalledWith({ hidden: true, holes: [], clickThrough: false }));
   });
 
   describe("Cancel", () => {

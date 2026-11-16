@@ -1,8 +1,9 @@
 #!/bin/zsh
 # Checks that nothing jumps in the running debug app: e2e.sh
 # Clicks every sidebar row twice and opens and closes + New, measuring the panel, the header, the first sidebar
-# row and the clicked control after every step, then checks that every overlay hides the native PDF preview
-# (the first demo document). Exits 1 on any drift of 1px or more or a preview left over an overlay.
+# row and the clicked control after every step, then checks the native PDF preview (the first demo document):
+# sheets hide it, menus and toasts leave it showing (ADR 0057). Exits 1 on any drift of 1px or more or a
+# preview in the wrong state.
 # Start the app first: bun run build:app && scripts/dev/launch.sh
 set -e
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
@@ -55,7 +56,7 @@ MARK="E2E-$(date +%s)-$$"
     store.navigate({ page: 'document', documentId: first.id, year: null });
     await expectPdf('demo document', true);
     document.querySelector('.new-btn').click();
-    await expectPdf('+ New open', false);
+    await expectPdf('+ New open', true);
     document.querySelector('.new-btn').click();
     await expectPdf('+ New closed', true);
     store.setPaletteOpen(true);
@@ -63,7 +64,7 @@ MARK="E2E-$(date +%s)-$$"
     window.hamster.getState().setPaletteOpen(false);
     await expectPdf('palette closed', true);
     store.showToast('info', 'E2E toast');
-    await expectPdf('toast shown', false);
+    await expectPdf('toast shown', true);
     for (const t of window.hamster.getState().toasts) window.hamster.getState().dismissToast(t.id);
     await expectPdf('toast dismissed', true);
     store.navigate({ page: 'today' });

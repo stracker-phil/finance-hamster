@@ -1,11 +1,23 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
+
+import { api } from "../api";
 import { useStore } from "../state/store";
+import { PdfCoversProbe } from "../test/PdfCoversProbe";
 import { TooltipHost } from "./TooltipHost";
 
+const mocked = vi.mocked(api, true);
+
 beforeEach(() => {
-  useStore.setState({ pdfCovers: 0 });
+  vi.clearAllMocks();
+  useStore.setState({ pdfCovers: [] });
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe("TooltipHost", () => {
@@ -22,22 +34,24 @@ describe("TooltipHost", () => {
     expect((await screen.findByRole("tooltip")).textContent).toBe("Back (⌘[)");
   });
 
-  it("covers the PDF preview while a tooltip shows and uncovers it when it hides", async () => {
+  it("cuts a hole for the tooltip in the PDF preview without hiding it, and sends the uncovered state when it hides", async () => {
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ left: 20, top: 30, width: 90, height: 24, right: 110, bottom: 54, x: 20, y: 30, toJSON: () => ({}) });
     render(
       <>
+        <PdfCoversProbe />
         <TooltipHost />
         <button title="Back (⌘[)">←</button>
       </>,
     );
-    expect(useStore.getState().pdfCovers).toBe(0);
+    expect(mocked.pdfViewCover).not.toHaveBeenCalled();
 
     await userEvent.hover(screen.getByRole("button"));
     await screen.findByRole("tooltip");
-    expect(useStore.getState().pdfCovers).toBe(1);
+    await waitFor(() => expect(mocked.pdfViewCover).toHaveBeenLastCalledWith({ hidden: false, holes: [{ x: 12, y: 22, width: 106, height: 40 }], clickThrough: false }));
 
     await userEvent.keyboard("a");
 
     expect(screen.queryByRole("tooltip")).toBeNull();
-    expect(useStore.getState().pdfCovers).toBe(0);
+    await waitFor(() => expect(mocked.pdfViewCover).toHaveBeenLastCalledWith({ hidden: false, holes: [], clickThrough: false }));
   });
 });

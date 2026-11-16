@@ -23,12 +23,12 @@ fn announced(app: &AppHandle, written: Written) -> String {
 }
 
 #[tauri::command]
-pub fn others_list(state: State<'_, AppState>, query: String) -> AppResult<Vec<OtherGroup>> {
+pub async fn others_list(state: State<'_, AppState>, query: String) -> AppResult<Vec<OtherGroup>> {
     view::list(&state.db, &query, DateOrder::system())
 }
 
 #[tauri::command]
-pub fn other_view(state: State<'_, AppState>, id: String) -> AppResult<OtherView> {
+pub async fn other_view(state: State<'_, AppState>, id: String) -> AppResult<OtherView> {
     view::view(&state.db, &id)
 }
 
@@ -81,7 +81,7 @@ pub async fn other_add_pdf(app: AppHandle) -> AppResult<Option<Added>> {
 
 /// Keeps a PDF waiting in the Add sheet as an other document.
 #[tauri::command]
-pub fn other_add_waiting(
+pub async fn other_add_waiting(
     app: AppHandle,
     state: State<'_, AppState>,
     token: String,
@@ -107,7 +107,7 @@ pub fn other_add_waiting(
 }
 
 #[tauri::command]
-pub fn other_edit(
+pub async fn other_edit(
     app: AppHandle,
     state: State<'_, AppState>,
     id: String,
@@ -117,7 +117,11 @@ pub fn other_edit(
 }
 
 #[tauri::command]
-pub fn other_delete(app: AppHandle, state: State<'_, AppState>, id: String) -> AppResult<String> {
+pub async fn other_delete(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    id: String,
+) -> AppResult<String> {
     let written = edit::delete(&state.db, &id)?;
     Ok(announced(&app, written))
 }

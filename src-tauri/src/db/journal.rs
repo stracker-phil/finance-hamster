@@ -87,7 +87,7 @@ pub fn entries_after(conn: &Connection, seq: i64) -> AppResult<Vec<Entry>> {
 }
 
 /// The last `seq` the file holds; 0 for a missing or empty file. Lines that do not parse, such as a torn last line, are skipped.
-fn last_mirrored(path: &Path) -> AppResult<i64> {
+pub fn last_mirrored(path: &Path) -> AppResult<i64> {
     let Ok(file) = std::fs::File::open(path) else {
         return Ok(0);
     };
@@ -160,11 +160,21 @@ pub fn compare(conn: &Connection, path: &Path) -> AppResult<Mirror> {
     })
 }
 
-/// Appends every row the file lacks and syncs it.
-pub fn catch_up(conn: &Connection, path: &Path) -> AppResult<usize> {
-    let missing = entries_after(conn, last_mirrored(path)?)?;
+/// Appends every row the file lacks and syncs it; returns the file's new last seq.
+pub fn catch_up(conn: &Connection, path: &Path) -> AppResult<i64> {
+    append_after(conn, path, last_mirrored(path)?)
+}
+
+/// Appends the rows after `seq` without reading the file; returns the new last seq.
+pub fn append_after(conn: &Connection, path: &Path, seq: i64) -> AppResult<i64> {
+    let missing = entries_after(conn, seq)?;
+    append(path, &missing)?;
+    Ok(missing.last().map_or(seq, |entry| entry.seq))
+}
+
+fn append(path: &Path, missing: &[Entry]) -> AppResult<()> {
     if missing.is_empty() {
-        return Ok(0);
+        return Ok(());
     }
     let mut file = OpenOptions::new().create(true).append(true).open(path)?;
     file.set_permissions(std::fs::Permissions::from_mode(0o600))?;
@@ -174,13 +184,13 @@ pub fn catch_up(conn: &Connection, path: &Path) -> AppResult<usize> {
     } else {
         String::new()
     };
-    for entry in &missing {
+    for entry in missing {
         text.push_str(&serde_json::to_string(entry)?);
         text.push('\n');
     }
     file.write_all(text.as_bytes())?;
     file.sync_all()?;
-    Ok(missing.len())
+    Ok(())
 }
 
 #[cfg(test)]
@@ -343,7 +353,7 @@ mod tests {
         let torn = r#"{"seq":2,"op""#;
         std::fs::write(&path, format!("{first}\n{torn}")).unwrap();
 
-        assert_eq!(catch_up(&conn, &path).unwrap(), 2);
+        assert_eq!(catch_up(&conn, &path).unwrap(), 3);
 
         let text = std::fs::read_to_string(&path).unwrap();
         let lines: Vec<&str> = text.lines().collect();
@@ -359,7 +369,7 @@ mod tests {
     }
 
     #[test]
-    fn catch_up_appends_only_the_missing_rows() {
+    fn catch_up_appends_only_the_missing_rows_and_returns_the_files_last_seq() {
         let dir = temp_config_dir();
         let path = dir.path().join(FILE_NAME);
         let mut conn = connection();
@@ -375,12 +385,12 @@ mod tests {
                 field("c", None, Some(json!(3))),
             ],
         );
-        assert_eq!(catch_up(&conn, &path).unwrap(), 2);
+        assert_eq!(catch_up(&conn, &path).unwrap(), 3);
         let all = std::fs::read_to_string(&path).unwrap();
         assert!(all.starts_with(&first));
         assert_eq!(all.lines().count(), 3);
 
-        assert_eq!(catch_up(&conn, &path).unwrap(), 0);
+        assert_eq!(catch_up(&conn, &path).unwrap(), 3);
         assert_eq!(std::fs::read_to_string(&path).unwrap(), all);
     }
 
@@ -528,6 +538,82 @@ mod tests {
             }
         );
         assert_eq!(mirror.behind(), 1);
+    }
+
+    fn parsed_lines(path: &Path) -> Vec<Entry> {
+        std::fs::read_to_string(path)
+            .unwrap()
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect()
+    }
+
+    #[test]
+    fn append_after_appends_exactly_the_rows_after_the_given_seq_and_returns_the_last() {
+        let (dir, conn, lines) = three_rows_with_lines();
+        let path = dir.path().join(FILE_NAME);
+        std::fs::write(&path, format!("{}\n", lines[0])).unwrap();
+
+        assert_eq!(append_after(&conn, &path, 1).unwrap(), 3);
+
+        assert_eq!(
+            std::fs::read_to_string(&path).unwrap(),
+            format!("{}\n", lines.join("\n"))
+        );
+    }
+
+    #[test]
+    fn append_after_with_every_row_mirrored_leaves_the_file_unchanged_and_returns_the_seq() {
+        let (dir, conn, lines) = three_rows_with_lines();
+        let path = dir.path().join(FILE_NAME);
+        let content = format!("{}\n", lines.join("\n"));
+        std::fs::write(&path, &content).unwrap();
+
+        assert_eq!(append_after(&conn, &path, 3).unwrap(), 3);
+
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), content);
+    }
+
+    #[test]
+    fn append_after_with_nothing_to_append_creates_no_file() {
+        let dir = temp_config_dir();
+        let path = dir.path().join(FILE_NAME);
+        assert_eq!(append_after(&connection(), &path, 0).unwrap(), 0);
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn append_after_appends_from_the_given_seq_even_when_the_file_disagrees() {
+        let (dir, conn, lines) = three_rows_with_lines();
+        let path = dir.path().join(FILE_NAME);
+        std::fs::write(&path, format!("{}\n", lines[0])).unwrap();
+
+        assert_eq!(append_after(&conn, &path, 0).unwrap(), 3);
+
+        let seqs: Vec<i64> = parsed_lines(&path).iter().map(|e| e.seq).collect();
+        assert_eq!(seqs, vec![1, 1, 2, 3]);
+    }
+
+    #[test]
+    fn append_after_a_torn_last_line_keeps_it_and_starts_new_entries_on_their_own_lines() {
+        let (dir, conn, lines) = three_rows_with_lines();
+        let path = dir.path().join(FILE_NAME);
+        let torn = r#"{"seq":2,"op""#;
+        std::fs::write(&path, format!("{}\n{torn}", lines[0])).unwrap();
+
+        assert_eq!(append_after(&conn, &path, 1).unwrap(), 3);
+
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(
+            text.lines().collect::<Vec<_>>(),
+            vec![
+                lines[0].as_str(),
+                torn,
+                lines[1].as_str(),
+                lines[2].as_str()
+            ]
+        );
+        assert!(text.ends_with('\n'));
     }
 
     #[test]

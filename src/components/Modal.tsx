@@ -28,7 +28,7 @@ const openSheets: object[] = [];
 /** A sheet over a scrim: Escape closes it, Tab stays inside, and focus returns to the element that opened it.
  *  The scrim over the toolbar still drags the window. */
 export function Modal({ onClose, role = "dialog", labelledBy, describedBy, className, dismissOnScrim = false, children }: Props) {
-  useCoversPdf();
+  useCoversPdf("sheet");
   const sheetRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
   useEffect(() => {

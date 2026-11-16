@@ -25,7 +25,7 @@ const unpaid = { paidFromLines: false, paid: null, paidText: null, lines: [] };
 beforeEach(() => {
   vi.clearAllMocks();
   mocked.documentStep.mockResolvedValue("Finished Demo Cloud Ltd");
-  useStore.setState({ toasts: [], pdfCovers: 0 });
+  useStore.setState({ toasts: [], pdfCovers: [] });
   mocked.documentEdit.mockResolvedValue(null);
   mocked.documentLineOptions.mockResolvedValue([]);
 });

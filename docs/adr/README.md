@@ -66,3 +66,5 @@ Why Hamster is built the way it is. One record per decision, in Nygard format, a
 | [0054](0054-import-a-rules-file-for-any-year.md) | Import a rules file for any year | Accepted (2026-11-15) |
 | [0055](0055-payslips-as-their-own-record.md) | Payslips as their own record; home office days from the latest one | Accepted (2026-11-15) |
 | [0056](0056-dokumente-holds-every-pdf.md) | Dokumente holds every PDF; one detail layout; a real tax-year sidebar | Accepted (2026-11-15) |
+| [0057](0057-overlays-cut-holes-in-the-pdf-preview.md) | Overlays cut holes in the PDF preview instead of hiding it | Accepted (2026-11-16) |
+| [0058](0058-commands-run-off-the-main-thread.md) | Data commands run off the main thread | Accepted (2026-11-16) |

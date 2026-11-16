@@ -15,6 +15,13 @@ export type SubscriptionSheet =
   | { kind: "edit"; id: string; form: SubscriptionForm }
   | { kind: "plan"; id: string; name: string; currentPlan: string; form: PlanForm; source?: ReviewLine };
 
+/** An overlay above the native PDF preview: a sheet hides it, a popover or float is cut out of it. While a
+ *  popover (a menu) is open, clicks on the preview go to the page, so they close it. */
+export interface PdfCover {
+  kind: "sheet" | "popover" | "float";
+  element: HTMLElement | null;
+}
+
 export interface Toast {
   id: number;
   kind: ToastKind;
@@ -72,10 +79,10 @@ export interface AppStore {
   setSubscriptionSheet: (sheet: SubscriptionSheet | null) => void;
   setImportPreview: (preview: ImportPreview | null) => void;
 
-  /** How many overlays (sheets, menus, toasts, tooltips) are open; the native PDF preview hides while any is. */
-  pdfCovers: number;
-  coverPdf: () => void;
-  uncoverPdf: () => void;
+  /** The open overlays above the native PDF preview (ADR 0057). */
+  pdfCovers: PdfCover[];
+  coverPdf: (cover: PdfCover) => void;
+  uncoverPdf: (cover: PdfCover) => void;
 
   /** The one open menu (ADR 0030). */
   menu: OpenMenu | null;
@@ -149,9 +156,9 @@ export const useStore = create<AppStore>((set, get) => ({
   setSubscriptionSheet: (subscriptionSheet) => set({ subscriptionSheet }),
   setImportPreview: (importPreview) => set({ importPreview }),
 
-  pdfCovers: 0,
-  coverPdf: () => set({ pdfCovers: get().pdfCovers + 1 }),
-  uncoverPdf: () => set({ pdfCovers: Math.max(0, get().pdfCovers - 1) }),
+  pdfCovers: [],
+  coverPdf: (cover) => set({ pdfCovers: [...get().pdfCovers, cover] }),
+  uncoverPdf: (cover) => set({ pdfCovers: get().pdfCovers.filter((c) => c !== cover) }),
 
   menu: null,
   openMenu: (entries, at, label = t().components.menu) => {

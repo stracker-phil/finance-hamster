@@ -8,7 +8,7 @@ export function LinePicker({ documentId, onPick, onClose }: { documentId: string
   const [query, setQuery] = useState("");
   const { data: options = [], isFetched } = useDocumentLineOptions(documentId, query, true);
   const ref = useRef<HTMLDivElement>(null);
-  useCoversPdf(true);
+  useCoversPdf("popover", ref);
   const text = useT().documents.picker;
   useEffect(() => {
     const away = (e: MouseEvent) => {

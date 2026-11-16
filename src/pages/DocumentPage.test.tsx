@@ -14,7 +14,7 @@ const mocked = vi.mocked(api, true);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useStore.setState({ toasts: [], confirmation: null, pdfCovers: 0 });
+  useStore.setState({ toasts: [], confirmation: null, pdfCovers: [] });
   mocked.documentHistory.mockResolvedValue([]);
   mocked.documentStep.mockResolvedValue("Done");
 });

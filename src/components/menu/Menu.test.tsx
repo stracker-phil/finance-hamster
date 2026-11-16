@@ -1,12 +1,16 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../../test/apiMock")).createApiMock() }));
 
+import { api } from "../../api";
 import { useStore } from "../../state/store";
+import { PdfCoversProbe } from "../../test/PdfCoversProbe";
 import { MenuHost, openMenu, type MenuEntry } from ".";
+
+const mocked = vi.mocked(api, true);
 
 const names = ["Archive", "Log", "Export", "Delete"] as const;
 
@@ -33,7 +37,7 @@ const menu = () => screen.queryByRole("menu");
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useStore.setState({ menu: null, pdfCovers: 0 });
+  useStore.setState({ menu: null, pdfCovers: [] });
 });
 
 describe("Menu", () => {
@@ -284,15 +288,20 @@ describe("Menu", () => {
   });
 
   describe("PDF preview", () => {
-    it("is covered while the menu is open and uncovered once it closes", async () => {
-      render(<Harness />);
-      expect(useStore.getState().pdfCovers).toBe(0);
+    it("lets clicks through while the menu is open and is uncovered once it closes", async () => {
+      render(
+        <>
+          <PdfCoversProbe />
+          <Harness />
+        </>,
+      );
+      expect(mocked.pdfViewCover).not.toHaveBeenCalled();
 
       await userEvent.click(opener());
-      expect(useStore.getState().pdfCovers).toBe(1);
+      await waitFor(() => expect(mocked.pdfViewCover).toHaveBeenLastCalledWith(expect.objectContaining({ hidden: false, clickThrough: true })));
 
       await userEvent.keyboard("{Escape}");
-      expect(useStore.getState().pdfCovers).toBe(0);
+      await waitFor(() => expect(mocked.pdfViewCover).toHaveBeenLastCalledWith({ hidden: false, holes: [], clickThrough: false }));
     });
   });
 });

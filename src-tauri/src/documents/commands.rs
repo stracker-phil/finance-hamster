@@ -80,7 +80,7 @@ pub async fn document_add_choose(app: AppHandle) -> AppResult<Option<AddPreview>
 
 /// Adds a read document as a draft; returns the label of the change.
 #[tauri::command]
-pub fn document_add_commit(
+pub async fn document_add_commit(
     app: AppHandle,
     state: State<'_, AppState>,
     input: AddInput,
@@ -107,7 +107,7 @@ pub fn document_add_commit(
 
 /// A bank line as the Add document sheet's picker shows it, for an invoice added from that line.
 #[tauri::command]
-pub fn document_line_choice(
+pub async fn document_line_choice(
     state: State<'_, AppState>,
     id: String,
 ) -> AppResult<Option<LineChoice>> {
@@ -126,7 +126,7 @@ pub fn document_add_cancel(state: State<'_, AppState>, token: String) {
 
 /// What a bank line counts as with an item, for the Add sheet; null without a line.
 #[tauri::command]
-pub fn document_estimate(
+pub async fn document_estimate(
     state: State<'_, AppState>,
     line_id: Option<String>,
     item_key: Option<String>,
@@ -184,7 +184,7 @@ pub fn offer(app: &AppHandle, path: &Path) {
 }
 
 #[tauri::command]
-pub fn document_view(state: State<'_, AppState>, id: String) -> AppResult<DocumentView> {
+pub async fn document_view(state: State<'_, AppState>, id: String) -> AppResult<DocumentView> {
     view::document(
         &state.db,
         &id,
@@ -195,7 +195,7 @@ pub fn document_view(state: State<'_, AppState>, id: String) -> AppResult<Docume
 
 /// Changes one field of a draft; returns the label of the change, or null when nothing changed.
 #[tauri::command]
-pub fn document_edit(
+pub async fn document_edit(
     app: AppHandle,
     state: State<'_, AppState>,
     id: String,
@@ -217,7 +217,7 @@ pub fn document_edit(
 
 /// The bank lines the picker offers for a document: likely matches, or lines containing `query`.
 #[tauri::command]
-pub fn document_line_options(
+pub async fn document_line_options(
     state: State<'_, AppState>,
     id: String,
     query: String,
@@ -232,7 +232,10 @@ pub fn document_line_options(
 }
 
 #[tauri::command]
-pub fn documents_list(state: State<'_, AppState>, query: String) -> AppResult<Vec<DocumentGroup>> {
+pub async fn documents_list(
+    state: State<'_, AppState>,
+    query: String,
+) -> AppResult<Vec<DocumentGroup>> {
     list::documents(
         &state.db,
         &query,
@@ -242,7 +245,7 @@ pub fn documents_list(state: State<'_, AppState>, query: String) -> AppResult<Ve
 }
 
 #[tauri::command]
-pub fn vendors_view(state: State<'_, AppState>) -> AppResult<VendorsView> {
+pub async fn vendors_view(state: State<'_, AppState>) -> AppResult<VendorsView> {
     vendors::view(&state.db)
 }
 
@@ -258,7 +261,7 @@ pub enum VendorChange {
 }
 
 #[tauri::command]
-pub fn vendor_change(
+pub async fn vendor_change(
     app: AppHandle,
     state: State<'_, AppState>,
     id: String,
@@ -293,7 +296,7 @@ fn now() -> i64 {
 }
 
 #[tauri::command]
-pub fn document_step(
+pub async fn document_step(
     app: AppHandle,
     state: State<'_, AppState>,
     id: String,
@@ -315,7 +318,7 @@ pub fn document_step(
 
 /// Deletes an excluded document for good; returns the label of the change.
 #[tauri::command]
-pub fn document_delete(
+pub async fn document_delete(
     app: AppHandle,
     state: State<'_, AppState>,
     id: String,
@@ -336,7 +339,10 @@ pub fn document_delete(
 }
 
 #[tauri::command]
-pub fn document_history(state: State<'_, AppState>, id: String) -> AppResult<Vec<HistoryEntry>> {
+pub async fn document_history(
+    state: State<'_, AppState>,
+    id: String,
+) -> AppResult<Vec<HistoryEntry>> {
     history::document_history(
         &state.db,
         &id,
@@ -346,7 +352,7 @@ pub fn document_history(state: State<'_, AppState>, id: String) -> AppResult<Vec
 }
 
 #[tauri::command]
-pub fn year_log(
+pub async fn year_log(
     state: State<'_, AppState>,
     year: i32,
     query: String,
@@ -361,7 +367,10 @@ pub fn year_log(
 }
 
 #[tauri::command]
-pub fn archive_list(state: State<'_, AppState>, year: i32) -> AppResult<Vec<ArchivedDocument>> {
+pub async fn archive_list(
+    state: State<'_, AppState>,
+    year: i32,
+) -> AppResult<Vec<ArchivedDocument>> {
     lifecycle::archive(
         &state.db,
         year,
@@ -372,6 +381,6 @@ pub fn archive_list(state: State<'_, AppState>, year: i32) -> AppResult<Vec<Arch
 }
 
 #[tauri::command]
-pub fn deletion_log(state: State<'_, AppState>) -> AppResult<Vec<DeletionView>> {
+pub async fn deletion_log(state: State<'_, AppState>) -> AppResult<Vec<DeletionView>> {
     lifecycle::deletion_log(&state.db, DateOrder::system())
 }

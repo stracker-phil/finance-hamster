@@ -226,7 +226,7 @@ pub fn elsewhere(
 }
 
 #[tauri::command]
-pub fn search_elsewhere(
+pub async fn search_elsewhere(
     state: tauri::State<'_, crate::state::AppState>,
     query: String,
 ) -> AppResult<Vec<Elsewhere>> {

@@ -36,7 +36,10 @@ tempfile = { version = "3", optional = true }
 # SQLite with FTS5, compiled in (ADR 0012).
 rusqlite = { version = "0.37", features = ["bundled"] }
 objc2-pdf-kit = { version = "0.3", default-features = false, features = ["std", "PDFDocument", "PDFPage", "PDFSelection", "PDFView", "objc2-app-kit", "objc2-core-foundation"] }
-objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSImage", "NSImageRep", "NSBitmapImageRep", "NSView", "NSResponder", "NSWindow", "NSColor", "NSGraphics"] }
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSImage", "NSImageRep", "NSBitmapImageRep", "NSView", "NSResponder", "NSWindow", "NSColor", "NSGraphics", "objc2-quartz-core"] }
+# The PDF preview's cut-outs for overlays (ADR 0057).
+objc2-quartz-core = { version = "0.3", default-features = false, features = ["std", "CALayer", "CAShapeLayer", "objc2-core-graphics"] }
+objc2-core-graphics = { version = "0.3", default-features = false, features = ["std", "CGPath"] }
 sha2 = "0.10"
 
 [features]

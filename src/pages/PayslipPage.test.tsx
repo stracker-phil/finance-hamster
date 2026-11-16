@@ -24,7 +24,7 @@ const toastMessages = () => useStore.getState().toasts.map((t) => t.message);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useStore.setState({ route: { page: "payslip", payslipId: "ps-7", year: 2026 }, back: [], forward: [], toasts: [], pdfCovers: 0 });
+  useStore.setState({ route: { page: "payslip", payslipId: "ps-7", year: 2026 }, back: [], forward: [], toasts: [], pdfCovers: [] });
   mocked.payslipEdit.mockResolvedValue(null);
   mocked.payslipAttach.mockResolvedValue(null);
   mocked.payslipDelete.mockResolvedValue("Delete Payslip July 2026");

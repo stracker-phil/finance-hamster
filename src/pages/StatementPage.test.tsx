@@ -14,7 +14,7 @@ const mocked = vi.mocked(api, true);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useStore.setState({ route: { page: "statement", statementId: "st-10" }, back: [], forward: [], toasts: [], pdfCovers: 0 });
+  useStore.setState({ route: { page: "statement", statementId: "st-10" }, back: [], forward: [], toasts: [], pdfCovers: [] });
 });
 
 describe("StatementPage", () => {

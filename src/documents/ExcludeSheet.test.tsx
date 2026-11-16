@@ -1,11 +1,13 @@
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
 
 import { api } from "../api";
 import { useStore } from "../state/store";
+import { PdfCoversProbe } from "../test/PdfCoversProbe";
 import { renderWithQuery } from "../test/renderWithQuery";
 import { ExcludeSheet } from "./ExcludeSheet";
 
@@ -16,7 +18,7 @@ const open = () => renderWithQuery(<ExcludeSheet documentId="doc-1" title="Demo 
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useStore.setState({ toasts: [], pdfCovers: 0 });
+  useStore.setState({ toasts: [], pdfCovers: [] });
   mocked.documentStep.mockResolvedValue("Excluded Demo Cloud Ltd");
 });
 
@@ -69,6 +71,24 @@ describe("ExcludeSheet", () => {
     await userEvent.click(screen.getByRole("button", { name: "Exclude" }));
 
     expect((await screen.findByRole("alert")).textContent).toBe("Disk full");
+  });
+
+  it("hides the PDF preview while open and sends the uncovered state once closed", async () => {
+    function Host() {
+      const [shown, setShown] = useState(true);
+      return (
+        <>
+          <PdfCoversProbe />
+          {shown && <ExcludeSheet documentId="doc-1" title="Demo Cloud Ltd" onClose={() => setShown(false)} />}
+        </>
+      );
+    }
+    renderWithQuery(<Host />);
+    await waitFor(() => expect(mocked.pdfViewCover).toHaveBeenLastCalledWith({ hidden: true, holes: [], clickThrough: false }));
+
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    await waitFor(() => expect(mocked.pdfViewCover).toHaveBeenLastCalledWith({ hidden: false, holes: [], clickThrough: false }));
   });
 
   it("closes on Cancel without excluding", async () => {

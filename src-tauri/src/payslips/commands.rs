@@ -61,18 +61,18 @@ async fn choose_pdf(app: &AppHandle) -> AppResult<Option<Vec<u8>>> {
 }
 
 #[tauri::command]
-pub fn payslips_year(state: State<'_, AppState>, year: i32) -> AppResult<PayslipsYear> {
+pub async fn payslips_year(state: State<'_, AppState>, year: i32) -> AppResult<PayslipsYear> {
     view::year_view(&state.db, year, state.settings.get().number_format)
 }
 
 /// Dokumente → Lohnzettel: every year with a payslip or an open tax year, twelve months each.
 #[tauri::command]
-pub fn payslips_list(state: State<'_, AppState>) -> AppResult<Vec<PayslipsYear>> {
+pub async fn payslips_list(state: State<'_, AppState>) -> AppResult<Vec<PayslipsYear>> {
     view::list(&state.db, state.settings.get().number_format)
 }
 
 #[tauri::command]
-pub fn payslip_view(state: State<'_, AppState>, id: String) -> AppResult<PayslipView> {
+pub async fn payslip_view(state: State<'_, AppState>, id: String) -> AppResult<PayslipView> {
     view::payslip_view(&state.db, &id, state.settings.get().number_format)
 }
 
@@ -86,7 +86,7 @@ pub struct PayslipAdded {
 
 /// Adds the month's payslip, typed by hand.
 #[tauri::command]
-pub fn payslip_add(
+pub async fn payslip_add(
     app: AppHandle,
     state: State<'_, AppState>,
     year: i32,
@@ -137,14 +137,19 @@ pub async fn payslip_attach(app: AppHandle, id: String) -> AppResult<Option<Stri
 
 /// The month a PDF waiting in the Add sheet is for, as `[year, month]`, when its top names one.
 #[tauri::command]
-pub fn payslip_guess(state: State<'_, AppState>, token: String) -> Option<(i32, u32)> {
-    let pending = state.adds.get(&token)?;
-    super::guess::month(&crate::documents::add::text_of(&pending.bytes))
+pub async fn payslip_guess(
+    state: State<'_, AppState>,
+    token: String,
+) -> AppResult<Option<(i32, u32)>> {
+    Ok(state
+        .adds
+        .get(&token)
+        .and_then(|pending| super::guess::month(&crate::documents::add::text_of(&pending.bytes))))
 }
 
 /// Adds a PDF waiting in the Add sheet as the month's payslip.
 #[tauri::command]
-pub fn payslip_add_waiting(
+pub async fn payslip_add_waiting(
     app: AppHandle,
     state: State<'_, AppState>,
     token: String,
@@ -174,7 +179,7 @@ pub fn payslip_add_waiting(
 
 /// The label of the change, or None when nothing changed.
 #[tauri::command]
-pub fn payslip_edit(
+pub async fn payslip_edit(
     app: AppHandle,
     state: State<'_, AppState>,
     id: String,
@@ -184,7 +189,11 @@ pub fn payslip_edit(
 }
 
 #[tauri::command]
-pub fn payslip_delete(app: AppHandle, state: State<'_, AppState>, id: String) -> AppResult<String> {
+pub async fn payslip_delete(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    id: String,
+) -> AppResult<String> {
     let written = edit::delete(&state.db, &id)?;
     Ok(announced(&app, written))
 }

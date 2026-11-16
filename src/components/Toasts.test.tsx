@@ -1,11 +1,23 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
+
+import { api } from "../api";
 import { useStore } from "../state/store";
+import { PdfCoversProbe } from "../test/PdfCoversProbe";
 import { Toasts } from "./Toasts";
 
+const mocked = vi.mocked(api, true);
+
 beforeEach(() => {
-  useStore.setState({ toasts: [] });
+  vi.clearAllMocks();
+  useStore.setState({ toasts: [], pdfCovers: [] });
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe("Toasts", () => {
@@ -38,15 +50,20 @@ describe("Toasts", () => {
     expect(screen.getByText("Something went wrong (×2)")).toBeTruthy();
   });
 
-  it("covers the PDF preview while a toast shows and uncovers it once dismissed", async () => {
-    useStore.setState({ pdfCovers: 0 });
+  it("cuts a hole for the toast in the PDF preview without hiding it, and sends the uncovered state once dismissed", async () => {
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ left: 300, top: 400, width: 200, height: 50, right: 500, bottom: 450, x: 300, y: 400, toJSON: () => ({}) });
     useStore.getState().showToast("error", "Could not save");
-    render(<Toasts />);
-    expect(useStore.getState().pdfCovers).toBe(1);
+    render(
+      <>
+        <PdfCoversProbe />
+        <Toasts />
+      </>,
+    );
+    await waitFor(() => expect(mocked.pdfViewCover).toHaveBeenLastCalledWith({ hidden: false, holes: [{ x: 292, y: 392, width: 216, height: 66 }], clickThrough: false }));
 
     await userEvent.click(screen.getByRole("button", { name: "Dismiss" }));
 
-    expect(useStore.getState().pdfCovers).toBe(0);
+    await waitFor(() => expect(mocked.pdfViewCover).toHaveBeenLastCalledWith({ hidden: false, holes: [], clickThrough: false }));
   });
 
   it("shows a toast action by its label and runs it on click", async () => {
