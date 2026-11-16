@@ -158,8 +158,16 @@ About has Show Data Folder and Open Log Folder. Shortcuts groups rows by where t
 window", then each page's fixed keys) and asks before taking a key another command holds (Reassign).
 
 ## Keys
-App actions are Rust commands with colon ids (ADR 0046); page keys (Review's A, S, I, J) are fixed, printed on their buttons and never fire in text fields. Menus in Mac order; View holds the palette, the filter field and Show/Hide Payslips; Help holds Open Log Folder and Show Data
-Folder. One binding per command.
+App actions are Rust commands with colon ids (ADR 0046); page keys (Review's A, S, I, J) are fixed, printed on their buttons and never fire in text fields. Menus in Mac order; View holds the palette, the filter field and Show/Hide Payslips; Go holds the sidebar's pages (⌘1–⌘4) and
+its tax years, newest first (⌘5–⌘9); Help holds Open Log Folder and Show Data Folder. One binding per command.
+
+Window keys (`shell/useWindowKeys`), fixed like page keys and never in text fields or under a sheet, menu or the palette:
+- **Esc** leaves a page one level down (a document, payslip, statement, account, Review, Log, Archive): Back when there
+  is history, else its parent (`parentOf` in `state/route.ts`). In a field, Esc first leaves the field. The native PDF
+  preview passes Esc on to the page.
+- **⌥1–⌥9** pick that segment of the page's main switch: Documents' tabs, the tax year's views. Their tooltips name the key.
+- **↓/J** and **↑/K** walk the rows of the page's list; Return opens the focused row.
+- **←/H/P** and **→/L/N** step to the previous or next year: on Accounts (the year stepper) and on a tax year page.
 
 ## Palette checks
 `src/styles/colors.test.ts` keeps literals inside `src/styles/palettes/` and the two palettes' token sets

@@ -26,6 +26,7 @@ import { StatementsYear } from "../statements/StatementsYear";
 import type { Route } from "../state/route";
 import { Sidebar } from "./Sidebar";
 import { usePageScroll } from "./usePageScroll";
+import { useWindowKeys } from "./useWindowKeys";
 import { titleFor } from "./titles";
 
 /** The main window: sidebar, and the panel with the header over the current page; the first run while no
@@ -61,6 +62,7 @@ export function Window() {
   const [finishingFirstRun, setFinishingFirstRun] = useState(false);
   const page = useRef<HTMLElement>(null);
   usePageScroll(page);
+  useWindowKeys();
   const importSheet = importPreview && <ImportSheet preview={importPreview} onImported={() => setFinishingFirstRun(false)} />;
   if (accounts?.length === 0 || finishingFirstRun) {
     return (

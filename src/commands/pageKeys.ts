@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 
 /** Typing in a field never triggers a page key. */
-export function isTypingTarget(target: EventTarget | null): boolean {
+export function isTypingTarget(target: EventTarget | null): target is HTMLElement {
   if (!(target instanceof HTMLElement)) return false;
   return target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
 }

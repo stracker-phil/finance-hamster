@@ -37,6 +37,30 @@ fn every_menu_title_has_an_english_and_a_german_text() {
 }
 
 #[test]
+fn the_go_menu_groups_the_pages_the_tax_years_and_the_history() {
+    let (_, groups) = MENUS.iter().find(|(title, _)| title.en == "Go").unwrap();
+    assert_eq!(
+        *groups,
+        &[
+            &[
+                "go:today",
+                "go:subscriptions",
+                "go:statements",
+                "go:documents"
+            ][..],
+            &[
+                "go:year:newest",
+                "go:year:second",
+                "go:year:third",
+                "go:year:fourth",
+                "go:year:fifth"
+            ][..],
+            &["go:back", "go:forward"][..],
+        ][..]
+    );
+}
+
+#[test]
 fn the_help_menu_offers_the_log_and_data_folders() {
     assert_eq!(HELP, &[&["app:logs", "app:data"][..]]);
 }

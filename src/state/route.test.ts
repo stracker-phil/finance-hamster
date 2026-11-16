@@ -1,5 +1,26 @@
 import { describe, expect, it } from "vitest";
-import { HOME, sameRoute, sidebarKey, type Route } from "./route";
+import { HOME, parentOf, sameRoute, sidebarKey, type Route } from "./route";
+
+describe("parentOf", () => {
+  it.each<[string, Route, Route | null]>([
+    ["a document opened from a year", { page: "document", documentId: "doc-1", year: 2026 }, { page: "year", year: 2026 }],
+    ["a document opened from Documents", { page: "document", documentId: "doc-1", year: null }, { page: "documents", tab: "invoices" }],
+    ["a payslip", { page: "payslip", payslipId: "ps-1", year: 2026 }, { page: "documents", tab: "payslips" }],
+    ["a statement", { page: "statement", statementId: "st-1" }, { page: "documents", tab: "statements" }],
+    ["an other document", { page: "other", otherId: "other-1" }, { page: "documents", tab: "other" }],
+    ["review", { page: "review" }, { page: "statements" }],
+    ["an account", { page: "account", accountId: "acc-1" }, { page: "statements" }],
+    ["a year's log", { page: "log", year: 2025 }, { page: "year", year: 2025 }],
+    ["a year's archive", { page: "archive", year: 2025 }, { page: "year", year: 2025 }],
+    ["today", { page: "today" }, null],
+    ["subscriptions", { page: "subscriptions" }, null],
+    ["statements", { page: "statements" }, null],
+    ["documents", { page: "documents", tab: "payslips" }, null],
+    ["a year", { page: "year", year: 2026 }, null],
+  ])("is %s's parent page", (_name, route, parent) => {
+    expect(parentOf(route)).toEqual(parent);
+  });
+});
 
 describe("sameRoute", () => {
   it("is true for equal routes", () => {

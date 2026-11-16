@@ -7,6 +7,8 @@ import { startImport } from "../statements/importFlow";
 import { newSubscription } from "../subscriptions/flow";
 import { togglePayslipPanel } from "../payslips/flow";
 import { t } from "../i18n";
+import { queryClient } from "../queries/queryClient";
+import { TAX_YEARS_KEY } from "../queries/taxYears";
 import { useStore } from "../state/store";
 
 type Handler = () => void;
@@ -31,6 +33,17 @@ function undoOrRedo(which: keyof typeof UNDO_WORDS) {
     .catch((e: unknown) => showToast("error", toAppError(e).message));
 }
 
+/** Opens the `nth` tax year of the sidebar, newest first; nothing when there are fewer. */
+function goToYear(nth: number) {
+  queryClient
+    .ensureQueryData({ queryKey: TAX_YEARS_KEY, queryFn: api.listTaxYears })
+    .then((years) => {
+      const year = years[nth - 1]?.year;
+      if (year !== undefined) useStore.getState().navigate({ page: "year", year });
+    })
+    .catch(() => undefined);
+}
+
 /** What the main window does for each page command (`commands::COMMANDS` in Rust). */
 const HANDLERS: Record<string, Handler> = {
   "edit:undo": () => undoOrRedo("undo"),
@@ -40,6 +53,11 @@ const HANDLERS: Record<string, Handler> = {
   "go:statements": () => useStore.getState().navigate({ page: "statements" }),
   "go:documents": () => useStore.getState().navigate({ page: "documents" }),
   "go:review": () => useStore.getState().navigate({ page: "review" }),
+  "go:year:newest": () => goToYear(1),
+  "go:year:second": () => goToYear(2),
+  "go:year:third": () => goToYear(3),
+  "go:year:fourth": () => goToYear(4),
+  "go:year:fifth": () => goToYear(5),
   "go:back": () => useStore.getState().goBack(),
   "go:forward": () => useStore.getState().goForward(),
   "palette:open": () => useStore.getState().setPaletteOpen(true),

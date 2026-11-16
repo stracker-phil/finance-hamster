@@ -55,3 +55,25 @@ export const sameRoute = (a: Route, b: Route) => {
   const fields = new Map(entries(b));
   return ea.length === fields.size && ea.every(([k, v]) => fields.get(k) === v);
 };
+
+/** The page a page one level down belongs to, where Esc goes without history; null for the sidebar's pages. */
+export function parentOf(route: Route): Route | null {
+  switch (route.page) {
+    case "document":
+      return route.year === null ? { page: "documents", tab: "invoices" } : { page: "year", year: route.year };
+    case "payslip":
+      return { page: "documents", tab: "payslips" };
+    case "statement":
+      return { page: "documents", tab: "statements" };
+    case "other":
+      return { page: "documents", tab: "other" };
+    case "review":
+    case "account":
+      return { page: "statements" };
+    case "log":
+    case "archive":
+      return { page: "year", year: route.year };
+    default:
+      return null;
+  }
+}

@@ -350,6 +350,54 @@ describe("YearPage", () => {
 
       expect(pressed("Months")).toBe("true");
     });
+
+    it("names the key of each view in its tooltip", async () => {
+      await show();
+
+      const titles = ["Categories", "Months", "FinanzOnline"].map((name) => screen.getByRole("button", { name }).title);
+      expect(titles).toEqual(["Categories (⌥1)", "Months (⌥2)", "FinanzOnline (⌥3)"]);
+    });
+  });
+
+  describe("stepping between tax years by key", () => {
+    const taxYears = [2027, 2026, 2025].map((year) => ({ year, state: "open" as const, ruleset: `${year} v1` }));
+
+    const pressUntilNavigated = (key: string) =>
+      vi.waitFor(async () => {
+        await userEvent.keyboard(key);
+        expect(useStore.getState().route.page).toBe("year");
+      });
+
+    it.each([
+      ["←", "{ArrowLeft}", 2025],
+      ["H", "h", 2025],
+      ["P", "p", 2025],
+      ["→", "{ArrowRight}", 2027],
+      ["L", "l", 2027],
+      ["N", "n", 2027],
+    ])("opens the neighbouring tax year on %s", async (_name, key, year) => {
+      mocked.listTaxYears.mockResolvedValue(taxYears);
+      await show();
+
+      await pressUntilNavigated(key);
+
+      expect(useStore.getState().route).toEqual({ page: "year", year });
+    });
+
+    it("stays on the newest tax year on →", async () => {
+      mocked.listTaxYears.mockResolvedValue(taxYears.filter((y) => y.year <= 2026));
+      await show();
+      await vi.waitFor(() => expect(mocked.listTaxYears).toHaveBeenCalled());
+      await vi.waitFor(async () => {
+        await userEvent.keyboard("{ArrowLeft}");
+        expect(useStore.getState().route).toEqual({ page: "year", year: 2025 });
+      });
+      useStore.setState({ route: HOME });
+
+      await userEvent.keyboard("{ArrowRight}");
+
+      expect(useStore.getState().route).toEqual(HOME);
+    });
   });
 
   describe("Categories", () => {

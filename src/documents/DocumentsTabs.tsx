@@ -19,5 +19,5 @@ export function DocumentsTabs({ tab: asked }: { tab?: DocumentsTab }) {
     useStore.getState().setDocumentsTab(next);
     useStore.getState().navigate({ page: "documents", tab: next });
   };
-  return <Segmented label={text.tabs} options={DOCUMENTS_TABS.map((t) => ({ value: t, label: text[t] }))} value={tab} onChange={choose} />;
+  return <Segmented label={text.tabs} options={DOCUMENTS_TABS.map((t) => ({ value: t, label: text[t] }))} value={tab} onChange={choose} keyHints />;
 }

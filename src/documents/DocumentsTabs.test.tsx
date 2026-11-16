@@ -21,6 +21,12 @@ describe("DocumentsTabs", () => {
     expect(tabButton("Other").getAttribute("aria-pressed")).toBe("false");
   });
 
+  it("names the key of each tab in its tooltip", () => {
+    render(<DocumentsTabs />);
+
+    expect(["Invoices", "Statements", "Payslips", "Other"].map((name) => tabButton(name).title)).toEqual(["Invoices (⌥1)", "Statements (⌥2)", "Payslips (⌥3)", "Other (⌥4)"]);
+  });
+
   it("presses the tab the route asks for over the remembered one", () => {
     render(<DocumentsTabs tab="other" />);
 

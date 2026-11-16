@@ -23,6 +23,13 @@ const MENUS: &[(Text, &[&[&str]])] = &[
                 "go:statements",
                 "go:documents",
             ],
+            &[
+                "go:year:newest",
+                "go:year:second",
+                "go:year:third",
+                "go:year:fourth",
+                "go:year:fifth",
+            ],
             &["go:back", "go:forward"],
         ],
     ),

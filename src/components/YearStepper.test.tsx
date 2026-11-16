@@ -72,4 +72,59 @@ describe("YearStepper", () => {
     expect(previous.disabled).toBe(true);
     expect(next.disabled).toBe(true);
   });
+
+  it("names the key of each arrow in its tooltip", () => {
+    const { previous, next } = stepper(2026, [2025, 2026, 2027]);
+
+    expect(previous.title).toBe("Previous Year (←)");
+    expect(next.title).toBe("Next Year (→)");
+  });
+
+  describe("keys", () => {
+    it.each([
+      ["←", "{ArrowLeft}"],
+      ["H", "h"],
+      ["P", "p"],
+    ])("steps to the previous year on %s", async (_name, key) => {
+      const { onChange } = stepper(2026, [2024, 2026, 2027]);
+
+      await userEvent.keyboard(key);
+
+      expect(onChange.mock.calls).toEqual([[2024]]);
+    });
+
+    it.each([
+      ["→", "{ArrowRight}"],
+      ["L", "l"],
+      ["N", "n"],
+    ])("steps to the next year on %s", async (_name, key) => {
+      const { onChange } = stepper(2026, [2024, 2026, 2027]);
+
+      await userEvent.keyboard(key);
+
+      expect(onChange.mock.calls).toEqual([[2027]]);
+    });
+
+    it.each([
+      ["oldest", 2025, [2025, 2026], "{ArrowLeft}hp"],
+      ["newest", 2026, [2025, 2026], "{ArrowRight}ln"],
+    ])("does not step past the %s year", async (_name, year, years, keys) => {
+      const { onChange } = stepper(year, years);
+
+      await userEvent.keyboard(keys);
+
+      expect(onChange).not.toHaveBeenCalled();
+    });
+
+    it("does not step while typing in a text field", async () => {
+      const { onChange } = stepper(2026, [2025, 2026, 2027]);
+      const field = document.body.appendChild(document.createElement("input"));
+
+      field.focus();
+      await userEvent.keyboard("hpln{ArrowLeft}{ArrowRight}");
+
+      expect(onChange).not.toHaveBeenCalled();
+      field.remove();
+    });
+  });
 });

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
 
 import { api } from "../api";
+import { queryClient } from "../queries/queryClient";
 import { HOME } from "../state/route";
 import { useStore } from "../state/store";
 import { addPreview } from "../test/documents";
@@ -22,6 +23,35 @@ describe("runPageCommand", () => {
     runPageCommand("go:review");
 
     expect(useStore.getState().route).toEqual({ page: "review" });
+  });
+
+  describe("go:year:*", () => {
+    const taxYears = [2027, 2026, 2025].map((year) => ({ year, state: "open" as const, ruleset: `${year} v1` }));
+
+    beforeEach(() => {
+      queryClient.clear();
+      mocked.listTaxYears.mockResolvedValue(taxYears);
+    });
+
+    it.each([
+      ["go:year:newest", 2027],
+      ["go:year:second", 2026],
+      ["go:year:third", 2025],
+    ])("opens the tax year at that place of the newest-first list for %s", async (id, year) => {
+      runPageCommand(id);
+
+      await vi.waitFor(() => expect(useStore.getState().route).toEqual({ page: "year", year }));
+    });
+
+    it("changes nothing when there are fewer tax years", async () => {
+      mocked.listTaxYears.mockResolvedValue(taxYears.slice(0, 1));
+
+      runPageCommand("go:year:second");
+
+      await vi.waitFor(() => expect(mocked.listTaxYears).toHaveBeenCalled());
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(useStore.getState().route).toEqual(HOME);
+    });
   });
 
   it("opens the Add document sheet for the invoice the owner chose for document:add", async () => {

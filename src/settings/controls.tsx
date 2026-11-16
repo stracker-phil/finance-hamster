@@ -81,11 +81,12 @@ export function Switch({ label, description, anchor, checked, onChange }: { labe
 }
 
 /** Mutually exclusive buttons; the pressed one is raised. */
-export function Segmented<T extends string>({ label, options, value, onChange }: { label: string; options: { value: T; label: string }[]; value: T | undefined; onChange: (v: T) => void }) {
+/** `keyHints` shows ⌥1, ⌥2, … in the tooltips: the page's main control, which those keys pick (`useWindowKeys`). */
+export function Segmented<T extends string>({ label, options, value, onChange, keyHints = false }: { label: string; options: { value: T; label: string }[]; value: T | undefined; onChange: (v: T) => void; keyHints?: boolean }) {
   return (
     <div className="seg" role="group" aria-label={label}>
-      {options.map((o) => (
-        <button key={o.value} type="button" className="seg-btn" aria-pressed={value === o.value} onClick={() => onChange(o.value)}>
+      {options.map((o, i) => (
+        <button key={o.value} type="button" className="seg-btn" aria-pressed={value === o.value} title={keyHints ? `${o.label} (⌥${i + 1})` : undefined} onClick={() => onChange(o.value)}>
           {o.label}
         </button>
       ))}

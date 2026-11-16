@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use objc2::rc::Retained;
 use objc2::runtime::{NSObject, NSObjectProtocol, ProtocolObject};
 use objc2::{AnyThread, DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send};
-use objc2_app_kit::{NSResponder, NSView, NSWindowOrderingMode};
+use objc2_app_kit::{NSEvent, NSResponder, NSView, NSWindowOrderingMode};
 use objc2_core_graphics::CGMutablePath;
 use objc2_foundation::{NSPoint, NSRect, NSSize, NSURL};
 use objc2_pdf_kit::{PDFDisplayMode, PDFDocument, PDFView, PDFViewDelegate};
@@ -118,8 +118,35 @@ define_class!(
                 unsafe { msg_send![super(self), hitTest: point] }
             }
         }
+
+        /// Esc belongs to the page (`useWindowKeys` leaves the document), so it goes to the webview below with the focus.
+        #[unsafe(method(keyDown:))]
+        fn key_down(&self, event: &NSEvent) {
+            if event.keyCode() == ESCAPE_KEY_CODE
+                && let Some(webview) = view_below(self)
+            {
+                if let Some(window) = self.window() {
+                    window.makeFirstResponder(Some(&webview));
+                }
+                // SAFETY: the webview's keyDown: (an NSResponder) with the event AppKit handed this view.
+                unsafe { msg_send![&*webview, keyDown: event] }
+            } else {
+                // SAFETY: PDFView's own keyDown: with the same event.
+                unsafe { msg_send![super(self), keyDown: event] }
+            }
+        }
     }
 );
+
+/// Carbon's `kVK_Escape`.
+const ESCAPE_KEY_CODE: u16 = 53;
+
+/// The sibling the view is placed right above: the webview.
+fn view_below(view: &NSView) -> Option<Retained<NSView>> {
+    let siblings = superview(view)?.subviews();
+    let at = siblings.iter().position(|v| std::ptr::eq(&*v, view))?;
+    at.checked_sub(1).map(|below| siblings.objectAtIndex(below))
+}
 
 impl PreviewView {
     fn new(mtm: MainThreadMarker) -> Retained<Self> {

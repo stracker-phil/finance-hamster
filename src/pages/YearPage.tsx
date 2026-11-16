@@ -4,7 +4,9 @@ import { api, type AttentionKind, type AttentionView, type KennzahlView, type Mo
 import { attachInvoiceTo, startAddDocument } from "../documents/addFlow";
 import { copyText } from "../lib/clipboard";
 import { showError } from "../lib/undoToast";
+import { useYearKeys } from "../components/YearStepper";
 import { useSettings } from "../queries/settings";
+import { useTaxYears } from "../queries/taxYears";
 import { useYearPage } from "../queries/year";
 import { useStore } from "../state/store";
 import { AddButton, AddEntry } from "../year/AddEntry";
@@ -281,6 +283,13 @@ export function YearPage({ year, attention }: { year: number; attention?: Attent
   const { data, isError } = useYearPage(year, filter);
   const panelOpen = useSettings().data?.payslipPanel ?? false;
   const text = useT().pages.year;
+  const navigate = useStore((s) => s.navigate);
+  const { data: taxYears = [] } = useTaxYears();
+  useYearKeys(
+    year,
+    taxYears.map((y) => y.year),
+    (to) => navigate({ page: "year", year: to }),
+  );
   if (isError) return <EmptyPage title={text.missingTitle(year)} text={text.missingText} />;
   if (!data) return null;
   const open = data.state === "open";
@@ -323,8 +332,8 @@ export function YearPage({ year, attention }: { year: number; attention?: Attent
         <AttentionList key={attention ?? "all"} year={data.year} items={data.attention} focus={attention} />
 
         <div className="year-switch" role="group" aria-label={text.show}>
-          {views.map((v) => (
-            <button key={v.value} className="seg-btn" aria-pressed={view === v.value} onClick={() => setChosen(v.value)}>
+          {views.map((v, i) => (
+            <button key={v.value} className="seg-btn" aria-pressed={view === v.value} title={`${v.label} (⌥${i + 1})`} onClick={() => setChosen(v.value)}>
               {v.label}
             </button>
           ))}

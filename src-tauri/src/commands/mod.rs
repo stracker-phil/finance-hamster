@@ -72,6 +72,31 @@ pub const COMMANDS: &[CommandDef] = &[
         Text::new("Review Lines", "Buchungen prüfen"),
         None,
     ),
+    page(
+        "go:year:newest",
+        Text::new("Newest Tax Year", "Neuestes Steuerjahr"),
+        Some("CmdOrCtrl+5"),
+    ),
+    page(
+        "go:year:second",
+        Text::new("Second Newest Tax Year", "Zweitneuestes Steuerjahr"),
+        Some("CmdOrCtrl+6"),
+    ),
+    page(
+        "go:year:third",
+        Text::new("Third Newest Tax Year", "Drittneuestes Steuerjahr"),
+        Some("CmdOrCtrl+7"),
+    ),
+    page(
+        "go:year:fourth",
+        Text::new("Fourth Newest Tax Year", "Viertneuestes Steuerjahr"),
+        Some("CmdOrCtrl+8"),
+    ),
+    page(
+        "go:year:fifth",
+        Text::new("Fifth Newest Tax Year", "Fünftneuestes Steuerjahr"),
+        Some("CmdOrCtrl+9"),
+    ),
     page("go:back", Text::new("Back", "Zurück"), Some("CmdOrCtrl+[")),
     page(
         "go:forward",
@@ -340,6 +365,51 @@ mod tests {
 
                 assert_eq!(command.title, expected, "{id} {language:?}");
                 assert_eq!(command.shortcut.as_deref(), shortcut, "{id}");
+            }
+            assert!(matches!(find(id).unwrap().runs, Runs::Page), "{id}");
+        }
+    }
+
+    #[test]
+    fn the_tax_year_pages_are_titled_in_both_languages_with_shortcuts_5_to_9() {
+        for (id, english, german, shortcut) in [
+            (
+                "go:year:newest",
+                "Newest Tax Year",
+                "Neuestes Steuerjahr",
+                "⌘5",
+            ),
+            (
+                "go:year:second",
+                "Second Newest Tax Year",
+                "Zweitneuestes Steuerjahr",
+                "⌘6",
+            ),
+            (
+                "go:year:third",
+                "Third Newest Tax Year",
+                "Drittneuestes Steuerjahr",
+                "⌘7",
+            ),
+            (
+                "go:year:fourth",
+                "Fourth Newest Tax Year",
+                "Viertneuestes Steuerjahr",
+                "⌘8",
+            ),
+            (
+                "go:year:fifth",
+                "Fifth Newest Tax Year",
+                "Fünftneuestes Steuerjahr",
+                "⌘9",
+            ),
+        ] {
+            for (language, expected) in [(Language::En, english), (Language::De, german)] {
+                let listed = with_lang(language, list);
+                let command = listed.iter().find(|c| c.id == id).unwrap();
+
+                assert_eq!(command.title, expected, "{id} {language:?}");
+                assert_eq!(command.shortcut.as_deref(), Some(shortcut), "{id}");
             }
             assert!(matches!(find(id).unwrap().runs, Runs::Page), "{id}");
         }
