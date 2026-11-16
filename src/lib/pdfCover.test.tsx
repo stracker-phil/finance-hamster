@@ -16,9 +16,10 @@ beforeEach(() => {
 
 const covers = () => useStore.getState().pdfCovers;
 
-function boxed(left: number, top: number, width: number, height: number, display?: string) {
+function boxed(left: number, top: number, width: number, height: number, display?: string, radius?: string) {
   const element = document.createElement("div");
   if (display) element.style.display = display;
+  if (radius) element.style.borderTopLeftRadius = radius;
   document.body.appendChild(element);
   vi.spyOn(element, "getBoundingClientRect").mockReturnValue({ left, top, width, height, right: left + width, bottom: top + height, x: left, y: top, toJSON: () => ({}) });
   return element;
@@ -82,16 +83,22 @@ describe("coversOf", () => {
     expect(coversOf([{ kind: "sheet", element: boxed(10, 10, 100, 100) }])).toEqual({ hidden: true, holes: [], clickThrough: false });
   });
 
-  it("cuts a popover out, grown by 8px on every side, and lets clicks through", () => {
+  it("cuts a popover out, grown by 1px on every side, and lets clicks through", () => {
     const result = coversOf([{ kind: "popover", element: boxed(100, 50, 200, 80) }]);
 
-    expect(result).toEqual({ hidden: false, holes: [{ x: 92, y: 42, width: 216, height: 96 }], clickThrough: true });
+    expect(result).toEqual({ hidden: false, holes: [{ frame: { x: 99, y: 49, width: 202, height: 82 }, radius: 1 }], clickThrough: true });
   });
 
   it("cuts a float out without letting clicks through", () => {
     const result = coversOf([{ kind: "float", element: boxed(0, 0, 40, 20) }]);
 
-    expect(result).toEqual({ hidden: false, holes: [{ x: -8, y: -8, width: 56, height: 36 }], clickThrough: false });
+    expect(result).toEqual({ hidden: false, holes: [{ frame: { x: -1, y: -1, width: 42, height: 22 }, radius: 1 }], clickThrough: false });
+  });
+
+  it("rounds a hole one pixel wider than the corner radius of its element", () => {
+    const result = coversOf([{ kind: "popover", element: boxed(10, 10, 100, 40, undefined, "8px") }]);
+
+    expect(result.holes).toEqual([{ frame: { x: 9, y: 9, width: 102, height: 42 }, radius: 9 }]);
   });
 
   it("combines a sheet, a popover and a float", () => {
@@ -124,8 +131,8 @@ describe("coversOf", () => {
     const result = coversOf([{ kind: "float", element: wrapper }]);
 
     expect(result.holes).toEqual([
-      { x: 12, y: 12, width: 46, height: 46 },
-      { x: 92, y: 92, width: 56, height: 56 },
+      { frame: { x: 19, y: 19, width: 32, height: 32 }, radius: 1 },
+      { frame: { x: 99, y: 99, width: 42, height: 42 }, radius: 1 },
     ]);
   });
 });

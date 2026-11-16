@@ -2,7 +2,7 @@ use chrono::{Datelike, NaiveDate};
 
 use super::import;
 use super::import_tests::{october, open_with_accounts};
-use super::view::{AccountCoverage, AccountState, Cover, Coverage, coverage};
+use super::view::{AccountCoverage, AccountState, Cover, Coverage, coverage, year_coverage};
 use crate::date::DateOrder;
 use crate::db::{Db, Source};
 use crate::rules::store::Action;
@@ -88,7 +88,7 @@ fn covers(account: &AccountCoverage) -> Vec<Cover> {
 }
 
 #[test]
-fn the_month_heads_run_twelve_months_up_to_this_one_with_january_marked() {
+fn the_month_heads_run_january_to_december_with_only_january_marked() {
     let (_dir, db) = seeded();
 
     let heads = overview(&db).months;
@@ -97,7 +97,7 @@ fn the_month_heads_run_twelve_months_up_to_this_one_with_january_marked() {
     assert_eq!(
         labels,
         [
-            "Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov"
+            "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
         ]
     );
     let januaries: Vec<usize> = heads
@@ -106,7 +106,7 @@ fn the_month_heads_run_twelve_months_up_to_this_one_with_january_marked() {
         .filter(|(_, m)| m.january)
         .map(|(i, _)| i)
         .collect();
-    assert_eq!(januaries, vec![1]);
+    assert_eq!(januaries, vec![0]);
 }
 
 #[test]
@@ -126,25 +126,24 @@ fn every_account_has_a_cover_for_every_month_shown() {
 fn months_are_before_full_part_or_missing_by_the_days_the_statements_cover() {
     let (_dir, db) = seeded();
     let overview = overview(&db);
-    use Cover::{Before, Full, Missing, Part};
+    use Cover::{Before, Full, Later, Missing, Part};
 
     assert_eq!(
         covers(account(&overview, "Private")),
         [
-            Before, Full, Full, Full, Full, Full, Full, Full, Full, Full, Full, Part
+            Full, Full, Full, Full, Full, Full, Full, Full, Full, Full, Part, Later
         ]
     );
     assert_eq!(
         covers(account(&overview, "Household")),
         [
-            Before, Part, Missing, Part, Full, Full, Full, Full, Full, Full, Full, Part
+            Part, Missing, Part, Full, Full, Full, Full, Full, Full, Full, Part, Later
         ]
     );
     assert_eq!(
         covers(account(&overview, "Business")),
         [
-            Before, Before, Before, Before, Before, Before, Before, Before, Before, Part, Full,
-            Part
+            Before, Before, Before, Before, Before, Before, Before, Before, Part, Full, Part, Later
         ]
     );
 }
@@ -157,13 +156,13 @@ fn months_before_the_first_statement_say_so_in_their_tip() {
     let overview = overview(&db);
     let private = account(&overview, "Private");
 
-    assert_eq!(private.months[9].cover, Cover::Before);
+    assert_eq!(private.months[8].cover, Cover::Before);
     assert_eq!(
-        private.months[9].tip,
+        private.months[8].tip,
         "September 2026 · before the first statement"
     );
     assert_eq!(private.months[0].cover, Cover::Before);
-    assert_eq!(private.months[10].cover, Cover::Part);
+    assert_eq!(private.months[9].cover, Cover::Part);
 }
 
 #[test]
@@ -173,6 +172,7 @@ fn cover_kinds_travel_as_snake_case_words() {
         (Cover::Part, "part"),
         (Cover::Missing, "missing"),
         (Cover::Before, "before"),
+        (Cover::Later, "later"),
     ] {
         assert_eq!(serde_json::to_value(cover).unwrap(), word, "{word}");
     }
@@ -190,15 +190,15 @@ fn month_tips_name_the_statements_that_cover_them() {
     };
 
     assert_eq!(
-        tips(private, &[0, 1, 10, 11]),
+        tips(private, &[0, 9, 10, 11]),
         [
-            "December 2025 · before the first statement",
             "January 2026 · Nr. 001/2026, Nr. 002/2026",
             "October 2026 · Nr. 010/2026, Nr. 011/2026",
             "November 2026 · partly, Nr. 011/2026",
+            "December 2026 · still ahead",
         ]
     );
-    assert_eq!(household.months[2].tip, "February 2026 · no statement");
+    assert_eq!(household.months[1].tip, "February 2026 · no statement");
 }
 
 #[test]
@@ -214,8 +214,8 @@ fn the_current_month_counts_only_up_to_today() {
     let overview = overview(&db);
     let private = account(&overview, "Private");
 
-    assert_eq!(private.months[11].cover, Cover::Full);
-    assert_eq!(private.months[11].tip, "November 2026 · Nr. 011/2026");
+    assert_eq!(private.months[10].cover, Cover::Full);
+    assert_eq!(private.months[10].tip, "November 2026 · Nr. 011/2026");
     assert_eq!(private.last, "Nr. 011 · until 13 Nov");
     assert_eq!(private.state, AccountState::Ok);
 }
@@ -228,11 +228,8 @@ fn a_statement_that_covers_some_days_of_a_past_month_makes_it_partly_covered() {
     let overview = overview(&db);
     let private = account(&overview, "Private");
 
-    assert_eq!(private.months[10].cover, Cover::Part);
-    assert_eq!(
-        private.months[10].tip,
-        "October 2026 · partly, Nr. 010/2026"
-    );
+    assert_eq!(private.months[9].cover, Cover::Part);
+    assert_eq!(private.months[9].tip, "October 2026 · partly, Nr. 010/2026");
 }
 
 #[test]
@@ -253,7 +250,7 @@ fn a_statement_directly_after_another_covers_the_days_between_their_bookings_but
         import_statement(&db, dir.path(), &october);
 
         let overview = overview(&db);
-        let september_cover = &account(&overview, "Private").months[9];
+        let september_cover = &account(&overview, "Private").months[8];
 
         assert_eq!(september_cover.cover, cover, "Nr. {october_number}");
         assert_eq!(september_cover.tip, tip, "Nr. {october_number}");
@@ -271,8 +268,8 @@ fn the_first_statement_of_a_new_year_covers_the_days_since_the_last_of_the_year_
         &demo_month(1, 2026, 1, december.new_balance()),
     );
 
-    let overview = overview(&db);
-    let december_cover = &account(&overview, "Private").months[0];
+    let overview = overview_of_year(&db, 2025);
+    let december_cover = &account(&overview, "Private").months[11];
 
     assert_eq!(december_cover.cover, Cover::Full);
     assert_eq!(
@@ -451,9 +448,11 @@ fn an_account_without_statements_is_behind_with_every_month_before_the_first_sta
         assert_eq!(account.state, AccountState::Behind, "{}", account.name);
         assert_eq!(account.state_label, "No statements", "{}", account.name);
         assert_eq!(account.note, None, "{}", account.name);
-        assert_eq!(covers(account), vec![Cover::Before; 12], "{}", account.name);
+        let mut expected = vec![Cover::Before; 11];
+        expected.push(Cover::Later);
+        assert_eq!(covers(account), expected, "{}", account.name);
         assert_eq!(
-            account.months[11].tip,
+            account.months[10].tip,
             "November 2026 · before the first statement"
         );
     }
@@ -487,7 +486,7 @@ fn balances_that_do_not_connect_are_a_note() {
 }
 
 #[test]
-fn the_month_heads_cross_the_year_boundary_for_an_early_date() {
+fn an_early_date_leaves_the_months_after_it_later_even_before_the_first_statement() {
     let (_dir, db) = open_with_accounts();
 
     let early = coverage(
@@ -500,20 +499,123 @@ fn the_month_heads_cross_the_year_boundary_for_an_early_date() {
     .unwrap();
 
     let labels: Vec<&str> = early.months.iter().map(|m| m.label.as_str()).collect();
-    assert_eq!(
-        labels,
-        [
-            "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb"
-        ]
+    assert_eq!(labels.len(), 12);
+    assert_eq!(labels[0], "Jan");
+    let mut expected = vec![Cover::Before; 2];
+    expected.extend(vec![Cover::Later; 10]);
+    for account in &early.accounts {
+        assert_eq!(covers(account), expected, "{}", account.name);
+    }
+}
+
+fn overview_of_year(db: &Db, year: i32) -> Coverage {
+    year_coverage(
+        db,
+        today(),
+        year,
+        "",
+        DateOrder::DayFirst,
+        BEHIND_AFTER_DAYS,
+    )
+    .unwrap()
+}
+
+#[test]
+fn the_overview_names_the_year_it_shows() {
+    let (_dir, db) = seeded();
+
+    assert_eq!(overview(&db).year, 2026);
+    for year in [2019, 2025, 2027] {
+        assert_eq!(overview_of_year(&db, year).year, year, "{year}");
+    }
+}
+
+#[test]
+fn the_overview_lists_this_year_and_every_year_with_data_oldest_first() {
+    let (dir, db) = open_with_accounts();
+    assert_eq!(overview(&db).years, [2026]);
+
+    let december = demo_month(12, 2025, 12, 141_230);
+    import_statement(&db, dir.path(), &december);
+    import_statement(
+        &db,
+        dir.path(),
+        &demo_month(1, 2026, 1, december.new_balance()),
     );
-    let januaries: Vec<usize> = early
-        .months
-        .iter()
-        .enumerate()
-        .filter(|(_, m)| m.january)
-        .map(|(i, _)| i)
-        .collect();
-    assert_eq!(januaries, vec![10]);
+
+    assert_eq!(overview(&db).years, [2025, 2026]);
+    assert_eq!(overview_of_year(&db, 2025).years, [2025, 2026]);
+}
+
+#[test]
+fn an_earlier_year_shows_its_months_with_the_coverage_of_its_statements() {
+    let (dir, db) = open_with_accounts();
+    let september = demo_month(9, 2025, 9, 141_230);
+    import_statement(&db, dir.path(), &september);
+    import_statement(
+        &db,
+        dir.path(),
+        &demo_month(10, 2025, 10, september.new_balance()),
+    );
+
+    let overview = overview_of_year(&db, 2025);
+    let private = account(&overview, "Private");
+
+    assert_eq!(covers(private)[..8], [Cover::Before; 8]);
+    assert_eq!(private.months[8].cover, Cover::Full);
+    assert_eq!(
+        private.months[8].tip,
+        "September 2025 · Nr. 009/2025, Nr. 010/2025"
+    );
+    assert_eq!(private.months[11].cover, Cover::Missing);
+    assert_eq!(private.months[11].tip, "December 2025 · no statement");
+}
+
+#[test]
+fn months_after_today_are_later_with_a_tip_saying_so() {
+    let (_dir, db) = seeded();
+
+    let next_year = overview_of_year(&db, 2027);
+
+    for account in &next_year.accounts {
+        assert_eq!(covers(account), vec![Cover::Later; 12], "{}", account.name);
+        assert_eq!(account.months[0].tip, "January 2027 · still ahead");
+        assert_eq!(account.months[11].tip, "December 2027 · still ahead");
+    }
+}
+
+#[test]
+fn a_year_before_any_statement_is_all_before_the_first_statement() {
+    let (_dir, db) = seeded();
+
+    let long_ago = overview_of_year(&db, 2024);
+
+    for account in &long_ago.accounts {
+        assert_eq!(covers(account), vec![Cover::Before; 12], "{}", account.name);
+        assert_eq!(
+            account.months[0].tip,
+            "January 2024 · before the first statement"
+        );
+    }
+}
+
+#[test]
+fn the_account_state_is_the_same_whichever_year_shows() {
+    let (_dir, db) = seeded();
+    let now = overview(&db);
+
+    for year in [2024, 2025, 2027] {
+        let other = overview_of_year(&db, year);
+
+        for (a, b) in now.accounts.iter().zip(&other.accounts) {
+            assert_eq!(a.name, b.name, "{year}");
+            assert_eq!(a.last, b.last, "{} {year}", a.name);
+            assert_eq!(a.state, b.state, "{} {year}", a.name);
+            assert_eq!(a.state_label, b.state_label, "{} {year}", a.name);
+            assert_eq!(a.to_review, b.to_review, "{} {year}", a.name);
+            assert_eq!(a.note, b.note, "{} {year}", a.name);
+        }
+    }
 }
 
 #[test]

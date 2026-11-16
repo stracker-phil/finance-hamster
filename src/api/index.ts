@@ -69,7 +69,7 @@ export const api = {
   statementImportCommit: (token: string) => invoke<string>("statement_import_commit", { token }),
   statementImportCancel: (token: string) => invoke<void>("statement_import_cancel", { token }),
   /** `query` keeps the accounts whose name contains it. */
-  statementsCoverage: (query: string) => invoke<Coverage>("statements_coverage", { query }),
+  statementsCoverage: (query: string, year?: number) => invoke<Coverage>("statements_coverage", { query, year: year ?? null }),
   /** `query` keeps the lines that contain it. */
   accountLines: (accountId: string, query: string) => invoke<AccountLines>("account_lines", { accountId, query }),
   /** `query` filters the rows. */

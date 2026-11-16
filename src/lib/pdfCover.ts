@@ -1,9 +1,9 @@
 import { useEffect, useRef, type RefObject } from "react";
-import { api, toAppError, type Covers, type Frame } from "../api";
+import { api, toAppError, type Covers, type Hole } from "../api";
 import { useStore, type PdfCover } from "../state/store";
 
-/** Room around an overlay's box for its shadow. */
-const SHADOW = 8;
+/** Room around an overlay's box for its hairline outline; its drop shadow can't fall on the native view. */
+const OUTLINE = 1;
 
 const NOTHING: Covers = { hidden: false, holes: [], clickThrough: false };
 
@@ -18,19 +18,15 @@ export function useCoversPdf(kind: PdfCover["kind"], ref?: RefObject<HTMLElement
   }, [kind, ref, active]);
 }
 
-/** The boxes an element draws; one with `display: contents` draws only its children. */
-function boxesOf(element: Element): DOMRect[] {
-  if (getComputedStyle(element).display === "contents") return [...element.children].flatMap(boxesOf);
+/** The rounded boxes an element draws; one with `display: contents` draws only its children. */
+function holesOf(element: Element): Hole[] {
+  const style = getComputedStyle(element);
+  if (style.display === "contents") return [...element.children].flatMap(holesOf);
   const box = element.getBoundingClientRect();
-  return box.width > 0 && box.height > 0 ? [box] : [];
+  if (box.width <= 0 || box.height <= 0) return [];
+  const frame = { x: box.left - OUTLINE, y: box.top - OUTLINE, width: box.width + 2 * OUTLINE, height: box.height + 2 * OUTLINE };
+  return [{ frame, radius: (parseFloat(style.borderTopLeftRadius) || 0) + OUTLINE }];
 }
-
-const hole = (box: DOMRect): Frame => ({
-  x: box.left - SHADOW,
-  y: box.top - SHADOW,
-  width: box.width + 2 * SHADOW,
-  height: box.height + 2 * SHADOW,
-});
 
 /** The elements cut out of the preview. */
 const cutOut = (covers: PdfCover[]) => covers.flatMap((c) => (c.kind !== "sheet" && c.element ? [c.element] : []));
@@ -39,7 +35,7 @@ const cutOut = (covers: PdfCover[]) => covers.flatMap((c) => (c.kind !== "sheet"
 export function coversOf(covers: PdfCover[]): Covers {
   return {
     hidden: covers.some((c) => c.kind === "sheet"),
-    holes: cutOut(covers).flatMap(boxesOf).map(hole),
+    holes: cutOut(covers).flatMap(holesOf),
     clickThrough: covers.some((c) => c.kind === "popover"),
   };
 }

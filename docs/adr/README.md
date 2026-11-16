@@ -68,3 +68,4 @@ Why Hamster is built the way it is. One record per decision, in Nygard format, a
 | [0056](0056-dokumente-holds-every-pdf.md) | Dokumente holds every PDF; one detail layout; a real tax-year sidebar | Accepted (2026-11-15) |
 | [0057](0057-overlays-cut-holes-in-the-pdf-preview.md) | Overlays cut holes in the PDF preview instead of hiding it | Accepted (2026-11-16) |
 | [0058](0058-commands-run-off-the-main-thread.md) | Data commands run off the main thread | Accepted (2026-11-16) |
+| [0059](0059-accounts-show-one-calendar-year.md) | Accounts show one calendar year, stepped in the toolbar | Accepted (2026-11-16) |

@@ -5,7 +5,8 @@ export type Route =
   | { page: "today" }
   /** `subscriptionId` opens its panel. */
   | { page: "subscriptions"; subscriptionId?: string }
-  | { page: "statements" }
+  /** `year` shows that calendar year's months; without it, the year chosen last. */
+  | { page: "statements"; year?: number }
   /** `tab` opens one kind of document; without it, the tab opened last. */
   | { page: "documents"; tab?: DocumentsTab }
   | { page: "statement"; statementId: string }

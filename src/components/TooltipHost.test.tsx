@@ -47,7 +47,7 @@ describe("TooltipHost", () => {
 
     await userEvent.hover(screen.getByRole("button"));
     await screen.findByRole("tooltip");
-    await waitFor(() => expect(mocked.pdfViewCover).toHaveBeenLastCalledWith({ hidden: false, holes: [{ x: 12, y: 22, width: 106, height: 40 }], clickThrough: false }));
+    await waitFor(() => expect(mocked.pdfViewCover).toHaveBeenLastCalledWith({ hidden: false, holes: [{ frame: { x: 19, y: 29, width: 92, height: 26 }, radius: 1 }], clickThrough: false }));
 
     await userEvent.keyboard("a");
 

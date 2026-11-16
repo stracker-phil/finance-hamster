@@ -26,6 +26,10 @@
 .link-btn { border: 0; background: transparent; padding: 0; color: var(--accent-text); font-size: 13px; font-weight: 600; }
 .link-btn:disabled { color: var(--text-muted); }
 
+/* Looks like `.seg` beside it in the toolbar; the year keeps one width, so the arrows never move. */
+.year-stepper { display: flex; align-items: center; gap: 2px; padding: 2px; border-radius: 8px; border: 1px solid var(--border); background: var(--fill-subtle); }
+.year-stepper .icon-btn { width: 24px; height: 24px; border-radius: 6px; }
+.year-stepper__year { min-width: 4ch; text-align: center; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text); }
 .seg { display: flex; gap: 2px; padding: 2px; border-radius: 8px; border: 1px solid var(--border); background: var(--fill-subtle); }
 .seg-btn {
   height: 24px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent;

@@ -8,6 +8,7 @@ pub mod lines;
 pub mod parse;
 pub mod store;
 pub mod view;
+pub mod years;
 
 #[cfg(test)]
 mod check_tests;
@@ -19,6 +20,8 @@ pub(crate) mod import_tests;
 mod lines_tests;
 #[cfg(test)]
 mod view_tests;
+#[cfg(test)]
+mod years_tests;
 
 use std::fmt::Write as _;
 

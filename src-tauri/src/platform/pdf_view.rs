@@ -31,6 +31,14 @@ pub struct Frame {
     pub height: f64,
 }
 
+/// An overlay's box with its corner radius, in the same coordinates as `Frame`.
+#[derive(Deserialize, Clone, Copy, Debug, Default, PartialEq, TS)]
+#[ts(export, export_to = "src/api/types.gen.ts")]
+pub struct Hole {
+    pub frame: Frame,
+    pub radius: f64,
+}
+
 /// What the page draws above the preview right now.
 #[derive(Deserialize, Clone, Debug, Default, PartialEq, TS)]
 #[serde(rename_all = "camelCase")]
@@ -38,8 +46,8 @@ pub struct Frame {
 pub struct Covers {
     /// A sheet is open: the view hides.
     pub hidden: bool,
-    /// Overlays the view leaves out and lets clicks through, in the same coordinates as `Frame`.
-    pub holes: Vec<Frame>,
+    /// Overlays the view leaves out and lets clicks through.
+    pub holes: Vec<Hole>,
     /// Every click on the view goes to the page, so a click beside an open menu closes it.
     pub click_through: bool,
 }
@@ -209,22 +217,22 @@ impl Preview {
 
     /// Cuts the overlays out of the view and lets their clicks through.
     fn apply_covers(&self, view: &PreviewView, webview: &NSView) {
-        let holes: Vec<NSRect> = self
+        let holes: Vec<(NSRect, f64)> = self
             .covers
             .holes
             .iter()
-            .map(|&hole| native_frame(webview, hole))
+            .map(|hole| (native_frame(webview, hole.frame), hole.radius))
             .collect();
         cut_out(view, &holes);
         *view.ivars().borrow_mut() = PassThrough {
-            holes,
+            holes: holes.into_iter().map(|(rect, _)| rect).collect(),
             click_through: self.covers.click_through,
         };
     }
 }
 
-/// Masks the view so it draws nothing inside `holes` (superview coordinates); no holes, no mask.
-fn cut_out(view: &NSView, holes: &[NSRect]) {
+/// Masks the view so it draws nothing inside `holes`: rounded boxes in superview coordinates; no holes, no mask.
+fn cut_out(view: &NSView, holes: &[(NSRect, f64)]) {
     let Some(layer) = view.layer() else {
         return;
     };
@@ -237,12 +245,15 @@ fn cut_out(view: &NSView, holes: &[NSRect]) {
         return;
     }
     let path = CGMutablePath::new();
-    // SAFETY: rectangles added to a fresh path without a transform.
+    // SAFETY: shapes added to a fresh path without a transform; each radius fits its box.
     unsafe {
         CGMutablePath::add_rect(Some(&path), std::ptr::null(), view.bounds());
-        for &hole in holes {
+        for &(hole, radius) in holes {
             let local = view.convertRect_fromView(hole, Some(&parent));
-            CGMutablePath::add_rect(Some(&path), std::ptr::null(), local);
+            let radius = radius
+                .min(local.size.width / 2.0)
+                .min(local.size.height / 2.0);
+            CGMutablePath::add_rounded_rect(Some(&path), std::ptr::null(), local, radius, radius);
         }
     }
     let mask = CAShapeLayer::new();

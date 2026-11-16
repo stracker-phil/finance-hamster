@@ -36,9 +36,11 @@ export function accountCoverage(patch: Partial<AccountCoverage> = {}): AccountCo
   };
 }
 
-/** A demo coverage over three months, with `patch` applied. */
+/** A demo coverage of 2026 over three months, with `patch` applied. */
 export function coverage(patch: Partial<Coverage> = {}): Coverage {
   return {
+    year: 2026,
+    years: [2025, 2026],
     months: [
       { label: "Sep", january: false },
       { label: "Oct", january: false },

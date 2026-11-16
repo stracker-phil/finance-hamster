@@ -10,6 +10,8 @@ const ACTION_DISMISS_MS = 10_000;
 
 function ToastItem({ toast }: { toast: Toast }) {
   const dismiss = useStore((s) => s.dismissToast);
+  const ref = useRef<HTMLDivElement>(null);
+  useCoversPdf("float", ref);
   useEffect(() => {
     const ttl = toast.action ? ACTION_DISMISS_MS : AUTO_DISMISS_MS[toast.kind];
     const timer = setTimeout(() => dismiss(toast.id), ttl);
@@ -20,7 +22,7 @@ function ToastItem({ toast }: { toast: Toast }) {
   const Icon = toast.kind === "error" ? AlertTriangle : toast.kind === "success" ? CheckCircle2 : Info;
   const [headline, ...rest] = toast.kind === "error" ? errorLines(toast.message) : [toast.message];
   return (
-    <div className={`toast toast--${toast.kind}`} role={toast.kind === "error" ? "alert" : "status"}>
+    <div ref={ref} className={`toast toast--${toast.kind}`} role={toast.kind === "error" ? "alert" : "status"}>
       <Icon size={16} />
       <span className="toast__text">
         {toast.kind === "error" && <strong className="toast__title">{text.somethingWrong}{toast.count > 1 ? ` (×${toast.count})` : ""}</strong>}
@@ -65,10 +67,8 @@ function errorLines(message: string): string[] {
 
 export function Toasts() {
   const toasts = useStore((s) => s.toasts);
-  const ref = useRef<HTMLDivElement>(null);
-  useCoversPdf("float", ref, toasts.length > 0);
   return (
-    <div ref={ref} className="toasts">
+    <div className="toasts">
       {toasts.map((t) => (
         <ToastItem key={t.id} toast={t} />
       ))}

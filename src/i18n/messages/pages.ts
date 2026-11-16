@@ -113,6 +113,9 @@ export const pages = both(
       partly: "Partly",
       missing: "Missing",
       before: "Before the first statement",
+      year: "Year",
+      previousYear: "Previous Year",
+      nextYear: "Next Year",
       legendNote: "Checked by printed balances · statements must follow each other",
     },
     today: {
@@ -292,6 +295,9 @@ export const pages = both(
       partly: "Teilweise",
       missing: "Fehlt",
       before: "Vor dem ersten Kontoauszug",
+      year: "Jahr",
+      previousYear: "Vorheriges Jahr",
+      nextYear: "Nächstes Jahr",
       legendNote: "Geprüft anhand der gedruckten Salden · Kontoauszüge müssen aneinander anschließen",
     },
     today: {

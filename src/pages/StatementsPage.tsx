@@ -3,6 +3,7 @@ import { api, type AccountCoverage } from "../api";
 import { showError } from "../lib/undoToast";
 import { useCoverage } from "../queries/statements";
 import { startImport } from "../statements/importFlow";
+import { useStatementsYear } from "../statements/StatementsYear";
 import { useStore } from "../state/store";
 import { accountTone } from "../lib/accountTone";
 import { EmptyPage } from "./EmptyPage";
@@ -45,10 +46,10 @@ function AccountRow({ account, index }: { account: AccountCoverage; index: numbe
   );
 }
 
-/** Coverage per account over the last twelve months. */
-export function StatementsPage() {
+/** Coverage per account, January to December of the year in the toolbar. */
+export function StatementsPage({ year }: { year?: number }) {
   const filter = useStore((s) => s.filter);
-  const { data } = useCoverage(filter);
+  const { data } = useCoverage(filter, useStatementsYear(year));
   const navigate = useStore((s) => s.navigate);
   const text = useT().pages.statements;
   if (data && data.accounts.length === 0)

@@ -74,6 +74,9 @@ export interface AppStore {
   /** The tab Dokumente opened last in this session. */
   documentsTab: DocumentsTab;
   setDocumentsTab: (tab: DocumentsTab) => void;
+  /** The year Accounts showed last in this session; null for this year. */
+  statementsYear: number | null;
+  setStatementsYear: (year: number) => void;
   /** The open New, Edit or Change Plan sheet of a subscription. */
   subscriptionSheet: SubscriptionSheet | null;
   setSubscriptionSheet: (sheet: SubscriptionSheet | null) => void;
@@ -152,6 +155,8 @@ export const useStore = create<AppStore>((set, get) => ({
   setAddPreview: (addPreview, onAdded, kind = "invoice") => set({ addPreview, addOnAdded: addPreview ? (onAdded ?? null) : null, addKind: kind }),
   documentsTab: "invoices",
   setDocumentsTab: (documentsTab) => set({ documentsTab }),
+  statementsYear: null,
+  setStatementsYear: (statementsYear) => set({ statementsYear }),
   subscriptionSheet: null,
   setSubscriptionSheet: (subscriptionSheet) => set({ subscriptionSheet }),
   setImportPreview: (importPreview) => set({ importPreview }),

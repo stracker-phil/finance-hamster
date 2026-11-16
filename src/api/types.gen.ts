@@ -169,9 +169,17 @@ shortcut: string | null,
  */
 custom: boolean, };
 
-export type Cover = "full" | "part" | "missing" | "before";
+export type Cover = "full" | "part" | "missing" | "before" | "later";
 
-export type Coverage = { months: Array<MonthHead>, accounts: Array<AccountCoverage>, };
+export type Coverage = { 
+/**
+ * The calendar year the months belong to.
+ */
+year: number, 
+/**
+ * Every year the page can show, oldest first (`years::shown`).
+ */
+years: Array<number>, months: Array<MonthHead>, accounts: Array<AccountCoverage>, };
 
 /**
  * What the page draws above the preview right now.
@@ -182,9 +190,9 @@ export type Covers = {
  */
 hidden: boolean, 
 /**
- * Overlays the view leaves out and lets clicks through, in the same coordinates as `Frame`.
+ * Overlays the view leaves out and lets clicks through.
  */
-holes: Array<Frame>, 
+holes: Array<Hole>, 
 /**
  * Every click on the view goes to the page, so a click beside an open menu closes it.
  */
@@ -392,6 +400,11 @@ when: string,
 document: string, documentId: string, };
 
 export type HistoryKind = "added" | "changed" | "linked" | "unlinked" | "finished" | "unlocked" | "excluded" | "restored" | "deleted";
+
+/**
+ * An overlay's box with its corner radius, in the same coordinates as `Frame`.
+ */
+export type Hole = { frame: Frame, radius: number, };
 
 /**
  * What the Import sheet shows.

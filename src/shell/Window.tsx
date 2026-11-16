@@ -22,11 +22,20 @@ import { FilesBanner } from "./FilesBanner";
 import { Header } from "./Header";
 import { YearSidebarToggle } from "../year/YearSidebarToggle";
 import { DocumentsTabs } from "../documents/DocumentsTabs";
+import { StatementsYear } from "../statements/StatementsYear";
+import type { Route } from "../state/route";
 import { Sidebar } from "./Sidebar";
 import { titleFor } from "./titles";
 
 /** The main window: sidebar, and the panel with the header over the current page; the first run while no
  *  account exists. */
+/** The page's own controls beside the title. */
+function headerControls(route: Route) {
+  if (route.page === "documents") return <DocumentsTabs tab={route.tab} />;
+  if (route.page === "statements") return <StatementsYear year={route.year} />;
+  return undefined;
+}
+
 export function Window() {
   const route = useStore((s) => s.route);
   const { data: accounts } = useAccounts();
@@ -67,7 +76,7 @@ export function Window() {
       <Sidebar years={years.map((y) => ({ year: y.year, closed: y.state === "closed" }))} />
       <main className="main">
         <div className="panel">
-          <Header route={route} title={title} controls={route.page === "documents" ? <DocumentsTabs tab={route.tab} /> : undefined} trailing={route.page === "year" ? <YearSidebarToggle /> : undefined} />
+          <Header route={route} title={title} controls={headerControls(route)} trailing={route.page === "year" ? <YearSidebarToggle /> : undefined} />
           <FilesBanner />
           <section className="page" aria-label={title.title}>
             <PageBody route={route} />

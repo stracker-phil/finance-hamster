@@ -15,7 +15,7 @@ const mocked = vi.mocked(api, true);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useStore.setState({ route: HOME, back: [], forward: [], filter: "", toasts: [], importPreview: null });
+  useStore.setState({ route: HOME, back: [], forward: [], filter: "", toasts: [], importPreview: null, statementsYear: null });
   mocked.statementsCoverage.mockResolvedValue(coverage());
   mocked.settingsShow.mockResolvedValue(undefined);
 });
@@ -35,7 +35,44 @@ describe("StatementsPage", () => {
     render(<StatementsPage />);
 
     await screen.findByText("Private");
-    expect(mocked.statementsCoverage).toHaveBeenCalledWith("sav");
+    expect(mocked.statementsCoverage).toHaveBeenCalledWith("sav", undefined);
+  });
+
+  it("asks for the year of its route", async () => {
+    render(<StatementsPage year={2025} />);
+
+    await screen.findByText("Private");
+    expect(mocked.statementsCoverage).toHaveBeenCalledWith("", 2025);
+  });
+
+  it("asks for the year chosen last when its route names none", async () => {
+    useStore.setState({ statementsYear: 2025 });
+
+    render(<StatementsPage />);
+
+    await screen.findByText("Private");
+    expect(mocked.statementsCoverage).toHaveBeenCalledWith("", 2025);
+  });
+
+  it("prefers the year of its route over the one chosen last", async () => {
+    useStore.setState({ statementsYear: 2025 });
+
+    render(<StatementsPage year={2024} />);
+
+    await screen.findByText("Private");
+    expect(mocked.statementsCoverage).toHaveBeenCalledWith("", 2024);
+    expect(mocked.statementsCoverage).not.toHaveBeenCalledWith("", 2025);
+  });
+
+  it("marks the months after today as later", async () => {
+    mocked.statementsCoverage.mockResolvedValue(
+      coverage({ accounts: [accountCoverage({ months: [{ cover: "full", tip: "Nov: complete" }, { cover: "later", tip: "Dec: not yet" }] })] }),
+    );
+
+    render(<StatementsPage />);
+
+    expect((await screen.findByTitle("Dec: not yet")).className).toContain("cov--later");
+    expect(screen.getByTitle("Nov: complete").className).not.toContain("cov--later");
   });
 
   it("shows the month heads and each month's tip", async () => {

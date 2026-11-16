@@ -59,11 +59,27 @@ describe("Toasts", () => {
         <Toasts />
       </>,
     );
-    await waitFor(() => expect(mocked.pdfViewCover).toHaveBeenLastCalledWith({ hidden: false, holes: [{ x: 292, y: 392, width: 216, height: 66 }], clickThrough: false }));
+    await waitFor(() => expect(mocked.pdfViewCover).toHaveBeenLastCalledWith({ hidden: false, holes: [{ frame: { x: 299, y: 399, width: 202, height: 52 }, radius: 1 }], clickThrough: false }));
 
     await userEvent.click(screen.getByRole("button", { name: "Dismiss" }));
 
     await waitFor(() => expect(mocked.pdfViewCover).toHaveBeenLastCalledWith({ hidden: false, holes: [], clickThrough: false }));
+  });
+
+  it("cuts one hole per toast rather than one for the whole stack", async () => {
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ left: 300, top: 400, width: 200, height: 50, right: 500, bottom: 450, x: 300, y: 400, toJSON: () => ({}) });
+    useStore.getState().showToast("error", "Could not save");
+    useStore.getState().showToast("success", "Subscription deleted");
+    render(
+      <>
+        <PdfCoversProbe />
+        <Toasts />
+      </>,
+    );
+
+    await waitFor(() => expect(mocked.pdfViewCover).toHaveBeenLastCalledWith(expect.objectContaining({ holes: expect.arrayContaining([expect.anything()]) })));
+    const sent = mocked.pdfViewCover.mock.lastCall?.[0];
+    expect(sent?.holes).toHaveLength(2);
   });
 
   it("shows a toast action by its label and runs it on click", async () => {

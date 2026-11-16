@@ -16,7 +16,7 @@ const mocked = vi.mocked(api, true);
 beforeEach(() => {
   vi.clearAllMocks();
   mocked.listAccounts.mockResolvedValue([account()]);
-  mocked.statementsCoverage.mockResolvedValue({ months: [], accounts: [] });
+  mocked.statementsCoverage.mockResolvedValue({ year: 2026, years: [2026], months: [], accounts: [] });
   mocked.getSettings.mockResolvedValue(settings({ hideOwnTransfers: true }));
   mocked.updateSettings.mockResolvedValue(settings());
 });

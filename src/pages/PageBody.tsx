@@ -21,7 +21,7 @@ export function PageBody({ route }: { route: Route }) {
     case "subscriptions":
       return <SubscriptionsPage key={route.subscriptionId ?? ""} open={route.subscriptionId} />;
     case "statements":
-      return <StatementsPage />;
+      return <StatementsPage year={route.year} />;
     case "documents":
       return <DocumentsPage tab={route.tab} />;
     case "review":

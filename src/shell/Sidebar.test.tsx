@@ -38,8 +38,8 @@ describe("Sidebar", () => {
     render(<Sidebar years={[]} />);
 
     await screen.findByRole("button", { name: "Accounts" });
-    expect(mocked.statementsCoverage).toHaveBeenCalledWith("");
-    expect(mocked.statementsCoverage).not.toHaveBeenCalledWith("market");
+    expect(mocked.statementsCoverage).toHaveBeenCalledWith("", undefined);
+    expect(mocked.statementsCoverage).not.toHaveBeenCalledWith("market", undefined);
   });
 
   it("shows no badge when no line waits for review", async () => {

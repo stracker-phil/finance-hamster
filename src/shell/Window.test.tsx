@@ -1,6 +1,6 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
 
@@ -13,14 +13,14 @@ import { renderWithQuery as render } from "../test/renderWithQuery";
 import { addPreview, documentView, otherGroup, otherView, statementView } from "../test/documents";
 import { PdfCoversProbe } from "../test/PdfCoversProbe";
 import { settings } from "../test/settings";
-import { accountLines, importPreview } from "../test/statements";
+import { accountLines, coverage, importPreview } from "../test/statements";
 import { Window } from "./Window";
 
 const mocked = vi.mocked(api, true);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useStore.setState({ route: HOME, back: [], forward: [], filter: "", toasts: [], confirmation: null, paletteOpen: false, pdfCovers: [], menu: null, importPreview: null, addPreview: null, subscriptionSheet: null });
+  useStore.setState({ route: HOME, back: [], forward: [], filter: "", toasts: [], confirmation: null, paletteOpen: false, pdfCovers: [], menu: null, importPreview: null, addPreview: null, subscriptionSheet: null, statementsYear: null });
   mocked.runCommand.mockResolvedValue(undefined);
   mocked.listCommands.mockResolvedValue([]);
   mocked.listAccounts.mockResolvedValue([account()]);
@@ -293,6 +293,58 @@ describe("account page", () => {
 
     expect(await screen.findByRole("region", { name: "Nr. 010/2026" })).toBeTruthy();
     expect(mocked.accountLines).toHaveBeenCalledWith("acc-2", "");
+  });
+});
+
+describe("Accounts year stepper", () => {
+  beforeEach(() => {
+    useStore.setState({ route: { page: "statements" }, statementsYear: null });
+    mocked.statementsCoverage.mockImplementation((_query, year) => Promise.resolve(coverage({ year: year ?? 2026, years: [2024, 2025, 2026] })));
+  });
+
+  afterEach(() => {
+    mocked.statementsCoverage.mockResolvedValue({ year: 2026, years: [2026], months: [], accounts: [] });
+  });
+
+  const stepper = async () => within(await screen.findByRole("group", { name: "Year" }));
+
+  it("shows the year of the accounts in the toolbar", async () => {
+    render(<Window />);
+
+    const group = await stepper();
+    expect(group.getByText("2026")).toBeTruthy();
+    expect(group.getByRole<HTMLButtonElement>("button", { name: "Next Year" }).disabled).toBe(true);
+  });
+
+  it("asks for the previous year and remembers it when its arrow is clicked", async () => {
+    render(<Window />);
+
+    await userEvent.click((await stepper()).getByRole("button", { name: "Previous Year" }));
+
+    await waitFor(() => expect(mocked.statementsCoverage).toHaveBeenCalledWith("", 2025));
+    expect((await stepper()).getByText("2025")).toBeTruthy();
+    expect(useStore.getState().route).toEqual({ page: "statements", year: 2025 });
+    expect(useStore.getState().statementsYear).toBe(2025);
+  });
+
+  it("keeps the chosen year when Accounts is opened again without one", async () => {
+    render(<Window />);
+    await userEvent.click((await stepper()).getByRole("button", { name: "Previous Year" }));
+    await waitFor(() => expect(useStore.getState().statementsYear).toBe(2025));
+
+    await userEvent.click(row("Today"));
+    await userEvent.click(row("Accounts"));
+
+    expect(useStore.getState().route).toEqual({ page: "statements" });
+    expect((await stepper()).getByText("2025")).toBeTruthy();
+  });
+
+  it("shows no stepper on other pages", () => {
+    useStore.setState({ route: HOME });
+
+    render(<Window />);
+
+    expect(screen.queryByRole("group", { name: "Year" })).toBeNull();
   });
 });
 

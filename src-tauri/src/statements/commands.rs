@@ -131,11 +131,18 @@ pub async fn statement_view(
     )
 }
 
+/// The accounts' months in `year`, or in this year without one.
 #[tauri::command]
-pub async fn statements_coverage(state: State<'_, AppState>, query: String) -> AppResult<Coverage> {
-    view::coverage(
+pub async fn statements_coverage(
+    state: State<'_, AppState>,
+    query: String,
+    year: Option<i32>,
+) -> AppResult<Coverage> {
+    let today = today();
+    view::year_coverage(
         &state.db,
-        today(),
+        today,
+        year.unwrap_or_else(|| chrono::Datelike::year(&today)),
         &query,
         DateOrder::system(),
         state.settings.get().import_after_days,

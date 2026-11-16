@@ -5,13 +5,12 @@ use serde::Serialize;
 use ts_rs::TS;
 
 use super::store::{self, StatementRow};
+use super::years;
 use crate::accounts::{self, AccountRow};
 use crate::date::{self, DateOrder};
 use crate::db::Db;
 use crate::error::AppResult;
 use crate::tr;
-
-const MONTHS_SHOWN: u32 = 12;
 
 #[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq, TS)]
 #[serde(rename_all = "snake_case")]
@@ -22,6 +21,7 @@ pub enum Cover {
     Missing,
     /// Before the account's first statement, so nothing is missing.
     Before,
+    Later,
 }
 
 #[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq, TS)]
@@ -75,16 +75,18 @@ pub struct AccountCoverage {
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "src/api/types.gen.ts")]
 pub struct Coverage {
+    /// The calendar year the months belong to.
+    pub year: i32,
+    /// Every year the page can show, oldest first (`years::shown`).
+    pub years: Vec<i32>,
     pub months: Vec<MonthHead>,
     pub accounts: Vec<AccountCoverage>,
 }
 
-/// The last `MONTHS_SHOWN` months up to `today`'s, oldest first.
-fn months(today: NaiveDate) -> Vec<NaiveDate> {
-    let this = today.with_day(1).unwrap_or(today);
-    (0..MONTHS_SHOWN)
-        .rev()
-        .filter_map(|back| this.checked_sub_months(Months::new(back)))
+/// January to December of `year`.
+fn months(year: i32) -> Vec<NaiveDate> {
+    (1..=12)
+        .filter_map(|month| NaiveDate::from_ymd_opt(year, month, 1))
         .collect()
 }
 
@@ -115,6 +117,13 @@ fn ranges(statements: &[StatementRow]) -> Vec<(NaiveDate, NaiveDate, String)> {
 }
 
 fn month_cover(first: NaiveDate, today: NaiveDate, statements: &[StatementRow]) -> MonthCover {
+    let heading = date::month_year(first);
+    if first > today {
+        return MonthCover {
+            cover: Cover::Later,
+            tip: tr!("{heading} · still ahead", "{heading} · steht noch bevor"),
+        };
+    }
     let next = first.checked_add_months(Months::new(1)).unwrap_or(first);
     let last = (next - Days::new(1)).min(today);
     let ranges = ranges(statements);
@@ -128,7 +137,6 @@ fn month_cover(first: NaiveDate, today: NaiveDate, statements: &[StatementRow]) 
         .filter(|(from, to, _)| *from <= last && *to >= first)
         .map(|(_, _, label)| label.as_str())
         .collect();
-    let heading = date::month_year(first);
     let first_statement = ranges.iter().map(|(from, _, _)| *from).min();
     if first_statement.is_none_or(|start| last < start) {
         return MonthCover {
@@ -201,6 +209,7 @@ fn account_coverage(
     statements: &[StatementRow],
     to_review: u32,
     today: NaiveDate,
+    months: &[NaiveDate],
     order: DateOrder,
     import_after_days: u32,
 ) -> AccountCoverage {
@@ -242,16 +251,15 @@ fn account_coverage(
         state,
         state_label,
         to_review,
-        months: months(today)
-            .into_iter()
-            .map(|m| month_cover(m, today, statements))
+        months: months
+            .iter()
+            .map(|&m| month_cover(m, today, statements))
             .collect(),
         note,
     }
 }
 
-/// `query` keeps only the accounts whose name contains it; an account is behind `import_after_days` after its
-/// last statement ends.
+/// The accounts' coverage in `today`'s year.
 pub fn coverage(
     db: &Db,
     today: NaiveDate,
@@ -259,7 +267,20 @@ pub fn coverage(
     order: DateOrder,
     import_after_days: u32,
 ) -> AppResult<Coverage> {
+    year_coverage(db, today, today.year(), query, order, import_after_days)
+}
+
+/// Coverage of the accounts whose name contains `query`, with their months in `year`; their state is today's.
+pub fn year_coverage(
+    db: &Db,
+    today: NaiveDate,
+    year: i32,
+    query: &str,
+    order: DateOrder,
+    import_after_days: u32,
+) -> AppResult<Coverage> {
     let needle = query.trim().to_lowercase();
+    let shown = months(year);
     let mut accounts = Vec::new();
     let waiting = db.read(crate::review::undecided_by_account)?;
     for account in db
@@ -274,12 +295,15 @@ pub fn coverage(
             &statements,
             to_review,
             today,
+            &shown,
             order,
             import_after_days,
         ));
     }
     Ok(Coverage {
-        months: months(today)
+        year,
+        years: db.read(|c| years::shown(c, today.year()))?,
+        months: shown
             .into_iter()
             .map(|m| MonthHead {
                 label: date::short_month(m).to_string(),
