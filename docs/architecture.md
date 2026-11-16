@@ -53,8 +53,7 @@ These rules hold everywhere in the code. Keep them when you change things.
 - No URL scheme (ADR 0047): outside callers use the CLI.
 - At launch a supervised task checks every referenced PDF (exists, SHA-256 matches) and appends journal rows
   missing from `journal.jsonl`; findings become a banner, nothing is repaired silently.
-- Reminders are (re)scheduled with the macOS notification center at launch and after every change that moves
-  a date; they fire while the app is not running (ADR 0035).
+- The running app tells due reminders at launch and every half hour (`app.rs` `REMINDER_INTERVAL`, ADR 0042).
 
 ## Data
 
@@ -69,14 +68,15 @@ Everything lives in the config dir (ADR 0012), 0700 with files 0600; each person
   settings.json         language, appearance, accent, number format (`settings::APP_WIDE`)
   profiles/<id>/
     hamster.sqlite      accounts, statements, transactions, rules, decisions, vendors, documents,
-                        document_links, deletions, answers, entries, subscriptions, plans, tax_years,
-                        snapshots, journal
+                        document_links, deletions, answers, entries, hidden_items, year_checks,
+                        subscriptions, plans, payslips, others, tax_years, snapshots, journal
     journal.jsonl       append-only copy of the journal table, one line per changed field, never rewritten
-    docs/<year>/        <yyyy-mm-dd>-<vendor>.pdf by payment date; -2, -3 on collision; evidence/ for amounts
+    docs/<year>/        <yyyy-mm-dd>-<vendor>.pdf by payment date; -2, -3 on collision; evidence/ for amounts;
+                        payslips/ for payslips
+    docs/other/         other documents worth keeping
     docs/inbox/         undated documents under their original name
     statements/<year>/  <account>-<nr>.pdf, year of the statement's end date
     snapshots/          <year>-summary.pdf, written when a year is closed; -2, -3 after a reopen
-    rules/              the owner's versions of the tax rules
     reminders.json      the keys of the reminders already told (ADR 0042)
     settings.json       every other setting
 ```
@@ -151,12 +151,12 @@ Frontend (`src/`):
 | `api/` | the `api` object (only place that imports `@tauri-apps/*`), `toAppError`, generated `types.gen.ts` |
 | `state/` | the zustand store (route and history, filter, toasts, confirmation; `window.hamster` in debug builds), `route.ts` (every page), `useAppEvents` |
 | `shell/` | `Window`, `FilesBanner` (red line while stored PDFs are missing or changed), `Sidebar` (pages, tax years, drop zone), `Header` (crumb, title, page controls, filter field with "matches elsewhere" and ⌘↩, + New), page titles |
-| `pages/` | each page's body (`PageBody`), the per-page header texts, `FirstRun` (no account yet), `StatementsPage` (coverage per account, Start Review), `AccountPage` (lines by statement with their decision), `TodayPage` (the next step as headline, quiet rows, coming up, the tax year), `ReviewPage` (one line at a time; A, S, I pick, Return confirms, J skips), `SubscriptionsPage` (by next charge, Ended folded, the detail panel), `DocumentsPage` (by year plus Inbox), `DocumentPage` (PDF beside `DocumentForm`, History on the right, finished and excluded banners), `LogPage`, `ArchivePage`, `YearPage` (hero, questions, needs attention, By Kennzahl with copy buttons, By month, … menu) |
+| `pages/` | each page's body (`PageBody`), the per-page header texts, `FirstRun` (no account yet), `StatementsPage` (the Accounts page: coverage per account over one calendar year with a year stepper, ADR 0059; Start Review), `AccountPage` (lines by statement with their decision), `TodayPage` (the next step as headline, quiet rows, coming up, the tax year), `ReviewPage` (one line at a time; A, S, I pick, Return confirms, J skips), `SubscriptionsPage` (by next charge, Ended folded, the detail panel), `DocumentsPage` (by year plus Inbox), `DocumentPage` (PDF beside `DocumentForm`, History on the right, finished and excluded banners), `LogPage`, `ArchivePage`, `YearPage` (hero, questions, needs attention, By Kennzahl with copy buttons, By month, … menu) |
 | `documents/` | `DocumentForm` (each field saves on its own; Mark Finished), `DepreciationBlock`, `HistoryList`, `ExcludeSheet`, `DeleteSheet`, `lifecycle.ts`, `LinePicker` (link a bank line), `AddDocumentSheet` (vendor, item, the bank line that paid it, what it counts as), `addFlow.ts` (`startAddDocument` from ⌘O, + New and the sidebar's Choose File…; `attachInvoiceTo`, the tax year's Attach PDF… for one bank line, which the sheet starts on; `useDroppedDocuments`) |
 | `subscriptions/` | `flow.ts` (New, New from a line, Edit, Change Plan, End, Resume, Delete), `SubscriptionSheet` (New and Edit, with the live match count; from a line it shows `SourceLine`, whose selected text becomes the match text), `PlanSheet` (Change Plan, with the line it came from), `SubscriptionPanel` (the detail panel beside the list) |
 | `review/` | `ReviewCard` (one line, "What is this line?" as a radio group, only the picked choice's details, and a confirm button beside one sentence of what it will do; its title and bank lines are selectable, and a selection becomes the term the Always rule or a new subscription matches, with a live "Matches N lines" count; a charge at another amount asks "Is this <subscription>?": Yes, new price · Yes, this once · No, after which it is asked like any line) |
-| `year/` | `YearMenu` (Log, Archive, Export Summary PDF…, Open Ruleset JSON, Close Year… or Open Snapshot PDF and Reopen Year…), `CloseYearSheet`, `AddEntry` (a Kennzahl's "+ Document/Amount/Trip": the add flow with its item set, or the inline amount or trip row), `entryActions.ts` (delete, attach and open evidence, each with an Undo toast), `PayslipPanel` (the year's sidebar: payslip sums only), `YearSidebarToggle` (its toggle at the header's trailing edge; `view:payslips`) |
-| `payslips/` | `PayslipForm` (each value saves on its own), `AddPayslipFields`/`AddOtherFields` (the Add sheet's payslip and other side), `flow.ts` (enter, add a PDF, add an other document, toggle the year's sidebar) |
+| `year/` | `YearMenu` (Choose Categories…, Log, Archive, Export Summary PDF…, Tax Rules… in Settings, Close Year… or Open Snapshot PDF and Reopen Year…), `CloseYearSheet`, `AddEntry` (a Kennzahl's "+ Document/Amount/Trip": the add flow with its item set, or the inline amount or trip row), `entryActions.ts` (delete, attach and open evidence, each with an Undo toast), `PayslipPanel` (the year's sidebar: payslip sums only), `YearSidebarToggle` (its toggle at the header's trailing edge; `view:payslips`) |
+| `payslips/` | `PayslipForm` (each value saves on its own), `AddPayslipFields` (the Add sheet's payslip side and, as `AddOtherFields`, its other side), `flow.ts` (enter, add a PDF, add an other document, toggle the year's sidebar) |
 | `documents/lists/` | the tabs of Dokumente (`pages/DocumentsPage`): `InvoiceList`, `StatementList`, `PayslipList`, `OtherList`; `documents/DetailLayout` is the shared detail page (PDF over most of the page, sidebar on the right) of `DocumentPage`, `StatementPage`, `PayslipPage` and `OtherPage` |
 | `statements/` | `ImportSheet` (what was read and checked; nothing is stored until Import), `importFlow.ts` (`startImport` from ⌘I, + New, the drop line and the first run; `useDroppedStatements`) |
 | `accounts/` | `AccountForm` (first run and Settings) and `AccountSheet` |

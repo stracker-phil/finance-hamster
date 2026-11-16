@@ -46,7 +46,7 @@ build's, and start with made-up demo data. Hamster makes no network requests.
 | `bun run test` | Vitest and Rust unit tests pass |
 | `bun run lint` | exits 0: types drift check, `tsc`, ESLint, `clippy -D warnings` |
 | `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | no differences |
-| `bun run release` | `Hamster.app` installed to `~/Applications`, the version committed and tagged |
+| `bun run release patch` | `Hamster.app` installed to `~/Applications`, the version committed and tagged |
 
 ## Adapt
 

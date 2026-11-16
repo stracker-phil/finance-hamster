@@ -36,7 +36,7 @@ step.
 - **Contracts:** `lib.rs` tests compare `APP_NAME` and `IDENTIFIER` with both Tauri configs and
   keep the version equal in `Cargo.toml`, `tauri.conf.json` and `package.json`; each `#[ts(export)]` type has
   an `export_bindings_*` test (`bun run types`).
-- **Parsers** are tested against synthetic statements in the bank's layout (`test_support/fixtures/`):
+- **Parsers** are tested against synthetic statements in the bank's layout (`test_support/statements.rs`):
   balance check, a tampered copy, card and FX lines, a gap in the chain. Real sample statements never enter
   the repo; `HAMSTER_REAL_FIXTURES=<dir>` runs an ignored test against local copies.
 - **No network:** `src-tauri/tests/no_network.rs` scans `Cargo.toml` and `cargo tree` for HTTP crates (ADR 0016); it runs with the unit tests.
@@ -55,7 +55,7 @@ step.
 The debug app, the tests and the README screenshots share one made-up data set in
 `src-tauri/src/test_support/` (ADR 0022, [`demo-data.md`](../.claude/rules/demo-data.md)).
 The debug app seeds it on its first launch with an empty data folder; `hamster dev seed --yes` (the debug
-binary) starts over. Notifications are recorded, not posted, unless `HAMSTER_REAL_NOTIFICATIONS=1`; the
+binary) starts over. Debug builds record notifications and never post them; the
 demo statement and invoice PDFs are generated from invented data.
 
 ## Driving the app

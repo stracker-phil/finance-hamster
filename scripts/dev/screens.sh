@@ -25,7 +25,15 @@ restore() {
 trap restore EXIT
 
 "$ROOT/scripts/sign-app.sh" "$APP" com.philippstracker.hamster.debug
-HAMSTER_WINDOW_FRAME="80,60,1440,900" HAMSTER_BACKGROUND=1 nohup "$BIN" >/dev/null 2>&1 &
+# A Retina screen gives 2x images; the origin is the top-left of the first such screen, else the main one.
+ORIGIN=$(swift - <<'SWIFT' 2>/dev/null
+import AppKit
+let main = NSScreen.screens[0].frame
+let f = (NSScreen.screens.first { $0.backingScaleFactor >= 2 } ?? NSScreen.screens[0]).frame
+print("\(Int(f.origin.x) + 80),\(Int(main.height - f.origin.y - f.height) + 60)")
+SWIFT
+)
+HAMSTER_WINDOW_FRAME="${ORIGIN:-80,60},1440,900" HAMSTER_BACKGROUND=1 nohup "$BIN" >/dev/null 2>&1 &
 disown
 # The first launch seeds the demo data.
 for _ in {1..60}; do
@@ -49,7 +57,7 @@ sleep 1
 "$HERE/js.sh" '(() => { [...document.querySelectorAll(".sub-row")].find((r) => r.textContent.includes("Lumen"))?.click(); })()'
 shot subscriptions-dark
 go '{ page: "statements" }'
-shot statements-dark
+shot accounts-dark
 
 appearance light
 go '{ page: "year", year: Number(new Date().getFullYear()) }'

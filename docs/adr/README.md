@@ -46,7 +46,7 @@ Why Hamster is built the way it is. One record per decision, in Nygard format, a
 | [0034](0034-settings-window.md) | Settings is a window of its own | Accepted (2026-11-13) |
 | [0035](0035-closing-the-window-keeps-the-app-running.md) | Closing the window keeps the app running in the Dock | Accepted (2026-11-13); reminder clause superseded by 0042 |
 | [0036](0036-no-status-bar.md) | No status bar | Accepted (2026-11-13) |
-| [0037](0037-pdfs-show-in-a-native-pdfview.md) | PDFs show in a native PDFView over the page | Accepted (2026-11-13) |
+| [0037](0037-pdfs-show-in-a-native-pdfview.md) | PDFs show in a native PDFView over the page | Accepted (2026-11-13); overlay handling superseded by 0057 |
 | [0038](0038-tax-rules-are-versioned-data-per-year.md) | Tax rules are versioned data per year, split into copy values and preview | Superseded by 0040 |
 | [0039](0039-werbungskosten-only-open-for-other-l1-sections.md) | Werbungskosten only, open for other L1 sections | Accepted (2026-11-13); partly superseded by 0040 |
 | [0040](0040-tax-rules-live-in-a-json-file-per-year.md) | Tax rules live in a JSON file per year; the tax year shows one copy value per Kennzahl | Accepted (2026-11-13); file handling superseded by 0051 |
@@ -64,7 +64,7 @@ Why Hamster is built the way it is. One record per decision, in Nygard format, a
 | [0052](0052-record-in-plain-words-file-in-finanzonline-terms.md) | Record in plain words, file in FinanzOnline terms; no year check | Accepted (2026-11-15) |
 | [0053](0053-hide-unused-categories-per-year.md) | Hide unused categories per year; FinanzOnline lists every Kennzahl | Accepted (2026-11-15) |
 | [0054](0054-import-a-rules-file-for-any-year.md) | Import a rules file for any year | Accepted (2026-11-15) |
-| [0055](0055-payslips-as-their-own-record.md) | Payslips as their own record; home office days from the latest one | Accepted (2026-11-15) |
+| [0055](0055-payslips-as-their-own-record.md) | Payslips as their own record; home office days from the latest one | Accepted (2026-11-15); where payslips show changed by 0056 |
 | [0056](0056-dokumente-holds-every-pdf.md) | Dokumente holds every PDF; one detail layout; a real tax-year sidebar | Accepted (2026-11-15) |
 | [0057](0057-overlays-cut-holes-in-the-pdf-preview.md) | Overlays cut holes in the PDF preview instead of hiding it | Accepted (2026-11-16) |
 | [0058](0058-commands-run-off-the-main-thread.md) | Data commands run off the main thread | Accepted (2026-11-16) |

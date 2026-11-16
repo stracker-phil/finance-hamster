@@ -11,10 +11,11 @@ One main window (1440×900 by default, min 1100×680) and the Settings window. N
 no context filter: time appears only as tax years and statement coverage.
 
 ### Sidebar (236px, on `--window-bg`)
-Top to bottom: the traffic-light strip (drags the window) · Today · Subscriptions · Statements (count badge =
+Top to bottom: the traffic-light strip (drags the window) · Today · Subscriptions · Accounts (count badge =
 lines waiting for review) · Documents (all years) · section **Tax years**, one row per year (Open, or a lock
 when closed) · the **doc zone** pinned at the bottom (drop target plus one Choose File… button; it highlights
-while a PDF is dragged anywhere over the window) · footer with the sidebar toggle and Settings. Rows 34px, 8px radius, 14px text;
+while a PDF is dragged anywhere over the window) · footer with Settings and the profile switcher (the active profile; its menu switches, adds or renames
+profiles). Rows 34px, 8px radius, 14px text;
 the selected row is an accent wash with accent text.
 
 ### Header (58px, same on every page)
@@ -22,7 +23,8 @@ Title (19px bold) · one page-specific control (for example the By Kennzahl / By
 field (200px, ⌘F, Esc clears; filters the current list as you type; when the text also matches elsewhere a
 small menu lists those matches plus Search everywhere ⌘↩; on pages without a list it reads Search everywhere;
 on Documents it and the big search field are one search)
-· the **+ New** menu: Import Statement… ⌘I, Add Invoice PDF… ⌘O, New Subscription ⌘N.
+· the **+ New** menu: Import Statement… ⌘I, Add Invoice… ⌘O, Add Payslip…, Add Other Document…, New
+Subscription ⌘N.
 
 ### Pages
 | Page | Shows |
@@ -30,7 +32,7 @@ on Documents it and the big search field are one search)
 | Today | one headline next step with one primary button (review → attach invoices → import overdue statement → finish drafts), other open items as quiet rows, the next 5 charges, the tax year's total and progress (the oldest open year once it is over, else the current one), one line on statements; the hamster with "You're up to date" when nothing is open |
 | Review | one undecided line at a time: "What is this line?" ANV (A) · Subscription (S) · Ignore (I) picks (the suggestion starts picked), only the pick's detail, "Also decide every line containing TERM this way", one sentence of what will happen beside the confirm button (↩); Skip (J), Previous, progress bar; "Is this <subscription>?" for another amount (Yes, new price · Yes, this once · No); a done state with counts |
 | Subscriptions | grouped by next charge (next 7 days · next 30 days · later, Ended collapsed); header: active count and cost per month; a detail panel with a 12-month plan timeline |
-| Accounts (Konten) | one coverage bar per account over 12 months (imported, partly, missing, before the first statement) and a status tag per account (Up to date, N to review, Statement missing, N days behind) |
+| Accounts (Konten) | one coverage bar per account over one calendar year, January to December, with a year stepper in the header (ADR 0059) (imported, partly, missing, before the first statement) and a status tag per account (Up to date, N to review, Statement missing, N days behind) |
 | Account | the account's lines grouped by statement, with a note where a statement is missing between two groups; clicking a decided line changes it (ANV with its item, Subscription, Ignore; one undoable change), a waiting line opens Review, transfers are fixed; each statement's number opens its PDF |
 | Tax year | recording first, filing last (ADR 0052). Hero with the total and progress ("Work costs 2026"; the FinanzOnline view says "Total to enter in FinanzOnline" with the rules version); **Your year** (number fields such as Home office days; empty = unanswered); Needs attention (missing invoices, drafts, undated scans); Categories / Months / FinanzOnline. Categories (default while open): each item by its plain label with examples (categories hidden for the year, ADR 0053, stay out unless they have an entry; "N hidden categories · Show" at the end; Show lists them below that line, so nothing above it moves), its rows (documents, amounts, trips, slices with a "From 2025" pill; row amounts only when it has several rows), its total and "+ Add" (Document, Amount or Trip); no Kennzahl and no rules text. Months: Whole year (amounts and earlier slices), then each month. FinanzOnline (default once closed): the Werbungskostenpauschale note, then every Kennzahl in number order, like the form (0,00 where nothing counts), its legal name, a copy button, the item's note and one worked-out line from its estimate rules ("About €928.40 counts: …"); A toggle at the toolbar's trailing edge (and View → Show or Hide Payslips, ⌥⌘L) opens the year's sidebar, a full-height column on the right like a macOS inspector: the year's payslip sums and "10 of 12 payslips" with Show in Documents (ADR 0056); while a payslip prints home office days, "Your year" shows them read-only with their month; … menu: Choose Categories…, Log, Archive, Export Summary PDF, Tax Rules… (Settings); Close Year… / Open Snapshot PDF |
 | Document (invoice) | `DetailLayout` (ADR 0056): the PDF over most of the page; on the right the edit form (Payment → Classification with the item picker and work share → Result → Notes → More), a GWG line or the Depreciation block, and History as a disclosure; breadcrumb "Documents /" or the tax year it was opened from |
@@ -76,7 +78,7 @@ on Documents it and the big search field are one search)
 - Lists don't re-sort while in use; a decided or removed row keeps its place (grayed) until the page is left.
 - Controls keep their size: state shows by color and outline, never an added icon or text; buttons that only
   sometimes apply keep their slot, invisible.
-- Nothing jumps, things move: fade in, glide (`useGlide`, `useListGlide`), animate height (`useHeightGlide`).
+- Nothing jumps, things move: fade in, glide (`useGlide`, `useListGlide`).
 - Folding into "…" follows the window width only.
 - Before finishing a UI change: click every new or changed control twice and run `scripts/dev/e2e.sh`.
 
@@ -156,7 +158,7 @@ About has Show Data Folder and Open Log Folder. Shortcuts groups rows by where t
 window", then each page's fixed keys) and asks before taking a key another command holds (Reassign).
 
 ## Keys
-App actions are Rust commands with colon ids (ADR 0046); page keys (Review's A, S, I, J) are fixed, printed on their buttons and never fire in text fields. Menus in Mac order; View holds window appearance only; Help holds Open Log Folder and Show Data
+App actions are Rust commands with colon ids (ADR 0046); page keys (Review's A, S, I, J) are fixed, printed on their buttons and never fire in text fields. Menus in Mac order; View holds the palette, the filter field and Show/Hide Payslips; Help holds Open Log Folder and Show Data
 Folder. One binding per command.
 
 ## Palette checks

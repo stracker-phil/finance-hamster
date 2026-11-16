@@ -34,3 +34,4 @@ user-level `app-blueprint` skill). When this repo has no answer yet, look there 
 | Daybook | `../daybook` | the Rust command bus (`docs/commands.md`), extra windows on a native layer, menu-bar app, global shortcuts, local HTTP API, JSON stores with repair |
 | TimeTracker | `../timetracker` | SQLite through sqlx, undo as ops, the seeds and showcase, performance tests, socket `watch`, the MCP server |
 | DataBee | `../databee` | optional features as inline plugins, ports with fakes (`Database`, `SecretStore`), the `Secret` type |
+| Launcher | `../project-launcher` | Settings search over every row, the Shortcuts page, the accent choice |

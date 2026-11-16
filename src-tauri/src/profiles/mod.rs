@@ -1,5 +1,5 @@
 //! Profiles: each person's data in its own folder under `profiles/`, listed in `profiles.json` in the app
-//! folder. The app opens the active profile at launch; a switch starts the app anew on another (ADR 0060).
+//! folder. The app opens the active profile at launch and switches to another in place (ADR 0060, ADR 0061).
 
 pub mod cli;
 pub mod commands;
