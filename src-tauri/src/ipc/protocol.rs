@@ -31,6 +31,10 @@ pub enum IpcMessage {
     Run {
         id: String,
     },
+    /// `hamster profile …`; a switch restarts the app on that profile.
+    Profile {
+        request: crate::profiles::cli::ProfileRequest,
+    },
     /// Runs JavaScript in a window (used by scripts/dev to drive the UI).
     #[cfg(debug_assertions)]
     Eval {
@@ -49,6 +53,7 @@ impl IpcMessage {
             IpcMessage::Quit => "Quit",
             IpcMessage::Status => "Status",
             IpcMessage::Run { .. } => "Run",
+            IpcMessage::Profile { .. } => "Profile",
             #[cfg(debug_assertions)]
             IpcMessage::Eval { .. } => "Eval",
         }

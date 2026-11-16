@@ -1,6 +1,7 @@
 //! Profiles: each person's data in its own folder under `profiles/`, listed in `profiles.json` in the app
 //! folder. The app opens the active profile at launch; a switch starts the app anew on another (ADR 0060).
 
+pub mod cli;
 pub mod commands;
 
 use std::path::{Path, PathBuf};
@@ -162,13 +163,41 @@ fn valid_name(name: &str, profiles: &Profiles, except: Option<&str>) -> AppResul
 
 /// Adds an empty profile with its own folder and makes it the one the next launch opens.
 pub fn create(root: &Path, name: &str) -> AppResult<Profile> {
+    insert(root, name, true)
+}
+
+/// Adds an empty profile with its own folder; the active profile stays.
+pub fn add(root: &Path, name: &str) -> AppResult<Profile> {
+    insert(root, name, false)
+}
+
+fn insert(root: &Path, name: &str, activate: bool) -> AppResult<Profile> {
     let mut profiles = load(root);
     let profile = new_profile(&valid_name(name, &profiles, None)?);
     create_private_dir(&dir(root, &profile.id))?;
-    profiles.active = profile.id.clone();
+    if activate {
+        profiles.active = profile.id.clone();
+    }
     profiles.profiles.push(profile.clone());
     file(root).save(&profiles)?;
     Ok(profile)
+}
+
+/// The profile called `name`, ignoring case and surrounding space.
+pub fn named(profiles: &Profiles, name: &str) -> AppResult<Profile> {
+    let wanted = name.trim().to_lowercase();
+    profiles
+        .profiles
+        .iter()
+        .find(|p| p.name.to_lowercase() == wanted)
+        .cloned()
+        .ok_or_else(|| {
+            let name = name.trim();
+            AppError::NotFound(tr!(
+                "There is no profile named {name}",
+                "Es gibt kein Profil namens {name}"
+            ))
+        })
 }
 
 /// Makes `id` the profile the next launch opens.

@@ -89,8 +89,12 @@ The app binary is also its command line, and talks to the running app.
 | `hamster show`, `focus`, `hide`, `quit` | shows the window (`focus` also brings it to the front), hides it, quits |
 | `hamster commands` | every command with its id and shortcut |
 | `hamster run <command-id>` | runs a command as its menu item would, e.g. `go:statements`, `app:settings` |
+| `hamster profile [list]` | every profile; `*` marks the one Hamster opens |
+| `hamster profile switch <name>` | opens that profile; a running Hamster restarts on it |
+| `hamster profile add <name> [--switch]` | adds an empty profile, and with `--switch` opens it |
+| `hamster profile rename <name> <new name>` | renames a profile |
 
-`--json` prints any reply as JSON.
+`--json` prints any reply as JSON. `profile` works without the app running; profiles are named, ignoring case.
 
 ## Docs
 

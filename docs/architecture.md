@@ -103,7 +103,7 @@ Rust (`src-tauri/src/`):
 |---|---|
 | `lib.rs` | identity consts (`IDENTIFIER`, `APP_NAME`), `config_dir`, `run` (CLI or app), the config-contract tests |
 | `app.rs` | the Tauri builder: plugins, window events, setup, run loop, logging |
-| `cli/` | the `hamster` command line (`parse`) and how replies print (`reply`); `commands` answers without the app |
+| `cli/` | the `hamster` command line (`parse`) and how replies print (`reply`); `commands` answers without the app; `profile` changes go to the running app, and without one (or for `list`) the CLI answers from `profiles.json` (`profiles::cli`) |
 | `commands/` | the catalog (ADR 0046): `COMMANDS` (colon id, title, accelerator, who runs it: the page, Settings or Rust), `run`, `list`, `shortcut_label`; page commands go to the main window as `run_command`; `handlers.rs` (the Tauri commands, Open Log Folder, Show Data Folder); `keys.rs` (the owner's shortcuts in `keybindings.json` through `JsonFile`, old dotted ids carried over, `conflict` and `reassign`; the menu bar is rebuilt and `commands_changed` sent) |
 | `i18n.rs` | the UI language (ADR 0050): `lang()` (set at launch and by `update_settings`, `with_lang` per thread for tests), `tr!`/`tr_plural!` with both texts at the call site, `Text` for compile-time tables |
 | `menu/` | the menu bar: macOS's standard items (texts in the UI language) around `MENUS` and `HELP` (command ids); a menu item's id is its command; rebuilt on a new language |
@@ -128,7 +128,7 @@ Rust (`src-tauri/src/`):
 | `review/` | Review: `queue` (undecided lines newest first, with the key, suggestion and last item for it), `plan_changed` and the active subscriptions for the Subscription choice; `decide`/`decide_as` (a hand decision, optionally with an "Always do this" rule applied to the other lines in the same op; the rule matches `rule_term`: text the owner selected on the card, which must be in the line, else the title's key), `undecided_by_account` |
 | `preview/` | PDFs by id (`PdfSource`, `resolve`), the `pdf_view_*` commands and the `pdf-page://` scheme serving page PNGs (in the CSP's `img-src`) |
 | `notify.rs` | `Notifier`: records every notification; `deliver` also shows it in the notification center in release builds |
-| `profiles/` | `profiles.json` and the profile folders: `open` (the first profile takes over older data), `create`, `activate`, `rename`; commands `profiles_list`, `profile_create`, `profile_switch`, `profile_rename` and the `profiles_changed` event |
+| `profiles/` | `profiles.json` and the profile folders: `open` (the first profile takes over older data), `create`, `add`, `activate`, `rename`, `named`; `cli.rs` answers `hamster profile`; commands `profiles_list`, `profile_create`, `profile_switch`, `profile_rename` and the `profiles_changed` event |
 | `settings/` | `settings.json`, split between the config dir (`APP_WIDE`) and the profile: language, appearance, accent, number format, original currency, own transfers, days in the Archive (`SettingsStore`, `get_settings`, `update_settings`) |
 | `instance.rs`, `ipc/` | single instance: lock file, Unix socket, one JSON line per request |
 | `remote/` | handles each `IpcMessage` from another process |

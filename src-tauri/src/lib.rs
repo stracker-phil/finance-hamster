@@ -87,6 +87,28 @@ fn fail(message: &str) -> ! {
     std::process::exit(2);
 }
 
+/// A change goes to the running app, so it restarts or refreshes; `list`, or any request without a running app,
+/// is answered here from `profiles.json`.
+fn answer_profile(
+    config_dir: &std::path::Path,
+    socket: &std::path::Path,
+    request: profiles::cli::ProfileRequest,
+    json: bool,
+) -> ! {
+    let answer = profiles::cli::answer(config_dir, &request).map_err(ipc::IpcError::from);
+    let message = IpcMessage::Profile { request };
+    if !matches!(
+        message,
+        IpcMessage::Profile {
+            request: profiles::cli::ProfileRequest::List
+        }
+    ) && let Some(code) = instance::ask(socket, &message, json)
+    {
+        std::process::exit(code);
+    }
+    std::process::exit(instance::answer_here(&message, answer, json))
+}
+
 /// Quits the running debug app (its lock is released on exit), then removes its data.
 #[cfg(debug_assertions)]
 fn reset_demo(config_dir: &std::path::Path, socket: &std::path::Path) -> ! {
@@ -125,6 +147,9 @@ pub fn run() {
                 Some(code) => std::process::exit(code),
                 None => fail("Hamster isn't running"),
             }
+        }
+        CliOutcome::Profile { request, json } => {
+            answer_profile(&config_dir, &socket, request, json)
         }
         #[cfg(debug_assertions)]
         CliOutcome::ResetDemo => reset_demo(&config_dir, &socket),

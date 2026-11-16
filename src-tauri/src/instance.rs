@@ -72,14 +72,23 @@ pub fn ask(socket: &Path, message: &IpcMessage, json: bool) -> Option<i32> {
         Ok(None) => return None,
         Err(e) => fail(&format!("Could not reach the running Hamster: {e}")),
     };
-    match reply.into_result() {
+    Some(answer_here(message, reply.into_result(), json))
+}
+
+/// Prints `result` as if the running app had answered `message`; returns the exit code.
+pub fn answer_here(
+    message: &IpcMessage,
+    result: Result<serde_json::Value, IpcError>,
+    json: bool,
+) -> i32 {
+    match result {
         Ok(result) => {
             print_result(message, &result, json);
-            Some(0)
+            0
         }
-        Err(error) => {
-            print_error(&error, json);
-            Some(1)
+        Err(e) => {
+            print_error(&e, json);
+            1
         }
     }
 }

@@ -10,6 +10,7 @@ use std::ffi::OsString;
 use clap::{Parser, Subcommand};
 
 use crate::ipc::IpcMessage;
+use crate::profiles::cli::ProfileRequest;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default, clap::ValueEnum)]
 pub enum LogLevel {
@@ -36,7 +37,8 @@ impl From<LogLevel> for log::LevelFilter {
 const EXAMPLES: &str = "Examples:
   hamster                  start Hamster or bring it to the front
   hamster status --json    whether it runs, its version and its window
-  hamster quit             quit the running app";
+  hamster quit             quit the running app
+  hamster profile switch Alex   restart on the profile named Alex";
 
 #[derive(Parser, Debug)]
 #[command(
@@ -76,6 +78,11 @@ enum Command {
     Run { id: String },
     /// List every command with its id and shortcut
     Commands,
+    /// List the profiles (the active one marked with *), or switch, add or rename one; works without the app
+    Profile {
+        #[command(subcommand)]
+        command: Option<ProfileCommand>,
+    },
     /// Debug build only: tools for its demo data
     #[cfg(debug_assertions)]
     #[command(subcommand)]
@@ -91,6 +98,36 @@ enum DevCommand {
         #[arg(long)]
         yes: bool,
     },
+}
+
+#[derive(Subcommand, Debug)]
+enum ProfileCommand {
+    /// Every profile; * marks the one the app opens
+    List,
+    /// Open the profile called NAME; a running app restarts on it
+    Switch { name: String },
+    /// Add an empty profile called NAME
+    Add {
+        name: String,
+        /// Also switch to it
+        #[arg(long)]
+        switch: bool,
+    },
+    /// Rename the profile called NAME to NEW_NAME
+    Rename { name: String, new_name: String },
+}
+
+impl From<ProfileCommand> for ProfileRequest {
+    fn from(command: ProfileCommand) -> Self {
+        match command {
+            ProfileCommand::List => ProfileRequest::List,
+            ProfileCommand::Switch { name } => ProfileRequest::Switch { name },
+            ProfileCommand::Add { name, switch } => ProfileRequest::Add { name, switch },
+            ProfileCommand::Rename { name, new_name } => {
+                ProfileRequest::Rename { name, to: new_name }
+            }
+        }
+    }
 }
 
 /// A message for the running app and how to print its reply.
@@ -113,6 +150,8 @@ pub enum CliOutcome {
     Ask(CliRequest),
     /// A subcommand the running app answers, or the app starts with it (`show`, `focus`).
     Remote(CliRequest),
+    /// `profile …`, routed in `lib.rs` `answer_profile`.
+    Profile { request: ProfileRequest, json: bool },
     /// `dev seed --yes`: quit the running debug app, then remove its data.
     #[cfg(debug_assertions)]
     ResetDemo,
@@ -156,6 +195,12 @@ where
             code: 0,
         };
     }
+    if let Command::Profile { command } = command {
+        return CliOutcome::Profile {
+            request: command.map_or(ProfileRequest::List, ProfileRequest::from),
+            json: cli.json,
+        };
+    }
     let starts_app = matches!(command, Command::Show | Command::Focus);
     let request = CliRequest {
         message: message(command),
@@ -176,7 +221,7 @@ fn message(command: Command) -> IpcMessage {
         Command::Hide => IpcMessage::Hide,
         Command::Quit => IpcMessage::Quit,
         Command::Run { id } => IpcMessage::Run { id },
-        Command::Commands => unreachable!("answered without the app"),
+        Command::Commands | Command::Profile { .. } => unreachable!("answered earlier in parse"),
         #[cfg(debug_assertions)]
         Command::Dev(_) => unreachable!("answered without the app"),
     }

@@ -212,6 +212,84 @@ fn version_prints_the_version_and_exits_with_code_0() {
     );
 }
 
+fn profile(request: ProfileRequest, json: bool) -> CliOutcome {
+    CliOutcome::Profile { request, json }
+}
+
+#[test]
+fn profile_without_an_action_lists_the_profiles() {
+    for args in [vec!["profile"], vec!["profile", "list"]] {
+        let args = args.as_slice();
+        assert_eq!(run(args), profile(ProfileRequest::List, false), "{args:?}");
+    }
+}
+
+#[test]
+fn profile_actions_carry_their_names() {
+    let name = |s: &str| s.to_string();
+    for (args, expected) in [
+        (
+            vec!["profile", "switch", "Alex"],
+            ProfileRequest::Switch { name: name("Alex") },
+        ),
+        (
+            vec!["profile", "add", "Casey"],
+            ProfileRequest::Add {
+                name: name("Casey"),
+                switch: false,
+            },
+        ),
+        (
+            vec!["profile", "add", "Casey", "--switch"],
+            ProfileRequest::Add {
+                name: name("Casey"),
+                switch: true,
+            },
+        ),
+        (
+            vec!["profile", "rename", "Alex", "Casey"],
+            ProfileRequest::Rename {
+                name: name("Alex"),
+                to: name("Casey"),
+            },
+        ),
+    ] {
+        assert_eq!(run(&args), profile(expected, false), "{args:?}");
+    }
+}
+
+#[test]
+fn profile_json_flag_is_passed_on() {
+    assert_eq!(
+        run(&["profile", "list", "--json"]),
+        profile(ProfileRequest::List, true)
+    );
+    assert_eq!(
+        run(&["--json", "profile", "switch", "Alex"]),
+        profile(
+            ProfileRequest::Switch {
+                name: "Alex".into()
+            },
+            true
+        )
+    );
+}
+
+#[test]
+fn profile_actions_missing_a_name_are_usage_errors() {
+    for args in [
+        vec!["profile", "switch"],
+        vec!["profile", "add"],
+        vec!["profile", "rename"],
+        vec!["profile", "rename", "Alex"],
+    ] {
+        assert!(
+            matches!(run(&args),CliOutcome::Exit { code: 2, .. }),
+            "{args:?}"
+        );
+    }
+}
+
 #[test]
 fn help_exits_with_code_0_and_lists_the_subcommands() {
     match run(&["--help"]) {
