@@ -65,6 +65,7 @@ export function Window() {
         <FirstRun onAccountAdded={() => setFinishingFirstRun(true)} onDone={() => setFinishingFirstRun(false)} />
         {importSheet}
         <Toasts />
+        <MenuHost />
       </div>
     );
   }

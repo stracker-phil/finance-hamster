@@ -26,7 +26,7 @@ fn today() -> chrono::NaiveDate {
 fn prepare(app: &AppHandle, path: &std::path::Path) -> AppResult<ImportPreview> {
     let state = app.state::<AppState>();
     let bytes = std::fs::read(path)?;
-    let pending = import::prepare(&state.db, &crate::config_dir(), bytes)?;
+    let pending = import::prepare(&state.db, &crate::profile_dir(), bytes)?;
     let file_name = path
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
@@ -90,7 +90,7 @@ pub async fn statement_import_commit(
     let now = chrono::Utc::now().timestamp_millis();
     let (written, _) = import::commit(
         &state.db,
-        &crate::config_dir(),
+        &crate::profile_dir(),
         pending,
         now,
         Source::Import,

@@ -25,6 +25,7 @@ pub mod others;
 pub mod payslips;
 pub mod platform;
 pub mod preview;
+pub mod profiles;
 pub mod reminders;
 mod remote;
 pub mod review;
@@ -64,12 +65,21 @@ pub const APP_NAME: &str = if cfg!(debug_assertions) {
 };
 const SOCKET_NAME: &str = "hamster.sock";
 
-/// Tauri's `app_config_dir`, resolvable before the app starts; it holds all data (ADR 0012).
+/// Tauri's `app_config_dir`, resolvable before the app starts; it holds every profile (ADR 0012, ADR 0060).
 pub fn config_dir() -> PathBuf {
     let Some(home) = std::env::home_dir() else {
         fail("Cannot locate the home directory for Hamster's data");
     };
     home.join("Library/Application Support").join(IDENTIFIER)
+}
+
+/// The active profile's folder: its database, journal, PDFs, rules and settings (ADR 0060).
+pub fn profile_dir() -> PathBuf {
+    profiles::active().dir.clone()
+}
+
+pub fn socket_path() -> PathBuf {
+    config_dir().join(SOCKET_NAME)
 }
 
 fn fail(message: &str) -> ! {
@@ -98,7 +108,7 @@ pub fn run() {
     if let Err(e) = create_private_dir(&config_dir) {
         eprintln!("Cannot create {}: {e}", config_dir.display());
     }
-    let socket = config_dir.join(SOCKET_NAME);
+    let socket = socket_path();
 
     let (message, log_level) = match cli::parse(std::env::args_os()) {
         CliOutcome::Exit { message, code } => {
@@ -128,11 +138,16 @@ pub fn run() {
 
     let hidden = matches!(message, IpcMessage::Activate { hidden: true });
     let _instance_lock = instance::forward_or_lock(&config_dir, &socket, &message);
-    let state = match AppState::open(&config_dir) {
+    i18n::set(settings::app_language(&config_dir));
+    let first_name = tr!("My Profile", "Mein Profil");
+    match profiles::open(&config_dir, &first_name) {
+        Ok(active) => profiles::set_active(active),
+        Err(e) => fail(&format!("Hamster can't open its profile: {e}")),
+    }
+    let state = match AppState::open(&config_dir, &profile_dir()) {
         Ok(state) => state,
         Err(e) => fail(&format!("Hamster can't open its data: {e}")),
     };
-    i18n::set(state.settings.get().language);
     app::start(
         state,
         socket,

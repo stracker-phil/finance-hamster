@@ -7,6 +7,7 @@ import { sidebarKey, type Route } from "../state/route";
 import { startAddDocument } from "../documents/addFlow";
 import { useCoverage } from "../queries/statements";
 import { useStore } from "../state/store";
+import { ProfileSwitcher } from "./ProfileSwitcher";
 
 export interface SidebarYear {
   year: number;
@@ -117,6 +118,7 @@ export function Sidebar({ years }: { years: SidebarYear[] }) {
         <button className="icon-btn" onClick={openSettings} title={text.settings}>
           <Icon name="settings" />
         </button>
+        <ProfileSwitcher />
       </div>
     </aside>
   );

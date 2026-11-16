@@ -1,7 +1,7 @@
 import { getName, getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { CategoryChoice, Account, AccountEdit, AccountLines, Action, Elsewhere, YearPage, NewEntry, TodayView, RulePreview, FileCheck, StatusGroup, CloseCheck, SubscriptionsView, SubscriptionDetail, SubscriptionForm, PlanForm, MatchCount, AddInput, AddPreview, ArchivedDocument, DeletionView, DocumentEdit, DocumentGroup, DocumentStep, DocumentView, HistoryEntry, VendorChange, VendorsView, Estimate, LineChoice, Coverage, ReviewQueue, RuleForm, RulesView, Covers, Frame, ImportPreview, PdfSource, AppError, AppInfo, CommandInfo, KeyConflict, ErrorKind, EventName, EventPayloads, JsonPreview, LaunchEvent, NewAccount, AccountStatements, OtherEdit, OtherGroup, OtherView, StatementView, PayslipAdded, PayslipEdit, PayslipView, PayslipsYear, RulesImport, RulesOverview, RulesYearView, Settings, SettingsPatch, TaxYear } from "./types";
+import type { CategoryChoice, Account, AccountEdit, AccountLines, Action, Elsewhere, YearPage, NewEntry, TodayView, RulePreview, FileCheck, StatusGroup, CloseCheck, SubscriptionsView, SubscriptionDetail, SubscriptionForm, PlanForm, MatchCount, AddInput, AddPreview, ArchivedDocument, DeletionView, DocumentEdit, DocumentGroup, DocumentStep, DocumentView, HistoryEntry, VendorChange, VendorsView, Estimate, LineChoice, Coverage, ReviewQueue, RuleForm, RulesView, Covers, Frame, ImportPreview, PdfSource, AppError, AppInfo, CommandInfo, KeyConflict, ErrorKind, EventName, EventPayloads, JsonPreview, LaunchEvent, NewAccount, AccountStatements, OtherEdit, OtherGroup, OtherView, StatementView, PayslipAdded, PayslipEdit, PayslipView, PayslipsYear, RulesImport, RulesOverview, RulesYearView, Profiles, Settings, SettingsPatch, TaxYear } from "./types";
 
 export * from "./types";
 
@@ -25,6 +25,12 @@ export const api = {
   updateSettings: (patch: SettingsPatch) => invoke<Settings>("update_settings", { patch }),
   showDataFolder: () => invoke<void>("show_data_folder"),
   dataFolder: () => invoke<string>("data_folder"),
+  profilesList: () => invoke<Profiles>("profiles_list"),
+  /** Makes an empty profile and starts the app anew on it. */
+  profileCreate: (name: string) => invoke<void>("profile_create", { name }),
+  /** Starts the app anew on another profile. */
+  profileSwitch: (id: string) => invoke<void>("profile_switch", { id }),
+  profileRename: (id: string, name: string) => invoke<void>("profile_rename", { id, name }),
   /** The label of what was undone, or null when there was nothing. */
   undo: () => invoke<string | null>("undo"),
   redo: () => invoke<string | null>("redo"),

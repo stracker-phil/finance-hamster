@@ -21,3 +21,5 @@ pub const ADD_READY_EVENT: &str = "add_ready";
 pub const FILES_CHECKED: &str = "files_checked";
 /// No payload; a shortcut changed (`commands::keys`).
 pub const COMMANDS_CHANGED: &str = "commands_changed";
+/// No payload; a profile was renamed (`profiles.json`).
+pub const PROFILES_CHANGED: &str = "profiles_changed";

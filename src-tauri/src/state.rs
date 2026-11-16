@@ -1,4 +1,4 @@
-//! `AppState`: what Tauri manages for the app's lifetime, opened from the config folder.
+//! `AppState`: what Tauri manages for the app's lifetime, opened from the app folder and the active profile's folder.
 
 use std::path::Path;
 
@@ -23,11 +23,14 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub fn open(config_dir: &Path) -> AppResult<Self> {
+    pub fn open(config_dir: &Path, profile_dir: &Path) -> AppResult<Self> {
         Ok(Self {
             launches: LaunchQueue::default(),
-            settings: SettingsStore::open(JsonFile::new(config_dir.join(settings::FILE_NAME))),
-            db: Db::open(config_dir)?,
+            settings: SettingsStore::open(
+                JsonFile::new(config_dir.join(settings::FILE_NAME)),
+                JsonFile::new(profile_dir.join(settings::FILE_NAME)),
+            ),
+            db: Db::open(profile_dir)?,
             notifier: Notifier::default(),
             imports: ImportQueue::default(),
             adds: AddQueue::default(),

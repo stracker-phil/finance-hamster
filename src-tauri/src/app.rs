@@ -137,7 +137,7 @@ fn check_files(app: AppHandle) {
         let state = app.state::<AppState>();
         match crate::integrity::verify(
             &state.db,
-            &crate::config_dir(),
+            &crate::profile_dir(),
             chrono::Utc::now().timestamp_millis(),
         ) {
             Ok(check) => {
@@ -165,7 +165,7 @@ fn start_reminders(app: AppHandle) {
             let state = app.state::<AppState>();
             let told = crate::reminders::tell(
                 &state.db,
-                &crate::config_dir(),
+                &crate::profile_dir(),
                 &state.settings.get(),
                 chrono::Local::now().date_naive(),
                 crate::date::DateOrder::system(),
@@ -198,12 +198,16 @@ fn start_tax_years(app: &tauri::App) {
     }
 }
 
+/// Only into the first profile; one made later starts empty.
 #[cfg(debug_assertions)]
 fn seed_demo(app: &tauri::App) {
+    if !crate::profiles::active().first {
+        return;
+    }
     let state = app.state::<AppState>();
     match crate::test_support::demo::seed_if_empty(
         &state.db,
-        &crate::config_dir(),
+        &crate::profile_dir(),
         chrono::Local::now().date_naive(),
     ) {
         Ok(0) => {}

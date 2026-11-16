@@ -704,6 +704,22 @@ price: string,
  */
 when: string, };
 
+export type Profile = { 
+/**
+ * Also the name of its folder.
+ */
+id: string, name: string, };
+
+export type Profiles = { 
+/**
+ * The id of the profile the app opens.
+ */
+active: string, 
+/**
+ * In the order they were made.
+ */
+profiles: Array<Profile>, };
+
 export type QuestionView = { id: string, label: string, help: string | null, unit: string | null, 
 /**
  * The answer as the field shows it; empty while unanswered.

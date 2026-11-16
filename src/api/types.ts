@@ -22,6 +22,8 @@ export interface EventPayloads {
   data_changed: DataChanged;
   /** `settings.json` changed. */
   settings_changed: null;
+  /** A profile was renamed. */
+  profiles_changed: null;
   /** A dropped statement was read, or refused. */
   import_ready: ImportReady;
   add_ready: AddReady;

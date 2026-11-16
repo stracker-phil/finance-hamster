@@ -21,6 +21,7 @@ import { useArchive, useDeletions, useDocument, useDocumentHistory, useDocumentL
 import { useLastFileCheck, useStatus } from "./integrity";
 import { useLineRules } from "./lineRules";
 import { usePayslip, usePayslipsYear } from "./payslips";
+import { useProfiles } from "./profiles";
 import { useReviewQueue } from "./review";
 import { useOther, useOthers } from "./others";
 import { useAccountLines, useCoverage, useStatement, useStatementsList } from "./statements";
@@ -665,6 +666,27 @@ describe("useEvents", () => {
       await act(async () => handler(null));
 
       expect(await screen.findByText("Shortcuts: ⌘⇧T")).toBeTruthy();
+    });
+  });
+
+  describe("profiles", () => {
+    function ProfilesProbe() {
+      useEvents();
+      const { data } = useProfiles();
+      return <p>Profiles: {data?.profiles.map((p) => p.name).join(", ")}</p>;
+    }
+
+    it("refetches the profiles when profiles_changed arrives", async () => {
+      mocked.profilesList.mockResolvedValue({ active: "p1", profiles: [{ id: "p1", name: "Demo" }] });
+      renderWithQuery(<ProfilesProbe />);
+      await screen.findByText("Profiles: Demo");
+      mocked.profilesList.mockResolvedValue({ active: "p1", profiles: [{ id: "p1", name: "Alex" }] });
+      await waitFor(() => expect(mocked.listen.mock.calls.some(([name]) => name === "profiles_changed")).toBe(true));
+      const handler = mocked.listen.mock.calls.find(([name]) => name === "profiles_changed")![1] as (payload: null) => void;
+
+      await act(async () => handler(null));
+
+      expect(await screen.findByText("Profiles: Alex")).toBeTruthy();
     });
   });
 

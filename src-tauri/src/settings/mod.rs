@@ -1,10 +1,13 @@
-//! The owner's preferences in `settings.json` (ADR 0013, ADR 0026).
+//! The owner's preferences in `settings.json` (ADR 0013, ADR 0026): language and look in the app folder's
+//! file, the rest in the active profile's (ADR 0060).
 
 pub mod commands;
 
+use std::path::Path;
 use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use ts_rs::TS;
 
 use crate::error::AppResult;
@@ -180,19 +183,77 @@ impl Settings {
     }
 }
 
-/// The settings file and its current value; every change is saved before it is answered.
+/// The settings the whole app shares, whichever profile is open; every other one belongs to the profile.
+const APP_WIDE: [&str; 4] = ["language", "appearance", "accent", "numberFormat"];
+
+type Fields = serde_json::Map<String, Value>;
+
+/// The language in the app folder's settings, before a profile is open.
+pub fn app_language(config_dir: &Path) -> Language {
+    JsonFile::new(config_dir.join(FILE_NAME))
+        .load::<Fields>()
+        .remove("language")
+        .and_then(|value| serde_json::from_value(value).ok())
+        .unwrap_or_default()
+}
+
+/// The settings from `fields`; a value that doesn't fit keeps its default, and the others stay.
+fn settings_from(fields: Fields) -> Settings {
+    let mut kept = fields_of(&Settings::default());
+    for (key, value) in fields {
+        let mut candidate = kept.clone();
+        candidate.insert(key, value);
+        match serde_json::from_value::<Settings>(Value::Object(candidate.clone())) {
+            Ok(_) => kept = candidate,
+            Err(e) => {
+                log::warn!("A setting has a value Hamster doesn't know ({e}); using its default")
+            }
+        }
+    }
+    serde_json::from_value(Value::Object(kept)).unwrap_or_default()
+}
+
+fn fields_of(settings: &Settings) -> Fields {
+    match serde_json::to_value(settings) {
+        Ok(Value::Object(fields)) => fields,
+        _ => Fields::new(),
+    }
+}
+
+fn is_app_wide(key: &str) -> bool {
+    APP_WIDE.contains(&key)
+}
+
+/// The two settings files and their current value; every change is saved before it is answered.
 pub struct SettingsStore {
-    file: JsonFile,
+    app: JsonFile,
+    profile: JsonFile,
     current: Mutex<Settings>,
 }
 
 impl SettingsStore {
-    pub fn open(file: JsonFile) -> Self {
-        let current = file.load::<Settings>();
+    pub fn open(app: JsonFile, profile: JsonFile) -> Self {
+        let mut fields = profile.load::<Fields>();
+        fields.retain(|key, _| !is_app_wide(key));
+        fields.extend(
+            app.load::<Fields>()
+                .into_iter()
+                .filter(|(key, _)| is_app_wide(key)),
+        );
+        let current = settings_from(fields);
         Self {
-            file,
+            app,
+            profile,
             current: Mutex::new(current),
         }
+    }
+
+    fn save(&self, settings: &Settings) -> AppResult<()> {
+        let (app, profile): (Fields, Fields) = fields_of(settings)
+            .into_iter()
+            .partition(|(key, _)| is_app_wide(key));
+        self.app.save(&app)?;
+        self.profile.save(&profile)
     }
 
     pub fn get(&self) -> Settings {
@@ -203,7 +264,7 @@ impl SettingsStore {
         let mut current = self.current.lock_unpoisoned();
         let mut next = current.clone();
         next.apply(patch);
-        self.file.save(&next)?;
+        self.save(&next)?;
         *current = next.clone();
         Ok(next)
     }
@@ -216,7 +277,24 @@ mod tests {
     use serde_json::json;
 
     fn store_in(dir: &tempfile::TempDir) -> SettingsStore {
-        SettingsStore::open(JsonFile::new(dir.path().join(FILE_NAME)))
+        SettingsStore::open(app_file(dir), profile_file(dir))
+    }
+
+    fn app_file(dir: &tempfile::TempDir) -> JsonFile {
+        JsonFile::new(dir.path().join(FILE_NAME))
+    }
+
+    fn profile_file(dir: &tempfile::TempDir) -> JsonFile {
+        JsonFile::new(dir.path().join("profile").join(FILE_NAME))
+    }
+
+    fn read_json(file: &JsonFile) -> serde_json::Value {
+        serde_json::from_slice(&std::fs::read(file.path()).unwrap()).unwrap()
+    }
+
+    fn write_json(file: &JsonFile, value: serde_json::Value) {
+        std::fs::create_dir_all(file.path().parent().unwrap()).unwrap();
+        std::fs::write(file.path(), value.to_string()).unwrap();
     }
 
     #[test]
@@ -309,7 +387,7 @@ mod tests {
     #[test]
     fn an_old_settings_file_without_reminder_fields_loads_their_defaults() {
         let dir = temp_config_dir();
-        std::fs::write(dir.path().join(FILE_NAME), r#"{"appearance":"dark"}"#).unwrap();
+        write_json(&app_file(&dir), json!({ "appearance": "dark" }));
 
         let settings = store_in(&dir).get();
         assert_eq!(settings.default_reminder, Reminder::ThreeDays);
@@ -353,11 +431,11 @@ mod tests {
     #[test]
     fn an_old_settings_file_without_hide_own_transfers_loads_it_as_true() {
         let dir = temp_config_dir();
-        std::fs::write(
-            dir.path().join(FILE_NAME),
-            r#"{"appearance":"dark","showOriginalCurrency":false}"#,
-        )
-        .unwrap();
+        write_json(&app_file(&dir), json!({ "appearance": "dark" }));
+        write_json(
+            &profile_file(&dir),
+            json!({ "showOriginalCurrency": false }),
+        );
 
         let settings = store_in(&dir).get();
         assert!(settings.hide_own_transfers);
@@ -451,13 +529,116 @@ mod tests {
     }
 
     #[test]
-    fn an_unknown_value_in_the_file_gives_the_defaults_and_moves_the_file_aside() {
+    fn an_unknown_value_resets_only_its_own_field_and_keeps_the_valid_ones() {
         let dir = temp_config_dir();
-        let path = dir.path().join(FILE_NAME);
-        std::fs::write(&path, r#"{"accent":"chartreuse"}"#).unwrap();
+        write_json(
+            &app_file(&dir),
+            json!({ "accent": "chartreuse", "language": "de" }),
+        );
+        write_json(
+            &profile_file(&dir),
+            json!({ "defaultReminder": "someday", "archiveDays": 14 }),
+        );
 
-        assert_eq!(store_in(&dir).get(), Settings::default());
-        assert!(!path.exists());
+        assert_eq!(
+            store_in(&dir).get(),
+            Settings {
+                language: Language::De,
+                archive_days: 14,
+                ..Settings::default()
+            }
+        );
+    }
+
+    #[test]
+    fn an_update_writes_the_app_wide_fields_only_to_the_app_file_and_the_rest_only_to_the_profile_file()
+     {
+        let dir = temp_config_dir();
+
+        store_in(&dir)
+            .update(SettingsPatch {
+                language: Some(Language::De),
+                appearance: Some(Appearance::Dark),
+                accent: Some(Accent::Teal),
+                number_format: Some(NumberFormat::CommaDecimal),
+                archive_days: Some(14),
+                ..SettingsPatch::default()
+            })
+            .unwrap();
+
+        assert_eq!(
+            read_json(&app_file(&dir)),
+            json!({
+                "language": "de",
+                "appearance": "dark",
+                "accent": "teal",
+                "numberFormat": "comma_decimal"
+            })
+        );
+        assert_eq!(
+            read_json(&profile_file(&dir)),
+            json!({
+                "showOriginalCurrency": true,
+                "hideOwnTransfers": true,
+                "archiveDays": 14,
+                "defaultReminder": "three_days",
+                "remindPriceChanges": true,
+                "importAfterDays": 30,
+                "remindGaps": true,
+                "remindFiling": true,
+                "remindQuestions": true,
+                "payslipPanel": false
+            })
+        );
+    }
+
+    #[test]
+    fn opening_takes_the_app_wide_fields_from_the_app_file_and_the_rest_from_the_profile_file() {
+        let dir = temp_config_dir();
+        write_json(
+            &app_file(&dir),
+            json!({ "language": "de", "accent": "red", "archiveDays": 99 }),
+        );
+        write_json(
+            &profile_file(&dir),
+            json!({
+                "language": "en",
+                "appearance": "light",
+                "accent": "blue",
+                "numberFormat": "comma_decimal",
+                "archiveDays": 3,
+                "payslipPanel": true
+            }),
+        );
+
+        assert_eq!(
+            store_in(&dir).get(),
+            Settings {
+                language: Language::De,
+                accent: Accent::Red,
+                archive_days: 3,
+                payslip_panel: true,
+                ..Settings::default()
+            }
+        );
+    }
+
+    #[test]
+    fn app_language_reads_the_language_from_the_app_folders_file() {
+        let dir = temp_config_dir();
+        write_json(
+            &app_file(&dir),
+            json!({ "language": "de", "accent": "teal" }),
+        );
+
+        assert_eq!(app_language(dir.path()), Language::De);
+    }
+
+    #[test]
+    fn app_language_is_english_when_the_file_is_missing() {
+        let dir = temp_config_dir();
+
+        assert_eq!(app_language(dir.path()), Language::En);
     }
 
     #[test]

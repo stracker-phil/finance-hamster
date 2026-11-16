@@ -14,6 +14,7 @@ import { ACCOUNT_LINES_KEY, COVERAGE_KEY, STATEMENT_KEY, STATEMENTS_LIST_KEY } f
 import { OTHER_KEY, OTHERS_KEY } from "./others";
 import { RULES_KEY, TAX_YEARS_KEY } from "./taxYears";
 import { PAYSLIP_KEY, PAYSLIPS_KEY } from "./payslips";
+import { PROFILES_KEY } from "./profiles";
 
 /** The query keys each Rust event makes stale; a feature adds its event here, or its table to `TABLE_KEYS`. */
 export const INVALIDATIONS: Partial<Record<EventName, QueryKey[]>> = {
@@ -21,6 +22,7 @@ export const INVALIDATIONS: Partial<Record<EventName, QueryKey[]>> = {
   settings_changed: [[]],
   files_checked: [FILE_CHECK_KEY, STATUS_KEY],
   commands_changed: [COMMANDS_KEY],
+  profiles_changed: [PROFILES_KEY],
 };
 
 /** The query keys a `data_changed` for each table makes stale. */

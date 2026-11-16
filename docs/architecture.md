@@ -38,7 +38,11 @@ These rules hold everywhere in the code. Keep them when you change things.
 
 - One process holds the window(s); the same binary is the CLI. The first process binds `hamster.sock` and
   holds `hamster.lock` in the config dir; a second one hands its request over and exits
-  (ADR 0009).
+  (ADR 0009). A process that finds the lock taken but nobody listening waits for the lock, which is how a
+  profile switch hands over (ADR 0060).
+- One process works in one profile, opened at launch (`profiles::open`, `crate::profile_dir()`); switching
+  writes the new active profile to `profiles.json`, removes the socket, starts a new Hamster through
+  LaunchServices and quits (`instance::relaunch`).
 - Windows are declared `visible: false` and shown by Rust, so `--hidden` never flashes them. Closing hides;
   only Quit ends the app.
 - Launch requests are queued in Rust and pulled by the page (`take_launch_events`).
@@ -50,22 +54,31 @@ These rules hold everywhere in the code. Keep them when you change things.
 
 ## Data
 
-Everything lives in the config dir (ADR 0012), 0700 with files 0600:
+Everything lives in the config dir (ADR 0012), 0700 with files 0600; each person's data in a profile folder
+(ADR 0060):
 
 ```
 ~/Library/Application Support/com.philippstracker.hamster/
-  hamster.sqlite      accounts, statements, transactions, rules, decisions, vendors, documents,
-                      document_links, deletions, answers, entries, subscriptions, plans, tax_years,
-                      snapshots, journal
-  journal.jsonl       append-only copy of the journal table, one line per changed field, never rewritten
-  docs/<year>/        <yyyy-mm-dd>-<vendor>.pdf by payment date; -2, -3 on collision; evidence/ for amounts
-  docs/inbox/         undated documents under their original name
-  statements/<year>/  <account>-<nr>.pdf, year of the statement's end date
-  snapshots/          <year>-summary.pdf, written when a year is closed; -2, -3 after a reopen
-  reminders.json      the keys of the reminders already told (ADR 0042)
-  keybindings.json    the owner's own shortcuts: { command id: accelerator | null } (`commands::keys`)
-  settings.json, ui-state.json
+  hamster.lock, hamster.sock
+  profiles.json         { active: id, profiles: [{ id, name }] } (`profiles`)
+  keybindings.json      the owner's own shortcuts: { command id: accelerator | null } (`commands::keys`)
+  settings.json         language, appearance, accent, number format (`settings::APP_WIDE`)
+  profiles/<id>/
+    hamster.sqlite      accounts, statements, transactions, rules, decisions, vendors, documents,
+                        document_links, deletions, answers, entries, subscriptions, plans, tax_years,
+                        snapshots, journal
+    journal.jsonl       append-only copy of the journal table, one line per changed field, never rewritten
+    docs/<year>/        <yyyy-mm-dd>-<vendor>.pdf by payment date; -2, -3 on collision; evidence/ for amounts
+    docs/inbox/         undated documents under their original name
+    statements/<year>/  <account>-<nr>.pdf, year of the statement's end date
+    snapshots/          <year>-summary.pdf, written when a year is closed; -2, -3 after a reopen
+    rules/              the owner's versions of the tax rules
+    reminders.json      the keys of the reminders already told (ADR 0042)
+    settings.json       every other setting
 ```
+
+The first launch with profiles moves the data above from the config dir into the first profile
+(`profiles::open`).
 
 - **SQLite** through rusqlite (bundled), WAL, one writer and readers on blocking threads, numbered embedded
   migrations under `PRAGMA user_version`; a newer file is refused.
@@ -115,7 +128,8 @@ Rust (`src-tauri/src/`):
 | `review/` | Review: `queue` (undecided lines newest first, with the key, suggestion and last item for it), `plan_changed` and the active subscriptions for the Subscription choice; `decide`/`decide_as` (a hand decision, optionally with an "Always do this" rule applied to the other lines in the same op; the rule matches `rule_term`: text the owner selected on the card, which must be in the line, else the title's key), `undecided_by_account` |
 | `preview/` | PDFs by id (`PdfSource`, `resolve`), the `pdf_view_*` commands and the `pdf-page://` scheme serving page PNGs (in the CSP's `img-src`) |
 | `notify.rs` | `Notifier`: records every notification; `deliver` also shows it in the notification center in release builds |
-| `settings/` | `settings.json`: language, appearance, accent, number format, original currency, own transfers, days in the Archive (`SettingsStore`, `get_settings`, `update_settings`) |
+| `profiles/` | `profiles.json` and the profile folders: `open` (the first profile takes over older data), `create`, `activate`, `rename`; commands `profiles_list`, `profile_create`, `profile_switch`, `profile_rename` and the `profiles_changed` event |
+| `settings/` | `settings.json`, split between the config dir (`APP_WIDE`) and the profile: language, appearance, accent, number format, original currency, own transfers, days in the Archive (`SettingsStore`, `get_settings`, `update_settings`) |
 | `instance.rs`, `ipc/` | single instance: lock file, Unix socket, one JSON line per request |
 | `remote/` | handles each `IpcMessage` from another process |
 | `launch.rs` | launch events queued for the page (`take_launch_events`) |

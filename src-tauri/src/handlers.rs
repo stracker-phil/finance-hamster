@@ -112,6 +112,10 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static
         crate::year::commands::year_evidence_choose,
         crate::year::commands::year_evidence_open,
         crate::search::search_elsewhere,
+        crate::profiles::commands::profiles_list,
+        crate::profiles::commands::profile_create,
+        crate::profiles::commands::profile_switch,
+        crate::profiles::commands::profile_rename,
     ]
 }
 

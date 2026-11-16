@@ -93,7 +93,7 @@ pub async fn document_add_commit(
     })?;
     let written = add::commit(
         &state.db,
-        &crate::config_dir(),
+        &crate::profile_dir(),
         pending,
         &input,
         now(),
@@ -150,7 +150,7 @@ pub async fn document_estimate(
 
 /// Moves the drafts' files after a write and announces it.
 pub fn relocate(app: &AppHandle, state: &AppState) {
-    match files::relocate(&state.db, &crate::config_dir()) {
+    match files::relocate(&state.db, &crate::profile_dir()) {
         Ok(Some(written)) => announce(app, &written),
         Ok(None) => {}
         Err(e) => log::warn!("Couldn't move document files: {e}"),
@@ -327,7 +327,7 @@ pub async fn document_delete(
 ) -> AppResult<String> {
     let written = lifecycle::delete(
         &state.db,
-        &crate::config_dir(),
+        &crate::profile_dir(),
         &id,
         &reason,
         understood,

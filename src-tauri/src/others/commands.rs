@@ -72,7 +72,7 @@ pub async fn other_add_pdf(app: AppHandle) -> AppResult<Option<Added>> {
         .unwrap_or("document.pdf")
         .to_string();
     let state = tauri::Manager::state::<AppState>(&app);
-    let (written, id) = edit::add(&state.db, &crate::config_dir(), &name, &bytes, now())?;
+    let (written, id) = edit::add(&state.db, &crate::profile_dir(), &name, &bytes, now())?;
     Ok(Some(Added {
         id,
         label: announced(&app, written),
@@ -94,7 +94,7 @@ pub async fn other_add_waiting(
     })?;
     let (written, id) = edit::add(
         &state.db,
-        &crate::config_dir(),
+        &crate::profile_dir(),
         &pending.original_name,
         &pending.bytes,
         now(),

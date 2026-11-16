@@ -16,7 +16,7 @@ pub async fn files_verify(
 ) -> AppResult<FileCheck> {
     let check = super::verify(
         &state.db,
-        &crate::config_dir(),
+        &crate::profile_dir(),
         chrono::Utc::now().timestamp_millis(),
     )?;
     last.set(check.clone());
@@ -37,7 +37,7 @@ pub async fn status_view(
 ) -> AppResult<Vec<StatusGroup>> {
     status::status(
         &state.db,
-        &crate::config_dir(),
+        &crate::profile_dir(),
         last.get().as_ref(),
         chrono::Local::now().date_naive(),
         DateOrder::system(),

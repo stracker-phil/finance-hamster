@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
 
 import { api } from "../api";
+import { MenuHost } from "../components/menu";
 import { useStore } from "../state/store";
 import { account } from "../test/accounts";
 import { importPreview } from "../test/statements";
@@ -28,7 +29,7 @@ async function addAccount() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useStore.setState({ importPreview: null, toasts: [] });
+  useStore.setState({ importPreview: null, toasts: [], menu: null });
   mocked.addAccount.mockResolvedValue(account());
 });
 
@@ -72,6 +73,29 @@ describe("FirstRun account step", () => {
     expect((await screen.findByRole("alert")).textContent).toBe("This IBAN is not valid");
     expect(onAccountAdded).not.toHaveBeenCalled();
     expect(screen.getByText("Step 1 of 2")).toBeTruthy();
+  });
+});
+
+describe("FirstRun profile switcher", () => {
+  it("shows the active profile in the titlebar", async () => {
+    renderFirstRun();
+
+    expect((await screen.findByRole("button", { name: "Profile: Demo" })).textContent).toBe("Demo");
+  });
+
+  it("switches to another profile chosen from its menu", async () => {
+    mocked.profilesList.mockResolvedValue({ active: "p1", profiles: [{ id: "p1", name: "Demo" }, { id: "p2", name: "Alex" }] });
+    renderWithQuery(
+      <>
+        <FirstRun onAccountAdded={vi.fn()} onDone={vi.fn()} />
+        <MenuHost />
+      </>,
+    );
+
+    await userEvent.click(await screen.findByRole("button", { name: "Profile: Demo" }));
+    await userEvent.click(screen.getByRole("menuitemradio", { name: "Alex" }));
+
+    expect(mocked.profileSwitch).toHaveBeenCalledWith("p2");
   });
 });
 

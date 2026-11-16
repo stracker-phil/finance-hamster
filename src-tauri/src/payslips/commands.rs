@@ -92,7 +92,7 @@ pub async fn payslip_add(
     year: i32,
     month: u32,
 ) -> AppResult<PayslipAdded> {
-    let (written, id) = edit::add(&state.db, &crate::config_dir(), year, month, None, now())?;
+    let (written, id) = edit::add(&state.db, &crate::profile_dir(), year, month, None, now())?;
     Ok(PayslipAdded {
         id,
         label: announced(&app, written),
@@ -112,7 +112,7 @@ pub async fn payslip_add_pdf(
     let state = tauri::Manager::state::<AppState>(&app);
     let (written, id) = edit::add(
         &state.db,
-        &crate::config_dir(),
+        &crate::profile_dir(),
         year,
         month,
         Some(&bytes),
@@ -131,7 +131,7 @@ pub async fn payslip_attach(app: AppHandle, id: String) -> AppResult<Option<Stri
         return Ok(None);
     };
     let state = tauri::Manager::state::<AppState>(&app);
-    let written = edit::attach(&state.db, &crate::config_dir(), &id, &bytes)?;
+    let written = edit::attach(&state.db, &crate::profile_dir(), &id, &bytes)?;
     Ok(Some(announced(&app, written)))
 }
 
@@ -164,7 +164,7 @@ pub async fn payslip_add_waiting(
     })?;
     let (written, id) = edit::add(
         &state.db,
-        &crate::config_dir(),
+        &crate::profile_dir(),
         year,
         month,
         Some(&pending.bytes),

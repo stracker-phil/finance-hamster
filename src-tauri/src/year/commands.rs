@@ -113,7 +113,7 @@ pub async fn year_entry_add(
     let ruleset: Ruleset = serde_json::from_str(&open_year(&state, year)?.rules)?;
     let written = entries::add(
         &state.db,
-        &crate::config_dir(),
+        &crate::profile_dir(),
         &ruleset,
         year,
         &entry,
@@ -180,7 +180,7 @@ pub async fn year_entry_attach(
     open_year(&state, year)?;
     let written = entries::attach(
         &state.db,
-        &crate::config_dir(),
+        &crate::profile_dir(),
         year,
         &id,
         Path::new(&path),
@@ -197,7 +197,7 @@ pub async fn year_evidence_open(
     year: i32,
     id: String,
 ) -> AppResult<()> {
-    let path = entries::evidence_path(&state.db, &crate::config_dir(), year, &id)?;
+    let path = entries::evidence_path(&state.db, &crate::profile_dir(), year, &id)?;
     tauri_plugin_opener::open_path(&path, None::<&str>).map_err(|e| {
         AppError::Internal(crate::tr!(
             "Couldn't open {}: {e}",
@@ -236,7 +236,7 @@ pub async fn year_close(
 ) -> AppResult<String> {
     let written = close::close(
         &state.db,
-        &crate::config_dir(),
+        &crate::profile_dir(),
         year,
         state.settings.get().number_format,
         DateOrder::system(),
@@ -262,7 +262,7 @@ pub async fn year_reopen(
 /// Opens the newest snapshot's summary PDF in the default viewer.
 #[tauri::command]
 pub async fn year_open_snapshot(state: State<'_, AppState>, year: i32) -> AppResult<()> {
-    let path = close::snapshot_file(&state.db, &crate::config_dir(), year)?;
+    let path = close::snapshot_file(&state.db, &crate::profile_dir(), year)?;
     tauri_plugin_opener::open_path(&path, None::<&str>).map_err(|e| {
         AppError::Internal(crate::tr!(
             "Couldn't open {}: {e}",

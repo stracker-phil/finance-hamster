@@ -13,7 +13,7 @@ the subagents for tests, suites and reviews. Every new name-, path- or platform-
 | Binary and CLI | `hamster` | the same, called by path | Cargo package name (also the self dev-dependency), `cli/` |
 | Installed links | `~/Applications/Hamster.app`, `~/.local/bin/hamster` | never installed | `scripts/install.sh` |
 | Socket and lock | `hamster.sock`, `hamster.lock` in the config dir | its own | `lib.rs`, `instance.rs`, `scripts/dev/js.sh` |
-| Config dir | `~/Library/Application Support/<identifier>/` | its own | `lib.rs` `config_dir()` |
+| Config dir | `~/Library/Application Support/<identifier>/`, each profile's data in `profiles/<id>/` | its own | `lib.rs` `config_dir()`, `profile_dir()`; `profiles/` |
 | Logs | `~/Library/Logs/<identifier>/` | its own | Tauri `app_log_dir` |
 | Signing | `HAMSTER_SIGN_IDENTITY`, else Apple Development, else `Hamster Local Signing` | same | `scripts/sign-app.sh` |
 | Env vars | `HAMSTER_SIGN_IDENTITY` | adds `HAMSTER_WINDOW_FRAME`, `HAMSTER_BACKGROUND`, `HAMSTER_DEV_TERMINAL` | `dev.rs`, `scripts/dev/` |

@@ -117,22 +117,36 @@ pub fn seed_if_empty(db: &Db, config_dir: &Path, today: chrono::NaiveDate) -> Ap
     Ok(count)
 }
 
-/// What `hamster dev seed --yes` removes: the database, the journal and every stored PDF, so the next launch
-/// seeds afresh. Only ever the debug build's own folder.
+/// What `hamster dev seed --yes` removes in the app folder and in every profile: the database, the journal and
+/// every stored PDF, so the next launch seeds afresh. Only ever the debug build's own folder.
 pub fn reset(config_dir: &Path) -> AppResult<()> {
+    reset_folder(config_dir)?;
+    let profiles = config_dir.join(crate::profiles::FOLDER);
+    if profiles.exists() {
+        for entry in std::fs::read_dir(profiles)? {
+            let path = entry?.path();
+            if path.is_dir() {
+                reset_folder(&path)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn reset_folder(dir: &Path) -> AppResult<()> {
     for name in [
         crate::db::FILE_NAME,
         "hamster.sqlite-wal",
         "hamster.sqlite-shm",
         crate::db::journal::FILE_NAME,
     ] {
-        let path = config_dir.join(name);
+        let path = dir.join(name);
         if path.exists() {
             std::fs::remove_file(path)?;
         }
     }
     for folder in ["docs", "statements", "snapshots"] {
-        let path = config_dir.join(folder);
+        let path = dir.join(folder);
         if path.exists() {
             std::fs::remove_dir_all(path)?;
         }
@@ -653,6 +667,45 @@ mod tests {
         }
         assert!(root.join("settings.json").exists());
         assert!(root.join("rules").join("2026").join("file.pdf").exists());
+    }
+
+    #[test]
+    fn reset_clears_the_data_of_every_profile_and_keeps_the_other_files() {
+        let dir = temp_config_dir();
+        let root = dir.path();
+        std::fs::write(root.join("settings.json"), "x").unwrap();
+        std::fs::write(root.join("profiles.json"), "x").unwrap();
+        let profile_dirs = [
+            root.join("profiles").join("a"),
+            root.join("profiles").join("b"),
+        ];
+        for profile in &profile_dirs {
+            std::fs::create_dir_all(profile).unwrap();
+            for name in ["hamster.sqlite", "journal.jsonl", "settings.json"] {
+                std::fs::write(profile.join(name), "x").unwrap();
+            }
+            for folder in ["docs", "statements", "snapshots"] {
+                std::fs::create_dir_all(profile.join(folder)).unwrap();
+                std::fs::write(profile.join(folder).join("file.pdf"), "x").unwrap();
+            }
+        }
+
+        reset(root).unwrap();
+
+        for profile in &profile_dirs {
+            for gone in [
+                "hamster.sqlite",
+                "journal.jsonl",
+                "docs",
+                "statements",
+                "snapshots",
+            ] {
+                assert!(!profile.join(gone).exists(), "{} {gone}", profile.display());
+            }
+            assert!(profile.join("settings.json").exists());
+        }
+        assert!(root.join("settings.json").exists());
+        assert!(root.join("profiles.json").exists());
     }
 
     #[test]
