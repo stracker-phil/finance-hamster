@@ -1373,7 +1373,18 @@ mod views {
                 "Homeoffice-Pauschale vom Arbeitgeber"
             ]
         );
-        assert_eq!(form.amounts[0].hint, "„Brutto“");
+        let hints: Vec<&str> = form.amounts.iter().map(|a| a.hint.as_str()).collect();
+        assert_eq!(
+            hints,
+            [
+                "",
+                "„SV Beitrag lfd“",
+                "„LSt Beitrag lfd“",
+                "",
+                "Der Betrag auf dem Kontoauszug",
+                "Steuerfrei, nur wenn der Arbeitgeber sie zahlt"
+            ]
+        );
     }
 
     #[test]

@@ -115,15 +115,16 @@ pub(super) fn label(name: PayslipAmount) -> String {
     }
 }
 
+/// Where the value is printed; empty where the German label already names it.
 fn hint(name: PayslipAmount) -> String {
     match name {
-        PayslipAmount::Gross => crate::tr!("“Brutto”", "„Brutto“"),
+        PayslipAmount::Gross => crate::tr!("“Brutto”", ""),
         PayslipAmount::Social => crate::tr!("“SV Beitrag lfd”", "„SV Beitrag lfd“"),
         PayslipAmount::Tax => crate::tr!("“LSt Beitrag lfd”", "„LSt Beitrag lfd“"),
-        PayslipAmount::Net => crate::tr!("“Netto”", "„Netto“"),
+        PayslipAmount::Net => crate::tr!("“Netto”", ""),
         PayslipAmount::Payout => crate::tr!(
             "“Auszahlung”, the amount on your bank statement",
-            "„Auszahlung“, der Betrag auf dem Kontoauszug"
+            "Der Betrag auf dem Kontoauszug"
         ),
         PayslipAmount::HomeOfficePay => crate::tr!(
             "Tax-free, only when the employer pays it",

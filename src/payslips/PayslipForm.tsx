@@ -29,7 +29,7 @@ function Field({ id, label, hint, error, children }: { id: string; label: string
     <>
       <label htmlFor={id} className="payslip-form__label">
         {label}
-        <span className="add-doc__hint">{hint}</span>
+        {hint && <span className="add-doc__hint">{hint}</span>}
       </label>
       <div>
         {children}
