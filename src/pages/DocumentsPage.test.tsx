@@ -108,6 +108,26 @@ describe("DocumentsPage", () => {
     });
   });
 
+  describe("search on the payslips tab", () => {
+    it("asks for the payslips matching the typed text", async () => {
+      renderWithQuery(<DocumentsPage tab="payslips" />);
+      await screen.findByText("No payslips yet, and no open tax year to add them to.");
+
+      await userEvent.type(screen.getByRole("textbox", { name: "Search documents" }), "july");
+
+      await waitFor(() => expect(mocked.payslipsList).toHaveBeenLastCalledWith("july"));
+    });
+
+    it("says nothing matches, with the trimmed filter, when no payslip does", async () => {
+      useStore.setState({ filter: " xyz " });
+
+      renderWithQuery(<DocumentsPage tab="payslips" />);
+
+      expect(await screen.findByText("Nothing matches “xyz”, so it isn't here yet.")).toBeTruthy();
+      expect(screen.queryByText("No payslips yet, and no open tax year to add them to.")).toBeNull();
+    });
+  });
+
   describe("search on the other tabs", () => {
     it("asks for the statements matching the typed text", async () => {
       mocked.statementsList.mockResolvedValue([accountStatements()]);

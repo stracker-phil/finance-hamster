@@ -700,7 +700,7 @@ describe("useEvents", () => {
     }
 
     it("goes back to Today and shows the new profile's data when profile_switched arrives", async () => {
-      useStore.setState({ route: { page: "subscriptions" }, back: [HOME], filter: "rent" });
+      useStore.setState({ route: { page: "subscriptions" }, back: [{ route: HOME, filter: "", scroll: 0 }], filter: "rent" });
       renderWithQuery(<SwitchProbe />);
       await screen.findByText("Accounts: Private");
       mocked.listAccounts.mockResolvedValue([account({ id: "acc-9", name: "Joint" })]);

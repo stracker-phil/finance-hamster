@@ -39,7 +39,7 @@ export function DocumentsPage({ tab: asked }: { tab?: DocumentsTab }) {
         </label>
         {tab === "invoices" && <InvoiceList query={query} empty={empty(text.emptyTitle, text.emptyText, text.chooseFile, startAddDocument)} />}
         {tab === "statements" && <StatementList query={query} empty={empty(text.statements, text.emptyStatements, text.importStatement, startImport)} />}
-        {tab === "payslips" && <PayslipList />}
+        {tab === "payslips" && <PayslipList query={query} noMatch={noMatch} />}
         {tab === "other" && <OtherList query={query} empty={empty(text.other, text.emptyOther, text.addOther, addOtherPdf)} />}
       </div>
     </div>

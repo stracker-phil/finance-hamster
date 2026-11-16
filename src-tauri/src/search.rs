@@ -151,7 +151,7 @@ pub fn elsewhere(
         },
     ));
     let mut payslips_found = Vec::new();
-    for year in crate::payslips::view::list(db, format)? {
+    for year in crate::payslips::view::list(db, "", format)? {
         for month in year.months {
             let Some(id) = month.id else { continue };
             let label = format!("{} {}", month.name, year.year);

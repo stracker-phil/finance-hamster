@@ -4,13 +4,14 @@ import { addPayslipPdf, enterPayslip } from "../../payslips/flow";
 import { usePayslipsList } from "../../queries/payslips";
 import { useStore } from "../../state/store";
 
-/** Every year with payslips or still open, newest first, each with all twelve months in their order. */
-export function PayslipList() {
-  const { data } = usePayslipsList();
+/** Every year with payslips or still open, newest first, each with its twelve months in their order; `query`
+ *  keeps the matching months. */
+export function PayslipList({ query, noMatch }: { query: string; noMatch: React.ReactNode }) {
+  const { data } = usePayslipsList(query);
   const years = data ?? [];
   const navigate = useStore((s) => s.navigate);
   const text = useT().payslips;
-  if (data && data.length === 0) return <p className="docs-page__none">{text.noYears}</p>;
+  if (data && data.length === 0) return query.trim() ? <>{noMatch}</> : <p className="docs-page__none">{text.noYears}</p>;
   return (
     <>
       {years.map((y) => (

@@ -6,20 +6,23 @@ const subscriptions: Route = { page: "subscriptions" };
 const statements: Route = { page: "statements" };
 
 beforeEach(() => {
-  useStore.setState({ route: HOME, back: [], forward: [], filter: "", toasts: [], confirmation: null });
+  useStore.setState({ route: HOME, back: [], forward: [], filter: "", scroll: 0, toasts: [], confirmation: null });
+  useStore.getState().noteScroll(0);
 });
 
 describe("navigation", () => {
-  it("pushes the current route to back, clears forward and clears the filter", () => {
-    useStore.setState({ filter: "rent", forward: [statements] });
+  it("pushes the current visit to back, clears forward and starts the new page without filter or scroll", () => {
+    useStore.setState({ filter: "rent", scroll: 40, forward: [{ route: statements, filter: "", scroll: 0 }] });
+    useStore.getState().noteScroll(120);
 
     useStore.getState().navigate(subscriptions);
 
     const s = useStore.getState();
     expect(s.route).toEqual(subscriptions);
-    expect(s.back).toEqual([HOME]);
+    expect(s.back).toEqual([{ route: HOME, filter: "rent", scroll: 120 }]);
     expect(s.forward).toEqual([]);
     expect(s.filter).toBe("");
+    expect(s.scroll).toBe(0);
   });
 
   it("does nothing when navigating to the current route", () => {
@@ -38,14 +41,14 @@ describe("navigation", () => {
 
     useStore.getState().goBack();
     expect(useStore.getState().route).toEqual(subscriptions);
-    expect(useStore.getState().forward).toEqual([statements]);
+    expect(useStore.getState().forward.map((v) => v.route)).toEqual([statements]);
 
     useStore.getState().goBack();
     expect(useStore.getState().route).toEqual(HOME);
 
     useStore.getState().goForward();
     expect(useStore.getState().route).toEqual(subscriptions);
-    expect(useStore.getState().back).toEqual([HOME]);
+    expect(useStore.getState().back.map((v) => v.route)).toEqual([HOME]);
   });
 
   it("keeps the route when there is no history to go back or forward to", () => {
@@ -55,13 +58,72 @@ describe("navigation", () => {
     expect(useStore.getState().route).toEqual(HOME);
   });
 
-  it("clears the filter when going back", () => {
-    useStore.getState().navigate(subscriptions);
+  it("restores the filter and scroll a page was left with when going back", () => {
     useStore.getState().setFilter("rent");
+    useStore.getState().noteScroll(300);
+    useStore.getState().navigate(subscriptions);
 
     useStore.getState().goBack();
 
+    const s = useStore.getState();
+    expect(s.route).toEqual(HOME);
+    expect(s.filter).toBe("rent");
+    expect(s.scroll).toBe(300);
+  });
+
+  it("restores the filter and scroll of the page left by going back when going forward", () => {
+    useStore.getState().navigate(subscriptions);
+    useStore.getState().setFilter("netflix");
+    useStore.getState().noteScroll(75);
+    useStore.getState().goBack();
+
+    useStore.getState().goForward();
+
+    const s = useStore.getState();
+    expect(s.route).toEqual(subscriptions);
+    expect(s.filter).toBe("netflix");
+    expect(s.scroll).toBe(75);
+  });
+
+  it("keeps each page's own position across several steps back", () => {
+    useStore.getState().setFilter("a");
+    useStore.getState().noteScroll(10);
+    useStore.getState().navigate(subscriptions);
+    useStore.getState().setFilter("b");
+    useStore.getState().noteScroll(20);
+    useStore.getState().navigate(statements);
+
+    useStore.getState().goBack();
+    expect(useStore.getState()).toMatchObject({ route: subscriptions, filter: "b", scroll: 20 });
+
+    useStore.getState().goBack();
+    expect(useStore.getState()).toMatchObject({ route: HOME, filter: "a", scroll: 10 });
+  });
+
+  it("remembers the scroll of the page it goes back from, without needing a new note", () => {
+    useStore.getState().navigate(subscriptions);
+    useStore.getState().noteScroll(55);
+    useStore.getState().goBack();
+    useStore.getState().goForward();
+    useStore.getState().goBack();
+
+    expect(useStore.getState().route).toEqual(HOME);
+    useStore.getState().goForward();
+
+    expect(useStore.getState().scroll).toBe(55);
+  });
+
+  it("starts a newly visited page with an empty filter and scroll 0", () => {
+    useStore.getState().setFilter("rent");
+    useStore.getState().noteScroll(300);
+
+    useStore.getState().navigate(subscriptions);
+
     expect(useStore.getState().filter).toBe("");
+    expect(useStore.getState().scroll).toBe(0);
+    useStore.getState().navigate(statements);
+    useStore.getState().goBack();
+    expect(useStore.getState().scroll).toBe(0);
   });
 });
 
@@ -148,8 +210,10 @@ describe("leaveProfile", () => {
     useStore.getState().navigate(subscriptions);
     useStore.getState().navigate(statements);
     useStore.getState().goBack();
+    useStore.getState().noteScroll(200);
     useStore.setState({
       filter: "rent",
+      scroll: 200,
       paletteOpen: true,
       paletteQuery: "pixelforge",
       importPreview: preview,
@@ -169,6 +233,7 @@ describe("leaveProfile", () => {
     expect(s.back).toEqual([]);
     expect(s.forward).toEqual([]);
     expect(s.filter).toBe("");
+    expect(s.scroll).toBe(0);
     expect(s.paletteOpen).toBe(false);
     expect(s.paletteQuery).toBe("");
     expect(s.importPreview).toBeNull();

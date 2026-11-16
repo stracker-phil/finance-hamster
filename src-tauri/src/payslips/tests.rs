@@ -1147,7 +1147,7 @@ mod views {
         year_state(&db, 2025, YearState::Closed);
         year_state(&db, 2026, YearState::Open);
 
-        let years = view::list(&db, DOT).unwrap();
+        let years = view::list(&db, "", DOT).unwrap();
 
         assert_eq!(
             years
@@ -1169,7 +1169,7 @@ mod views {
         fill(&db, &id, ["1000", "", "", "", "800", ""]);
         year_2026(&db, YearState::Open);
 
-        let years = view::list(&db, COMMA).unwrap();
+        let years = view::list(&db, "", COMMA).unwrap();
 
         assert_eq!(years, vec![view::year_view(&db, 2026, COMMA).unwrap()]);
     }
@@ -1179,7 +1179,100 @@ mod views {
         let (_dir, db) = open();
         year_state(&db, 2025, YearState::Closed);
 
-        assert_eq!(view::list(&db, DOT).unwrap(), vec![]);
+        assert_eq!(view::list(&db, "", DOT).unwrap(), vec![]);
+    }
+
+    fn searchable_years() -> (TempDir, Db) {
+        let (dir, db) = open();
+        let id = add(&db, &dir, 7);
+        fill(&db, &id, ["", "", "", "", "1234", ""]);
+        year_state(&db, 2025, YearState::Open);
+        year_state(&db, 2026, YearState::Open);
+        (dir, db)
+    }
+
+    fn found(db: &Db, query: &str) -> Vec<(i32, Vec<u32>)> {
+        view::list(db, query, DOT)
+            .unwrap()
+            .into_iter()
+            .map(|y| (y.year, y.months.iter().map(|m| m.month).collect()))
+            .collect()
+    }
+
+    #[test]
+    fn a_blank_query_keeps_every_year_with_its_twelve_months() {
+        let (_dir, db) = searchable_years();
+
+        for query in ["", "   ", "\t\n"] {
+            let years = view::list(&db, query, DOT).unwrap();
+
+            assert_eq!(
+                years.iter().map(|y| y.year).collect::<Vec<_>>(),
+                [2026, 2025],
+                "{query:?}"
+            );
+            assert!(years.iter().all(|y| y.months.len() == 12), "{query:?}");
+        }
+    }
+
+    #[test]
+    fn a_month_name_fragment_keeps_that_month_of_every_year_even_without_a_payslip() {
+        let (_dir, db) = searchable_years();
+
+        assert_eq!(found(&db, "jan"), [(2026, vec![1]), (2025, vec![1])]);
+    }
+
+    #[test]
+    fn a_year_keeps_only_that_year_with_all_its_months() {
+        let (_dir, db) = searchable_years();
+
+        assert_eq!(found(&db, "2025"), [(2025, (1..=12).collect::<Vec<u32>>())]);
+    }
+
+    #[test]
+    fn every_word_of_the_query_must_match() {
+        let (_dir, db) = searchable_years();
+
+        assert_eq!(found(&db, "2025 jan"), [(2025, vec![1])]);
+    }
+
+    #[test]
+    fn matching_ignores_case() {
+        let (_dir, db) = searchable_years();
+
+        assert_eq!(found(&db, "JAN"), found(&db, "jan"));
+        assert_eq!(found(&db, "2025 JaN"), [(2025, vec![1])]);
+    }
+
+    #[test]
+    fn a_query_that_matches_nothing_gives_an_empty_list() {
+        let (_dir, db) = searchable_years();
+
+        assert_eq!(view::list(&db, "nonsense", DOT).unwrap(), vec![]);
+        assert_eq!(view::list(&db, "2025 july 2026", DOT).unwrap(), vec![]);
+    }
+
+    #[test]
+    fn a_payout_fragment_keeps_the_month_with_that_payout() {
+        let (_dir, db) = searchable_years();
+
+        assert_eq!(found(&db, "1,234"), [(2026, vec![7])]);
+    }
+
+    #[test]
+    fn month_names_in_the_query_follow_the_ui_language() {
+        let (_dir, db) = searchable_years();
+
+        let german = with_lang(Language::De, || view::list(&db, "märz", DOT)).unwrap();
+
+        assert_eq!(
+            german
+                .iter()
+                .map(|y| (y.year, y.months.len()))
+                .collect::<Vec<_>>(),
+            [(2026, 1), (2025, 1)]
+        );
+        assert_eq!(found(&db, "märz"), vec![]);
     }
 
     #[test]

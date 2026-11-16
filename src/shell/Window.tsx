@@ -1,5 +1,5 @@
 import { MenuHost } from "../components/menu";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import { ConfirmHost } from "../components/ConfirmSheet";
 import { Toasts } from "../components/Toasts";
@@ -25,6 +25,7 @@ import { DocumentsTabs } from "../documents/DocumentsTabs";
 import { StatementsYear } from "../statements/StatementsYear";
 import type { Route } from "../state/route";
 import { Sidebar } from "./Sidebar";
+import { usePageScroll } from "./usePageScroll";
 import { titleFor } from "./titles";
 
 /** The main window: sidebar, and the panel with the header over the current page; the first run while no
@@ -58,6 +59,8 @@ export function Window() {
   }, []);
   // Keeps the first run's second step showing once its account exists.
   const [finishingFirstRun, setFinishingFirstRun] = useState(false);
+  const page = useRef<HTMLElement>(null);
+  usePageScroll(page);
   const importSheet = importPreview && <ImportSheet preview={importPreview} onImported={() => setFinishingFirstRun(false)} />;
   if (accounts?.length === 0 || finishingFirstRun) {
     return (
@@ -79,7 +82,7 @@ export function Window() {
         <div className="panel">
           <Header route={route} title={title} controls={headerControls(route)} trailing={route.page === "year" ? <YearSidebarToggle /> : undefined} />
           <FilesBanner />
-          <section className="page" aria-label={title.title}>
+          <section ref={page} className="page" aria-label={title.title}>
             <PageBody route={route} />
           </section>
         </div>

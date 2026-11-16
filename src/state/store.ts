@@ -43,8 +43,12 @@ export interface Confirmation {
 /** UI-only state of the main window; data reads go through TanStack Query (ADR 0014). */
 export interface AppStore {
   route: Route;
-  back: Route[];
-  forward: Route[];
+  back: Visit[];
+  forward: Visit[];
+  /** Where the current page's list starts scrolled: 0 on a new visit, the left position on Back or Forward. */
+  scroll: number;
+  /** The page's list scrolled to `top`; kept for the history without a render. */
+  noteScroll: (top: number) => void;
   navigate: (route: Route) => void;
   goBack: () => void;
   goForward: () => void;
@@ -55,7 +59,7 @@ export interface AppStore {
   searchEverywhere: (query: string) => void;
   setPaletteOpen: (open: boolean) => void;
 
-  /** The header's filter text; each page clears it. */
+  /** The header's filter text; a new visit starts without one, Back and Forward bring it back. */
   filter: string;
   setFilter: (filter: string) => void;
 
@@ -102,6 +106,25 @@ export interface AppStore {
   confirm: (question: Omit<Confirmation, "answer">) => Promise<boolean>;
 }
 
+/** A page left for another, as Back or Forward returns to it. */
+export interface Visit {
+  route: Route;
+  filter: string;
+  scroll: number;
+}
+
+let scrolledTo = 0;
+
+const leaving = (): Visit => {
+  const { route, filter } = useStore.getState();
+  return { route, filter, scroll: scrolledTo };
+};
+
+const returnTo = ({ route, filter, scroll }: Visit) => {
+  scrolledTo = scroll;
+  return { route, filter, scroll };
+};
+
 let nextToastId = 1;
 let nextMenuId = 1;
 
@@ -114,6 +137,7 @@ const SESSION_START = {
   route: HOME,
   back: [],
   forward: [],
+  scroll: 0,
   filter: "",
   paletteOpen: false,
   paletteQuery: "",
@@ -132,19 +156,25 @@ export const useStore = create<AppStore>((set, get) => ({
   navigate: (route) => {
     const { route: current, back } = get();
     if (sameRoute(route, current)) return;
-    set({ route, back: [...back, current], forward: [], filter: "" });
+    set({ route, back: [...back, leaving()], forward: [], filter: "", scroll: 0 });
+    scrolledTo = 0;
   },
   goBack: () => {
-    const { route, back, forward } = get();
+    const { back, forward } = get();
     const previous = back.at(-1);
     if (!previous) return;
-    set({ route: previous, back: back.slice(0, -1), forward: [route, ...forward], filter: "" });
+    const left = leaving();
+    set({ ...returnTo(previous), back: back.slice(0, -1), forward: [left, ...forward] });
   },
   goForward: () => {
-    const { route, back, forward } = get();
+    const { back, forward } = get();
     const [next, ...rest] = forward;
     if (!next) return;
-    set({ route: next, back: [...back, route], forward: rest, filter: "" });
+    const left = leaving();
+    set({ ...returnTo(next), back: [...back, left], forward: rest });
+  },
+  noteScroll: (top) => {
+    scrolledTo = top;
   },
 
   searchEverywhere: (paletteQuery) => set({ paletteOpen: true, paletteQuery }),
@@ -184,6 +214,7 @@ export const useStore = create<AppStore>((set, get) => ({
 
   leaveProfile: () => {
     get().confirmation?.answer(false);
+    scrolledTo = 0;
     set(SESSION_START);
   },
 

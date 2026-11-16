@@ -179,8 +179,10 @@ pub fn year_view(db: &Db, year: i32, format: NumberFormat) -> AppResult<Payslips
     })
 }
 
-/// Every year with a payslip or an open tax year, newest first, for Dokumente → Lohnzettel.
-pub fn list(db: &Db, format: NumberFormat) -> AppResult<Vec<PayslipsYear>> {
+/// Every year with a payslip or an open tax year, newest first, for Dokumente → Lohnzettel. `query` keeps the
+/// months whose year, month name or payout contain each of its words, ignoring case; a year without such a
+/// month is left out.
+pub fn list(db: &Db, query: &str, format: NumberFormat) -> AppResult<Vec<PayslipsYear>> {
     let mut years: Vec<i32> = db.read(|c| {
         let mut query = c.prepare(&format!("SELECT DISTINCT year FROM {PAYSLIPS}"))?;
         let rows = query.query_map([], |r| r.get(0))?;
@@ -194,10 +196,20 @@ pub fn list(db: &Db, format: NumberFormat) -> AppResult<Vec<PayslipsYear>> {
     );
     years.sort_unstable_by(|a, b| b.cmp(a));
     years.dedup();
-    years
-        .into_iter()
-        .map(|y| year_view(db, y, format))
-        .collect()
+    let words: Vec<String> = query.split_whitespace().map(str::to_lowercase).collect();
+    let mut views = Vec::new();
+    for y in years {
+        let mut view = year_view(db, y, format)?;
+        view.months.retain(|m| {
+            let text = format!("{y} {} {}", m.name, m.payout.as_deref().unwrap_or_default())
+                .to_lowercase();
+            words.iter().all(|w| text.contains(w.as_str()))
+        });
+        if !view.months.is_empty() {
+            views.push(view);
+        }
+    }
+    Ok(views)
 }
 
 pub fn payslip_view(db: &Db, id: &str, format: NumberFormat) -> AppResult<PayslipView> {

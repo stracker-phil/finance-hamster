@@ -15,7 +15,7 @@ const mocked = vi.mocked(api, true);
 
 const show = async (...years: ReturnType<typeof payslipsYear>[]) => {
   mocked.payslipsList.mockResolvedValue(years);
-  renderWithQuery(<PayslipList />);
+  renderWithQuery(<PayslipList query="" noMatch={<p>Nothing matches</p>} />);
   await screen.findByRole("region", { name: String(years[0].year) });
 };
 
@@ -46,10 +46,38 @@ describe("PayslipList", () => {
 
   it("says there are no payslips and no open tax year when there is no year at all", async () => {
     mocked.payslipsList.mockResolvedValue([]);
-    renderWithQuery(<PayslipList />);
+    renderWithQuery(<PayslipList query="" noMatch={<p>Nothing matches</p>} />);
 
     expect(await screen.findByText("No payslips yet, and no open tax year to add them to.")).toBeTruthy();
+    expect(screen.queryByText("Nothing matches")).toBeNull();
     expect(screen.queryByRole("region")).toBeNull();
+  });
+
+  it("asks for the payslips matching the query", async () => {
+    mocked.payslipsList.mockResolvedValue([payslipsYear({ filled: { 7: {} } })]);
+
+    renderWithQuery(<PayslipList query="july" noMatch={<p>Nothing matches</p>} />);
+
+    await screen.findByRole("region", { name: "2026" });
+    expect(mocked.payslipsList).toHaveBeenCalledWith("july");
+  });
+
+  it("shows the no-match content instead of the no-years text when a query finds nothing", async () => {
+    mocked.payslipsList.mockResolvedValue([]);
+
+    renderWithQuery(<PayslipList query="xyz" noMatch={<p>Nothing matches xyz</p>} />);
+
+    expect(await screen.findByText("Nothing matches xyz")).toBeTruthy();
+    expect(screen.queryByText("No payslips yet, and no open tax year to add them to.")).toBeNull();
+  });
+
+  it("treats a blank query as no query", async () => {
+    mocked.payslipsList.mockResolvedValue([]);
+
+    renderWithQuery(<PayslipList query="   " noMatch={<p>Nothing matches</p>} />);
+
+    expect(await screen.findByText("No payslips yet, and no open tax year to add them to.")).toBeTruthy();
+    expect(screen.queryByText("Nothing matches")).toBeNull();
   });
 
   it("opens the tax year page from a year's title", async () => {
